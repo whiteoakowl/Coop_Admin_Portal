@@ -35,16 +35,50 @@
 
         <h1><%= event.title %></h1>
         <% if (event.categoryName) { %><span class="badge-pill" style="background: <%= event.categoryColor %>; color: #fff;"><%= event.categoryName %></span><% } %>
-        <p class="site-hero-meta"><svg class="icon"><use href="#icon-calendar-check"/></svg> <%= startsLabel %><% if (endsLabel) { %> &ndash; <%= endsLabel %><% } %></p>
-        <% if (event.location) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= event.location %></p><% } %>
-        <% if (priceLabel) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-tag"/></svg> <%= priceLabel %></p><% } %>
+        <%
+          // A real request: "if the event starts and ends the same day we
+          // only need to see one date. Time should be stacked under date
+          // with a clock icon. Location should be stacked under time. All
+          // three spaced nicely and not overlapping."
+          var dateLine = sameDay || !endsDateLabel ? startsDateLabel : `${startsDateLabel} – ${endsDateLabel}`;
+          var timeLine = endsTimeLabel ? `${startsTimeLabel} – ${endsTimeLabel}` : startsTimeLabel;
+        %>
+        <div class="event-hero-meta-stack">
+          <p class="site-hero-meta"><svg class="icon"><use href="#icon-calendar-check"/></svg> <%= dateLine %></p>
+          <p class="site-hero-meta"><svg class="icon"><use href="#icon-clock"/></svg> <%= timeLine %></p>
+          <% if (event.location) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= event.location %></p><% } %>
+          <% if (priceLabel) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-tag"/></svg> <%= priceLabel %></p><% } %>
+        </div>
         <% if (event.description) { %><div class="forum-editable-display"><%- event.description %></div><% } %>
+
+        <%
+          // A real request: "event editing under details add another text
+          // box... include this section? If the box is checked then the
+          // information filled out and the section will appear on the
+          // event for members to see." Each only renders when its own
+          // checkbox is on AND it actually has text - an admin checking
+          // the box before typing anything shouldn't show an empty box.
+          var infoSections = [
+            { label: 'Activity Information', text: event.activity_info, included: event.include_activity_info },
+            { label: 'Meetup and Parking Information', text: event.meetup_parking_info, included: event.include_meetup_parking_info },
+            { label: 'What to Bring', text: event.what_to_bring, included: event.include_what_to_bring },
+            { label: 'Extra Notes', text: event.extra_notes, included: event.include_extra_notes },
+          ];
+        %>
+        <% infoSections.forEach(function(section) { %>
+          <% if (section.included && section.text) { %>
+            <div class="manage-section">
+              <h2><%= section.label %></h2>
+              <p style="white-space: pre-wrap;"><%= section.text %></p>
+            </div>
+          <% } %>
+        <% }); %>
 
         <% if (!portalAccount) { %>
           <p class="hint"><a href="/login?next=<%= encodeURIComponent('/events/' + event.id) %>">Log in</a> to register, volunteer, or claim a donation item.</p>
         <% } else { %>
 
-          <div class="manage-section">
+          <div class="manage-section event-register-card">
             <div class="grid-box-header"><h2>Register</h2></div>
             <% if (event.capacity != null) { %><p class="hint"><%= event.registrationCount %>/<%= event.capacity %> registered<% if (event.waitlistCount) { %> &middot; <%= event.waitlistCount %> waitlisted<% } %></p><% } %>
             <% if (event.family_capacity != null) { %><p class="hint"><%= event.familyCount %>/<%= event.family_capacity %> families registered</p><% } %>
@@ -60,19 +94,29 @@
                 <% if (event.registration_closes_at) { %> Registration closed <%= event.registration_closes_at %>.<% } %>
               </p>
             <% } else if ((!event.extraFields || event.extraFields.length === 0) && (!event.ticketTypes || event.ticketTypes.length === 0)) { %>
-              <div class="roster-btn-row">
+              <%# A real request: "name of each member should not be on
+                  each button. It should be a list of members with a small
+                  register button next to each name in a clean column. It
+                  will gray out member who are not of the age or grade to
+                  register." %>
+              <div class="event-register-member-list">
                 <% family.forEach(function(m) { %>
-                  <% if (registeredMemberIds.indexOf(m.id) !== -1) { %>
-                    <form method="POST" action="/events/<%= event.id %>/unregister" class="inline-block-form">
-                      <input type="hidden" name="memberId" value="<%= m.id %>" />
-                      <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= m.name %>: Cancel</button>
-                    </form>
-                  <% } else { %>
-                    <form method="POST" action="/events/<%= event.id %>/register" class="inline-block-form">
-                      <input type="hidden" name="memberId" value="<%= m.id %>" />
-                      <button type="submit" class="roster-action-btn"><%= m.name %>: Register</button>
-                    </form>
-                  <% } %>
+                  <div class="event-register-member-row<%= eligibleForRegistration.has(m.id) ? '' : ' event-register-member-row-ineligible' %>">
+                    <span class="event-register-member-name"><%= m.name %></span>
+                    <% if (registeredMemberIds.indexOf(m.id) !== -1) { %>
+                      <form method="POST" action="/events/<%= event.id %>/unregister" class="inline-block-form">
+                        <input type="hidden" name="memberId" value="<%= m.id %>" />
+                        <button type="submit" class="roster-action-btn roster-action-btn-danger roster-action-btn-small">Cancel</button>
+                      </form>
+                    <% } else if (eligibleForRegistration.has(m.id)) { %>
+                      <form method="POST" action="/events/<%= event.id %>/register" class="inline-block-form">
+                        <input type="hidden" name="memberId" value="<%= m.id %>" />
+                        <button type="submit" class="roster-action-btn roster-action-btn-small">Register</button>
+                      </form>
+                    <% } else { %>
+                      <span class="hint">Not eligible</span>
+                    <% } %>
+                  </div>
                 <% }); %>
               </div>
             <% } else { %>
@@ -94,8 +138,14 @@
                 <% if (registeredMemberIds.indexOf(m.id) !== -1) { %>
                   <form method="POST" action="/events/<%= event.id %>/unregister" class="inline-block-form" style="margin-bottom: 0.5rem;">
                     <input type="hidden" name="memberId" value="<%= m.id %>" />
-                    <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= m.name %>: Cancel</button>
+                    <span class="event-register-member-name"><%= m.name %>: </span>
+                    <button type="submit" class="roster-action-btn roster-action-btn-danger roster-action-btn-small">Cancel</button>
                   </form>
+                <% } else if (!eligibleForRegistration.has(m.id)) { %>
+                  <div class="event-register-member-row event-register-member-row-ineligible">
+                    <span class="event-register-member-name"><%= m.name %></span>
+                    <span class="hint">Not eligible</span>
+                  </div>
                 <% } else { %>
                   <form method="POST" action="/events/<%= event.id %>/register" class="manage-section member-form-grid" style="margin-bottom: 1rem;">
                     <input type="hidden" name="memberId" value="<%= m.id %>" />
@@ -129,7 +179,7 @@
                       </label>
                     <% }); %>
                     <div class="member-form-full">
-                      <button type="submit" class="roster-action-btn">Register <%= m.name %></button>
+                      <button type="submit" class="roster-action-btn">Register</button>
                     </div>
                   </form>
                 <% } %>

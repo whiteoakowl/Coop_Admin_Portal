@@ -404,6 +404,21 @@ function eventFields(data) {
     // page (views/events-detail.ejs) next to its Price/Ticket Types.
     data.paymentInstructionsTitle || null,
     data.paymentInstructionsText || null,
+    // A real request: "event editing under details add another text box
+    // that says activity information... meetup and parking
+    // information... what to bring... extra notes. Next to each of these
+    // title is a check box... include this section?" Same title-less
+    // text+its-own-include_* toggle shape as paymentInstructionsTitle/
+    // Text just above - each only renders on the public event detail
+    // page (views/events-detail.ejs) when its own checkbox is on.
+    data.activityInfo || null,
+    data.includeActivityInfo ? 1 : 0,
+    data.meetupParkingInfo || null,
+    data.includeMeetupParkingInfo ? 1 : 0,
+    data.whatToBring || null,
+    data.includeWhatToBring ? 1 : 0,
+    data.extraNotes || null,
+    data.includeExtraNotes ? 1 : 0,
   ];
 }
 
@@ -429,8 +444,10 @@ async function createEvent(data, accountId, { submittedByAccountId = null, statu
          lock_registration_to_grade, lock_registration_to_age, age_group_restriction,
          lock_registration_to_section, registration_section_id, lock_visibility_to_section, visibility_section_id, accounting_category_id,
          allow_waitlist_signups, allow_signup_for_others_in_group, payment_instructions_title, payment_instructions_text,
+         activity_info, include_activity_info, meetup_parking_info, include_meetup_parking_info,
+         what_to_bring, include_what_to_bring, extra_notes, include_extra_notes,
          created_by_account_id, submitted_by_account_id, approval_status, status
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(...eventFields(data), accountId, submittedByAccountId, approvalStatus, status);
   return info.lastInsertRowid;
@@ -450,6 +467,8 @@ async function updateEvent(id, data) {
          lock_registration_to_grade = ?, lock_registration_to_age = ?, age_group_restriction = ?,
          lock_registration_to_section = ?, registration_section_id = ?, lock_visibility_to_section = ?, visibility_section_id = ?, accounting_category_id = ?,
          allow_waitlist_signups = ?, allow_signup_for_others_in_group = ?, payment_instructions_title = ?, payment_instructions_text = ?,
+         activity_info = ?, include_activity_info = ?, meetup_parking_info = ?, include_meetup_parking_info = ?,
+         what_to_bring = ?, include_what_to_bring = ?, extra_notes = ?, include_extra_notes = ?,
          updated_at = now_text()
        WHERE id = ?`
     )
@@ -1518,6 +1537,8 @@ module.exports = {
   EVENT_TYPES,
   monthGrid,
   sortByLastNameField,
+  ageGroupAllowsMember,
+  ageBucketAllowsMember,
   parseAgeGroupList,
   memberIsAdult,
   registrationWindowStatus,

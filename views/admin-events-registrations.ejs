@@ -14,24 +14,17 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <%# A real bug report: "when you click the back button it goes to
-        something went wrong then the kiosk homepage." This page had no
-        real link back to the Attendance list it's reached from - only
-        "Back to Event" (the builder) - so getting back to Attendance
-        meant relying on the browser's own back button, which (this app's
-        own fullscreen-nav.js intercepts every back/forward navigation
-        while the page happens to be in real browser fullscreen, e.g. via
-        the corner "Full Screen View" toggle every admin page has) can
-        land on a stale or failing fetch instead of a real page load in
-        that state. A real, explicit link is never at the mercy of
-        browser history or fullscreen interception either way. A later
-        real request relabeled both: "back to event should say edit
-        event, back to attendance should say all events" - same two
-        links, clearer about what each one actually does. %>
+    <%# A real request: "remove back to all events button. edit event
+        should just be a blue text link with back arrow on its own row.
+        add registration, print, export, import buttons should all be on
+        their own row below/stacked under the edit event link" - same
+        plain <p><a>&larr; ...</a></p> convention as admin-events-
+        builder.ejs's own "All Events" link, replacing this page's own
+        roster-action-btn pair that used to share the toolbar row with
+        Add Registration/Print/Export/Import. %>
+    <p><a href="/main-admin/events/<%= event.id %>/builder">&larr; Edit Event</a></p>
     <div class="roster-toolbar">
       <div class="roster-btn-row">
-        <a class="roster-action-btn" href="/main-admin/events?tab=attendance">&larr; All Events</a>
-        <a class="roster-action-btn" href="/main-admin/events/<%= event.id %>/builder">Edit Event</a>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-registration-dialog').showModal()">+ Add Registration</button>
         <a class="roster-action-btn print-action-btn" href="/main-admin/events/<%= event.id %>/registrations/print" target="_blank">Print</a>
         <a class="roster-action-btn file-action-btn" href="/main-admin/events/<%= event.id %>/registrations/export.csv">Export</a>

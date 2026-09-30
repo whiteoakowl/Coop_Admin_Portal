@@ -227,6 +227,36 @@ function formatFriendlyTimestamp(sqlTimestamp) {
   return `${monthName} ${parts.day}, ${parts.year} ${parts.hour}:${parts.minute}${ampm}`;
 }
 
+// Same Eastern-zoned "December 1, 2025" + "9:52am" pieces as
+// formatFriendlyTimestamp above, just kept separate instead of joined into
+// one string - a real request: "time should be stacked under date with a
+// clock icon" on the public event detail page (views/events-detail.ejs),
+// which also needs the bare date label on its own to compare a start date
+// against an end date ("if the event starts and ends the same day we only
+// need to see one date").
+function formatFriendlyDateAndTime(sqlTimestamp) {
+  if (!sqlTimestamp) return { dateLabel: null, timeLabel: null };
+  const d = new Date(sqlTimestamp.replace(' ', 'T') + 'Z');
+  const parts = {};
+  for (const p of new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).formatToParts(d)) {
+    parts[p.type] = p.value;
+  }
+  const monthName = MONTHS_LONG[Number(parts.month) - 1];
+  const ampm = parts.dayPeriod.toLowerCase();
+  return {
+    dateLabel: `${monthName} ${parts.day}, ${parts.year}`,
+    timeLabel: `${parts.hour}:${parts.minute}${ampm}`,
+  };
+}
+
 // Splits a `now_text()` timestamp string (UTC, "YYYY-MM-DD HH:MM:SS") into
 // separate date/time labels in Eastern time - e.g. the Name Tag Request
 // log's own "Date" and "Time" columns, a real request to split what used
@@ -293,6 +323,7 @@ module.exports = {
   formatTimeOfDay,
   formatTimestamp,
   formatFriendlyTimestamp,
+  formatFriendlyDateAndTime,
   formatDateAndTime,
   ageFromBirthday,
   ageAsOfDate,

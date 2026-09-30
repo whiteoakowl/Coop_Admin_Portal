@@ -2453,6 +2453,15 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   gap: 1rem 1.5rem;
 }
 .member-form-full { grid-column: 1 / -1; }
+/* Event Details' Starts/Ends fields (views/admin-events-builder.ejs) - a
+   calendar date input beside a time-of-day <select> (partials/time-
+   select.ejs), combined into the field's own hidden startsAt/endsAt input
+   by public/js/event-date-time-picker.js. A real request: "date picker
+   should be a calendar. Start and end time should be separate drop down
+   menus." */
+.date-time-picker-row { display: flex; gap: 0.5rem; }
+.date-time-picker-row input[type="date"],
+.date-time-picker-row select { flex: 1; min-width: 0; }
 .checkbox-group-label { display: block; font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-bottom: 0.35rem; }
 /* A real bug report on the Name Tag/Absence forms: "when you choose a
    parent name the select all button overlaps everything." This button
@@ -3009,7 +3018,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .event-url-base { color: var(--muted); font-size: 0.9rem; white-space: nowrap; }
 .event-url-field input { flex: 1; min-width: 10rem; }
 
-.legend { display: flex; gap: 1.25rem; margin-bottom: 0.75rem; font-size: 0.9rem; color: var(--muted); }
+/* A real bug report: "present, late and absent colored circled above the
+   roster list need proper spacing between stacked rows. They are
+   overlapping other features." No margin-top meant this sat flush
+   against whatever came before it (e.g. the Registrations page's own
+   .totals-card), and no flex-wrap meant a narrow screen had no room to
+   drop "Present"/"Late"/"Absent" onto their own line without a gap
+   between them and whatever wrapped below. */
+.legend { display: flex; flex-wrap: wrap; gap: 0.6rem 1.25rem; margin-top: 0.75rem; margin-bottom: 0.75rem; font-size: 0.9rem; color: var(--muted); }
 .legend-item { display: flex; align-items: center; gap: 0.4rem; }
 
 .roster-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
@@ -8833,6 +8849,30 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
 .site-hero .btn-secondary { background: transparent; border-color: rgba(255, 255, 255, 0.6); color: #fff; font-size: 1.05rem; padding: 0.85rem 1.6rem; }
 .site-hero .btn-secondary:hover { background: rgba(255, 255, 255, 0.12); border-color: #fff; color: #fff; }
 .site-hero-meta { margin-top: 1.5rem; font-size: 0.95rem; opacity: 0.85; }
+
+/* Public event detail page (views/events-detail.ejs) - a real request:
+   "if the event starts and ends the same day we only need to see one
+   date. Time should be stacked under date with a clock icon. Location
+   should be stacked under time. All three spaced nicely and not
+   overlapping." Groups the three .site-hero-meta lines into one stack
+   with its own small, even gap instead of each carrying its own full
+   margin-top (which would otherwise compound into uneven gaps once
+   there are three lines instead of two). */
+.event-hero-meta-stack { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 1.5rem; }
+.event-hero-meta-stack .site-hero-meta { margin-top: 0; }
+/* "Details should have some space before registration card begins." */
+.event-register-card { margin-top: 1.5rem; }
+
+/* "Name of each member should not be on each button. It should be a list
+   of members with a small register button next to each name in a clean
+   column. It will gray out member who are not of the age or grade to
+   register." */
+.event-register-member-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.event-register-member-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+.event-register-member-row:last-child { border-bottom: none; }
+.event-register-member-row-ineligible { opacity: 0.5; }
+.event-register-member-name { font-weight: 600; }
+.roster-action-btn-small { padding: 0.3rem 0.75rem; font-size: 0.85rem; }
 
 /* Real bug, the same one .form-outer-panel exists to fix elsewhere in
    this app: html/body's own default background is the branded blue

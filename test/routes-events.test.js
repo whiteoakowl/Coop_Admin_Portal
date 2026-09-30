@@ -110,22 +110,31 @@ test('main admin can create, publish, and manage an event', async () => {
   assert.equal(event.visibility, 'public');
 });
 
-test('Event Attendance (registrations) page: a real link back to the Attendance list, not just the browser back button', async () => {
+test('Event Attendance (registrations) page: a plain "Edit Event" back link on its own row, no "All Events" button', async () => {
   // A real bug report: "when you click the back button it goes to
   // something went wrong then the kiosk homepage." A real <a> link back
-  // to the Attendance list this page is reached from is never at the
-  // mercy of browser history/fullscreen-nav.js's own back interception -
-  // see views/admin-events-registrations.ejs's own comment. A later real
-  // request relabeled both: "back to event should say edit event, back
-  // to attendance should say all events."
+  // to the event this page is reached from is never at the mercy of
+  // browser history/fullscreen-nav.js's own back interception - see
+  // views/admin-events-registrations.ejs's own comment. A later real
+  // request: "remove back to all events button. edit event should just
+  // be a blue text link with back arrow on its own row. add
+  // registration, print, export, import buttons should all be on their
+  // own row below/stacked under the edit event link" - removes the "All
+  // Events" button entirely and moves "Edit Event" to its own plain-link
+  // row above the action-button row, same convention as admin-events-
+  // builder.ejs's own "All Events" link.
   const admin = await loginAsMainAdmin();
   const eventId = await createEvent(admin);
   await publishEvent(admin, eventId);
 
   const res = await request(app).get(`/main-admin/events/${eventId}/registrations`).set('Cookie', admin.cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /<a class="roster-action-btn" href="\/main-admin\/events\?tab=attendance">&larr; All Events<\/a>/);
-  assert.match(res.text, new RegExp(`<a class="roster-action-btn" href="/main-admin/events/${eventId}/builder">Edit Event</a>`));
+  assert.doesNotMatch(res.text, /All Events/);
+  assert.match(res.text, new RegExp(`<p><a href="/main-admin/events/${eventId}/builder">&larr; Edit Event</a></p>`));
+
+  const linkIndex = res.text.indexOf('&larr; Edit Event');
+  const btnRowIndex = res.text.indexOf('+ Add Registration');
+  assert.ok(linkIndex > -1 && btnRowIndex > linkIndex, 'the Edit Event link row should come before the action button row');
 });
 
 test('a signed-out visitor sees only public events, not members-only ones', async () => {
@@ -296,4 +305,145 @@ test('donation claim clamps to what is actually still needed', async () => {
     .type('form')
     .send({ memberId: String(secondParent.memberId), quantity: '1', _csrf: secondParent.csrfToken });
   assert.match(decodeURIComponent(secondClaim.headers.location), /no longer needs any more/);
+});
+
+// A real request: "event editing under details add another text box that
+// says activity information, another text box below that saying meetup
+// and parking information, another text box under that saying what to
+// bring. Under that a text box that says extra notes. Next to each of
+// these title is a check box and question that says include this
+// section? If the box is checked then the information filled out and the
+// section will appear on the event for members to see."
+test('Event Details: four optional info sections (Activity Information/Meetup & Parking/What to Bring/Extra Notes), each gated by its own "Include this section?" checkbox', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin, { visibility: 'public' });
+
+  const builderPage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=details`).set('Cookie', admin.cookie);
+  assert.match(builderPage.text, /Activity Information[\s\S]*?Include this section\?/);
+  assert.match(builderPage.text, /Meetup and Parking Information[\s\S]*?Include this section\?/);
+  assert.match(builderPage.text, /What to Bring[\s\S]*?Include this section\?/);
+  assert.match(builderPage.text, /Extra Notes[\s\S]*?Include this section\?/);
+  assert.match(builderPage.text, /<textarea name="activityInfo"/);
+  assert.match(builderPage.text, /<textarea name="meetupParkingInfo"/);
+  assert.match(builderPage.text, /<textarea name="whatToBring"/);
+  assert.match(builderPage.text, /<textarea name="extraNotes"/);
+
+  await request(app)
+    .post(`/main-admin/events/${eventId}`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({
+      title: 'Fall Picnic',
+      startsAt: '2027-09-01T18:00',
+      activityInfo: 'Bring your own blanket and enjoy games in the field.',
+      includeActivityInfo: '1',
+      meetupParkingInfo: 'Park in the north lot and meet by the flagpole.',
+      // includeMeetupParkingInfo intentionally omitted - box unchecked.
+      whatToBring: 'Sunscreen and a water bottle.',
+      includeWhatToBring: '1',
+      _csrf: admin.csrfToken,
+    });
+
+  const event = await db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+  assert.equal(event.activity_info, 'Bring your own blanket and enjoy games in the field.');
+  assert.equal(Number(event.include_activity_info), 1);
+  assert.equal(Number(event.include_meetup_parking_info), 0);
+  assert.equal(event.what_to_bring, 'Sunscreen and a water bottle.');
+  assert.equal(Number(event.include_what_to_bring), 1);
+  assert.equal(event.extra_notes, null);
+  assert.equal(Number(event.include_extra_notes), 0);
+
+  await publishEvent(admin, eventId);
+  const parent = await createParentAccount();
+  const detailPage = await request(app).get(`/events/${eventId}`).set('Cookie', parent.cookie);
+  assert.equal(detailPage.status, 200);
+  assert.match(detailPage.text, /Activity Information/);
+  assert.match(detailPage.text, /Bring your own blanket and enjoy games in the field\./);
+  assert.match(detailPage.text, /What to Bring/);
+  assert.match(detailPage.text, /Sunscreen and a water bottle\./);
+  // Meetup and Parking Information has text but its checkbox is off - must
+  // not show, proving the checkbox (not just having text) gates display.
+  assert.doesNotMatch(detailPage.text, /Meetup and Parking Information/);
+  assert.doesNotMatch(detailPage.text, /Park in the north lot/);
+  // Extra Notes has neither text nor its checkbox on - must not show.
+  assert.doesNotMatch(detailPage.text, /Extra Notes/);
+});
+
+// A real request: "clicking on an event to register. If the event starts
+// and ends the same day we only need to see one date. Time should be
+// stacked under date with a clock icon. Location should be stacked under
+// time."
+test('Public event detail page: same-day event shows one date, stacked time (with clock icon) and location', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin, { visibility: 'public', startsAt: '2027-09-01T18:00', endsAt: '2027-09-01T20:00', location: 'Main Hall' });
+  await publishEvent(admin, eventId);
+
+  const page = await request(app).get(`/events/${eventId}`);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /event-hero-meta-stack/);
+  // One date line for the date, not a range, since both ends land on the
+  // same Eastern-zoned calendar day.
+  assert.match(page.text, /<use href="#icon-calendar-check"\/><\/svg> September 1, 2027<\/p>/);
+  assert.match(page.text, /<use href="#icon-clock"\/><\/svg> 2:00pm – 4:00pm<\/p>/);
+  assert.match(page.text, /<use href="#icon-map-pin"\/><\/svg> Main Hall<\/p>/);
+});
+
+test('Public event detail page: a multi-day event shows a date range', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin, { visibility: 'public', startsAt: '2027-09-01T18:00', endsAt: '2027-09-02T10:00' });
+  await publishEvent(admin, eventId);
+
+  const page = await request(app).get(`/events/${eventId}`);
+  assert.match(page.text, /September 1, 2027 – September 2, 2027/);
+});
+
+// A real request: "Name of each member should not be on each button. It
+// should be a list of members with a small register button next to each
+// name in a clean column. It will gray out member who are not of the age
+// or grade to register."
+test('Public event detail page: Register list is a clean column (no name-on-button), grays out members outside the age restriction', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin, { visibility: 'public' });
+  await publishEvent(admin, eventId);
+
+  // Lock the event to age 8 only.
+  await db.prepare('UPDATE events SET lock_registration_to_age = 1, age_group_restriction = ? WHERE id = ?').run('8', eventId);
+
+  const parent = await createParentAccount(1);
+  const childId = parent.familyMemberIds[0];
+  const thisYear = new Date().getUTCFullYear();
+  // Parent gets an adult birthday (ineligible - not age 8); child gets a
+  // birthday landing exactly on age 8 (eligible).
+  await db.prepare('UPDATE members SET birthday = ? WHERE id = ?').run(`${thisYear - 40}-01-01`, parent.memberId);
+  await db.prepare('UPDATE members SET birthday = ? WHERE id = ?').run(`${thisYear - 8}-01-01`, childId);
+
+  const page = await request(app).get(`/events/${eventId}`).set('Cookie', parent.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /event-register-member-list/);
+  // Neither button carries the member's own name in its own text.
+  assert.doesNotMatch(page.text, /: Register</);
+  assert.match(page.text, /class="event-register-member-row event-register-member-row-ineligible"/);
+  // The ineligible row shows "Not eligible" instead of a Register button.
+  const rowsSection = page.text.slice(page.text.indexOf('event-register-member-list'));
+  assert.match(rowsSection, /Not eligible/);
+  assert.match(rowsSection, /roster-action-btn-small">Register</);
+
+  // The eligible child can still actually register (server-side gate
+  // agrees with what the page showed as clickable).
+  const csrfToken = extractCsrf(page.text);
+  const res = await request(app)
+    .post(`/events/${eventId}/register`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ memberId: String(childId), _csrf: csrfToken });
+  assert.equal(res.status, 302);
+  assert.doesNotMatch(res.headers.location, /error=/);
+
+  // The ineligible parent is rejected server-side too, not just hidden.
+  const rejected = await request(app)
+    .post(`/events/${eventId}/register`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ memberId: String(parent.memberId), _csrf: csrfToken });
+  assert.match(decodeURIComponent(rejected.headers.location), /limited to specific ages/);
 });

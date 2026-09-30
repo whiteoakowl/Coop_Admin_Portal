@@ -3647,15 +3647,7 @@ alter table classes add column if not exists allow_parent_chat integer not null 
 -- rather than adding a second column: every existing row is still exactly
 -- "whoever posted this message's display name", just not exclusively an
 -- admin's anymore.
-do $$
-begin
-  if exists (
-    select 1 from information_schema.columns
-    where table_name = 'class_chat_messages' and column_name = 'admin_username'
-  ) then
-    alter table class_chat_messages rename column admin_username to author_name;
-  end if;
-end $$;
+alter table class_chat_messages rename column admin_username to author_name;
 
 -- ===== 20261003010000_orientation_progress.sql =====
 -- A real request: "Co-op admin portal. Add an orientation tab. List of
@@ -3691,3 +3683,309 @@ create table if not exists orientation_progress (
   unique (member_id, day)
 );
 create index if not exists idx_orientation_progress_member on orientation_progress(member_id);
+
+-- ===== 20261005010000_store_option_groups.sql =====
+-- A real request: "Shop, add option will be a drop down menu on parent/
+-- student portals. On main admin shop, product, when you add an option
+-- there will be sub categories to add variables, each with their own
+-- price. This setup is like shopify." Confirmed with the requester:
+-- a product can have several option groups at once (e.g. "Size" AND
+-- "Color"), each rendered as its own dropdown at checkout; not every
+-- group's values carry their own price - the final price defaults to
+-- whichever one value has a set price, or sums every priced value's
+-- price if more than one group has one (an unset price contributes $0).
+-- Replaces the flat per-product options list from
+-- 20260921010000_store_product_options.sql with a two-level
+-- Group -> Values hierarchy.
+create table if not exists store_product_option_groups (
+  id integer generated always as identity primary key,
+  product_id integer not null references store_products(id) on delete cascade,
+  name text not null,
+  position integer not null default 0,
+  created_at text not null default now_text()
+);
+create index if not exists idx_store_product_option_groups_product on store_product_option_groups(product_id);
+
+-- A value now belongs to a group instead of directly to a product, and
+-- a value's price is optional (null = adds nothing beyond the base
+-- product price, or beyond whatever another group's value already
+-- prices it at) - "not all groups have separate price."
+alter table store_product_options add column if not exists group_id integer references store_product_option_groups(id) on delete cascade;
+alter table store_product_options alter column price_cents drop not null;
+
+-- Backfill: every product that already had flat options gets one
+-- default group ("Options") so its existing values keep working as a
+-- single dropdown, unchanged from a buyer's point of view.
+insert into store_product_option_groups (product_id, name, position)
+select distinct product_id, 'Options', 0
+from store_product_options
+where group_id is null;
+
+update store_product_options o
+set group_id = g.id
+from store_product_option_groups g
+where o.group_id is null and g.product_id = o.product_id and g.name = 'Options';
+
+-- Every value is now reached through its group (group_id, set not null
+-- above) rather than directly by product - product_id here is now
+-- redundant with store_product_option_groups.product_id.
+alter table store_product_options alter column group_id set not null;
+alter table store_product_options drop column if exists product_id;
+
+-- One row per selected value per line item, since a line item can now
+-- have one selection per group instead of at most one option overall.
+-- store_order_items.option_name stays a single COMBINED snapshot string
+-- (every selected value's group+name joined together) so the existing
+-- fulfillmentTotals()/salesAnalytics() reports (both GROUP BY
+-- i.option_name) need no changes; this table is the detailed breakdown
+-- behind that combined string.
+create table if not exists store_order_item_options (
+  id integer generated always as identity primary key,
+  order_item_id integer not null references store_order_items(id) on delete cascade,
+  option_id integer references store_product_options(id) on delete set null,
+  group_name text not null,
+  option_name text not null,
+  price_cents integer,
+  created_at text not null default now_text()
+);
+create index if not exists idx_store_order_item_options_item on store_order_item_options(order_item_id);
+
+-- ===== 20261006010000_documents_public_and_images.sql =====
+-- A real request: "co-op admin, document upload... should move to the
+-- documents page... each document line should have a copy link button
+-- for easy public sharing. When uploading the document file there should
+-- be an option to add an image as well." Confirmed: the copy-link should
+-- make the document genuinely viewable without an admin login (e.g. to
+-- hand a parent handbook to a prospective family), not just a
+-- convenience link for already-logged-in admins - see routes/
+-- documents.js (new, mounted at the site root, no auth) versus routes/
+-- admin-documents.js's existing requireFullAdmin-gated management routes.
+--
+-- public_token is a random, unguessable string (not documents.id) so a
+-- public link can't be used to enumerate every other document by
+-- incrementing a small integer - the same reasoning
+-- utils/portalAuth.js's own session tokens already use.
+alter table documents add column if not exists image_path text;
+alter table documents add column if not exists image_mime_type text;
+alter table documents add column if not exists public_token text;
+
+update documents set public_token = md5(random()::text || clock_timestamp()::text || id::text) where public_token is null;
+
+alter table documents alter column public_token set not null;
+create unique index if not exists idx_documents_public_token on documents(public_token);
+
+-- ===== 20261007010000_admin_position_permissions.sql =====
+-- A real request: "Main admin portal, settings gear icon, admins...
+-- click on each admin position in the list and it will open an edit
+-- window. Here you can add a member from the drop down list. Add email
+-- address, add phone number. Then the roles and permissions are listed
+-- below." Confirmed: permissions belong to the POSITION itself (not per
+-- individual holder) - same shape role_permissions already uses for a
+-- role (see 20260825020000_portal_platform_foundation.sql), just scoped
+-- to an admin_position instead. The email/phone fields in that same edit
+-- window are the member's own contact info (members.email/phone,
+-- unchanged columns) shown/editable there for convenience, not separate
+-- position-level fields - no schema change needed for those.
+create table if not exists admin_position_permissions (
+  admin_position_id integer not null references admin_positions(id) on delete cascade,
+  permission_id integer not null references permissions(id) on delete cascade,
+  primary key (admin_position_id, permission_id)
+);
+
+-- ===== 20261008010000_orientation_open_house.sql =====
+-- A real request: "Co-op admin portal, orientation member list...
+-- add a column for open house." Same shape as the 4 existing circle
+-- columns on orientation_progress (one _complete/_completed_at pair per
+-- column - see 20261003010000_orientation_progress.sql).
+alter table orientation_progress add column if not exists open_house_complete integer not null default 0;
+alter table orientation_progress add column if not exists open_house_completed_at text;
+
+-- ===== 20261009010000_class_dates_supply_list.sql =====
+-- A real request: "Parent and student portal. On classroom dashboard
+-- when you click on a Class card it take you to that class. Details
+-- should have teachers, assistants, room number, start and end dates,
+-- start and end time, day of the week, class description, supply
+-- list." start_time/end_time (a class's own daily time slot) and
+-- description already existed; this adds the class's own overall
+-- start/end DATE range (the term/session it runs for) and a supply
+-- list, both editable from Co-op Admin's own Class Details form
+-- (views/admin-class-schedule-manage.ejs).
+alter table classes add column if not exists start_date text;
+alter table classes add column if not exists end_date text;
+alter table classes add column if not exists supply_list text;
+
+-- ===== 20261010010000_lesson_content_assignments.sql =====
+-- A real request: "Main admin portal, class lessons... Link to video
+-- should include a description area. Link to file should include a
+-- description area. There should be an option in the dropdown menu for
+-- assignment upload, text box with word count and full editing
+-- features, also be able to upload a file such as doc, pdf, jpg etc."
+-- description is shared by every content type that wants one (video/
+-- file today); assignment_upload reuses the existing `body` column (the
+-- same rich-text field 'text' content already has) for its own text box,
+-- plus a new attachment file of its own.
+alter table lesson_content_items add column if not exists description text;
+alter table lesson_content_items add column if not exists attachment_url text;
+alter table lesson_content_items add column if not exists attachment_name text;
+
+alter table lesson_content_items drop constraint if exists lesson_content_items_type_check;
+alter table lesson_content_items add constraint lesson_content_items_type_check
+  check (type in ('video', 'text', 'file', 'quiz', 'assignment_upload'));
+
+-- ===== 20261011010000_semesters.sql =====
+-- A real request: "Overall class settings. Add a place to create and add
+-- new semester titles. On individual class settings add dropdown for
+-- choosing semester." A brand new, generic concept (like Sections) that
+-- classes get tagged with, purely for grouping/labeling (e.g. "Fall
+-- 2026", "Spring 2027") - task #181's orientation rebuild depends on this
+-- existing first, so a semester can also be the scope orientation
+-- members are grouped by.
+create table if not exists semesters (
+  id integer generated always as identity primary key,
+  title text not null unique,
+  created_at text not null default now_text()
+);
+
+alter table classes add column if not exists semester_id integer references semesters(id) on delete set null;
+
+-- ===== 20261012010000_orientation_semesters.sql =====
+-- A real request: "Now each orientation semester is created with all
+-- members registered for classes that semester." Orientation progress
+-- moves from being tracked per (member, day) to per (member, semester) -
+-- a family's orientation is tracked fresh for each semester (via the new
+-- Semester concept - see 20261011010000_semesters.sql), and a family
+-- registered for both Monday and Wednesday classes no longer gets two
+-- separate rows/circle-sets: which day(s) a family attends is now purely
+-- a display value computed live from class_enrollments (see utils/
+-- orientation.js's own orientationRows), not something orientation
+-- progress itself is keyed by.
+alter table orientation_progress add column if not exists semester_id integer references semesters(id) on delete cascade;
+
+alter table orientation_progress drop constraint if exists orientation_progress_member_id_day_key;
+
+-- Merge any existing per-day rows for the same member (OR each _complete
+-- flag together, keep the latest _completed_at of the two) before
+-- dropping the day column entirely - a real bug this data migration
+-- avoids: two Monday/Wednesday rows for the same family silently
+-- collapsing to whichever one happens to survive, losing the other
+-- day's already-recorded progress.
+with merged as (
+  select
+    member_id,
+    max(video_complete) as video_complete,
+    max(video_completed_at) as video_completed_at,
+    max(meetup_complete) as meetup_complete,
+    max(meetup_completed_at) as meetup_completed_at,
+    max(teacher_training_complete) as teacher_training_complete,
+    max(teacher_training_completed_at) as teacher_training_completed_at,
+    max(tour_complete) as tour_complete,
+    max(tour_completed_at) as tour_completed_at,
+    max(open_house_complete) as open_house_complete,
+    max(open_house_completed_at) as open_house_completed_at,
+    min(id) as keep_id
+  from orientation_progress
+  group by member_id
+)
+update orientation_progress op
+set video_complete = merged.video_complete,
+    video_completed_at = merged.video_completed_at,
+    meetup_complete = merged.meetup_complete,
+    meetup_completed_at = merged.meetup_completed_at,
+    teacher_training_complete = merged.teacher_training_complete,
+    teacher_training_completed_at = merged.teacher_training_completed_at,
+    tour_complete = merged.tour_complete,
+    tour_completed_at = merged.tour_completed_at,
+    open_house_complete = merged.open_house_complete,
+    open_house_completed_at = merged.open_house_completed_at
+from merged
+where op.id = merged.keep_id;
+
+delete from orientation_progress
+where id not in (select min(id) from orientation_progress group by member_id);
+
+alter table orientation_progress drop column if exists day;
+
+-- A plain unique constraint can't be used here since Postgres treats
+-- every NULL semester_id as distinct from every other - the coalesce
+-- collapses every "no semester" row into one shared bucket (the
+-- fallback view when no semesters have been created yet), same trick
+-- utils/orientation.js's own setOrientationField relies on for its
+-- ON CONFLICT target.
+create unique index if not exists idx_orientation_progress_member_semester on orientation_progress (member_id, coalesce(semester_id, -1));
+
+-- A real request: "Add button for orientation settings to Link training
+-- or check in with each circle check mark column so the information can
+-- be linked" - one optional URL per checkmark column (video/meetup/
+-- teacherTraining/tour/openHouse - see utils/orientation.js's own FIELDS),
+-- so each column's header can link out to the actual training video or
+-- check-in event instead of being purely a plain label.
+create table if not exists orientation_settings (
+  field text primary key,
+  link_url text not null
+);
+
+-- ===== 20261013010000_class_grade_age_lock_and_registration.sql =====
+-- A real request: "Co-op admin, classes, grade and age should have a
+-- checkbox that says lock class by grade or lock class by age." Grade
+-- and Age selections on a class were always BOTH enforced together at
+-- registration time (utils/classRegistration.js's own "both gates must
+-- pass" comment) - these two independent toggles let an admin choose
+-- which of the two actually gates registration for a given class,
+-- defaulting to true (both locked) to preserve that existing behavior
+-- for every class that already has one.
+alter table classes add column if not exists lock_by_grade integer not null default 1;
+alter table classes add column if not exists lock_by_age integer not null default 1;
+
+-- A real request: "Add close registration check box on detail page" -
+-- registration_open already existed (previously toggled from the old
+-- Class Settings tab's per-class table, now removed - see task #188's
+-- own Co-op Class Settings rebuild), this just documents it moving to
+-- live on the class's own Details tab instead. No column change needed.
+
+-- ===== 20261014010000_event_ticket_type_registration.sql =====
+-- A real request built out the popup-card -> full event page -> ticket
+-- selection -> registration flow for Parent/Student portal events. Ticket
+-- types (event_ticket_types) existed already but were admin-only -
+-- registration always charged the event's own flat price_cents. This
+-- column lets a registration remember which ticket (if any) the member
+-- picked, so its own charge can be priced off that ticket instead.
+alter table event_registrations add column if not exists ticket_type_id integer references event_ticket_types(id) on delete set null;
+
+-- ===== 20261015010000_temporary_permanent_jobs.sql =====
+-- A real request: "add a button on floater assignment page ... called
+-- add/edit temporary position. Same popup and format. However, when a
+-- job is added using this temporary button the job is only available
+-- that day. It [should not] appear as a job needing to be filled other
+-- days." Reuses permanent_jobs itself rather than a parallel table - a
+-- temporary position is staffed, assigned, and unassigned through the
+-- exact same substitute_assignments (slot_type='job', slot_id=this row's
+-- id) machinery a permanent job already uses, so nothing about that flow
+-- needs its own copy. NULL session_date (every existing row, and every
+-- permanent job going forward) means "recurs every session," matching
+-- today's behavior exactly; a non-NULL session_date scopes the row to
+-- that one date only.
+alter table permanent_jobs add column if not exists session_date text;
+
+-- ===== 20261016010000_volunteer_date_archiving.sql =====
+-- A real request: "Floater assignments, choose date drop down should show
+-- all of the dates so far until you click an archive button for each
+-- date." Before this, a date fell off the manage page's Choose Date
+-- dropdown (and into the read-only Archive tab) automatically the moment
+-- it was no longer today or later - an admin could never go back and fix
+-- an already-past date's assignments from the manage page again. Now that
+-- move only happens once an admin explicitly archives the date, whether
+-- it's already passed or not. NULL (every existing date) means "still
+-- active" - identical to today's behavior for every row that exists
+-- before this migration runs, since none of them have been explicitly
+-- archived yet.
+alter table volunteer_dates add column if not exists archived_at text;
+
+-- ===== 20261017010000_event_ticket_physical_ticket.sql =====
+-- A real request: "finance, add ticket type pop up, add a checkbox for
+-- include physical ticket. Members will be able to print tickets with a
+-- barcode for check in and out. Barcode is the same as their member ID
+-- number barcode used for classes." Per-ticket-type, not per-event - an
+-- event can offer some ticket types that print (e.g. general admission)
+-- and others that don't (e.g. a free/RSVP-only tier), same as its own
+-- price_per already varies per ticket type rather than per event.
+alter table event_ticket_types add column if not exists includes_physical_ticket boolean not null default false;

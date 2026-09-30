@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main document-view-main">
+    <div class="grid-box-header">
+      <p class="subtitle"><a href="/main-admin/documents">&larr; All Documents</a></p>
+      <button type="button" class="roster-action-btn" data-copy-link="<%= publicOrigin %>/documents/<%= doc.public_token %>">Copy Link</button>
+    </div>
+    <% if (doc.image_path) { %>
+      <img class="document-view-image" src="/main-admin/documents/<%= doc.id %>/image" alt="" />
+    <% } %>
+    <h1><%= doc.title %></h1>
+    <div class="document-view-frame-wrap">
+      <iframe class="document-view-frame" src="/main-admin/documents/<%= doc.id %>/file" title="<%= doc.title %>"></iframe>
+    </div>
+  </main>
+  <script src="/js/copy-link.js"></script>
+</body>
+</html>

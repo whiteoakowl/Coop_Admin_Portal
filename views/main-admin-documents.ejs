@@ -3,16 +3,14 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
-<body class="admin-page">
-  <%- include('partials/admin-nav') %>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
       <h1>Documents</h1>
-      <%# A real request: "document upload is currently under settings.
-          It should move to the documents page and be a button called
-          add/edit documents." Replaces the old Settings > Documents tab
-          (views/admin-settings.ejs) entirely - upload, the existing
-          list, Copy Link, and delete all live in this one popup now. %>
       <button type="button" class="primary-btn" onclick="document.getElementById('manage-documents-dialog').showModal()">Add/Edit Documents</button>
     </div>
 
@@ -27,12 +25,9 @@
       %>
       <div class="landing-grid documents-grid">
         <% documents.forEach(function(d, i) { %>
-          <a class="landing-card <%= docColors[i % docColors.length] %>" href="/admin/documents/<%= d.id %>/view">
-            <%# A real request: "on the document click card with title
-                below it, all one card" - the image (when set) replaces
-                the generic file icon, title stays below it either way. %>
+          <a class="landing-card <%= docColors[i % docColors.length] %>" href="/main-admin/documents/<%= d.id %>/view">
             <% if (d.image_path) { %>
-              <img class="landing-card-image" src="/admin/documents/<%= d.id %>/image" alt="" />
+              <img class="landing-card-image" src="/main-admin/documents/<%= d.id %>/image" alt="" />
             <% } else { %>
               <span class="landing-icon"><svg class="icon"><use href="#icon-file-text"/></svg></span>
             <% } %>
@@ -49,7 +44,7 @@
         <h4>Upload Document</h4>
         <p class="hint">Add a PDF or Word document to show as a card on this page. An optional image shows on its line below and on its own card.</p>
         <% if (storageConfigured) { %>
-          <form id="document-upload-form" data-direct-upload="true" data-upload-base="/admin/documents" class="stack-form stack-form-narrow">
+          <form id="document-upload-form" data-direct-upload="true" data-upload-base="/main-admin/documents" class="stack-form stack-form-narrow">
             <label for="docTitle">Title</label>
             <input id="docTitle" name="title" type="text" placeholder="e.g. Parent Handbook" />
 
@@ -63,7 +58,7 @@
             <p class="hint" data-upload-status></p>
           </form>
         <% } else { %>
-          <form method="POST" action="/admin/documents/upload" enctype="multipart/form-data" class="stack-form stack-form-narrow">
+          <form method="POST" action="/main-admin/documents/upload" enctype="multipart/form-data" class="stack-form stack-form-narrow">
             <label for="docTitle">Title</label>
             <input id="docTitle" name="title" type="text" placeholder="e.g. Parent Handbook" />
 
@@ -87,7 +82,7 @@
             <% documents.forEach(function(d) { %>
               <div class="document-manage-row">
                 <% if (d.image_path) { %>
-                  <img class="document-manage-row-thumb" src="/admin/documents/<%= d.id %>/image" alt="" />
+                  <img class="document-manage-row-thumb" src="/main-admin/documents/<%= d.id %>/image" alt="" />
                 <% } %>
                 <div class="document-manage-row-info">
                   <span class="document-manage-row-title"><%= d.title %></span>
@@ -95,7 +90,7 @@
                 </div>
                 <div class="roster-btn-row">
                   <button type="button" class="roster-action-btn" data-copy-link="<%= publicOrigin %>/documents/<%= d.public_token %>">Copy Link</button>
-                  <form method="POST" action="/admin/documents/<%= d.id %>/delete" data-confirm="Delete &quot;<%= d.title %>&quot;?">
+                  <form method="POST" action="/main-admin/documents/<%= d.id %>/delete" data-confirm="Delete &quot;<%= d.title %>&quot;?">
                     <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= d.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                   </form>
                 </div>

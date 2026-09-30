@@ -128,6 +128,10 @@ const mainAdminAnnouncementsRouter = require('./routes/main-admin-announcements'
 // Curated resource links shown on member portals (currently just Student
 // Portal) - same sibling-router shape as mainAdminAnnouncementsRouter.
 const mainAdminResourceLinksRouter = require('./routes/main-admin-resource-links');
+// Main Admin's own Documents upload/management page - same sibling-router
+// shape, shares the `documents` table/bucket with Co-op Admin's own
+// routes/admin-documents.js.
+const mainAdminDocumentsRouter = require('./routes/main-admin-documents');
 // Babysitter Directory approval queue - same sibling-router shape.
 const mainAdminBabysittersRouter = require('./routes/main-admin-babysitters');
 // Committees, Sign-Up Lists, and Volunteer Lists - same sibling-router shape.
@@ -417,6 +421,7 @@ app.use('/main-admin', mainAdminRouter);
 app.use('/main-admin/members', mainAdminMembersRouter);
 app.use('/main-admin/announcements', mainAdminAnnouncementsRouter);
 app.use('/main-admin/resource-links', mainAdminResourceLinksRouter);
+app.use('/main-admin/documents', mainAdminDocumentsRouter);
 app.use('/main-admin/babysitters', mainAdminBabysittersRouter);
 app.use('/main-admin/volunteers', mainAdminVolunteersRouter);
 app.use('/committees', committeesRouter);

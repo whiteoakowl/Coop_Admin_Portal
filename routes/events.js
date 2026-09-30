@@ -10,7 +10,7 @@ const router = express.Router();
 const db = require('../db');
 const { requirePortalAuth } = require('../middleware/portalAuth');
 const { familyForAccount } = require('../utils/portalAuth');
-const { formatFriendlyTimestamp } = require('../utils/dates');
+const { formatFriendlyTimestamp, formatFriendlyDateAndTime } = require('../utils/dates');
 const events = require('../utils/events');
 const signupLists = require('../utils/committeesAndSignupLists');
 const notifications = require('../utils/notifications');
@@ -152,12 +152,34 @@ router.get('/:id', async (req, res) => {
     ? (await events.registrationsForEvent(event.id)).filter((r) => r.status !== 'cancelled')
     : [];
 
+  // A real request: "if the event starts and ends the same day we only
+  // need to see one date. Time should be stacked under date with a clock
+  // icon." Same-day is decided off the already-Eastern-zoned date labels
+  // (not the raw UTC starts_at/ends_at strings), so an event that only
+  // crosses midnight in UTC but not in the timezone members actually see
+  // times in still reads as one day.
+  const startsDateAndTime = formatFriendlyDateAndTime(event.starts_at);
+  const endsDateAndTime = formatFriendlyDateAndTime(event.ends_at);
+  // A real request: "It will gray out member who are not of the age or
+  // grade to register" - the same ageGroupAllowsMember/ageBucketAllowsMember
+  // gates registerForEvent itself enforces server-side, checked here only
+  // to decide which family members the Register list shows as clickable.
+  const eligibleForRegistration = new Set(
+    family.filter((m) => events.ageGroupAllowsMember(event, m) && events.ageBucketAllowsMember(event, m)).map((m) => m.id)
+  );
+
   res.render('events-detail', {
     title: event.title,
     settings,
     event: withImageUrl(event),
     startsLabel: formatFriendlyTimestamp(event.starts_at),
     endsLabel: event.ends_at ? formatFriendlyTimestamp(event.ends_at) : null,
+    startsDateLabel: startsDateAndTime.dateLabel,
+    startsTimeLabel: startsDateAndTime.timeLabel,
+    endsDateLabel: endsDateAndTime.dateLabel,
+    endsTimeLabel: endsDateAndTime.timeLabel,
+    sameDay: !endsDateAndTime.dateLabel || startsDateAndTime.dateLabel === endsDateAndTime.dateLabel,
+    eligibleForRegistration,
     family,
     familyIds,
     registeredMemberIds: myRegistrations.map((r) => r.member_id),

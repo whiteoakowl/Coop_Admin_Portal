@@ -1,0 +1,47 @@
+<%
+// A plain time-of-day <select> in 15-minute increments (12:00 AM-11:45 PM),
+// value in 24-hour "HH:MM" (matching a datetime-local input's own time
+// component) so it combines cleanly with a companion <input type="date">
+// via public/js/event-date-time-picker.js. A real request: "start and end
+// time should be separate drop down menus" (previously one combined
+// datetime-local input per field - see views/admin-events-builder.ejs's
+// own Starts/Ends fields).
+//
+// Locals: dataGroup (data-date-time-group value tying this select to its
+// date input and hidden combined field - see event-date-time-picker.js),
+// selectedTime (24-hour "HH:MM" string or null/''), required (optional
+// bool), placeholderLabel (optional, defaults to "Time").
+var required = typeof required !== 'undefined' ? required : false;
+var placeholderLabel = typeof placeholderLabel !== 'undefined' ? placeholderLabel : 'Time';
+var selectedTime = (typeof selectedTime !== 'undefined' && selectedTime) ? selectedTime : '';
+
+var slots = [];
+for (var h = 0; h < 24; h++) {
+  for (var m = 0; m < 60; m += 15) {
+    slots.push(String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'));
+  }
+}
+// A legacy event saved with an off-grid minute (e.g. from the old
+// datetime-local input) still needs its exact time selectable/shown,
+// not silently rounded away.
+if (selectedTime && slots.indexOf(selectedTime) === -1) {
+  slots.push(selectedTime);
+  slots.sort();
+}
+
+function timeLabel(value) {
+  var parts = value.split(':');
+  var hour = parseInt(parts[0], 10);
+  var minute = parts[1];
+  var suffix = hour >= 12 ? 'PM' : 'AM';
+  var hour12 = hour % 12;
+  if (hour12 === 0) hour12 = 12;
+  return hour12 + ':' + minute + ' ' + suffix;
+}
+%>
+<select data-date-time-time data-date-time-group="<%= dataGroup %>" <%= required ? 'required' : '' %>>
+  <option value=""><%= placeholderLabel %></option>
+  <% slots.forEach(function(slot) { %>
+    <option value="<%= slot %>" <%= slot === selectedTime ? 'selected' : '' %>><%= timeLabel(slot) %></option>
+  <% }); %>
+</select>

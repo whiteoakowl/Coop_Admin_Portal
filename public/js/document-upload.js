@@ -1,19 +1,26 @@
-// Co-op Admin Documents' upload form (views/admin-documents.ejs) - when
-// Storage is configured (data-direct-upload="true", set from
-// storageConfigured on the server), this intercepts submit and PUTs the
-// file (and optional image) straight to Supabase Storage via a signed
-// upload URL, instead of posting the bytes through this app's own
-// Netlify Function - see routes/admin-documents.js's own comment on why
-// (a real request: "I can't upload larger files"). A local/LAN install
-// with no Storage configured has no such ceiling to work around, so its
-// form has no data-direct-upload attribute and submits as a plain
-// multipart POST, same as before - this script no-ops entirely then.
+// Co-op Admin and Main Admin Documents' upload forms (views/admin-
+// documents.ejs, views/main-admin-documents.ejs) - when Storage is
+// configured (data-direct-upload="true", set from storageConfigured on
+// the server), this intercepts submit and PUTs the file (and optional
+// image) straight to Supabase Storage via a signed upload URL, instead of
+// posting the bytes through this app's own Netlify Function - see
+// routes/admin-documents.js's own comment on why (a real request: "I
+// can't upload larger files"). A local/LAN install with no Storage
+// configured has no such ceiling to work around, so its form has no
+// data-direct-upload attribute and submits as a plain multipart POST,
+// same as before - this script no-ops entirely then.
+//
+// data-upload-base picks which router's endpoints to call (Co-op Admin's
+// /admin/documents vs Main Admin's /main-admin/documents both manage the
+// same shared `documents` table, each behind their own portal's auth), so
+// this script stays shared between both pages.
 (function () {
   const form = document.getElementById('document-upload-form');
   if (!form || form.dataset.directUpload !== 'true') return;
+  const uploadBase = form.dataset.uploadBase || '/admin/documents';
 
   async function uploadToSignedUrl(file) {
-    const initRes = await fetch('/admin/documents/upload-url', {
+    const initRes = await fetch(`${uploadBase}/upload-url`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
       body: JSON.stringify({ filename: file.name }),
@@ -44,7 +51,7 @@
       const fileResult = await uploadToSignedUrl(fileInput.files[0]);
       const imageResult = imageInput && imageInput.files[0] ? await uploadToSignedUrl(imageInput.files[0]) : null;
 
-      const completeRes = await fetch('/admin/documents/upload-complete', {
+      const completeRes = await fetch(`${uploadBase}/upload-complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
         body: JSON.stringify({

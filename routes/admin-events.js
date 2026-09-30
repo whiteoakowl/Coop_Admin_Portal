@@ -188,6 +188,14 @@ function eventDataFromRow(event) {
     allowSignupForOthersInGroup: !!event.allow_signup_for_others_in_group,
     paymentInstructionsTitle: event.payment_instructions_title,
     paymentInstructionsText: event.payment_instructions_text,
+    activityInfo: event.activity_info,
+    includeActivityInfo: !!event.include_activity_info,
+    meetupParkingInfo: event.meetup_parking_info,
+    includeMeetupParkingInfo: !!event.include_meetup_parking_info,
+    whatToBring: event.what_to_bring,
+    includeWhatToBring: !!event.include_what_to_bring,
+    extraNotes: event.extra_notes,
+    includeExtraNotes: !!event.include_extra_notes,
   };
 }
 
@@ -660,6 +668,14 @@ router.post('/:id', async (req, res) => {
     shortDescription: (req.body.shortDescription || '').trim(),
     organizedBy: (req.body.organizedBy || '').trim(),
     tags: [].concat(req.body.tags || []).map((t) => t.trim()).filter(Boolean).join(', '),
+    activityInfo: (req.body.activityInfo || '').trim(),
+    includeActivityInfo: req.body.includeActivityInfo === '1',
+    meetupParkingInfo: (req.body.meetupParkingInfo || '').trim(),
+    includeMeetupParkingInfo: req.body.includeMeetupParkingInfo === '1',
+    whatToBring: (req.body.whatToBring || '').trim(),
+    includeWhatToBring: req.body.includeWhatToBring === '1',
+    extraNotes: (req.body.extraNotes || '').trim(),
+    includeExtraNotes: req.body.includeExtraNotes === '1',
   });
   res.redirect(`/main-admin/events/${id}/builder?notice=` + encodeURIComponent('Event details saved.'));
 });

@@ -157,11 +157,33 @@
               <% }); %>
             </select>
           </label>
+          <%
+            // A real request: "date picker should be a calendar. Start and
+            // end time should be separate drop down menus" - replaces the
+            // single combined datetime-local input with a plain calendar
+            // date input plus a time-of-day <select> (partials/time-
+            // select.ejs), recombined into the same startsAt/endsAt
+            // "YYYY-MM-DDTHH:MM" value this form has always submitted (see
+            // public/js/event-date-time-picker.js) so nothing server-side
+            // needs to change.
+            var startsDate = event.starts_at ? event.starts_at.slice(0, 10) : '';
+            var startsTime = event.starts_at ? event.starts_at.slice(11, 16) : '';
+            var endsDate = event.ends_at ? event.ends_at.slice(0, 10) : '';
+            var endsTime = event.ends_at ? event.ends_at.slice(11, 16) : '';
+          %>
           <label>Starts
-            <input type="datetime-local" name="startsAt" value="<%= event.starts_at ? event.starts_at.replace(' ', 'T').slice(0, 16) : '' %>" required />
+            <div class="date-time-picker-row" data-date-time-picker>
+              <input type="date" data-date-time-date data-date-time-group="starts" value="<%= startsDate %>" required />
+              <%- include('partials/time-select', { dataGroup: 'starts', selectedTime: startsTime, required: true }) %>
+            </div>
+            <input type="hidden" name="startsAt" data-date-time-hidden="starts" value="<%= event.starts_at ? event.starts_at.replace(' ', 'T').slice(0, 16) : '' %>" />
           </label>
           <label>Ends
-            <input type="datetime-local" name="endsAt" value="<%= event.ends_at ? event.ends_at.replace(' ', 'T').slice(0, 16) : '' %>" />
+            <div class="date-time-picker-row" data-date-time-picker>
+              <input type="date" data-date-time-date data-date-time-group="ends" value="<%= endsDate %>" />
+              <%- include('partials/time-select', { dataGroup: 'ends', selectedTime: endsTime }) %>
+            </div>
+            <input type="hidden" name="endsAt" data-date-time-hidden="ends" value="<%= event.ends_at ? event.ends_at.replace(' ', 'T').slice(0, 16) : '' %>" />
           </label>
           <label>Organized By
             <input type="text" name="organizedBy" value="<%= event.organized_by || '' %>" placeholder="e.g., Sanford Homeschoolers" />
@@ -175,6 +197,32 @@
               <input type="text" class="tag-input-field" placeholder="Add tags and press Enter" />
             </div>
           </div>
+
+          <%
+            // A real request: "event editing under details add another
+            // text box that says activity information, another text box
+            // below that saying meetup and parking information, another
+            // text box under that saying what to bring. Under that a text
+            // box that says extra notes. Next to each of these title is a
+            // check box and question that says include this section? If
+            // the box is checked then the information filled out and the
+            // section will appear on the event for members to see."
+            var infoSections = [
+              { key: 'activityInfo', label: 'Activity Information', text: event.activity_info, included: event.include_activity_info },
+              { key: 'meetupParkingInfo', label: 'Meetup and Parking Information', text: event.meetup_parking_info, included: event.include_meetup_parking_info },
+              { key: 'whatToBring', label: 'What to Bring', text: event.what_to_bring, included: event.include_what_to_bring },
+              { key: 'extraNotes', label: 'Extra Notes', text: event.extra_notes, included: event.include_extra_notes },
+            ];
+          %>
+          <% infoSections.forEach(function(section) { %>
+            <div class="member-form-full">
+              <label class="checkbox-option">
+                <input type="checkbox" name="include<%= section.key.charAt(0).toUpperCase() + section.key.slice(1) %>" value="1" <%= section.included ? 'checked' : '' %> />
+                <%= section.label %> <span class="hint">&mdash; Include this section?</span>
+              </label>
+              <textarea name="<%= section.key %>" rows="3"><%= section.text || '' %></textarea>
+            </div>
+          <% }); %>
 
         </form>
 
@@ -798,5 +846,6 @@
   <script src="/js/copy-link.js"></script>
   <script src="/js/multi-select-checkbox.js"></script>
   <script src="/js/event-image-preview.js"></script>
+  <script src="/js/event-date-time-picker.js"></script>
 </body>
 </html>
