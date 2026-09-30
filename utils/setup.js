@@ -2,7 +2,7 @@ const db = require('../db');
 const { byLastName, hasInfantChild } = require('./members');
 const { todayISO } = require('./dates');
 const { taskSectionForTeam, refreshBadgesForTeam } = require('./taskList');
-const { absentMemberIdsForDate, checkedInMemberIdsForDate } = require('./classSchedule');
+const { absentMemberIdsForDate, checkedInMemberIdsForDate, checkedOutMemberIdsForDate } = require('./classSchedule');
 
 async function teamsForDay(day) {
   return db
@@ -226,6 +226,19 @@ async function setTaskAssignment(day, memberId, date, slot, taskItemId) {
     throw new Error('That task has already been assigned to someone else for this date.');
   }
 
+  // A real request: "if someone checks out... you won't be allowed to
+  // assign a job to them" - a hard server-side block to match, mirroring
+  // the conflict check just above (the suggestion dropdown already hides
+  // this via assignmentCardsForDate's own m.checkedOut, but that's a
+  // render-time filter only - the same stale-page/second-tab risk the
+  // conflict check's own comment describes applies here too). Unassign
+  // (the `if (!taskItemId)` branch above) is never blocked - someone
+  // should always be removable from a task once they've left for the day.
+  const checkedOut = (await checkedOutMemberIdsForDate(date)).has(memberId);
+  if (checkedOut) {
+    throw new Error('That member has already checked out for this date and cannot be assigned a task.');
+  }
+
   await db
     .prepare(
       `INSERT INTO setup_task_assignments (day, member_id, session_date, ${column}) VALUES (?, ?, ?, ?)
@@ -313,7 +326,7 @@ function suggestDistinctTasks(members, allOptions, assignedKey, optionsKey) {
   if (n === 0) return suggestions;
   let pointer = 0;
   for (const m of members) {
-    if (m.absent || m[assignedKey]) continue;
+    if (m.absent || m.checkedOut || m[assignedKey]) continue;
     const options = m[optionsKey] || [];
     if (options.length === 0) continue;
     for (let i = 0; i < n; i++) {
@@ -345,6 +358,11 @@ async function assignmentCardsForDate(day, date) {
   // on-site to do their task, same "compute on read from the attendance
   // table" shape as absentIds just above.
   const checkedInIds = await checkedInMemberIdsForDate(date);
+  // A real request: "if someone checks out, it should highlight their name
+  // yellow on the setup/cleanup assignment page and you won't be allowed
+  // to assign a job to them" - same "compute on read from the checkouts
+  // table" shape as absentIds/checkedInIds just above.
+  const checkedOutIds = await checkedOutMemberIdsForDate(date);
   return teams.map((t) => {
     const allOptions = t.taskSection ? t.taskSection.items : [];
     const members = t.members.map((m) => {
@@ -357,6 +375,7 @@ async function assignmentCardsForDate(day, date) {
         infant: !!m.infant,
         absent: absentIds.has(m.id),
         checkedIn: checkedInIds.has(m.id),
+        checkedOut: checkedOutIds.has(m.id),
         taskItemId: a.taskItemId || null,
         taskItemId2: a.taskItemId2 || null,
         taskNumber: taskItem ? taskItem.number : null,

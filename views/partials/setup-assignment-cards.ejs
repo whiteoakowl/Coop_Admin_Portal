@@ -122,9 +122,18 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
                   after an earlier check-in), same plain-control-flow-tag
                   class-attribute pattern as m.absent for the reason
                   explained above. %>
-              <tr<% if (m.absent) { %> class="setup-assignment-row-absent"<% } else if (m.checkedIn) { %> class="setup-assignment-row-checked-in"<% } %>>
+              <%# A real request: "if someone checks out, it should
+                  highlight their name yellow on the setup/cleanup
+                  assignment page." m.checkedOut (assignmentCardsForDate,
+                  utils/setup.js) is computed the same "read from the
+                  checkouts table" way as m.absent/m.checkedIn above -
+                  absent still wins if somehow both are true (a corrected
+                  status), and checkedOut wins over checkedIn since
+                  checking out is a later, more specific state than simply
+                  having checked in earlier that day. %>
+              <tr<% if (m.absent) { %> class="setup-assignment-row-absent"<% } else if (m.checkedOut) { %> class="setup-assignment-row-checked-out"<% } else if (m.checkedIn) { %> class="setup-assignment-row-checked-in"<% } %>>
                 <td class="floater-card-position">
-                  <a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %><% if (m.absent) { %> <span class="floater-card-unassigned">(absent)</span><% } %>
+                  <a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %><% if (m.absent) { %> <span class="floater-card-unassigned">(absent)</span><% } else if (m.checkedOut) { %> <span class="floater-card-unassigned">(checked out)</span><% } %>
                 </td>
                 <%
                   var slots = [
@@ -154,6 +163,16 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
                           nothing to hand-pick until they're marked present again. %>
                       <select disabled class="floater-select-noavail" aria-label="<%= m.name %> is absent - no task suggested">
                         <option>Absent - no task</option>
+                      </select>
+                    <% } else if (m.checkedOut) { %>
+                      <%# "you won't be allowed to assign a job to them" once
+                          checked out - same disabled-dropdown treatment as
+                          the absent branch just above, matching the hard
+                          server-side block setTaskAssignment now throws if
+                          this is somehow bypassed (a stale page, a second
+                          admin tab). %>
+                      <select disabled class="floater-select-noavail" aria-label="<%= m.name %> has checked out - no task can be assigned">
+                        <option>Checked out - no task</option>
                       </select>
                     <% } else if (slot.options.length === 0) { %>
                       <select disabled class="floater-select-noavail" aria-label="No tasks available for <%= m.name %>">

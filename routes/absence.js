@@ -5,6 +5,7 @@ const { isValidISODate, formatDateLabel } = require('../utils/dates');
 const { getMemberRostersForDate } = require('../utils/rosters');
 const { activeParentAndAdminOptions, familyGroupsByMember, loadFamilyMember } = require('../utils/members');
 const { createRateLimiter } = require('../utils/rateLimit');
+const { unassignMemberForDate } = require('../utils/substitutes');
 
 // Generous cap for real use (a parent reporting for several kids, or
 // retrying after a typo) that still stops a script from hammering this
@@ -114,6 +115,16 @@ router.post('/absence/submit', async (req, res) => {
         )
         .run(student.id, roster.id, sessionDate, status, reasonCategory, reason);
     }
+    // A real request: "if someone submits an absence form and they are
+    // currently assigned as a floater, it should automatically unassign
+    // them." Only once a real absent/late row was actually written for
+    // this date (skippedAsPresent < rosters.length) - someone already
+    // checked in as present that day shouldn't have a same-day floater
+    // assignment yanked out from under them.
+    if (skippedAsPresent < rosters.length) {
+      await unassignMemberForDate(sessionDate, student.id);
+    }
+
     totalRosters += rosters.length;
     totalSkippedAsPresent += skippedAsPresent;
     namesRecorded.push(student.name);

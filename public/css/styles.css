@@ -6276,6 +6276,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    table only ever shows one of the two at once (see the partial's own
    comment on precedence). */
 .setup-assignment-row-checked-in td { background: var(--green-bg); color: var(--green); }
+/* A real request: "if someone checks out, it should highlight their name
+   yellow on the setup/cleanup assignment page" - same row-highlight
+   pattern as the absent/checked-in rules just above, this app's own
+   standard yellow pairing (see --yellow/--yellow-bg, e.g. .cell-late). */
+.setup-assignment-row-checked-out td { background: var(--yellow-bg); color: var(--yellow); }
 
 /* A member row staged for removal (public/js/team-member-remove-toggle.js)
    but not yet saved - a real request: "allow for multiple deletes and

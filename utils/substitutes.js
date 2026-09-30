@@ -468,6 +468,18 @@ async function clearAssignment(date, slotType, slotId) {
   await db.prepare('DELETE FROM substitute_assignments WHERE session_date = ? AND slot_type = ? AND slot_id = ?').run(date, slotType, slotId);
 }
 
+// A real request: "if someone submits an absence form and they are
+// currently assigned as a floater, it should automatically unassign
+// them" - called from routes/absence.js right after an Absence/Late form
+// actually records them absent/late for a date. Clears every slot
+// (class-coverage or permanent-job) this member holds on that date in one
+// go, same blanket by-key delete as clearAssignment above, just keyed off
+// the member instead of a single slot since a floater could in theory
+// hold more than one hour's coverage that day.
+async function unassignMemberForDate(date, memberId) {
+  await db.prepare('DELETE FROM substitute_assignments WHERE session_date = ? AND member_id = ?').run(date, memberId);
+}
+
 // floaterPool (optional - only substituteBoard's own hour-scoped pool has
 // one to give) supplies `rank` so the Floater Assignments dropdown can
 // still show a correct "(Choose First)"/"(Sometimes)"/"(Backup Only)"
@@ -897,6 +909,7 @@ module.exports = {
   setAssignment,
   approveAssignment,
   clearAssignment,
+  unassignMemberForDate,
   assignedHourCountsForDate,
   substituteBoard,
   jobAssignmentGrid,

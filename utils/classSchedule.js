@@ -1028,6 +1028,20 @@ async function checkedInMemberIdsForDate(date) {
   );
 }
 
+// Everyone with an actual kiosk checkout recorded on a given date - a real
+// request: "if someone checks out, it should highlight their name yellow
+// on the setup/cleanup assignment page and you won't be allowed to assign
+// a job to them." Same "compute on read" shape as checkedInMemberIdsForDate
+// just above, keyed off the checkouts table (a row's mere existence for
+// this date means they checked out that day - there's no separate pending
+// state to filter on).
+async function checkedOutMemberIdsForDate(date) {
+  if (!date) return new Set();
+  return new Set(
+    (await db.prepare(`SELECT DISTINCT member_id FROM checkouts WHERE session_date = ?`).all(date)).map((r) => r.member_id)
+  );
+}
+
 // Everyone who submitted an Absence form (not a Late form - someone
 // running late is still coming) for a given date - classesAtRiskForDay's
 // own narrower "actually won't be there" signal, based specifically on a
@@ -2103,6 +2117,7 @@ module.exports = {
   classesAtRiskForDay,
   absentMemberIdsForDate,
   checkedInMemberIdsForDate,
+  checkedOutMemberIdsForDate,
   absenceFormMemberIdsForDate,
   absenceFormAbsentMemberIdsForDate,
   missingMemberIdsForDate,
