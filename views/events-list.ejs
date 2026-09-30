@@ -107,7 +107,7 @@
           <%- include('partials/event-calendar-grid', {
             calendar: calendar,
             monthLinkBase: `/events?view=calendar${portalQuerySuffix}`,
-            eventHref: function (e) { return `/events/${e.id}`; },
+            eventHref: function (e) { return `/events/${e.id}${effectivePortal ? '?portal=' + effectivePortal : ''}`; },
           }) %>
         <% } else if (events.length === 0) { %>
           <p class="roster-empty">No upcoming events right now &mdash; check back soon.</p>

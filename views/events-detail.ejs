@@ -4,6 +4,37 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
+  <%
+    // A real bug report: "parent portal, when you click on an event its
+    // should be a normal page with the dashboard panel and header still
+    // like the other pages" + "backing out of an event takes you to
+    // student portal. It should stay in parent portal." /events/:id is a
+    // genuinely public page (no requirePortalAuth - see routes/events.js),
+    // so it can't assume a signed-in visitor belongs to one portal the way
+    // a native /parent/* or /student/* page can - same shape as events-
+    // list.ejs's own fix for /events itself (see its own comment for the
+    // full history). A signed-in student or parent gets their real portal
+    // nav shell here too, using the same ?portal=parent|student param
+    // (routes/events.js's own portalPrefix keeps it attached across every
+    // register/cancel/volunteer/claim action that redirects back to this
+    // same page) so a dual-role account never gets bounced to the wrong
+    // portal mid-visit.
+    const hasStudentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'student');
+    const hasParentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'parent');
+    const requestedPortal = typeof portalParam !== 'undefined' ? portalParam : null;
+    let effectivePortal = null;
+    if (requestedPortal === 'parent' && hasParentRole) effectivePortal = 'parent';
+    else if (requestedPortal === 'student' && hasStudentRole) effectivePortal = 'student';
+    else if (hasStudentRole) effectivePortal = 'student';
+    else if (hasParentRole) effectivePortal = 'parent';
+    const usesPortalNavShell = effectivePortal !== null;
+    const backHref = effectivePortal ? `/events?view=calendar&portal=${effectivePortal}` : '/events';
+  %>
+  <% if (effectivePortal === 'student') { %>
+    <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+  <% } else if (effectivePortal === 'parent') { %>
+    <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+  <% } else { %>
   <%- include('partials/icon-sprite') %>
 
   <header class="site-header">
@@ -20,11 +51,12 @@
       <% } %>
     </div>
   </header>
+  <% } %>
 
-  <main id="main-content" tabindex="-1">
+  <main id="main-content" tabindex="-1"<% if (usesPortalNavShell) { %> class="admin-main"<% } %>>
     <section class="site-section">
       <div class="site-section-inner">
-        <p><a href="/events">&larr; All Events</a></p>
+        <p><a href="<%= backHref %>">&larr; All Events</a></p>
 
         <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
         <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
@@ -435,5 +467,6 @@
       </div>
     </section>
   </main>
+  <script src="/js/events-preserve-portal.js"></script>
 </body>
 </html>

@@ -159,32 +159,25 @@
           </label>
           <%
             // A real request: "date picker should be a calendar. Start and
-            // end time should be separate drop down menus" - replaces the
-            // single combined datetime-local input with a plain calendar
-            // date input plus a time-of-day <select> (partials/time-
-            // select.ejs), recombined into the same startsAt/endsAt
-            // "YYYY-MM-DDTHH:MM" value this form has always submitted (see
-            // public/js/event-date-time-picker.js) so nothing server-side
-            // needs to change.
+            // end time should be separate drop down menus" - a plain
+            // calendar date input plus a time-of-day <select> pair
+            // (partials/date-range-picker.ejs), recombined into the same
+            // startsAt/endsAt "YYYY-MM-DDTHH:MM" value this form has
+            // always submitted (see public/js/event-date-time-picker.js)
+            // so nothing server-side needs to change.
             var startsDate = event.starts_at ? event.starts_at.slice(0, 10) : '';
             var startsTime = event.starts_at ? event.starts_at.slice(11, 16) : '';
             var endsDate = event.ends_at ? event.ends_at.slice(0, 10) : '';
             var endsTime = event.ends_at ? event.ends_at.slice(11, 16) : '';
           %>
-          <label>Starts
-            <div class="date-time-picker-row" data-date-time-picker>
-              <input type="date" data-date-time-date data-date-time-group="starts" value="<%= startsDate %>" required />
-              <%- include('partials/time-select', { dataGroup: 'starts', selectedTime: startsTime, required: true }) %>
-            </div>
-            <input type="hidden" name="startsAt" data-date-time-hidden="starts" value="<%= event.starts_at ? event.starts_at.replace(' ', 'T').slice(0, 16) : '' %>" />
-          </label>
-          <label>Ends
-            <div class="date-time-picker-row" data-date-time-picker>
-              <input type="date" data-date-time-date data-date-time-group="ends" value="<%= endsDate %>" />
-              <%- include('partials/time-select', { dataGroup: 'ends', selectedTime: endsTime }) %>
-            </div>
-            <input type="hidden" name="endsAt" data-date-time-hidden="ends" value="<%= event.ends_at ? event.ends_at.replace(' ', 'T').slice(0, 16) : '' %>" />
-          </label>
+          <%- include('partials/date-range-picker', {
+            startGroup: 'starts', endGroup: 'ends',
+            startDateLabel: 'Start Date', endDateLabel: 'End Date',
+            startTimeLabel: 'Start Time', endTimeLabel: 'End Time',
+            startDate: startsDate, startTime: startsTime, endDate: endsDate, endTime: endsTime,
+            startFieldName: 'startsAt', endFieldName: 'endsAt',
+            startRequired: true,
+          }) %>
           <label>Organized By
             <input type="text" name="organizedBy" value="<%= event.organized_by || '' %>" placeholder="e.g., Sanford Homeschoolers" />
           </label>
@@ -618,12 +611,24 @@
                 "counted by" type stay paired (routes/admin-events.js's
                 capacityFieldsFromBody needs both from the same
                 submission to compute capacity/family_capacity correctly). %>
-            <label>Registration Opens
-              <input type="datetime-local" name="registrationOpensAt" value="<%= event.registration_opens_at ? event.registration_opens_at.replace(' ', 'T').slice(0, 16) : '' %>" />
-            </label>
-            <label>Registration Closes
-              <input type="datetime-local" name="registrationClosesAt" value="<%= event.registration_closes_at ? event.registration_closes_at.replace(' ', 'T').slice(0, 16) : '' %>" />
-            </label>
+            <%
+              // A real request: "individual event settings date should be
+              // calendar picker times should be clock picker separate" +
+              // later "event edit settings, date and time laid out the
+              // same way" as the Details tab's own Starts/Ends fields
+              // above (partials/date-range-picker.ejs).
+              var opensDate = event.registration_opens_at ? event.registration_opens_at.slice(0, 10) : '';
+              var opensTime = event.registration_opens_at ? event.registration_opens_at.slice(11, 16) : '';
+              var closesDate = event.registration_closes_at ? event.registration_closes_at.slice(0, 10) : '';
+              var closesTime = event.registration_closes_at ? event.registration_closes_at.slice(11, 16) : '';
+            %>
+            <%- include('partials/date-range-picker', {
+              startGroup: 'regOpens', endGroup: 'regCloses',
+              startDateLabel: 'Registration Opens Date', endDateLabel: 'Registration Closes Date',
+              startTimeLabel: 'Registration Opens Time', endTimeLabel: 'Registration Closes Time',
+              startDate: opensDate, startTime: opensTime, endDate: closesDate, endTime: closesTime,
+              startFieldName: 'registrationOpensAt', endFieldName: 'registrationClosesAt',
+            }) %>
             <label>Capacity <span class="hint">(blank = no limit)</span>
               <input type="number" name="capacityValue" min="1" value="<%= event.family_capacity ?? event.capacity ?? '' %>" placeholder="No limit" />
             </label>

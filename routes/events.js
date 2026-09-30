@@ -20,6 +20,20 @@ function withImageUrl(event) {
   return { ...event, imageUrl: event.image_key ? `/uploads/events/${event.image_key}` : null };
 }
 
+// A real bug report: "parent portal, backing out of an event takes you to
+// student portal. It should stay in parent portal." /events/:id is a
+// shared public/member page (like /events itself - see below), so a
+// dual-role account's own portal nav shell there depends on a ?portal=
+// query param the visitor arrived with (views/events-detail.ejs's own
+// effectivePortal). Every action on that same page (register, cancel,
+// volunteer, claim a donation/food item, guest signup, etc.) redirects
+// back to itself, so that param has to survive every one of those round
+// trips too, or the very next render falls back to guessing (student
+// before parent) and a dual-role account flips portals mid-visit.
+function portalPrefix(req) {
+  return req.query.portal === 'parent' || req.query.portal === 'student' ? `?portal=${req.query.portal}&` : '?';
+}
+
 // GET /events - public + member events, filtered to what THIS visitor is
 // actually allowed to see: signed out sees visibility='public' only; a
 // signed-in portal account (any role) sees every published event, minus
@@ -168,9 +182,11 @@ router.get('/:id', async (req, res) => {
     family.filter((m) => events.ageGroupAllowsMember(event, m) && events.ageBucketAllowsMember(event, m)).map((m) => m.id)
   );
 
+  const portalParam = req.query.portal === 'student' || req.query.portal === 'parent' ? req.query.portal : null;
   res.render('events-detail', {
     title: event.title,
     settings,
+    portalParam,
     event: withImageUrl(event),
     startsLabel: formatFriendlyTimestamp(event.starts_at),
     endsLabel: event.ends_at ? formatFriendlyTimestamp(event.ends_at) : null,
@@ -212,10 +228,12 @@ router.get('/:id/fragment', async (req, res) => {
     const family = await familyForAccount(req.portalAccount.id);
     if (family.length && !(await events.eventVisibleToFamily(event.id, family))) return res.status(404).send('Not found');
   }
+  const portalParam = req.query.portal === 'student' || req.query.portal === 'parent' ? req.query.portal : null;
   res.render('events-card-fragment', {
     event: withImageUrl(event),
     startsLabel: formatFriendlyTimestamp(event.starts_at),
     priceLabel: event.price_cents == null ? null : `$${(event.price_cents / 100).toFixed(2)} per ${event.price_per}`,
+    portalParam,
   });
 });
 
@@ -240,11 +258,11 @@ router.post('/:id/register', requirePortalAuth, async (req, res) => {
   }
   const ticketTypeId = req.body.ticketTypeId ? parseInt(req.body.ticketTypeId, 10) : null;
   const result = await events.registerForEvent({ eventId, memberId, accountId: req.portalAccount.id, family, answers, ticketTypeId });
-  if (!result.ok) return res.redirect(back + '?error=' + encodeURIComponent(result.error));
+  if (!result.ok) return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent(result.error));
 
   const event = await events.getEvent(eventId);
   await notifications.notify(req.portalAccount.id, 'event_registration', { title: `Registered: ${event.title}`, body: result.notice, linkUrl: back });
-  res.redirect(back + '?notice=' + encodeURIComponent(result.notice));
+  res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent(result.notice));
 });
 
 // A real request: "add a checkbox for include physical ticket. Members
@@ -287,17 +305,17 @@ router.post('/:id/unregister', requirePortalAuth, async (req, res) => {
 
   const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
-    return res.redirect(back + '?error=' + encodeURIComponent('You can only manage your own family\'s registrations.'));
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('You can only manage your own family\'s registrations.'));
   }
   // A real request: "allow registration cancelations" checkbox - gates a
   // member's own self-service cancel here only; a Main Admin can always
   // cancel a registration from the Registrations page regardless.
   const event = await events.getEvent(eventId);
   if (event && !event.allow_registration_cancellations) {
-    return res.redirect(back + '?error=' + encodeURIComponent('Cancellations are not allowed for that event - contact an admin.'));
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('Cancellations are not allowed for that event - contact an admin.'));
   }
   await events.cancelRegistration(eventId, memberId);
-  res.redirect(back + '?notice=' + encodeURIComponent('Registration cancelled.'));
+  res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent('Registration cancelled.'));
 });
 
 // A real request: "guest check in shouldn't be [on the Attendance page].
@@ -316,16 +334,16 @@ router.post('/:id/register-guest', requirePortalAuth, async (req, res) => {
   const eventId = req.params.id;
   const back = `/events/${eventId}`;
   const event = await events.getEvent(eventId);
-  if (!event || !event.allow_guest_register) return res.redirect(back + '?error=' + encodeURIComponent('This event isn\'t accepting guest registrations.'));
+  if (!event || !event.allow_guest_register) return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('This event isn\'t accepting guest registrations.'));
 
   const guestName = (req.body.guestName || '').trim();
-  if (!guestName) return res.redirect(back + '?error=' + encodeURIComponent('Guest name is required.'));
+  if (!guestName) return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('Guest name is required.'));
   await events.addGuestRegistration(
     eventId,
     { guestName, guestEmail: (req.body.guestEmail || '').trim(), guestPhone: (req.body.guestPhone || '').trim() },
     req.portalAccount.id
   );
-  res.redirect(back + '?notice=' + encodeURIComponent(`${guestName} registered as a guest.`));
+  res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent(`${guestName} registered as a guest.`));
 });
 
 router.post('/:id/unregister-guest', requirePortalAuth, async (req, res) => {
@@ -334,10 +352,10 @@ router.post('/:id/unregister-guest', requirePortalAuth, async (req, res) => {
   const guestId = parseInt(req.body.guestId, 10);
   const guest = await db.prepare('SELECT * FROM event_guest_registrations WHERE id = ? AND event_id = ?').get(guestId, eventId);
   if (!guest || guest.registered_by_account_id !== req.portalAccount.id) {
-    return res.redirect(back + '?error=' + encodeURIComponent('You can only manage guests you registered yourself.'));
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('You can only manage guests you registered yourself.'));
   }
   await events.cancelGuestRegistration(guestId);
-  res.redirect(back + '?notice=' + encodeURIComponent('Guest registration cancelled.'));
+  res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent('Guest registration cancelled.'));
 });
 
 router.post('/:id/volunteer-roles/:roleId/signup', requirePortalAuth, async (req, res) => {
@@ -347,10 +365,10 @@ router.post('/:id/volunteer-roles/:roleId/signup', requirePortalAuth, async (req
 
   const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
-    return res.redirect(back + '?error=' + encodeURIComponent('You can only sign up yourself or your own family.'));
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('You can only sign up yourself or your own family.'));
   }
   const ok = await events.signUpForVolunteerRole(req.params.roleId, memberId, req.portalAccount.id);
-  res.redirect(back + '?notice=' + encodeURIComponent(ok ? 'Signed up to volunteer.' : 'That role is already full, or you\'re already signed up.'));
+  res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent(ok ? 'Signed up to volunteer.' : 'That role is already full, or you\'re already signed up.'));
 });
 
 router.post('/:id/volunteer-roles/:roleId/cancel', requirePortalAuth, async (req, res) => {
@@ -360,10 +378,10 @@ router.post('/:id/volunteer-roles/:roleId/cancel', requirePortalAuth, async (req
 
   const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
-    return res.redirect(back + '?error=' + encodeURIComponent('You can only manage your own family\'s volunteer signups.'));
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('You can only manage your own family\'s volunteer signups.'));
   }
   await events.cancelVolunteerSignup(req.params.roleId, memberId);
-  res.redirect(back + '?notice=' + encodeURIComponent('Volunteer signup cancelled.'));
+  res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent('Volunteer signup cancelled.'));
 });
 
 router.post('/:id/donation-items/:itemId/claim', requirePortalAuth, async (req, res) => {
@@ -373,11 +391,11 @@ router.post('/:id/donation-items/:itemId/claim', requirePortalAuth, async (req, 
 
   const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
-    return res.redirect(back + '?error=' + encodeURIComponent('You can only claim an item as yourself or your own family.'));
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('You can only claim an item as yourself or your own family.'));
   }
   const claimed = await events.claimDonationItem(req.params.itemId, memberId, req.body.quantity, req.portalAccount.id);
   const notice = claimed > 0 ? `Thank you - ${claimed} claimed.` : 'That item no longer needs any more - thank you for checking!';
-  res.redirect(back + '?notice=' + encodeURIComponent(notice));
+  res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent(notice));
 });
 
 // Food - a real request: "on the volunteer, donations and food pages..."
@@ -389,11 +407,11 @@ router.post('/:id/food-items/:itemId/claim', requirePortalAuth, async (req, res)
 
   const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
-    return res.redirect(back + '?error=' + encodeURIComponent('You can only claim an item as yourself or your own family.'));
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('You can only claim an item as yourself or your own family.'));
   }
   const claimed = await events.claimFoodItem(req.params.itemId, memberId, req.body.quantity, req.portalAccount.id);
   const notice = claimed > 0 ? `Thank you - ${claimed} claimed.` : 'That item no longer needs any more - thank you for checking!';
-  res.redirect(back + '?notice=' + encodeURIComponent(notice));
+  res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent(notice));
 });
 
 // A real request: "be able to attach these lists to events" (Main
@@ -408,11 +426,11 @@ router.post('/:id/signup-list-items/:itemId/claim', requirePortalAuth, async (re
 
   const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
-    return res.redirect(back + '?error=' + encodeURIComponent('You can only claim an item as yourself or your own family.'));
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('You can only claim an item as yourself or your own family.'));
   }
   const claimed = await signupLists.claimSignUpItem(req.params.itemId, memberId, req.body.quantity, req.portalAccount.id);
   const notice = claimed > 0 ? `Thank you - ${claimed} claimed.` : 'That item no longer needs any more - thank you for checking!';
-  res.redirect(back + '?notice=' + encodeURIComponent(notice));
+  res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent(notice));
 });
 
 router.post('/:id/volunteer-list-shifts/:shiftId/signup', requirePortalAuth, async (req, res) => {
@@ -422,10 +440,10 @@ router.post('/:id/volunteer-list-shifts/:shiftId/signup', requirePortalAuth, asy
 
   const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
-    return res.redirect(back + '?error=' + encodeURIComponent('You can only sign up yourself or your own family.'));
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('You can only sign up yourself or your own family.'));
   }
   await signupLists.signUpForShift(req.params.shiftId, memberId, req.portalAccount.id);
-  res.redirect(back + '?notice=' + encodeURIComponent('Signed up - thank you for volunteering!'));
+  res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent('Signed up - thank you for volunteering!'));
 });
 
 router.post('/:id/volunteer-list-shifts/:shiftId/cancel', requirePortalAuth, async (req, res) => {
@@ -435,10 +453,10 @@ router.post('/:id/volunteer-list-shifts/:shiftId/cancel', requirePortalAuth, asy
 
   const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
-    return res.redirect(back + '?error=' + encodeURIComponent('You can only manage your own family\'s volunteer signups.'));
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('You can only manage your own family\'s volunteer signups.'));
   }
   await signupLists.cancelShiftSignup(req.params.shiftId, memberId);
-  res.redirect(back + '?notice=' + encodeURIComponent('Volunteer signup cancelled.'));
+  res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent('Volunteer signup cancelled.'));
 });
 
 module.exports = router;

@@ -1,0 +1,36 @@
+<%
+// A real request: "start date and end date picker should be on the same
+// row next to each other. Stacked below start time and end time clock
+// picker in the same row next to each other" - a Dates row (Start Date,
+// End Date side by side) stacked above a Times row (Start Time, End Time
+// side by side), instead of each field's own date+time pair in one row.
+// Shared by the Details tab's own Starts/Ends fields and the Settings
+// tab's own Registration Opens/Closes fields (views/admin-events-
+// builder.ejs), so both got "laid out the same way" from one place.
+//
+// Locals: startGroup/endGroup (data-date-time-group values), startDate/
+// startTime/endDate/endTime (current values, 'YYYY-MM-DD'/'HH:MM' or ''),
+// startFieldName/endFieldName (the real <input type="hidden"> name= this
+// form has always submitted), startDateLabel/endDateLabel/startTimeLabel/
+// endTimeLabel (field labels), startRequired (optional bool - only the
+// Details tab's own Start is required).
+var startRequired = typeof startRequired !== 'undefined' ? startRequired : false;
+%>
+<div class="member-form-full date-time-two-col-row">
+  <label><%= startDateLabel %>
+    <input type="date" data-date-time-date data-date-time-group="<%= startGroup %>" value="<%= startDate %>"<%= startRequired ? ' required' : '' %> />
+  </label>
+  <label><%= endDateLabel %>
+    <input type="date" data-date-time-date data-date-time-group="<%= endGroup %>" value="<%= endDate %>" />
+  </label>
+</div>
+<div class="member-form-full date-time-two-col-row">
+  <label><%= startTimeLabel %>
+    <%- include('time-select', { dataGroup: startGroup, selectedTime: startTime, required: startRequired }) %>
+  </label>
+  <label><%= endTimeLabel %>
+    <%- include('time-select', { dataGroup: endGroup, selectedTime: endTime }) %>
+  </label>
+</div>
+<input type="hidden" name="<%= startFieldName %>" data-date-time-hidden="<%= startGroup %>" value="<%= startDate && startTime ? startDate + 'T' + startTime : '' %>" />
+<input type="hidden" name="<%= endFieldName %>" data-date-time-hidden="<%= endGroup %>" value="<%= endDate && endTime ? endDate + 'T' + endTime : '' %>" />

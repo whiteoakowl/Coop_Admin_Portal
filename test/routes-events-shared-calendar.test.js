@@ -91,8 +91,13 @@ test('Parent Portal Events calendar renders the same month/year-dropdown calenda
   }
 
   // The event pill links differ (Main Admin's own builder vs. the public
-  // event detail page) - each still lands on its own right target.
-  assert.match(parentPage.text, /href="\/events\/\d+" class="badge-pill/);
+  // event detail page) - each still lands on its own right target. The
+  // Parent Portal one now also carries ?portal=parent (a real bug report:
+  // "backing out of an event takes you to student portal" - see
+  // views/events-list.ejs's own eventHref and events-detail.ejs's own
+  // effectivePortal comment) so a dual-role account's own click-through
+  // stays on the portal it was actually browsing from.
+  assert.match(parentPage.text, /href="\/events\/\d+\?portal=parent" class="badge-pill/);
   assert.match(adminPage.text, /href="\/main-admin\/events\/\d+\/builder" class="badge-pill/);
 
   // Parent Portal's own nav shell (not the generic public site header)

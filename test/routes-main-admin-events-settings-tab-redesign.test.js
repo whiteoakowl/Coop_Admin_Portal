@@ -292,3 +292,47 @@ test('Lock visibility to one section: event is hidden from a family with no memb
   const visible = await request(app).get(`/events/${eventId}`).set('Cookie', parent.cookie);
   assert.equal(visible.status, 200);
 });
+
+// A real request: "individual event settings date should be calendar
+// picker times should be clock picker separate" - same calendar date
+// input + time-of-day <select> pair as the Details tab's own Starts/Ends
+// fields (test/routes-admin-events-date-time-picker.test.js).
+test('Settings tab: Registration Opens/Closes render as a calendar date input plus a time-of-day dropdown, not datetime-local', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/permissions`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ registrationOpensAt: '2027-08-15T09:30', registrationClosesAt: '2027-08-31T17:00', _csrf: admin.csrfToken });
+
+  const page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=settings`).set('Cookie', admin.cookie);
+  assert.equal(page.status, 200);
+  assert.doesNotMatch(page.text, /type="datetime-local"/);
+  assert.match(page.text, /<input type="date" data-date-time-date data-date-time-group="regOpens" value="2027-08-15" \/>/);
+  assert.match(page.text, /<option value="09:30" selected>9:30 AM<\/option>/);
+  assert.match(page.text, /<input type="hidden" name="registrationOpensAt" data-date-time-hidden="regOpens" value="2027-08-15T09:30" \/>/);
+  assert.match(page.text, /<input type="date" data-date-time-date data-date-time-group="regCloses" value="2027-08-31" \/>/);
+  assert.match(page.text, /<option value="17:00" selected>5:00 PM<\/option>/);
+  assert.match(page.text, /<input type="hidden" name="registrationClosesAt" data-date-time-hidden="regCloses" value="2027-08-31T17:00" \/>/);
+});
+
+// A real request: "event edit settings, date and time laid out the same
+// way" as the Details tab's own Start/End Date row + Start/End Time row.
+test('Settings tab: Registration Opens Date/Closes Date share one row, Opens Time/Closes Time share a separate row below it', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  const page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=settings`).set('Cookie', admin.cookie);
+
+  const dateRowMatch = /<div class="member-form-full date-time-two-col-row">\s*<label>Registration Opens Date([\s\S]*?)<\/div>/.exec(page.text);
+  assert.ok(dateRowMatch, 'expected a Dates row starting with Registration Opens Date');
+  assert.match(dateRowMatch[1], /Registration Closes Date/);
+  assert.doesNotMatch(dateRowMatch[1], /data-date-time-time/, 'the Dates row should contain no time <select>');
+
+  const timeRowMatch = /<div class="member-form-full date-time-two-col-row">\s*<label>Registration Opens Time([\s\S]*?)<\/div>/.exec(page.text);
+  assert.ok(timeRowMatch, 'expected a Times row starting with Registration Opens Time');
+  assert.match(timeRowMatch[1], /Registration Closes Time/);
+  assert.doesNotMatch(timeRowMatch[1], /data-date-time-date/, 'the Times row should contain no date input');
+
+  assert.ok(dateRowMatch.index < timeRowMatch.index, 'the Dates row should come before the Times row');
+});

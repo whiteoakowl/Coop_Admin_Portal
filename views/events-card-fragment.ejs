@@ -35,5 +35,5 @@
     <p class="hint"><svg class="icon"><use href="#icon-tag"/></svg> <%= priceLabel %></p>
   <% } %>
 
-  <a class="primary-btn primary-btn-dark" style="display: block; text-align: center; margin-top: 0.75rem;" href="/events/<%= event.id %>">Register Now</a>
+  <a class="primary-btn primary-btn-dark" style="display: block; text-align: center; margin-top: 0.75rem;" href="/events/<%= event.id %><%= portalParam ? '?portal=' + portalParam : '' %>">Register Now</a>
 </div>

@@ -84,3 +84,30 @@ test('an event with no end time renders the Ends date/time controls empty, not p
   assert.match(page.text, /<input type="date" data-date-time-date data-date-time-group="ends" value=""[^>]* \/>/);
   assert.match(page.text, /<input type="hidden" name="endsAt" data-date-time-hidden="ends" value="" \/>/);
 });
+
+// A real request: "start date and end date picker should be on the same
+// row next to each other. Stacked below start time and end time clock
+// picker in the same row next to each other." Start/End Date share one
+// row, Start/End Time share a separate row stacked below it - not each
+// field's own date+time pair together.
+test('Details tab: Start Date/End Date share one row, Start Time/End Time share a separate row below it', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin, '2027-09-01T18:15', '2027-09-01T20:30');
+  const page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=details`).set('Cookie', admin.cookie);
+
+  const dateRowMatch = /<div class="member-form-full date-time-two-col-row">\s*<label>Start Date([\s\S]*?)<\/div>/.exec(page.text);
+  assert.ok(dateRowMatch, 'expected a Dates row starting with Start Date');
+  assert.match(dateRowMatch[1], /End Date/);
+  assert.match(dateRowMatch[1], /data-date-time-group="starts"/);
+  assert.match(dateRowMatch[1], /data-date-time-group="ends"/);
+  assert.doesNotMatch(dateRowMatch[1], /data-date-time-time/, 'the Dates row should contain no time <select>');
+
+  const timeRowMatch = /<div class="member-form-full date-time-two-col-row">\s*<label>Start Time([\s\S]*?)<\/div>/.exec(page.text);
+  assert.ok(timeRowMatch, 'expected a Times row starting with Start Time');
+  assert.match(timeRowMatch[1], /End Time/);
+  assert.match(timeRowMatch[1], /data-date-time-time data-date-time-group="starts"/);
+  assert.match(timeRowMatch[1], /data-date-time-time data-date-time-group="ends"/);
+  assert.doesNotMatch(timeRowMatch[1], /data-date-time-date/, 'the Times row should contain no date input');
+
+  assert.ok(dateRowMatch.index < timeRowMatch.index, 'the Dates row should come before the Times row');
+});

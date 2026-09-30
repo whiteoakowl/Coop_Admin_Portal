@@ -2453,15 +2453,17 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   gap: 1rem 1.5rem;
 }
 .member-form-full { grid-column: 1 / -1; }
-/* Event Details' Starts/Ends fields (views/admin-events-builder.ejs) - a
-   calendar date input beside a time-of-day <select> (partials/time-
-   select.ejs), combined into the field's own hidden startsAt/endsAt input
-   by public/js/event-date-time-picker.js. A real request: "date picker
-   should be a calendar. Start and end time should be separate drop down
-   menus." */
-.date-time-picker-row { display: flex; gap: 0.5rem; }
-.date-time-picker-row input[type="date"],
-.date-time-picker-row select { flex: 1; min-width: 0; }
+/* Event Details' Starts/Ends and Settings' Registration Opens/Closes
+   fields (views/admin-events-builder.ejs, partials/date-range-picker.ejs)
+   - a real request: "date picker should be a calendar. Start and end time
+   should be separate drop down menus," later "start date and end date
+   picker should be on the same row next to each other, stacked below
+   start time and end time... in the same row" - a Dates row (Start/End
+   Date) stacked above a Times row (Start/End Time), each pair combined
+   into its own hidden startsAt/endsAt/registrationOpensAt/
+   registrationClosesAt input by public/js/event-date-time-picker.js. */
+.date-time-two-col-row { display: flex; gap: 0.75rem; }
+.date-time-two-col-row label { flex: 1; min-width: 0; }
 .checkbox-group-label { display: block; font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-bottom: 0.35rem; }
 /* A real bug report on the Name Tag/Absence forms: "when you choose a
    parent name the select all button overlaps everything." This button
@@ -9274,7 +9276,15 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
      viewport on their own without it. */
   .event-calendar-table th, .event-calendar-table td { padding: 0.2rem 0.15rem; font-size: 0.62rem; }
   .event-calendar-table td { height: 3rem; }
-  .event-calendar-table .badge-pill { font-size: 0.5rem; padding: 0.05rem 0.2rem; }
+  /* A real request: "shrink text on event calendar mobile so that a word
+     is not split into two lines" - the base rule's overflow-wrap: break-
+     word (needed on desktop for a genuinely long single word) let a
+     narrow mobile column break an ordinary short word mid-letter once it
+     no longer fit; word-break: keep-all + a smaller font-size instead let
+     a multi-word title wrap onto its own extra line at a space, the way
+     text normally wraps, while a single word that's still too wide simply
+     overflows its cell rather than splitting. */
+  .event-calendar-table .badge-pill { font-size: 0.45rem; padding: 0.05rem 0.2rem; overflow-wrap: normal; word-break: keep-all; }
 }
 
 /* Item 2 - square icon-only Calendar View/List View toggle buttons. A
