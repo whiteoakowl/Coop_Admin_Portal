@@ -15,7 +15,7 @@
     inline scan input before this page did) instead of a kiosk route. %>
 <body data-event-id="<%= event.id %>" data-mode="<%= mode %>">
   <%- include('partials/portal-nav', {
-    portalTitle: 'Main Admin',
+    portalTitle: (typeof isOrganizerView !== 'undefined' && isOrganizerView) ? 'Parent Portal' : 'Main Admin',
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">

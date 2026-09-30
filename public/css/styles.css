@@ -8885,8 +8885,17 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
    there are three lines instead of two). */
 .event-hero-meta-stack { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 1.5rem; }
 .event-hero-meta-stack .site-hero-meta { margin-top: 0; }
-/* "Details should have some space before registration card begins." */
-.event-register-card { margin-top: 1.5rem; }
+/* "Details should have some space before registration card begins." A
+   later real request: "The register card at the bottom should be blue
+   to stand out" - tinted brand-blue background + a matching border,
+   rather than the plain .manage-section white every other card here
+   uses, and its own heading colored to match. */
+.event-register-card {
+  margin-top: 1.5rem;
+  background: var(--brand-soft);
+  border-color: var(--brand);
+}
+.event-register-card h2 { color: var(--brand-darker); }
 
 /* "Name of each member should not be on each button. It should be a list
    of members with a small register button next to each name in a clean

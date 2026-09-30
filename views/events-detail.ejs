@@ -65,7 +65,22 @@
           <img src="<%= event.imageUrl %>" alt="" style="width: 100%; max-height: 320px; object-fit: cover; border-radius: var(--radius); margin-bottom: 1.25rem;" />
         <% } %>
 
-        <h1><%= event.title %></h1>
+        <div class="grid-box-header">
+          <h1><%= event.title %></h1>
+          <%
+            // A real request: "If a member is added as an organizer for
+            // an event, on parent portal when they click on the event it
+            // will show an edit event button at the top to allow them to
+            // change details." Straight to the same Main Admin builder
+            // page an admin uses - routes/admin-events.js's own
+            // requireMainAdminOrEventOrganizer lets an organizer-parent
+            // in there too, with Finance frozen and no Cancel/Delete/
+            // Publish (its own comment covers the full scope).
+          %>
+          <% if (typeof isOrganizer !== 'undefined' && isOrganizer) { %>
+            <a class="primary-btn" href="/main-admin/events/<%= event.id %>/builder">Edit Event</a>
+          <% } %>
+        </div>
         <% if (event.categoryName) { %><span class="badge-pill" style="background: <%= event.categoryColor %>; color: #fff;"><%= event.categoryName %></span><% } %>
         <%
           // A real request: "if the event starts and ends the same day we
@@ -95,7 +110,17 @@
             <p class="site-hero-meta"><svg class="icon"><use href="#icon-user"/></svg> Organized by <%= organizerLines.join(', ') %></p>
           <% } %>
         </div>
-        <% if (event.description) { %><div class="forum-editable-display"><%- event.description %></div><% } %>
+        <%
+          // A real request: "Event details should also be card style like
+          // the other text information for events" - matches the
+          // .manage-section card each infoSection below already renders in.
+        %>
+        <% if (event.description) { %>
+          <div class="manage-section">
+            <h2>Details</h2>
+            <div class="forum-editable-display"><%- event.description %></div>
+          </div>
+        <% } %>
 
         <%
           // A real request: "event editing under details add another text

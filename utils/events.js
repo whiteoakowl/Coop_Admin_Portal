@@ -1286,6 +1286,19 @@ async function organizersForEvent(eventId) {
     .all(eventId);
 }
 
+// A real request: "If a member is added as an organizer for an event, on
+// parent portal when they click on the event it will show an edit event
+// button at the top to allow them to change details." Checked against
+// the requesting account's own member_id (member_accounts.member_id) -
+// not their whole family - since organizers are added as specific
+// members, not families. Never true for the fixed "Sanford Homeschoolers"
+// row (member_id null) - there's no member to be signed in as it.
+async function isEventOrganizer(eventId, memberId) {
+  if (!memberId) return false;
+  const row = await db.prepare('SELECT 1 FROM event_organizers WHERE event_id = ? AND member_id = ?').get(eventId, memberId);
+  return !!row;
+}
+
 // selections: array of strings, each either the literal 'org' (Sanford
 // Homeschoolers) or 'member:<id>' (a specific parent) - matching values
 // the admin-events-builder.ejs multi-select checkbox options above.
@@ -1641,6 +1654,7 @@ module.exports = {
   setGuestAttendanceStatus,
   organizersForEvent,
   setEventOrganizers,
+  isEventOrganizer,
   addVolunteerRole,
   updateVolunteerRole,
   deleteVolunteerRole,

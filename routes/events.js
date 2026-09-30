@@ -186,11 +186,20 @@ router.get('/:id', async (req, res) => {
   // A real request: "will show on parent portal who Organized the event
   // and their email address" - see utils/events.js's own organizersForEvent.
   const organizers = await events.organizersForEvent(event.id);
+  // A real request: "If a member is added as an organizer for an event,
+  // on parent portal when they click on the event it will show an edit
+  // event button at the top to allow them to change details." Reuses the
+  // exact same Main Admin builder page (routes/admin-events.js's own
+  // requireMainAdminOrEventOrganizer gate checks this same organizer
+  // relationship again server-side - this is purely to decide whether to
+  // show the button at all).
+  const isOrganizer = req.portalAccount ? await events.isEventOrganizer(event.id, req.portalAccount.member_id) : false;
   res.render('events-detail', {
     title: event.title,
     settings,
     portalParam,
     organizers,
+    isOrganizer,
     event: withImageUrl(event),
     startsLabel: formatFriendlyTimestamp(event.starts_at),
     endsLabel: event.ends_at ? formatFriendlyTimestamp(event.ends_at) : null,

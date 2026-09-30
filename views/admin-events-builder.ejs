@@ -4,8 +4,21 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
+  <%
+    // A real request: "If a member is added as an organizer for an
+    // event, on parent portal when they click on the event it will show
+    // an edit event button... Members are not allowed to change anything
+    // on the financial tab... Everything except Finance, including
+    // Attendance" (confirmed scope). This same page now also renders for
+    // an organizer-parent (routes/admin-events.js's own
+    // requireMainAdminOrEventOrganizer sets req.isOrganizerView) -
+    // organizers are always parent-type members (utils/members.js's own
+    // activeParentOptionsWithEmail, the only picker that feeds event_
+    // organizers), so their own nav shell is always Parent Portal.
+    var organizerView = typeof isOrganizerView !== 'undefined' && isOrganizerView;
+  %>
   <%- include('partials/portal-nav', {
-    portalTitle: 'Main Admin',
+    portalTitle: organizerView ? 'Parent Portal' : 'Main Admin',
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
@@ -18,18 +31,27 @@
         <p><a>&larr; ...</a></p> convention every other single-record edit
         page in this app already uses (see e.g. admin-accounting-member.ejs's
         own "All Accounting" link), instead of a roster-action-btn sharing
-        the toolbar row below. %>
-    <p><a href="/main-admin/events">&larr; All Events</a></p>
+        the toolbar row below. An organizer-parent has no Main Admin
+        Events list to go back to - back to the event's own public page
+        instead. %>
+    <% if (organizerView) { %>
+      <p><a href="/events/<%= event.id %>?portal=parent">&larr; Back to Event</a></p>
+    <% } else { %>
+      <p><a href="/main-admin/events">&larr; All Events</a></p>
+    <% } %>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
-    <% if (event.approval_status === 'pending') { %>
+    <% if (!organizerView && event.approval_status === 'pending') { %>
       <div class="alert alert-error">
         This event was submitted by a member and is awaiting approval.
         <a href="/main-admin/events?tab=requests">Review it on the Requests tab &rarr;</a>
       </div>
     <% } %>
 
+    <%# An organizer-parent only ever gets Copy Event Link here - Publish/
+        Cancel/Move to Draft/Delete stay Main-Admin-only (confirmed
+        scope: "No - Copy Link only"). %>
     <div class="roster-toolbar">
       <%# A real request: "get rid of registrations button, it's all under
           attendance tab" - the Attendance link in the tab strip below
@@ -40,6 +62,7 @@
           Event with nothing else crowding it out. %>
       <div class="roster-btn-row roster-btn-row-fit-text">
         <button type="button" class="roster-action-btn" data-copy-link="<%= eventLink %>">Copy Event Link</button>
+        <% if (!organizerView) { %>
         <% if (event.status !== 'published') { %>
           <form method="POST" action="/main-admin/events/<%= event.id %>/status" class="inline-block-form">
             <input type="hidden" name="status" value="published" />
@@ -60,6 +83,7 @@
         <form method="POST" action="/main-admin/events/<%= event.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= event.title %>&quot;? This cannot be undone.">
           <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete Event" title="Delete Event"><svg class="icon"><use href="#icon-trash"/></svg></button>
         </form>
+        <% } %>
       </div>
     </div>
 
@@ -285,6 +309,16 @@
           above ticket types" - the flat Price/Charged Per fields that
           used to sit here are gone; each Ticket Type below now carries
           its own price and person/family basis instead. %>
+      <%
+        // A real request: "Members are not allowed to change anything on
+        // the financial tab. They can click on the tab but everything
+        // will be frozen and not clickable." An organizer-parent still
+        // sees this whole tab (so they can check pricing/payment info)
+        // but every field/button in it is disabled - a disabled <button
+        // onclick="..."> never fires its handler, so the Add Ticket
+        // Type dialog and every delete icon are frozen the same way.
+        var financeDisabled = organizerView ? 'disabled' : '';
+      %>
       <div class="manage-section">
         <form method="POST" action="/main-admin/events/<%= event.id %>/finance" class="member-form-grid">
           <%# A real request: "add a drop down menu for choosing
@@ -292,7 +326,7 @@
               Events list page's own Settings tab (Add/Edit Accounting
               Category), same place/pattern as Categories/Locations. %>
           <label>Accounting Category
-            <select name="accountingCategoryId">
+            <select name="accountingCategoryId" <%= financeDisabled %>>
               <option value="">None</option>
               <% accountingCategories.forEach(function(c) { %>
                 <option value="<%= c.id %>" <%= event.accounting_category_id === c.id ? 'selected' : '' %>><%= c.name %></option>
@@ -306,14 +340,16 @@
               a registrant on the event's own public page next to its
               Price/Ticket Types, not a real checkout. %>
           <label class="member-form-full">Payment Instructions Title
-            <input type="text" name="paymentInstructionsTitle" value="<%= event.payment_instructions_title || '' %>" placeholder="e.g. How to Pay" />
+            <input type="text" name="paymentInstructionsTitle" value="<%= event.payment_instructions_title || '' %>" placeholder="e.g. How to Pay" <%= financeDisabled %> />
           </label>
           <label class="member-form-full">Payment Instructions
-            <textarea name="paymentInstructionsText" rows="3" placeholder="e.g. Pay by cash, check, or Venmo @coopname at drop-off."><%= event.payment_instructions_text || '' %></textarea>
+            <textarea name="paymentInstructionsText" rows="3" placeholder="e.g. Pay by cash, check, or Venmo @coopname at drop-off." <%= financeDisabled %>><%= event.payment_instructions_text || '' %></textarea>
           </label>
+          <% if (!organizerView) { %>
           <div class="member-form-full">
             <button type="submit" class="primary-btn">Save Finance</button>
           </div>
+          <% } %>
         </form>
       </div>
 
@@ -325,7 +361,7 @@
       <div class="manage-section">
           <div class="grid-box-header">
             <h2>Ticket Types (<%= event.ticketTypes.length %>)</h2>
-            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-ticket-type-dialog').showModal()">+ Add Ticket Type</button>
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-ticket-type-dialog').showModal()" <%= financeDisabled %>>+ Add Ticket Type</button>
           </div>
 
           <% if (event.ticketTypes.length === 0) { %>
@@ -341,11 +377,13 @@
                     <strong><%= t.title %></strong>
                     <span class="hint">$<%= (t.price_cents / 100).toFixed(2) %> per <%= t.price_per %><% if (t.includes_physical_ticket) { %> &middot; Physical ticket<% } %></span>
                   </div>
+                  <% if (!organizerView) { %>
                   <div class="training-lesson-actions">
                     <form method="POST" action="/main-admin/events/<%= event.id %>/ticket-types/<%= t.id %>/delete" class="inline-block-form" data-confirm="Remove ticket type &quot;<%= t.title %>&quot;?">
                       <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= t.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                     </form>
                   </div>
+                  <% } %>
                 </div>
               </div>
             <% }); %>

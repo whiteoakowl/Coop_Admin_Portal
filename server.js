@@ -417,6 +417,22 @@ app.use('/kiosk/class-checkin', kioskClassCheckinRouter);
 app.use('/', require('./middleware/csrfProtection'));
 app.use('/', portalAuthRouter);
 app.use('/parent', parentPortalRouter);
+// Registered before the generic '/main-admin' mounts below (Express
+// tries mounted routers in registration order for matching prefixes,
+// and '/main-admin/events' is otherwise just a prefix match away from
+// being swallowed by mainAdminRouter's/mainAdminTrainingRouter's own
+// blanket requirePortal('main_admin') first) - a real request: "If a
+// member is added as an organizer for an event, on parent portal when
+// they click on the event it will show an edit event button." Those two
+// routers' own blanket gate would otherwise 403 an organizer-parent
+// before ever reaching adminEventsRouter's own requireMainAdminOrEvent
+// Organizer, which needs the chance to allow them through for this one
+// event. routes/main-admin.js/main-admin-training.js are both on Track
+// A's hard-boundary "don't touch" list, so this reorders the mount
+// instead of touching either of them - a real Main Admin's own access is
+// completely unchanged either way, since adminEventsRouter's own gate
+// re-checks main_admin+manage_events itself.
+app.use('/main-admin/events', adminEventsRouter);
 app.use('/main-admin', mainAdminRouter);
 app.use('/main-admin/members', mainAdminMembersRouter);
 app.use('/main-admin/announcements', mainAdminAnnouncementsRouter);
@@ -431,7 +447,6 @@ app.use('/main-admin/sections', mainAdminSectionsRouter);
 app.use('/main-admin/name-tags', mainAdminNameTagsRouter);
 app.use('/main-admin', mainAdminTrainingRouter);
 app.use('/events', eventsRouter);
-app.use('/main-admin/events', adminEventsRouter);
 app.use('/directory', directoryRouter);
 app.use('/main-admin/directory', adminDirectoryRouter);
 app.use('/classifieds', classifiedsRouter);

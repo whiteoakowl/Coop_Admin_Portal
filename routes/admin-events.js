@@ -1,17 +1,19 @@
 // Main Admin's own Events management (Community & Commerce track, item
-// 1) - mounted at /main-admin/events (server.js), gated the same way
-// every other Main Admin section is: requirePortalAuth + requirePortal
-// ('main_admin') + requirePortalPermission('manage_events'), matching
-// routes/main-admin.js's own pattern (read that file, not duplicated
-// here, since it's on Track A's hard-boundary "don't touch" list - this
-// is a sibling router, not an edit to it).
+// 1) - mounted at /main-admin/events (server.js). Gated by
+// requireMainAdminOrEventOrganizer below (requirePortalAuth +
+// requirePortal('main_admin') + requirePortalPermission('manage_events'),
+// same as every other Main Admin section and matching routes/main-admin.
+// js's own pattern - read that file, not duplicated here, since it's on
+// Track A's hard-boundary "don't touch" list - OR a signed-in parent who
+// organizes this specific event, for a restricted subset of actions; see
+// that function's own comment).
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
-const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
+const { requirePortalPermission } = require('../middleware/portalAuth');
 const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = require('../utils/storage');
 const { formatFriendlyTimestamp } = require('../utils/dates');
@@ -38,7 +40,40 @@ const auditLog = require('../utils/auditLog');
 const { findMemberByBarcodeOrName } = require('../utils/memberLookup');
 const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/spreadsheet');
 
-router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_events'));
+// A real request: "If a member is added as an organizer for an event, on
+// parent portal when they click on the event it will show an edit event
+// button at the top to allow them to change details. Members are not
+// allowed to change anything on the financial tab... Everything except
+// Finance, including Attendance" (confirmed scope). Rather than build a
+// second, parallel set of routes/views for organizer-parents, this same
+// router (and the same admin-events-builder.ejs/admin-events-
+// registrations.ejs it already renders) is reused as-is - every existing
+// /main-admin/events/:id/... URL keeps working unchanged for a real Main
+// Admin. For a signed-in parent who organizes THIS specific event, the
+// same URLs are allowed through too, except for the handful of actions
+// that stay Main-Admin-only regardless (financial fields, publish/
+// cancel/draft, delete, and the pending-event approve/reject decision -
+// none of which is "detail" or "attendance" editing). req.isOrganizerView
+// (also mirrored onto res.locals for the views) tells the templates to
+// swap the Main Admin nav chrome for the requester's own portal nav, hide
+// the admin-only toolbar actions, and freeze the Finance tab's fields.
+const ORGANIZER_RESTRICTED_PATH = /^\/\d+\/(finance|ticket-types(\/\d+\/delete)?|status|delete|decide|quick-edit)$/;
+async function requireMainAdminOrEventOrganizer(req, res, next) {
+  if (!req.portalAccount) return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
+  const isMainAdmin = req.portalRoles.some((r) => r.key === 'main_admin') && req.portalPermissions.has('manage_events');
+  if (isMainAdmin) return next();
+
+  const idMatch = /^\/(\d+)(?:\/|$)/.exec(req.path);
+  const deny = () =>
+    res.status(403).render('403', { title: 'Not Authorized', message: "You don't have permission to do that.", backHref: '/portal', backLabel: 'Back to My Portals' });
+  if (!idMatch || ORGANIZER_RESTRICTED_PATH.test(req.path)) return deny();
+  if (!(await events.isEventOrganizer(idMatch[1], req.portalAccount.member_id))) return deny();
+
+  req.isOrganizerView = true;
+  res.locals.isOrganizerView = true;
+  next();
+}
+router.use(requireMainAdminOrEventOrganizer);
 
 // A real request: "capacity totals dropdown choosing family or person
 // capacity" - one number field (capacityValue) plus a type picker
@@ -1063,6 +1098,7 @@ router.get('/:id/registrations', async (req, res) => {
     attachedVolunteerLists,
     attachedSignUpLists,
     canRegisterGuests: req.portalPermissions.has('register_guests'),
+    isOrganizerView: !!req.isOrganizerView,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -1128,6 +1164,7 @@ router.get('/:id/registrations/print', async (req, res) => {
     event,
     familyGroups,
     volunteerSignupsByMember,
+    isOrganizerView: !!req.isOrganizerView,
   });
 });
 
@@ -1176,6 +1213,7 @@ router.get('/:id/checkin-scan', async (req, res) => {
     title: `${event.title} - ${mode === 'checkout' ? 'Check Out' : 'Check In'}`,
     event,
     mode,
+    isOrganizerView: !!req.isOrganizerView,
   });
 });
 
@@ -1244,7 +1282,14 @@ router.post('/:id/guests/:guestId/status', async (req, res) => {
 // own /:id/register-guest) when the event's "Guests can register" setting
 // allows it. Cancelling one a Main Admin still needs to be able to remove
 // (a no-show, a duplicate, ...) stays available below.
-router.post('/:id/guests/:guestId/cancel', requirePortalPermission('register_guests'), async (req, res) => {
+// An organizer-parent already cleared requireMainAdminOrEventOrganizer
+// above for this whole /registrations area (Attendance is in scope per
+// the same real request) - requirePortalPermission('register_guests')
+// checks the account's own portal-wide permission catalog, which a
+// parent role was never granted (that permission exists for Main Admin
+// only), so it would otherwise wrongly block this one action for an
+// organizer who's allowed everywhere else on this page.
+router.post('/:id/guests/:guestId/cancel', (req, res, next) => (req.isOrganizerView ? next() : requirePortalPermission('register_guests')(req, res, next)), async (req, res) => {
   await events.cancelGuestRegistration(req.params.guestId);
   res.redirect(`/main-admin/events/${req.params.id}/registrations?notice=` + encodeURIComponent('Guest registration cancelled.'));
 });

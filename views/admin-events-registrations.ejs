@@ -4,8 +4,15 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
+  <%
+    // See admin-events-builder.ejs's own comment - this same page now
+    // also renders for an organizer-parent (routes/admin-events.js's own
+    // requireMainAdminOrEventOrganizer), whose real portal is always
+    // Parent Portal.
+    var organizerView = typeof isOrganizerView !== 'undefined' && isOrganizerView;
+  %>
   <%- include('partials/portal-nav', {
-    portalTitle: 'Main Admin',
+    portalTitle: organizerView ? 'Parent Portal' : 'Main Admin',
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
