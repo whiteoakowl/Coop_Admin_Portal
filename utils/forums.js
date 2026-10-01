@@ -5,6 +5,7 @@
 const db = require('../db');
 const { sanitizePostBody } = require('./sanitizeHtml');
 const { forumCategorySectionIds, sectionIdsForMember, memberSatisfiesRestriction } = require('./sections');
+const { formatChatTimestamp } = require('./dates');
 
 const CATEGORY_SELECT = `SELECT c.*, cl.class_name AS "class_name", mo.name AS "moderatorName"
    FROM forum_categories c
@@ -196,14 +197,19 @@ async function createThread(categoryId, title, bodyHtml, memberId, accountId) {
   return threadId;
 }
 
+// createdAtLabel is a real request: "date and time on chat room posts
+// should be August 3, 2026 at 6:09pm" - computed here (not at render
+// time) so both the full-page thread view and the live chat room feed's
+// own JSON (same rows, see feed.json's route) get it for free.
 async function listPosts(threadId) {
-  return db
+  const rows = await db
     .prepare(
       `SELECT p.*, m.name AS "authorName", ${ADMIN_TITLE_SUBQUERY} FROM forum_posts p
        LEFT JOIN members m ON m.id = p.member_id
        WHERE p.thread_id = ? ORDER BY p.created_at`
     )
     .all(threadId);
+  return rows.map((r) => ({ ...r, createdAtLabel: formatChatTimestamp(r.created_at) }));
 }
 
 async function addPost(threadId, bodyHtml, memberId, accountId) {
@@ -221,9 +227,10 @@ async function getPost(id) {
 // uses this to hand back the just-created message without a second round
 // trip through the full thread.
 async function getPostWithAuthor(id) {
-  return db
+  const row = await db
     .prepare(`SELECT p.*, m.name AS "authorName", ${ADMIN_TITLE_SUBQUERY} FROM forum_posts p LEFT JOIN members m ON m.id = p.member_id WHERE p.id = ?`)
     .get(id);
+  return row ? { ...row, createdAtLabel: formatChatTimestamp(row.created_at) } : row;
 }
 
 async function editPost(id, bodyHtml) {

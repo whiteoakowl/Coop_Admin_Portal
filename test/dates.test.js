@@ -26,6 +26,7 @@ const {
   formatTimeOfDay,
   formatTimestamp,
   formatFriendlyTimestamp,
+  formatChatTimestamp,
   ageFromBirthday,
 } = require('../utils/dates');
 
@@ -266,6 +267,23 @@ test('formatTimestamp / formatFriendlyTimestamp', async (t) => {
 
   await t.test('formatFriendlyTimestamp pads single-digit minutes', () => {
     assert.equal(formatFriendlyTimestamp('2024-06-15 09:05:00'), 'June 15, 2024 5:05am');
+  });
+});
+
+// A real request: "date and time on chat room posts should be August 3,
+// 2026 at 6:09pm" - same Eastern-zoned pieces as formatFriendlyTimestamp,
+// just joined with " at " instead of a plain space.
+test('formatChatTimestamp', async (t) => {
+  await t.test('returns null for a falsy input', () => {
+    assert.equal(formatChatTimestamp(null), null);
+  });
+
+  await t.test('joins the date and time with " at "', () => {
+    assert.equal(formatChatTimestamp('2024-06-15 16:30:00'), 'June 15, 2024 at 12:30pm');
+  });
+
+  await t.test('pads single-digit minutes', () => {
+    assert.equal(formatChatTimestamp('2024-06-15 09:05:00'), 'June 15, 2024 at 5:05am');
   });
 });
 

@@ -234,3 +234,82 @@ test('the Chat Groups list shows a Live Chat Room badge for a chat room and not 
   const groupSection = listView.text.split('Badge List Group')[1] || '';
   assert.doesNotMatch(groupSection.split('</div>')[0], /Live Chat Room/);
 });
+
+// A real request: "Full text features on chat rooms isn't necessary for
+// chat room. A text box for typing and options for bold, italic,
+// underline, color and emoji all in one row is sufficient."
+test('a chat room\'s own composer gets the trimmed 5-control toolbar, not the full rich-text toolbar', async () => {
+  const admin = await loginAsMainAdmin();
+  const category = await createChatRoom(admin, 'Simple Toolbar Room');
+  const member = await createParentAccount();
+
+  const view = await request(app).get(`/forums/threads/${category.room_thread_id}`).set('Cookie', member.cookie);
+  assert.equal(view.status, 200);
+  assert.match(view.text, /class="forum-editor-toolbar forum-editor-toolbar-chat"/);
+  assert.match(view.text, /data-forum-cmd="bold"/);
+  assert.match(view.text, /data-forum-cmd="italic"/);
+  assert.match(view.text, /data-forum-cmd="underline"/);
+  assert.match(view.text, /data-forum-cmd="foreColor"/);
+  assert.match(view.text, /data-forum-cmd="insertSymbol"/);
+  // Full-toolbar-only controls must not leak into the chat room composer.
+  assert.doesNotMatch(view.text, /data-forum-cmd="toggleSource"/);
+  assert.doesNotMatch(view.text, /data-forum-cmd="insertTable"/);
+  assert.doesNotMatch(view.text, /data-forum-cmd="formatBlock"/);
+  assert.doesNotMatch(view.text, /data-forum-cmd="strikeThrough"/);
+});
+
+test('a normal (non-chat-room) thread\'s Reply form still gets the full rich-text toolbar, unaffected by the chat room simplification', async () => {
+  const admin = await loginAsMainAdmin();
+  await request(app).post('/main-admin/forums').set('Cookie', admin.cookie).type('form').send({ name: 'Full Toolbar Group', scope: 'general', _csrf: admin.csrfToken });
+  const category = await db.prepare("SELECT * FROM forum_categories WHERE name = 'Full Toolbar Group'").get();
+  const member = await createParentAccount();
+  const threadRes = await request(app)
+    .post(`/forums/${category.id}/threads`)
+    .set('Cookie', member.cookie)
+    .type('form')
+    .send({ title: 'A Normal Thread', body: '<p>hello</p>', _csrf: member.csrfToken });
+  const threadId = Number(/\/forums\/threads\/(\d+)/.exec(threadRes.headers.location)[1]);
+
+  const view = await request(app).get(`/forums/threads/${threadId}`).set('Cookie', member.cookie);
+  assert.equal(view.status, 200);
+  assert.doesNotMatch(view.text, /forum-editor-toolbar-chat/);
+  assert.match(view.text, /data-forum-cmd="toggleSource"/);
+  assert.match(view.text, /data-forum-cmd="insertTable"/);
+});
+
+// A real request: "date and time on chat room posts should be August 3,
+// 2026 at 6:09pm."
+test('a chat room message\'s timestamp is formatted as "Month D, YYYY at H:MMam/pm"', async () => {
+  const admin = await loginAsMainAdmin();
+  const category = await createChatRoom(admin, 'Timestamp Format Room');
+  const member = await createParentAccount();
+  await request(app)
+    .post(`/forums/threads/${category.room_thread_id}/posts`)
+    .set('Cookie', member.cookie)
+    .type('form')
+    .send({ body: '<p>Timed message</p>', _csrf: member.csrfToken });
+
+  const view = await request(app).get(`/forums/threads/${category.room_thread_id}`).set('Cookie', member.cookie);
+  assert.match(view.text, /[A-Z][a-z]+ \d{1,2}, \d{4} at \d{1,2}:\d{2}(am|pm)/);
+
+  const feed = await request(app).get(`/forums/threads/${category.room_thread_id}/feed.json`).set('Cookie', member.cookie);
+  assert.match(feed.body.posts[0].createdAtLabel, /[A-Z][a-z]+ \d{1,2}, \d{4} at \d{1,2}:\d{2}(am|pm)/);
+});
+
+// A real request: "shrink the text sizes on chat room member posts so we
+// can see more posts at once on the screen."
+test('chat room messages render inside the smaller-text .forum-chat-room-messages wrapper', async () => {
+  const admin = await loginAsMainAdmin();
+  const category = await createChatRoom(admin, 'Small Text Room');
+  const member = await createParentAccount();
+  await request(app)
+    .post(`/forums/threads/${category.room_thread_id}/posts`)
+    .set('Cookie', member.cookie)
+    .type('form')
+    .send({ body: '<p>Small text message</p>', _csrf: member.csrfToken });
+
+  const view = await request(app).get(`/forums/threads/${category.room_thread_id}`).set('Cookie', member.cookie);
+  const wrapper = /<div data-chat-room-messages class="([^"]*)">/.exec(view.text);
+  assert.ok(wrapper, 'expected the chat room messages wrapper');
+  assert.match(wrapper[1], /forum-chat-room-messages/);
+});

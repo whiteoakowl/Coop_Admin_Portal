@@ -227,6 +227,32 @@ function formatFriendlyTimestamp(sqlTimestamp) {
   return `${monthName} ${parts.day}, ${parts.year} ${parts.hour}:${parts.minute}${ampm}`;
 }
 
+// Same Eastern-zoned pieces as formatFriendlyTimestamp above, just joined
+// with " at " instead of a plain space - a real request: "date and time
+// on chat room posts should be August 3, 2026 at 6:09pm." Scoped to chat
+// room message timestamps specifically (utils/forums.js) - every other
+// formatFriendlyTimestamp caller (events, library, membership approvals,
+// announcements, ...) keeps its existing space-joined format.
+function formatChatTimestamp(sqlTimestamp) {
+  if (!sqlTimestamp) return null;
+  const d = new Date(sqlTimestamp.replace(' ', 'T') + 'Z');
+  const parts = {};
+  for (const p of new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).formatToParts(d)) {
+    parts[p.type] = p.value;
+  }
+  const monthName = MONTHS_LONG[Number(parts.month) - 1];
+  const ampm = parts.dayPeriod.toLowerCase();
+  return `${monthName} ${parts.day}, ${parts.year} at ${parts.hour}:${parts.minute}${ampm}`;
+}
+
 // Same Eastern-zoned "December 1, 2025" + "9:52am" pieces as
 // formatFriendlyTimestamp above, just kept separate instead of joined into
 // one string - a real request: "time should be stacked under date with a
@@ -336,6 +362,7 @@ module.exports = {
   formatTimeOfDay,
   formatTimestamp,
   formatFriendlyTimestamp,
+  formatChatTimestamp,
   formatFriendlyDateAndTime,
   formatDateAndTime,
   ageFromBirthday,

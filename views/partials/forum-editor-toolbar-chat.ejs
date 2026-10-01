@@ -1,0 +1,36 @@
+<%
+  // A real request: "Full text features on chat rooms isn't necessary
+  // for chat room. A text box for typing and options for bold, italic,
+  // underline, color and emoji all in one row is sufficient." The full
+  // forum-editor-toolbar.ejs (publications/newsletter/announcements/
+  // event-class descriptions/emails - "anywhere there is text") stays
+  // exactly as-is everywhere else; this is a second, much smaller
+  // toolbar used only for a chat room's own message composer/edit-
+  // message dialog (views/forums-thread.ejs, views/admin-forums-
+  // thread.ejs), reusing the SAME data-forum-cmd wiring (public/js/
+  // forum-editor.js) and the same symbol popup markup/classes the full
+  // toolbar's emoji button depends on - nothing new to wire up in JS.
+%>
+<div class="forum-editor-toolbar forum-editor-toolbar-chat">
+  <div class="forum-editor-toolbar-row">
+    <button type="button" data-forum-cmd="bold" title="Bold"><strong>B</strong></button>
+    <button type="button" data-forum-cmd="italic" title="Italic"><em>I</em></button>
+    <button type="button" data-forum-cmd="underline" title="Underline"><u>U</u></button>
+    <span class="forum-editor-sep"></span>
+    <label class="forum-editor-color" title="Text Color">
+      <span class="forum-editor-color-glyph" data-color-glyph style="border-bottom-color:#000000">A</span>
+      <input type="color" class="forum-editor-color-input" data-forum-cmd="foreColor" value="#000000" />
+    </label>
+    <span class="forum-editor-sep"></span>
+    <button type="button" data-forum-cmd="insertSymbol" title="Emoji"><svg class="icon"><use href="#icon-smile"/></svg></button>
+  </div>
+
+  <div class="forum-editor-popup" data-forum-popup="symbol" hidden>
+    <%
+      var symbolChoices = ['😀','👍','👎','🎉','❗','✅','🔔','❤️','😂','😮','😢','🙏'];
+    %>
+    <% symbolChoices.forEach(function(ch) { %>
+      <button type="button" class="forum-editor-symbol-btn" data-forum-symbol="<%= ch %>"><%= ch %></button>
+    <% }); %>
+  </div>
+</div>

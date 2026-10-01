@@ -33,11 +33,11 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <% posts.forEach(function(p, i) { %>
-      <div class="forum-post <%= p.status === 'removed' ? 'forum-post-removed' : '' %>">
+      <div class="forum-post <%= p.status === 'removed' ? 'forum-post-removed' : '' %> <%= category.is_chat_room ? 'forum-chat-room-post' : '' %>">
         <div class="forum-post-header">
           <span class="forum-post-author"><%= p.authorName || 'Unknown' %></span>
           <% if (p.authorAdminTitle) { %><span class="badge-pill" title="Admin Position"><%= p.authorAdminTitle %></span><% } %>
-          <span class="hint"><%= category.is_chat_room ? 'Message' : (i === 0 ? 'Post' : 'Comment') %> &middot; <%= p.created_at %></span>
+          <span class="hint"><%= category.is_chat_room ? 'Message' : (i === 0 ? 'Post' : 'Comment') %> &middot; <%= category.is_chat_room ? p.createdAtLabel : p.created_at %></span>
           <% if (p.edited_at) { %><span class="hint">(edited)</span><% } %>
           <% if (p.status === 'removed') { %><span class="badge-pill badge-pill-gray">Removed</span><% } %>
         </div>
@@ -60,7 +60,7 @@
         <dialog id="edit-post-<%= p.id %>" class="member-picker-dialog">
           <form method="POST" action="/main-admin/forums/threads/<%= thread.id %>/posts/<%= p.id %>/edit" data-forum-editor>
             <h3>Edit <%= category.is_chat_room ? 'Message' : (i === 0 ? 'Post' : 'Comment') %></h3>
-            <%- include('partials/forum-editor-toolbar') %>
+            <%- include(category.is_chat_room ? 'partials/forum-editor-toolbar-chat' : 'partials/forum-editor-toolbar') %>
             <div class="forum-editable" data-forum-editable contenteditable="true"><%- p.body_html %></div>
             <input type="hidden" name="body" data-forum-body-input />
             <div class="notes-dialog-actions">

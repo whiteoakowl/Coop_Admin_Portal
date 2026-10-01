@@ -76,7 +76,7 @@
             <div class="forum-post-header">
               <span class="forum-post-author"><%= p.authorName || 'Unknown' %></span>
               <% if (p.authorAdminTitle) { %><span class="badge-pill" title="Admin Position"><%= p.authorAdminTitle %></span><% } %>
-              <span class="hint"><%= p.created_at %></span>
+              <span class="hint"><%= category.is_chat_room ? p.createdAtLabel : p.created_at %></span>
               <% if (p.edited_at) { %><span class="hint">(edited)</span><% } %>
               <% if (p.status === 'removed') { %><span class="badge-pill badge-pill-gray">Removed</span><% } %>
             </div>
@@ -103,7 +103,7 @@
             <dialog id="edit-post-<%= p.id %>" class="member-picker-dialog">
               <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/edit" data-forum-editor>
                 <h3>Edit Post</h3>
-                <%- include('partials/forum-editor-toolbar') %>
+                <%- include(category.is_chat_room ? 'partials/forum-editor-toolbar-chat' : 'partials/forum-editor-toolbar') %>
                 <div class="forum-editable" data-forum-editable contenteditable="true"><%- p.body_html %></div>
                 <input type="hidden" name="body" data-forum-body-input />
                 <div class="notes-dialog-actions">
@@ -130,7 +130,7 @@
         <div class="manage-section">
           <% if (!category.is_chat_room) { %><div class="grid-box-header"><h2>Reply</h2></div><% } %>
           <form method="POST" action="/forums/threads/<%= thread.id %>/posts" data-forum-editor <% if (category.is_chat_room) { %>data-chat-room-form<% } %>>
-            <%- include('partials/forum-editor-toolbar') %>
+            <%- include(category.is_chat_room ? 'partials/forum-editor-toolbar-chat' : 'partials/forum-editor-toolbar') %>
             <div class="forum-editable" data-forum-editable contenteditable="true"></div>
             <input type="hidden" name="body" data-forum-body-input />
             <button type="submit" class="primary-btn" style="margin-top: 0.75rem;"><%= category.is_chat_room ? 'Send' : 'Post Reply' %></button>

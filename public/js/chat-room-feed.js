@@ -40,7 +40,7 @@
       '</span>' +
       authorTitle +
       '<span class="hint">' +
-      escapeHtml(p.created_at) +
+      escapeHtml(p.createdAtLabel || p.created_at) +
       '</span></div>' +
       body;
     return div;
