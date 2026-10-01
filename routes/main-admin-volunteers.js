@@ -12,6 +12,7 @@ const volunteers = require('../utils/committeesAndSignupLists');
 const events = require('../utils/events');
 const { listAdminPositions, membersByAdminPosition } = require('../utils/adminPositions');
 const { activeParentAndAdminOptions, activeMemberOptions } = require('../utils/members');
+const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_volunteers'));
 
@@ -120,6 +121,22 @@ router.post('/committees/:id/positions/:positionId/delete', async (req, res) => 
   res.redirect(`/main-admin/volunteers/committees/${req.params.id}?notice=` + encodeURIComponent('Position removed.'));
 });
 
+// A real request: "add print and export buttons" (Committees' own Edit
+// Committee page) - the plain member roster plus every position's own
+// signups, same shape as the Volunteer/Sign-Up List exports above.
+router.get('/committees/:id/export.csv', async (req, res) => {
+  const committee = await volunteers.getCommittee(req.params.id);
+  if (!committee) return res.status(404).render('404', { title: 'Not Found' });
+  const members = await volunteers.membersForCommittee(committee.id);
+  const positions = await volunteers.positionsForCommittee(committee.id);
+  const lines = [toCsvRow(['Section', 'Name', 'Email'])];
+  for (const m of members) lines.push(toCsvRow(['Member', m.name, m.email || '']));
+  for (const p of positions) {
+    for (const s of p.signups) lines.push(toCsvRow([`Position: ${p.position_name}`, s.memberName, s.memberEmail || '']));
+  }
+  sendCsv(res, `${committee.name.replace(/[^a-z0-9]+/gi, '-')}-committee.csv`, lines);
+});
+
 // --- Sign-Up Lists ---
 
 router.post('/signup-lists', async (req, res) => {
@@ -147,6 +164,32 @@ router.post('/signup-lists/:id/update', async (req, res) => {
 router.post('/signup-lists/:id/delete', async (req, res) => {
   await volunteers.deleteSignUpList(req.params.id);
   res.redirect('/main-admin/volunteers?tab=signup-lists&notice=' + encodeURIComponent('List deleted.'));
+});
+
+// A real request: "enable button when you click it members can signup on
+// the list. Enable button turns into disable button. If you click
+// disable button nobody can signup on the list but they can still view
+// the link."
+router.post('/signup-lists/:id/open', async (req, res) => {
+  await volunteers.setSignUpListOpen(req.params.id, true);
+  res.redirect(`/main-admin/volunteers/signup-lists/${req.params.id}?notice=` + encodeURIComponent('Signups opened.'));
+});
+
+router.post('/signup-lists/:id/close', async (req, res) => {
+  await volunteers.setSignUpListOpen(req.params.id, false);
+  res.redirect(`/main-admin/volunteers/signup-lists/${req.params.id}?notice=` + encodeURIComponent('Signups closed.'));
+});
+
+router.get('/signup-lists/:id/export.csv', async (req, res) => {
+  const list = await volunteers.getSignUpList(req.params.id);
+  if (!list) return res.status(404).render('404', { title: 'Not Found' });
+  const items = await volunteers.itemsForSignUpList(list.id);
+  const lines = [toCsvRow(['Item', 'Quantity Needed', 'Quantity Claimed', 'Claimed By'])];
+  for (const item of items) {
+    const claimedBy = item.claims.map((c) => (c.quantity_claimed > 1 ? `${c.memberName} (${c.quantity_claimed})` : c.memberName)).join('; ');
+    lines.push(toCsvRow([item.item_name, item.quantity_needed, item.quantityClaimed, claimedBy]));
+  }
+  sendCsv(res, `${list.title.replace(/[^a-z0-9]+/gi, '-')}-signup-list.csv`, lines);
 });
 
 router.get('/signup-lists/:id', async (req, res) => {
@@ -225,6 +268,27 @@ router.post('/volunteer-lists/:id/update', async (req, res) => {
 router.post('/volunteer-lists/:id/delete', async (req, res) => {
   await volunteers.deleteVolunteerList(req.params.id);
   res.redirect('/main-admin/volunteers?tab=volunteer-lists&notice=' + encodeURIComponent('List deleted.'));
+});
+
+router.post('/volunteer-lists/:id/open', async (req, res) => {
+  await volunteers.setVolunteerListOpen(req.params.id, true);
+  res.redirect(`/main-admin/volunteers/volunteer-lists/${req.params.id}?notice=` + encodeURIComponent('Signups opened.'));
+});
+
+router.post('/volunteer-lists/:id/close', async (req, res) => {
+  await volunteers.setVolunteerListOpen(req.params.id, false);
+  res.redirect(`/main-admin/volunteers/volunteer-lists/${req.params.id}?notice=` + encodeURIComponent('Signups closed.'));
+});
+
+router.get('/volunteer-lists/:id/export.csv', async (req, res) => {
+  const list = await volunteers.getVolunteerList(req.params.id);
+  if (!list) return res.status(404).render('404', { title: 'Not Found' });
+  const shifts = await volunteers.shiftsForVolunteerList(list.id);
+  const lines = [toCsvRow(['Job', 'Date', 'Start Time', 'End Time', 'Slots Needed', 'Signed Up'])];
+  for (const shift of shifts) {
+    lines.push(toCsvRow([shift.job_name, shift.shift_date || '', shift.start_time || '', shift.end_time || '', shift.slots_needed, shift.signups.map((s) => s.memberName).join('; ')]));
+  }
+  sendCsv(res, `${list.title.replace(/[^a-z0-9]+/gi, '-')}-volunteer-list.csv`, lines);
 });
 
 router.get('/volunteer-lists/:id', async (req, res) => {

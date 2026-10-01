@@ -429,9 +429,9 @@
         // shape for all three sections, so one shared block renders
         // whichever one is active instead of writing this out 3 times.
         var sectionInfo = {
-          volunteers: { enabled: !!event.volunteers_enabled, count: event.volunteer_selection_count, items: event.volunteerRoles, noun: 'volunteer' },
-          donations: { enabled: !!event.donations_enabled, count: event.donation_selection_count, items: event.donationItems, noun: 'donation' },
-          food: { enabled: !!event.food_enabled, count: event.food_selection_count, items: event.foodItems, noun: 'food' },
+          volunteers: { enabled: !!event.volunteers_enabled, count: event.volunteer_selection_count, items: event.volunteerRoles, noun: 'volunteer', scope: event.volunteer_requirement_scope },
+          donations: { enabled: !!event.donations_enabled, count: event.donation_selection_count, items: event.donationItems, noun: 'donation', scope: event.donation_requirement_scope },
+          food: { enabled: !!event.food_enabled, count: event.food_selection_count, items: event.foodItems, noun: 'food', scope: event.food_requirement_scope },
         }[activeSection];
         %>
         <div class="manage-section">
@@ -450,6 +450,20 @@
                 <% } %>
               </select>
             </label>
+            <%# A real request: "there should also be a question that says
+                Require for each attendees or each family. Radio buttons
+                that say attendees, and family." 'family' means only one
+                person across the whole registering family needs to meet
+                the selection count above; 'attendee' means every
+                registering member individually does (enforced in
+                utils/events.js's registerForEvent). %>
+            <div class="member-form-full">
+              <span class="class-form-field-label">Require for each:</span>
+              <div class="checkbox-group">
+                <label class="checkbox-option"><input type="radio" name="requirementScope" value="attendee" <%= sectionInfo.scope === 'attendee' ? 'checked' : '' %> /> Attendees</label>
+                <label class="checkbox-option"><input type="radio" name="requirementScope" value="family" <%= sectionInfo.scope !== 'attendee' ? 'checked' : '' %> /> Family</label>
+              </div>
+            </div>
             <div class="member-form-full">
               <button type="submit" class="primary-btn">Save</button>
             </div>

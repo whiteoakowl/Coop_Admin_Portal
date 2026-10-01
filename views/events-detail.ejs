@@ -135,7 +135,14 @@
             <% } %>
             <% visibleInfoSections.forEach(function(section) { %>
               <h3><%= section.label %></h3>
-              <p style="white-space: pre-wrap;"><%= section.text %></p>
+              <%# A real request: "Activity information, meet-up and
+                  parking, what to bring and notes should match font and
+                  size of the details section." Reusing the exact same
+                  .forum-editable-display class as the Details description
+                  above (instead of a bare <p>) guarantees identical
+                  typography - same selector, not two parallel rules that
+                  could drift apart later. %>
+              <div class="forum-editable-display" style="white-space: pre-wrap;"><%= section.text %></div>
             <% }); %>
           </div>
         <% } %>
@@ -177,7 +184,16 @@
               // bulk "Register Selected" button only make sense when
               // there's nothing per-member to ask first, so they're
               // scoped to the no-ticket/no-extra-field case.
-              var needsDialog = (event.ticketTypes && event.ticketTypes.length > 0) || (event.extraFields && event.extraFields.length > 0);
+              // A real request: "if these items are selected when editing
+              // the event with options added. Then member should be
+              // asked when clicking register along with the extra fields
+              // questions" - Volunteer/Donations/Food each now also
+              // trigger the dialog whenever the section is on and has at
+              // least one real option, same as tickets/extra fields.
+              var needsDialog = (event.ticketTypes && event.ticketTypes.length > 0) || (event.extraFields && event.extraFields.length > 0) ||
+                (event.volunteers_enabled && event.volunteerRoles && event.volunteerRoles.length > 0) ||
+                (event.donations_enabled && event.donationItems && event.donationItems.length > 0) ||
+                (event.food_enabled && event.foodItems && event.foodItems.length > 0);
               // A real request: "register selected, [but] if all members
               // from that family are selected [and already registered],
               // will say unregister selected" - the bulk button now
@@ -222,59 +238,180 @@
                 <% }); %>
               </div>
               <% if (needsDialog) { %>
-                <%# A real request: "extra fields is where you can add
-                    extra form type questions for people signing up for an
-                    event" - answers[] here comes from that per-event
-                    event_extra_fields list, named answers[f<fieldId>] -
-                    the "f" prefix keeps qs's body parser from reading a
-                    purely-numeric bracket key as an ARRAY index instead
-                    of an object key. A real request also added ticket
-                    selection here: "select tickets, click register" -
-                    once event.ticketTypes has any rows (Finance tab), the
-                    dialog gains a required Ticket dropdown, priced off
-                    that ticket instead of the event's own flat
-                    price_cents. Both are event-wide (not per-member), so
-                    one shared dialog works for every member -
-                    events-detail-register.js just swaps its hidden
-                    memberId/heading before opening it. %>
+                <%
+                  // A real request: "after asking about signups, food,
+                  // etc. you are taken to a ticket view and selection
+                  // screen. After selecting the ticket you want you click
+                  // submit and you are taken to a payment screen. We stop
+                  // there because there is no processor for payment yet.
+                  // For now it creates an invoice and registration is
+                  // completed." The old single-screen dialog (extra
+                  // fields/volunteer/donation/food + a plain ticket
+                  // dropdown, one Register button) is now a sequence of
+                  // .register-dialog-step panels inside the same dialog/
+                  // form (events-detail-register.js just shows/hides them
+                  // and validates whichever one is currently visible on
+                  // Next) - a details step (extra fields + volunteer/
+                  // donation/food, when any exist), then a ticket step
+                  // (when the event has ticket types), then a payment
+                  // step (when there's anything to charge at all - either
+                  // ticket types or the event's own flat price_cents).
+                  // Whichever of these actually renders is always the
+                  // final step whose submit button really posts the form -
+                  // registerForEvent's existing charge logic (utils/
+                  // events.js's own chargeForConfirmedRegistration) is
+                  // already the "invoice" this creates, so nothing new was
+                  // needed server-side for that part.
+                  var dialogHasDetails = !!((event.extraFields && event.extraFields.length) ||
+                    (event.volunteers_enabled && event.volunteerRoles && event.volunteerRoles.length) ||
+                    (event.donations_enabled && event.donationItems && event.donationItems.length) ||
+                    (event.food_enabled && event.foodItems && event.foodItems.length));
+                  var dialogHasTicket = !!(event.ticketTypes && event.ticketTypes.length);
+                  var dialogHasPayment = dialogHasTicket || event.price_cents != null;
+                %>
                 <dialog id="event-register-dialog" class="notes-dialog event-register-dialog">
                   <form id="event-register-dialog-form" method="POST" action="/events/<%= event.id %>/register" class="member-form-grid">
                     <h3 class="member-form-full">Register <span id="event-register-dialog-member-name"></span></h3>
                     <input type="hidden" name="memberId" id="event-register-dialog-member-id" />
                     <p class="alert alert-error member-form-full" id="event-register-dialog-error" hidden></p>
-                    <% if (event.ticketTypes && event.ticketTypes.length) { %>
-                      <label class="member-form-full">Ticket
-                        <select name="ticketTypeId" required>
-                          <option value="">Select a ticket</option>
-                          <% event.ticketTypes.forEach(function(t) { %>
-                            <option value="<%= t.id %>"><%= t.title %> &ndash; $<%= (t.price_cents / 100).toFixed(2) %> / <%= t.price_per %></option>
-                          <% }); %>
-                        </select>
-                      </label>
-                    <% } %>
-                    <% (event.extraFields || []).forEach(function(field) { %>
-                      <label class="member-form-full"><%= field.label %><% if (field.required) { %> *<% } %>
-                        <% if (field.field_type === 'textarea') { %>
-                          <textarea name="answers[f<%= field.id %>]" rows="2" <%= field.required ? 'required' : '' %>></textarea>
-                        <% } else if (field.field_type === 'select') { %>
-                          <select name="answers[f<%= field.id %>]" <%= field.required ? 'required' : '' %>>
-                            <option value="">Select one</option>
-                            <% (field.options || '').split('\n').filter(Boolean).forEach(function(opt) { %>
-                              <option value="<%= opt %>"><%= opt %></option>
+
+                    <% if (dialogHasDetails) { %>
+                      <div class="register-dialog-step" data-step="details">
+                        <%# A real request: "extra fields is where you can
+                            add extra form type questions for people
+                            signing up for an event" - answers[] here comes
+                            from that per-event event_extra_fields list,
+                            named answers[f<fieldId>] - the "f" prefix
+                            keeps qs's body parser from reading a purely-
+                            numeric bracket key as an ARRAY index instead
+                            of an object key. %>
+                        <% (event.extraFields || []).forEach(function(field) { %>
+                          <label class="member-form-full"><%= field.label %><% if (field.required) { %> *<% } %>
+                            <% if (field.field_type === 'textarea') { %>
+                              <textarea name="answers[f<%= field.id %>]" rows="2" <%= field.required ? 'required' : '' %>></textarea>
+                            <% } else if (field.field_type === 'select') { %>
+                              <select name="answers[f<%= field.id %>]" <%= field.required ? 'required' : '' %>>
+                                <option value="">Select one</option>
+                                <% (field.options || '').split('\n').filter(Boolean).forEach(function(opt) { %>
+                                  <option value="<%= opt %>"><%= opt %></option>
+                                <% }); %>
+                              </select>
+                            <% } else if (field.field_type === 'checkbox') { %>
+                              <input type="checkbox" name="answers[f<%= field.id %>]" value="Yes" <%= field.required ? 'required' : '' %> />
+                            <% } else { %>
+                              <input type="text" name="answers[f<%= field.id %>]" <%= field.required ? 'required' : '' %> />
+                            <% } %>
+                          </label>
+                        <% }); %>
+                        <%# A real request: "if these items are selected
+                            when editing the event with options added.
+                            Then member should be asked when clicking
+                            register along with the extra fields
+                            questions." Only still-open roles/items are
+                            offered - one already full/fully claimed has
+                            nothing left to pick. %>
+                        <% if (event.volunteers_enabled && event.volunteerRoles.length) { %>
+                          <div class="member-form-full">
+                            <span class="class-form-field-label">Volunteer<% if (event.volunteer_selection_count) { %> (select at least <%= event.volunteer_selection_count %>)<% } %></span>
+                            <% event.volunteerRoles.filter(function(role) { return role.filled < role.slots_needed; }).forEach(function(role) { %>
+                              <label class="checkbox-option"><input type="checkbox" name="volunteerRoleIds" value="<%= role.id %>" /> <%= role.role_name %></label>
                             <% }); %>
-                          </select>
-                        <% } else if (field.field_type === 'checkbox') { %>
-                          <input type="checkbox" name="answers[f<%= field.id %>]" value="Yes" <%= field.required ? 'required' : '' %> />
-                        <% } else { %>
-                          <input type="text" name="answers[f<%= field.id %>]" <%= field.required ? 'required' : '' %> />
+                          </div>
                         <% } %>
-                      </label>
-                    <% }); %>
-                    <div class="notes-dialog-actions member-form-full">
-                      <button type="button" class="btn-secondary" id="event-register-dialog-cancel">Cancel</button>
-                      <button type="submit" class="primary-btn">Register</button>
-                    </div>
+                        <% if (event.donations_enabled && event.donationItems.length) { %>
+                          <div class="member-form-full">
+                            <span class="class-form-field-label">Donations Needed<% if (event.donation_selection_count) { %> (select at least <%= event.donation_selection_count %>)<% } %></span>
+                            <% event.donationItems.filter(function(item) { return item.quantity_needed - item.quantityClaimed > 0; }).forEach(function(item) { %>
+                              <label class="checkbox-option"><input type="checkbox" name="donationItemIds" value="<%= item.id %>" /> <%= item.item_name %></label>
+                            <% }); %>
+                          </div>
+                        <% } %>
+                        <% if (event.food_enabled && event.foodItems.length) { %>
+                          <div class="member-form-full">
+                            <span class="class-form-field-label">Food Sign-Up<% if (event.food_selection_count) { %> (select at least <%= event.food_selection_count %>)<% } %></span>
+                            <% event.foodItems.filter(function(item) { return item.quantity_needed - item.quantityClaimed > 0; }).forEach(function(item) { %>
+                              <label class="checkbox-option"><input type="checkbox" name="foodItemIds" value="<%= item.id %>" /> <%= item.item_name %></label>
+                            <% }); %>
+                          </div>
+                        <% } %>
+                        <div class="notes-dialog-actions member-form-full">
+                          <button type="button" class="btn-secondary" id="event-register-dialog-cancel">Cancel</button>
+                          <% if (dialogHasPayment) { %>
+                            <button type="button" class="primary-btn js-dialog-next">Next</button>
+                          <% } else { %>
+                            <button type="submit" class="primary-btn">Register</button>
+                          <% } %>
+                        </div>
+                      </div>
+                    <% } %>
+
+                    <% if (dialogHasTicket) { %>
+                      <%# "You are taken to a ticket view and selection
+                          screen" - a real step of its own now, radio cards
+                          instead of the old plain <select>, so the chosen
+                          ticket's price can also drive the Payment step's
+                          summary text just below. %>
+                      <div class="register-dialog-step" data-step="ticket" <%= dialogHasDetails ? 'hidden' : '' %>>
+                        <h3 class="member-form-full">Select Your Ticket</h3>
+                        <div class="member-form-full ticket-select-list">
+                          <% event.ticketTypes.forEach(function(t, i) { %>
+                            <label class="ticket-select-option">
+                              <input type="radio" name="ticketTypeId" value="<%= t.id %>" data-price-label="<%= t.title %> &ndash; $<%= (t.price_cents / 100).toFixed(2) %> / <%= t.price_per %>" <%= i === 0 ? 'checked' : '' %> required />
+                              <span class="ticket-select-info">
+                                <strong><%= t.title %></strong>
+                                <span class="hint">$<%= (t.price_cents / 100).toFixed(2) %> / <%= t.price_per %></span>
+                              </span>
+                            </label>
+                          <% }); %>
+                        </div>
+                        <div class="notes-dialog-actions member-form-full">
+                          <% if (dialogHasDetails) { %>
+                            <button type="button" class="btn-secondary js-dialog-back">Back</button>
+                          <% } else { %>
+                            <button type="button" class="btn-secondary" id="event-register-dialog-cancel">Cancel</button>
+                          <% } %>
+                          <button type="button" class="primary-btn js-dialog-next">Next</button>
+                        </div>
+                      </div>
+                    <% } %>
+
+                    <% if (dialogHasPayment) { %>
+                      <%# "Click submit and you are taken to a payment
+                          screen. We stop there because there is no
+                          processor for payment yet. For now it creates an
+                          invoice and registration is completed." This
+                          step is always last - its submit really posts
+                          the form (events-detail-register.js's existing
+                          submit handler), which is what actually runs
+                          registerForEvent and its charge/"invoice". %>
+                      <div class="register-dialog-step" data-step="payment" hidden>
+                        <h3 class="member-form-full">Payment</h3>
+                        <p class="member-form-full" id="event-register-payment-summary">
+                          <% if (!dialogHasTicket) { %>$<%= (event.price_cents / 100).toFixed(2) %> / <%= event.price_per %><% } %>
+                        </p>
+                        <p class="hint member-form-full">Online payment isn't set up yet. Clicking Complete Registration below will finish your registration and create an invoice for this amount &ndash; we'll follow up separately on how to pay it.</p>
+                        <div class="notes-dialog-actions member-form-full">
+                          <button type="button" class="btn-secondary js-dialog-back">Back</button>
+                          <button type="submit" class="primary-btn">Complete Registration</button>
+                        </div>
+                      </div>
+                    <% } %>
                   </form>
+                </dialog>
+
+                <%# "Message that says thank you for registering for the
+                    event!" - shown once the dialog's own AJAX submit
+                    succeeds (events-detail-register.js), in place of just
+                    silently closing the dialog. %>
+                <dialog id="event-register-thankyou-dialog" class="notes-dialog">
+                  <h3>Thank You!</h3>
+                  <p>Thank you for registering for <strong><%= event.title %></strong>!</p>
+                  <% if (dialogHasPayment) { %>
+                    <p class="hint">An invoice has been created for your registration &ndash; we'll follow up separately on how to pay it.</p>
+                  <% } %>
+                  <div class="notes-dialog-actions">
+                    <button type="button" class="primary-btn" onclick="this.closest('dialog').close()">Close</button>
+                  </div>
                 </dialog>
               <% } %>
             <% } %>
@@ -338,118 +475,81 @@
             <% } %>
           </div>
 
-          <% if (event.volunteers_enabled && event.volunteerRoles.length) { %>
-            <div class="manage-section">
-              <div class="grid-box-header"><h2>Volunteer</h2></div>
-              <% if (event.volunteer_selection_count) { %>
-                <p class="hint">Please select at least <%= event.volunteer_selection_count %> role<%= event.volunteer_selection_count == 1 ? '' : 's' %> to help with this event.</p>
-              <% } %>
-              <div class="training-lesson-list">
-                <% event.volunteerRoles.forEach(function(role) { %>
-                  <div class="training-lesson-row">
-                    <div class="training-lesson-row-main">
-                      <svg class="icon"><use href="#icon-users"/></svg>
-                      <div class="training-lesson-info">
-                        <strong><%= role.role_name %></strong>
-                        <span class="hint">
-                          <%= role.remaining %> spot<%= role.remaining == 1 ? '' : 's' %> left
-                          <% if (role.time_label) { %> &middot; <%= role.time_label %><% } %>
-                          <% if (role.location) { %> &middot; <%= role.location %><% } %>
-                        </span>
-                        <% if (role.description) { %><span class="hint"><%= role.description %></span><% } %>
-                      </div>
-                      <div class="training-lesson-actions roster-btn-row">
-                        <% family.forEach(function(m) { %>
-                          <% var key = role.id + ':' + m.id; %>
-                          <% if (volunteeredKey.indexOf(key) !== -1) { %>
-                            <form method="POST" action="/events/<%= event.id %>/volunteer-roles/<%= role.id %>/cancel" class="inline-block-form">
-                              <input type="hidden" name="memberId" value="<%= m.id %>" />
-                              <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= m.name %>: Cancel</button>
-                            </form>
-                          <% } else if (role.remaining > 0) { %>
-                            <form method="POST" action="/events/<%= event.id %>/volunteer-roles/<%= role.id %>/signup" class="inline-block-form">
-                              <input type="hidden" name="memberId" value="<%= m.id %>" />
-                              <button type="submit" class="roster-action-btn"><%= m.name %>: Sign Up</button>
-                            </form>
-                          <% } %>
-                        <% }); %>
-                      </div>
-                    </div>
-                  </div>
+          <%
+            // A real request: "after registering there will be a card
+            // below the registration card that says my registration...
+            // listing everyone signed up by this family in a single
+            // organized column, no register buttons next to members
+            // there. Then list volunteer positions signed up for,
+            // donations signed up for and food signed up for. Then a
+            // button that says edit registration." Only shown once the
+            // family actually has at least one active registration.
+          %>
+          <% if (myRegistrations.length) { %>
+            <div class="manage-section event-my-registration-card">
+              <div class="grid-box-header">
+                <h2>My Registration</h2>
+                <button type="button" class="roster-action-btn roster-action-btn-fit" onclick="document.getElementById('edit-registration-dialog').showModal()">Edit Registration</button>
+              </div>
+              <div class="event-my-registration-column">
+                <% myRegistrations.forEach(function(r) {
+                  var m = family.find(function(fm) { return fm.id === r.member_id; });
+                %>
+                  <p class="event-my-registration-row"><%= m ? m.name : 'Member' %><% if (r.status === 'waitlisted') { %> <span class="hint">(waitlisted)</span><% } %></p>
                 <% }); %>
               </div>
+              <% if (myVolunteerSignups.length) { %>
+                <h3>Volunteer Positions Signed Up For</h3>
+                <ul class="portal-dashboard-list">
+                  <% myVolunteerSignups.forEach(function(s) {
+                    var m = family.find(function(fm) { return fm.id === s.member_id; });
+                  %>
+                    <li><%= s.roleName %> &mdash; <%= m ? m.name : 'Member' %></li>
+                  <% }); %>
+                </ul>
+              <% } %>
+              <% if (myDonationClaims.length) { %>
+                <h3>Donations Signed Up For</h3>
+                <ul class="portal-dashboard-list">
+                  <% myDonationClaims.forEach(function(c) {
+                    var m = family.find(function(fm) { return fm.id === c.member_id; });
+                  %>
+                    <li><%= c.itemName %><% if (c.quantity_claimed > 1) { %> (<%= c.quantity_claimed %>)<% } %> &mdash; <%= m ? m.name : 'Member' %></li>
+                  <% }); %>
+                </ul>
+              <% } %>
+              <% if (myFoodClaims.length) { %>
+                <h3>Food Signed Up For</h3>
+                <ul class="portal-dashboard-list">
+                  <% myFoodClaims.forEach(function(c) {
+                    var m = family.find(function(fm) { return fm.id === c.member_id; });
+                  %>
+                    <li><%= c.itemName %><% if (c.quantity_claimed > 1) { %> (<%= c.quantity_claimed %>)<% } %> &mdash; <%= m ? m.name : 'Member' %></li>
+                  <% }); %>
+                </ul>
+              <% } %>
             </div>
+
+            <%# A real request: "click and see a popup that allows you to
+                view what's left on those lists, unassigned what they
+                signed up for and register for something else" - reuses
+                the exact same Volunteer/Donations/Food section partials
+                rendered below (same remaining counts, same Sign Up/
+                Cancel toggle), just inside a dialog. %>
+            <dialog id="edit-registration-dialog" class="member-picker-dialog event-registration-edit-dialog">
+              <h3>Edit Registration</h3>
+              <%- include('partials/event-volunteer-section', { event: event, family: family, volunteeredKey: volunteeredKey }) %>
+              <%- include('partials/event-donation-section', { event: event, family: family }) %>
+              <%- include('partials/event-food-section', { event: event, family: family }) %>
+              <div class="notes-dialog-actions">
+                <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+              </div>
+            </dialog>
           <% } %>
 
-          <% if (event.donations_enabled && event.donationItems.length) { %>
-            <div class="manage-section">
-              <div class="grid-box-header"><h2>Donations Needed</h2></div>
-              <% if (event.donation_selection_count) { %>
-                <p class="hint">Please select at least <%= event.donation_selection_count %> item<%= event.donation_selection_count == 1 ? '' : 's' %> to bring.</p>
-              <% } %>
-              <div class="training-lesson-list">
-                <% event.donationItems.forEach(function(item) { %>
-                  <div class="training-lesson-row">
-                    <div class="training-lesson-row-main">
-                      <svg class="icon"><use href="#icon-badge"/></svg>
-                      <div class="training-lesson-info">
-                        <strong><%= item.item_name %></strong>
-                        <span class="hint">
-                          <%= item.remaining %> still needed
-                          <% if (item.deadline) { %> &middot; needed by <%= item.deadline %><% } %>
-                        </span>
-                        <% if (item.notes) { %><span class="hint"><%= item.notes %></span><% } %>
-                      </div>
-                      <% if (item.remaining > 0) { %>
-                        <form method="POST" action="/events/<%= event.id %>/donation-items/<%= item.id %>/claim" class="training-lesson-actions">
-                          <select name="memberId">
-                            <% family.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
-                          </select>
-                          <input type="number" name="quantity" min="1" value="1" max="<%= item.remaining %>" style="width: 4rem;" />
-                          <button type="submit" class="roster-action-btn">I'll Bring It</button>
-                        </form>
-                      <% } %>
-                    </div>
-                  </div>
-                <% }); %>
-              </div>
-            </div>
-          <% } %>
-
-          <% if (event.food_enabled && event.foodItems.length) { %>
-            <div class="manage-section">
-              <div class="grid-box-header"><h2>Food Sign-Up</h2></div>
-              <% if (event.food_selection_count) { %>
-                <p class="hint">Please select at least <%= event.food_selection_count %> item<%= event.food_selection_count == 1 ? '' : 's' %> to bring.</p>
-              <% } %>
-              <div class="training-lesson-list">
-                <% event.foodItems.forEach(function(item) { %>
-                  <div class="training-lesson-row">
-                    <div class="training-lesson-row-main">
-                      <svg class="icon"><use href="#icon-badge"/></svg>
-                      <div class="training-lesson-info">
-                        <strong><%= item.item_name %></strong>
-                        <span class="hint">
-                          <%= item.remaining %> still needed
-                          <% if (item.deadline) { %> &middot; needed by <%= item.deadline %><% } %>
-                        </span>
-                        <% if (item.notes) { %><span class="hint"><%= item.notes %></span><% } %>
-                      </div>
-                      <% if (item.remaining > 0) { %>
-                        <form method="POST" action="/events/<%= event.id %>/food-items/<%= item.id %>/claim" class="training-lesson-actions">
-                          <select name="memberId">
-                            <% family.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
-                          </select>
-                          <input type="number" name="quantity" min="1" value="1" max="<%= item.remaining %>" style="width: 4rem;" />
-                          <button type="submit" class="roster-action-btn">I'll Bring It</button>
-                        </form>
-                      <% } %>
-                    </div>
-                  </div>
-                <% }); %>
-              </div>
-            </div>
-          <% } %>
+          <%- include('partials/event-volunteer-section', { event: event, family: family, volunteeredKey: volunteeredKey }) %>
+          <%- include('partials/event-donation-section', { event: event, family: family }) %>
+          <%- include('partials/event-food-section', { event: event, family: family }) %>
 
           <%# A real request: "be able to attach these lists to events" -
               Main Admin's own Sign-Up Lists/Volunteer Lists (routes/
@@ -457,7 +557,7 @@
               Donations/Food sections above once attached to this event. %>
           <% attachedSignUpLists.forEach(function(list) { %>
             <div class="manage-section">
-              <div class="grid-box-header"><h2><%= list.title %></h2></div>
+              <div class="grid-box-header"><h2><%= list.title %><% if (!list.is_open) { %> <span class="badge-pill badge-pill-gray">Closed</span><% } %></h2></div>
               <% if (list.description) { %><p class="hint"><%= list.description %></p><% } %>
               <div class="training-lesson-list">
                 <% list.items.forEach(function(item) { %>
@@ -469,7 +569,7 @@
                         <strong><%= item.item_name %></strong>
                         <span class="hint"><%= remaining %> still needed<% if (item.notes) { %> &middot; <%= item.notes %><% } %></span>
                       </div>
-                      <% if (remaining > 0) { %>
+                      <% if (list.is_open && remaining > 0) { %>
                         <form method="POST" action="/events/<%= event.id %>/signup-list-items/<%= item.id %>/claim" class="training-lesson-actions">
                           <select name="memberId">
                             <% family.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
@@ -487,7 +587,7 @@
 
           <% attachedVolunteerLists.forEach(function(list) { %>
             <div class="manage-section">
-              <div class="grid-box-header"><h2><%= list.title %></h2></div>
+              <div class="grid-box-header"><h2><%= list.title %><% if (!list.is_open) { %> <span class="badge-pill badge-pill-gray">Closed</span><% } %></h2></div>
               <% if (list.description) { %><p class="hint"><%= list.description %></p><% } %>
               <div class="training-lesson-list">
                 <% list.shifts.forEach(function(shift) { %>
@@ -510,7 +610,7 @@
                               <input type="hidden" name="memberId" value="<%= m.id %>" />
                               <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= m.name %>: Cancel</button>
                             </form>
-                          <% } else if (shift.signups.length < shift.slots_needed) { %>
+                          <% } else if (list.is_open && shift.signups.length < shift.slots_needed) { %>
                             <form method="POST" action="/events/<%= event.id %>/volunteer-list-shifts/<%= shift.id %>/signup" class="inline-block-form">
                               <input type="hidden" name="memberId" value="<%= m.id %>" />
                               <button type="submit" class="roster-action-btn"><%= m.name %>: Sign Up</button>

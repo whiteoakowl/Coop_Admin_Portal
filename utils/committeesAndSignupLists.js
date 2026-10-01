@@ -165,6 +165,15 @@ async function deleteSignUpList(id) {
   await db.prepare('DELETE FROM sign_up_lists WHERE id = ?').run(id);
 }
 
+// A real request: "enable button when you click it members can signup on
+// the list. Enable button turns into disable button. If you click
+// disable button nobody can signup on the list but they can still view
+// the link." Gated in routes/signup-volunteer-lists.js's own claim route,
+// never the GET view.
+async function setSignUpListOpen(id, open) {
+  await db.prepare('UPDATE sign_up_lists SET is_open = ? WHERE id = ?').run(open ? 1 : 0, id);
+}
+
 async function itemsForSignUpList(listId) {
   const items = await db.prepare('SELECT * FROM sign_up_list_items WHERE list_id = ? ORDER BY position, id').all(listId);
   for (const item of items) {
@@ -247,6 +256,12 @@ async function deleteVolunteerList(id) {
   await db.prepare('DELETE FROM volunteer_signup_lists WHERE id = ?').run(id);
 }
 
+// Same open/closed concept as setSignUpListOpen above, for the sibling
+// feature.
+async function setVolunteerListOpen(id, open) {
+  await db.prepare('UPDATE volunteer_signup_lists SET is_open = ? WHERE id = ?').run(open ? 1 : 0, id);
+}
+
 async function shiftsForVolunteerList(listId) {
   const shifts = await db.prepare('SELECT * FROM volunteer_signup_list_shifts WHERE list_id = ? ORDER BY position, shift_date, start_time, id').all(listId);
   for (const shift of shifts) {
@@ -312,6 +327,7 @@ module.exports = {
   createSignUpList,
   updateSignUpList,
   deleteSignUpList,
+  setSignUpListOpen,
   itemsForSignUpList,
   addSignUpItem,
   updateSignUpItem,
@@ -324,6 +340,7 @@ module.exports = {
   createVolunteerList,
   updateVolunteerList,
   deleteVolunteerList,
+  setVolunteerListOpen,
   shiftsForVolunteerList,
   addVolunteerShift,
   updateVolunteerShift,

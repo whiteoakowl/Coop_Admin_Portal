@@ -384,6 +384,12 @@ function eventFields(data) {
     data.volunteerSelectionCount ?? null,
     data.donationSelectionCount ?? null,
     data.foodSelectionCount ?? null,
+    // A real request: "Require for each attendees or each family. Radio
+    // buttons that say attendees, and family" - see this field's own
+    // migration comment.
+    data.volunteerRequirementScope === 'attendee' ? 'attendee' : 'family',
+    data.donationRequirementScope === 'attendee' ? 'attendee' : 'family',
+    data.foodRequirementScope === 'attendee' ? 'attendee' : 'family',
     data.isClosed ? 1 : 0,
     // Same "undefined must not silently override the migration's own
     // DEFAULT 1" guard volunteersEnabled/donationsEnabled already need
@@ -459,6 +465,7 @@ async function createEvent(data, accountId, { submittedByAccountId = null, statu
          slug, event_type, short_description, language, organized_by, tags,
          volunteers_enabled, donations_enabled, food_enabled,
          volunteer_selection_count, donation_selection_count, food_selection_count,
+         volunteer_requirement_scope, donation_requirement_scope, food_requirement_scope,
          is_closed, allow_registration_cancellations, allow_refund_on_cancel, show_registrants_to_members, track_participants_only,
          lock_registration_to_grade, lock_registration_to_age, age_group_restriction,
          lock_registration_to_section, registration_section_id, lock_visibility_to_section, visibility_section_id, accounting_category_id,
@@ -466,7 +473,7 @@ async function createEvent(data, accountId, { submittedByAccountId = null, statu
          activity_info, include_activity_info, meetup_parking_info, include_meetup_parking_info,
          what_to_bring, include_what_to_bring, extra_notes, include_extra_notes,
          created_by_account_id, submitted_by_account_id, approval_status, status
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(...eventFields(data), accountId, submittedByAccountId, approvalStatus, status);
   return info.lastInsertRowid;
@@ -482,6 +489,7 @@ async function updateEvent(id, data) {
          slug = ?, event_type = ?, short_description = ?, language = ?, organized_by = ?, tags = ?,
          volunteers_enabled = ?, donations_enabled = ?, food_enabled = ?,
          volunteer_selection_count = ?, donation_selection_count = ?, food_selection_count = ?,
+         volunteer_requirement_scope = ?, donation_requirement_scope = ?, food_requirement_scope = ?,
          is_closed = ?, allow_registration_cancellations = ?, allow_refund_on_cancel = ?, show_registrants_to_members = ?, track_participants_only = ?,
          lock_registration_to_grade = ?, lock_registration_to_age = ?, age_group_restriction = ?,
          lock_registration_to_section = ?, registration_section_id = ?, lock_visibility_to_section = ?, visibility_section_id = ?, accounting_category_id = ?,
@@ -1040,7 +1048,56 @@ async function createOrReactivateRegistration(event, member, accountId, answers 
 }
 
 // { ok: false, error } or { ok: true, notice, status, waitlistPosition }
-async function registerForEvent({ eventId, memberId, accountId, family, answers = {}, ticketTypeId = null }) {
+// How many DISTINCT volunteer roles/donation items/food items any of
+// `memberIds` has already signed up for/claimed on this event - the
+// building block for enforcing "Require for each: Attendees / Family"
+// (volunteer_requirement_scope et al.) at registration time. 'attendee'
+// scope checks just the registering member's own id; 'family' checks
+// every family member's, since the whole family only needs to clear the
+// minimum once between them.
+async function distinctSectionSelectionCount(eventId, memberIds, kind) {
+  if (!memberIds.length) return 0;
+  const placeholders = memberIds.map(() => '?').join(',');
+  const queries = {
+    volunteer: `SELECT COUNT(DISTINCT evs.volunteer_role_id) AS c FROM event_volunteer_signups evs
+                JOIN event_volunteer_roles evr ON evr.id = evs.volunteer_role_id
+                WHERE evr.event_id = ? AND evs.member_id IN (${placeholders})`,
+    donation: `SELECT COUNT(DISTINCT edc.donation_item_id) AS c FROM event_donation_claims edc
+               JOIN event_donation_items edi ON edi.id = edc.donation_item_id
+               WHERE edi.event_id = ? AND edc.member_id IN (${placeholders})`,
+    food: `SELECT COUNT(DISTINCT efc.food_item_id) AS c FROM event_food_claims efc
+           JOIN event_food_items efi ON efi.id = efc.food_item_id
+           WHERE efi.event_id = ? AND efc.member_id IN (${placeholders})`,
+  };
+  const row = await db.prepare(queries[kind]).get(eventId, ...memberIds);
+  return Number(row.c);
+}
+
+const SECTION_REQUIREMENT_DEFS = {
+  volunteer: { enabledField: 'volunteers_enabled', countField: 'volunteer_selection_count', scopeField: 'volunteer_requirement_scope', noun: 'volunteer role' },
+  donation: { enabledField: 'donations_enabled', countField: 'donation_selection_count', scopeField: 'donation_requirement_scope', noun: 'donation item' },
+  food: { enabledField: 'food_enabled', countField: 'food_selection_count', scopeField: 'food_requirement_scope', noun: 'food item' },
+};
+
+// Returns an error string if `newIds` (what this member is picking right
+// now, alongside the extra-field answers) doesn't clear this section's
+// own minimum, or null if there's no requirement or it's already met.
+async function checkSectionRequirement(event, member, family, kind, newIds) {
+  const def = SECTION_REQUIREMENT_DEFS[kind];
+  if (!event[def.enabledField]) return null;
+  const required = event[def.countField];
+  if (!required) return null;
+  const scope = event[def.scopeField] === 'attendee' ? 'attendee' : 'family';
+  const memberIds = scope === 'attendee' ? [member.id] : family.map((m) => m.id);
+  const existing = await distinctSectionSelectionCount(event.id, memberIds, kind);
+  if (existing + newIds.length < required) {
+    const who = scope === 'attendee' ? 'You' : 'Your family';
+    return `${who} must select at least ${required} ${def.noun}${required === 1 ? '' : 's'} to register for this event.`;
+  }
+  return null;
+}
+
+async function registerForEvent({ eventId, memberId, accountId, family, answers = {}, ticketTypeId = null, volunteerRoleIds = [], donationItemIds = [], foodItemIds = [] }) {
   const event = await getEvent(eventId);
   if (!event) return { ok: false, error: 'That event no longer exists.' };
   if (event.status !== 'published') return { ok: false, error: 'That event is not open for registration.' };
@@ -1078,6 +1135,20 @@ async function registerForEvent({ eventId, memberId, accountId, family, answers 
     }
   }
 
+  // A real request: "if these items are selected when editing the event
+  // with options added, then member should be asked when clicking
+  // register along with the extra fields questions." Each section's own
+  // minimum (and whether it's enforced per attendee or once per family)
+  // is checked the same way required extra fields are, right alongside
+  // them - a member picks their volunteer/donation/food items in the
+  // same Register dialog instead of a separate, unlinked page.
+  const volunteerError = await checkSectionRequirement(event, member, family, 'volunteer', volunteerRoleIds);
+  if (volunteerError) return { ok: false, error: volunteerError };
+  const donationError = await checkSectionRequirement(event, member, family, 'donation', donationItemIds);
+  if (donationError) return { ok: false, error: donationError };
+  const foodError = await checkSectionRequirement(event, member, family, 'food', foodItemIds);
+  if (foodError) return { ok: false, error: foodError };
+
   // A real request: "select tickets, click register" - once an event has
   // any ticket types defined (Finance tab), registering requires picking
   // one; an event with none defined keeps registering at its own flat
@@ -1090,7 +1161,14 @@ async function registerForEvent({ eventId, memberId, accountId, family, answers 
     resolvedTicketTypeId = match.id;
   }
 
-  return createOrReactivateRegistration(event, member, accountId, answers, { allowWaitlist: !!event.allow_waitlist_signups, ticketTypeId: resolvedTicketTypeId });
+  const result = await createOrReactivateRegistration(event, member, accountId, answers, { allowWaitlist: !!event.allow_waitlist_signups, ticketTypeId: resolvedTicketTypeId });
+  if (!result.ok) return result;
+
+  for (const roleId of volunteerRoleIds) await signUpForVolunteerRole(roleId, member.id, accountId);
+  for (const itemId of donationItemIds) await claimDonationItem(itemId, member.id, 1, accountId);
+  for (const itemId of foodItemIds) await claimFoodItem(itemId, member.id, 1, accountId);
+
+  return result;
 }
 
 // A real request: "add a button that says add registration. Pop up with

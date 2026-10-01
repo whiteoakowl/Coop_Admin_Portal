@@ -33,8 +33,15 @@ router.get('/signup-lists/:id', requirePortalAuth, async (req, res) => {
   });
 });
 
+// A real request: "if you click disable button nobody can signup on the
+// list but they can still view the link" - the GET route above is
+// unaffected; only the actual claim action is gated.
 router.post('/signup-lists/:id/items/:itemId/claim', requirePortalAuth, async (req, res) => {
   const back = `/signup-lists/${req.params.id}`;
+  const list = await lists.getSignUpList(req.params.id);
+  if (!list || !list.is_open) {
+    return res.redirect(back + '?error=' + encodeURIComponent('Signups are currently closed for this list.'));
+  }
   const memberId = parseInt(req.body.memberId, 10);
   const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
@@ -64,6 +71,10 @@ router.get('/volunteer-lists/:id', requirePortalAuth, async (req, res) => {
 
 router.post('/volunteer-lists/:id/shifts/:shiftId/signup', requirePortalAuth, async (req, res) => {
   const back = `/volunteer-lists/${req.params.id}`;
+  const list = await lists.getVolunteerList(req.params.id);
+  if (!list || !list.is_open) {
+    return res.redirect(back + '?error=' + encodeURIComponent('Signups are currently closed for this list.'));
+  }
   const memberId = parseInt(req.body.memberId, 10);
   const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {

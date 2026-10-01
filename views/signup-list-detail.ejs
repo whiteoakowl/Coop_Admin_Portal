@@ -25,6 +25,9 @@
 
         <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
         <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+        <%# A real request: "if you click disable button nobody can
+            signup on the list but they can still view the link." %>
+        <% if (!list.is_open) { %><p class="hint">Signups are currently closed for this list &mdash; you can still view what's needed.</p><% } %>
 
         <% if (items.length === 0) { %>
           <p class="roster-empty">No items yet.</p>
@@ -39,7 +42,7 @@
                     <strong><%= item.item_name %></strong>
                     <span class="hint"><%= remaining %> still needed<% if (item.notes) { %> &middot; <%= item.notes %><% } %></span>
                   </div>
-                  <% if (remaining > 0) { %>
+                  <% if (list.is_open && remaining > 0) { %>
                     <form method="POST" action="/signup-lists/<%= list.id %>/items/<%= item.id %>/claim" class="training-lesson-actions">
                       <select name="memberId">
                         <% family.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>

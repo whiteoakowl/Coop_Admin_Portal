@@ -207,6 +207,9 @@ function eventDataFromRow(event) {
     volunteerSelectionCount: event.volunteer_selection_count,
     donationSelectionCount: event.donation_selection_count,
     foodSelectionCount: event.food_selection_count,
+    volunteerRequirementScope: event.volunteer_requirement_scope,
+    donationRequirementScope: event.donation_requirement_scope,
+    foodRequirementScope: event.food_requirement_scope,
     isClosed: !!event.is_closed,
     allowRegistrationCancellations: !!event.allow_registration_cancellations,
     allowRefundOnCancel: !!event.allow_refund_on_cancel,
@@ -812,6 +815,20 @@ router.post('/:id/permissions', async (req, res) => {
 // read-the-row-back-first shape as the Settings/permissions route above,
 // for the same reason (this tiny form only carries its own section's two
 // fields).
+// A real bug report: "edit event, add volunteer positions, drop down for
+// choosing how many volunteer positions someone must sign up for... you
+// choose a number and click save. It gets back to default. Same with
+// donations." `section` is plural ('volunteers'/'donations'/'food') to
+// match the route names, but eventFields() (utils/events.js) only reads
+// the singular `volunteerSelectionCount`/`donationSelectionCount` keys -
+// `${section}SelectionCount` was building `volunteersSelectionCount`/
+// `donationsSelectionCount`, a key nothing ever read, silently dropping
+// the new value while the old one got written back unchanged from the
+// eventDataFromRow(event) spread. 'food' had no singular/plural
+// distinction, so it never showed the bug. SECTION_NOUN maps the plural
+// route/section name to the singular field-name segment every other
+// consumer of these fields already uses.
+const SECTION_NOUN = { volunteers: 'volunteer', donations: 'donation', food: 'food' };
 function sectionToggleRoute(section) {
   return async (req, res) => {
     const id = req.params.id;
@@ -820,7 +837,10 @@ function sectionToggleRoute(section) {
     await events.updateEvent(id, {
       ...eventDataFromRow(event),
       [`${section}Enabled`]: req.body.enabled === '1',
-      [`${section}SelectionCount`]: selectionCountFromBody(req.body.selectionCount),
+      [`${SECTION_NOUN[section]}SelectionCount`]: selectionCountFromBody(req.body.selectionCount),
+      // A real request: "Require for each attendees or each family. Radio
+      // buttons that say attendees, and family."
+      [`${SECTION_NOUN[section]}RequirementScope`]: req.body.requirementScope === 'attendee' ? 'attendee' : 'family',
     });
     res.redirect(`/main-admin/events/${id}/builder?tab=volunteers&section=${section}&notice=` + encodeURIComponent('Saved.'));
   };

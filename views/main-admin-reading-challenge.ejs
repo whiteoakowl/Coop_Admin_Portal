@@ -13,32 +13,86 @@
     <% if (!students.length) { %>
       <p class="roster-empty">No reading logs yet.</p>
     <% } else if (!groupByFamily) { %>
-      <div class="manage-section">
-        <div class="roster-scroll">
-          <table class="roster-table condensed-table">
-            <thead><tr><th>Name</th><th>Total Hours</th><th>Total Points</th><th>Logs</th><th>Weekly Goal</th></tr></thead>
-            <tbody>
-              <% students.forEach(function(s) { %>
-                <tr>
-                  <td class="roster-name-col"><%= s.name %></td>
-                  <td><%= s.totalHours.toFixed(1) %></td>
-                  <td><%= s.totalPoints %></td>
-                  <td><%= s.logCount %></td>
-                  <td><%= s.weeklyGoalHours %> hrs/wk</td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
+      <%# A real request: "student reading challenge divide into separate
+          cards by grade level sections... top card shows highest person
+          from each grade sections." gradeBands/topByBand come pre-bucketed
+          from routes/main-admin-fun.js (utils/reading.js's own
+          gradeBandForGradeLevel). %>
+      <% if (topByBand.length) { %>
+        <div class="manage-section">
+          <div class="grid-box-header"><h2>Top Student By Grade Section</h2></div>
+          <div class="roster-scroll">
+            <table class="roster-table condensed-table">
+              <thead><tr><th>Grade Section</th><th>Student</th><th>Total Hours</th><th>Total Points</th></tr></thead>
+              <tbody>
+                <% topByBand.forEach(function(entry) { %>
+                  <tr>
+                    <td class="roster-name-col"><%= entry.label %></td>
+                    <td><%= entry.student.name %></td>
+                    <td><%= entry.student.totalHours.toFixed(1) %></td>
+                    <td><%= entry.student.totalPoints %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    <% } else {
-      const families = new Map();
-      students.forEach(function(s) {
-        const key = s.familyName || 'No Family';
-        if (!families.has(key)) families.set(key, []);
-        families.get(key).push(s);
-      });
-    %>
+      <% } %>
+      <% gradeBands.forEach(function(band) { %>
+        <div class="manage-section">
+          <div class="grid-box-header"><h2><%= band.label %></h2></div>
+          <% if (!band.students.length) { %>
+            <p class="roster-empty">No students in this grade section yet.</p>
+          <% } else { %>
+            <div class="roster-scroll">
+              <table class="roster-table condensed-table">
+                <thead><tr><th>Name</th><th>Total Hours</th><th>Total Points</th><th>Logs</th><th>Weekly Goal</th></tr></thead>
+                <tbody>
+                  <% band.students.forEach(function(s) { %>
+                    <tr>
+                      <td class="roster-name-col"><%= s.name %></td>
+                      <td><%= s.totalHours.toFixed(1) %></td>
+                      <td><%= s.totalPoints %></td>
+                      <td><%= s.logCount %></td>
+                      <td><%= s.weeklyGoalHours %> hrs/wk</td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+      <% }); %>
+    <% } else { %>
+      <%# A real request: "parent reading challenge page. add a top card
+          that shows top 10 adult with the most hours." %>
+      <% if (topAdults.length) { %>
+        <div class="manage-section">
+          <div class="grid-box-header"><h2>Top 10 Adults By Hours</h2></div>
+          <div class="roster-scroll">
+            <table class="roster-table condensed-table">
+              <thead><tr><th>Name</th><th>Total Hours</th><th>Total Points</th></tr></thead>
+              <tbody>
+                <% topAdults.forEach(function(s) { %>
+                  <tr>
+                    <td class="roster-name-col"><%= s.name %></td>
+                    <td><%= s.totalHours.toFixed(1) %></td>
+                    <td><%= s.totalPoints %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      <% } %>
+      <%
+        const families = new Map();
+        students.forEach(function(s) {
+          const key = s.familyName || 'No Family';
+          if (!families.has(key)) families.set(key, []);
+          families.get(key).push(s);
+        });
+      %>
       <% Array.from(families.entries()).forEach(function(entry) { %>
         <div class="manage-section">
           <div class="grid-box-header"><h2><%= entry[0] %></h2></div>

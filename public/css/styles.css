@@ -425,6 +425,24 @@ textarea:focus-visible,
 
 .documents-grid { justify-content: flex-start; }
 
+/* A real request (Parent Portal Documents, mobile): "document card/
+   buttons should be centered on the screen and smaller." .documents-grid
+   overrides .landing-grid's own centered layout to flex-start so a long
+   list reads left-to-right on desktop - but once .landing-grid's own
+   640px/500px breakpoints above collapse it to a single column, that same
+   left-alignment just pins one lonely card to the left edge instead of
+   centering it the way every other .landing-grid page already does at
+   that width. Centered again on mobile, plus a smaller icon/label/padding
+   so each card doesn't dominate a phone screen the way the desktop-sized
+   220px card does. */
+@media (max-width: 640px) {
+  .documents-grid { justify-content: center; }
+  .documents-grid .landing-card { padding: 1.1rem 0.75rem; gap: 0.5rem; }
+  .documents-grid .landing-icon,
+  .documents-grid .landing-card-image { width: 2.5rem; height: 2.5rem; }
+  .documents-grid .landing-label { font-size: 1.15rem; }
+}
+
 .library-checkout-section input[type="text"] {
   width: 100%;
   max-width: 420px;
@@ -522,6 +540,7 @@ textarea:focus-visible,
 
 @media (max-width: 500px) {
   .landing-grid { grid-template-columns: 220px; }
+  .documents-grid { grid-template-columns: 170px; }
 }
 
 /* ---------- Kiosk ---------- */
@@ -4261,6 +4280,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    the only child, just the only .roster-action-btn, so it was still
    stretching to fill the whole row on its own. */
 .email-toolbar-row .roster-action-btn { flex: 0 0 auto; }
+
+/* A real request (Committees' Edit Committee page): "edit button, add
+   member button and add position buttons should be smaller and simply
+   fit the text clean." Each already sits alone in its own .grid-box-
+   header, so .grid-box-header .roster-action-btn above already stops it
+   from stretching to fill the row (flex: 0 0 auto) - the real culprit is
+   .roster-action-btn's own min-width: 5.5rem, sized for a toolbar row of
+   several buttons side by side, forcing a short one-word label like
+   "Edit" noticeably wider than its own text needs. */
+.roster-action-btn-fit { min-width: 0; padding: 0.5rem 0.75rem; }
 
 /* Events' own Add/Edit Category/Add/Edit Location toolbar - a real
    request: "events, desktop, add/edit category and add/edit location
@@ -8885,6 +8914,20 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
 .training-lesson-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .training-lesson-actions { display: flex; align-items: center; gap: 0.2rem; flex-shrink: 0; }
 
+/* A real request (event Volunteer/Donations/Food sections and their
+   shared Edit Registration popup): "make sure all of these pages and
+   buttons don't trail off the page on mobile." .training-lesson-row-main
+   and .training-lesson-actions above have no wrap by default (fine on
+   desktop, where there's room for several per-family-member Sign Up/
+   Cancel buttons beside the role/item info on one line) - on a narrow
+   phone screen, especially inside the Edit Registration dialog's own
+   narrower width, that same row can run past the edge instead of
+   wrapping. */
+@media (max-width: 640px) {
+  .training-lesson-row-main { flex-wrap: wrap; }
+  .training-lesson-actions { flex-wrap: wrap; width: 100%; }
+}
+
 .training-quiz-question-list { margin: 0.6rem 0 0 2.2rem; display: flex; flex-direction: column; gap: 0.35rem; }
 .training-quiz-question-row {
   display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.5rem;
@@ -9170,6 +9213,48 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
    wider since a ticket dropdown plus several extra-field questions is
    more content than that dialog's usual single textarea. */
 .event-register-dialog { width: min(480px, 90vw); }
+
+/* A real request: "you are taken to a ticket view and selection screen...
+   then a payment screen" - the dialog's content is now a sequence of
+   .register-dialog-step panels (details/ticket/payment), shown one at a
+   time by events-detail-register.js toggling `hidden`; this just keeps
+   each one's own fields laid out in the same single-column grid the rest
+   of the dialog already uses. */
+.register-dialog-step { display: contents; }
+
+/* The ticket step's radio cards - one per ticket type, replacing the old
+   plain <select>. Wraps cleanly on narrow screens instead of letting a
+   long ticket title push the price off the edge of the dialog. */
+.ticket-select-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.ticket-select-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+.ticket-select-option:has(input:checked) { border-color: var(--brand); background: var(--brand-soft); }
+.ticket-select-option input[type="radio"] { accent-color: var(--brand); flex-shrink: 0; }
+.ticket-select-info { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+
+/* Parent Portal's own "My Registration" card (below the Register card,
+   once the family has registered) and its Edit Registration popup - a
+   real request: "listing everyone signed up by this family in a single
+   organized column, no register buttons." A plain stacked column of
+   names, same spirit as .event-register-member-list above but read-only. */
+.event-my-registration-column { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.75rem; }
+.event-my-registration-row { margin: 0; font-weight: 600; }
+
+/* The Edit Registration dialog reuses the same Volunteer/Donations/Food
+   section partials rendered inline further down the page (event-
+   volunteer-section.ejs et al.) - several full sections can be taller
+   than the viewport, so (like .role-permissions-dialog elsewhere) this
+   scrolls internally instead of letting the dialog itself grow past the
+   screen on mobile. */
+.event-registration-edit-dialog { width: min(560px, 92vw); max-height: 85vh; overflow-y: auto; }
+.event-registration-edit-dialog .manage-section:first-of-type { margin-top: 0; }
 
 /* Real bug, the same one .form-outer-panel exists to fix elsewhere in
    this app: html/body's own default background is the branded blue

@@ -180,6 +180,42 @@ async function leaderboard(limit = 10, memberType = 'student') {
   }));
 }
 
+// A real request: "student reading challenge divide into separate cards
+// by grade level sections. Grades nursery-preK. K-1, 2-3, 4-5, 6-7,
+// 8-12." members.grade_level is free text written by two different flows
+// with two different vocabularies (see utils/spellingBee.js's own header
+// comment on normalizeGradeLevel) - gradeBandForGradeLevel below tolerates
+// both the same way, but can't reuse that function as-is since it
+// deliberately lumps Kindergarten in with Pre-K/Preschool (0 = "any
+// pre-elementary stage") for word-difficulty purposes, while this needs
+// Kindergarten grouped with 1st grade instead, so Nursery/Toddler/
+// Preschool/Pre-K get their own number (-1) one band below it.
+const GRADE_BANDS = [
+  { key: 'nursery-prek', label: 'Nursery - PreK', min: -1, max: -1 },
+  { key: 'k-1', label: 'K - 1st Grade', min: 0, max: 1 },
+  { key: '2-3', label: '2nd - 3rd Grade', min: 2, max: 3 },
+  { key: '4-5', label: '4th - 5th Grade', min: 4, max: 5 },
+  { key: '6-7', label: '6th - 7th Grade', min: 6, max: 7 },
+  { key: '8-12', label: '8th - 12th Grade', min: 8, max: 12 },
+];
+
+function normalizeGradeNumber(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim().replace(/\s*grade$/i, '').trim();
+  const lower = s.toLowerCase().replace(/^pre-k$/i, 'prek');
+  const numMatch = lower.match(/^(\d{1,2})(st|nd|rd|th)?$/);
+  if (numMatch) return Math.min(12, parseInt(numMatch[1], 10));
+  if (lower === 'kindergarten' || lower === 'k') return 0;
+  if (['infant', 'toddler', 'preschool', 'prek'].includes(lower)) return -1;
+  return null;
+}
+
+function gradeBandForGradeLevel(raw) {
+  const n = normalizeGradeNumber(raw);
+  if (n === null) return null;
+  return GRADE_BANDS.find((b) => n >= b.min && n <= b.max) || null;
+}
+
 module.exports = {
   POINTS_PER_HOUR,
   WEEKLY_GOAL_HOURS,
@@ -189,4 +225,6 @@ module.exports = {
   coverColor,
   getWeeklyGoal,
   setWeeklyGoal,
+  GRADE_BANDS,
+  gradeBandForGradeLevel,
 };

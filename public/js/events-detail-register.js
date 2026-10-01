@@ -23,6 +23,32 @@
   const needsDialog = list.dataset.needsDialog === '1';
   const dialog = document.getElementById('event-register-dialog');
   const selectedBtn = document.getElementById('event-register-selected-btn');
+  const thankYouDialog = document.getElementById('event-register-thankyou-dialog');
+
+  // A real request: "after asking about signups, food, etc. you are
+  // taken to a ticket view and selection screen. After selecting the
+  // ticket you want you click submit and you are taken to a payment
+  // screen." The dialog's steps (views/events-detail.ejs's own
+  // .register-dialog-step panels - details/ticket/payment, whichever of
+  // those the event actually has) are shown one at a time in DOM order;
+  // showStep/updatePaymentSummary live at this top level (not nested
+  // inside the `if (dialog)` block below) since the Register-button
+  // handler further down also needs to reset to step 0 before opening.
+  const dialogSteps = dialog ? [...dialog.querySelectorAll('.register-dialog-step')] : [];
+  function showStep(index) {
+    dialogSteps.forEach((step, i) => {
+      step.hidden = i !== index;
+    });
+    if (dialogSteps[index] && dialogSteps[index].dataset.step === 'payment') updatePaymentSummary();
+  }
+  // The ticket step's chosen price drives the Payment step's summary -
+  // the flat (no-ticket-types) case already has its static amount
+  // rendered server-side, so there's nothing to compute here then.
+  function updatePaymentSummary() {
+    const summary = document.getElementById('event-register-payment-summary');
+    const checkedTicket = dialog && dialog.querySelector('input[name="ticketTypeId"]:checked');
+    if (summary && checkedTicket) summary.textContent = checkedTicket.dataset.priceLabel || '';
+  }
 
   function rowActions(row) {
     return row.querySelector('.event-register-member-actions');
@@ -122,6 +148,7 @@
           err.hidden = true;
           err.textContent = '';
         }
+        showStep(0);
         dialog.showModal();
         return;
       }
@@ -184,10 +211,33 @@
     });
   }
 
+  // Next validates only the step being left (reportValidity() skips
+  // hidden/display:none fields per spec, so it never blocks on a later
+  // step's still-empty required inputs) and Back/Next just toggle
+  // `hidden` via the shared showStep() declared above.
   if (dialog) {
     const dialogForm = document.getElementById('event-register-dialog-form');
     const cancelBtn = document.getElementById('event-register-dialog-cancel');
+
+    dialog.querySelectorAll('.js-dialog-next').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const current = dialogSteps.findIndex((step) => !step.hidden);
+        if (current === -1) return;
+        if (!dialogForm.reportValidity()) return;
+        showStep(Math.min(current + 1, dialogSteps.length - 1));
+      });
+    });
+    dialog.querySelectorAll('.js-dialog-back').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const current = dialogSteps.findIndex((step) => !step.hidden);
+        if (current <= 0) return;
+        showStep(current - 1);
+      });
+    });
+
     if (cancelBtn) cancelBtn.addEventListener('click', () => dialog.close());
+
+    dialog.addEventListener('close', () => showStep(0));
 
     dialogForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -201,6 +251,7 @@
         dialog.close();
         const row = list.querySelector(`.event-register-member-row[data-member-id="${memberId}"]`);
         if (row) markRegistered(row);
+        if (thankYouDialog) thankYouDialog.showModal();
       } else {
         const err = document.getElementById('event-register-dialog-error');
         if (err) {

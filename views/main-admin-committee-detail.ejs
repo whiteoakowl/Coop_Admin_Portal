@@ -12,7 +12,11 @@
     <p><a href="/main-admin/volunteers?tab=committees">&larr; Back to Committees</a></p>
     <div class="grid-box-header">
       <h1><%= committee.name %></h1>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-committee-dialog').showModal()">Edit</button>
+      <div class="roster-btn-row roster-btn-row-fit-text">
+        <button type="button" class="roster-action-btn roster-action-btn-fit" onclick="document.getElementById('edit-committee-dialog').showModal()">Edit</button>
+        <button type="button" class="roster-action-btn roster-action-btn-fit" onclick="window.print()">Print</button>
+        <a class="roster-action-btn file-action-btn roster-action-btn-fit" href="/main-admin/volunteers/committees/<%= committee.id %>/export.csv">Export</a>
+      </div>
     </div>
     <% if (committee.description) { %><p><%= committee.description %></p><% } %>
     <% if (committee.leaderName || committee.leaderEmail) { %>
@@ -27,7 +31,7 @@
 
     <div class="grid-box-header">
       <h2>Members</h2>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
+      <button type="button" class="roster-action-btn roster-action-btn-fit" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
     </div>
     <% if (members.length === 0) { %>
       <p class="roster-empty">No members yet &mdash; add one above.</p>
@@ -54,7 +58,7 @@
 
     <div class="grid-box-header">
       <h2>Positions</h2>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-position-dialog').showModal()">+ Add Position</button>
+      <button type="button" class="roster-action-btn roster-action-btn-fit" onclick="document.getElementById('add-position-dialog').showModal()">+ Add Position</button>
     </div>
 
     <% if (positions.length === 0) { %>

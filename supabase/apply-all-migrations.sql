@@ -4105,3 +4105,32 @@ alter table event_settings add constraint event_settings_family_submit_events_ch
 -- rather than a parallel messages table.
 alter table forum_categories add column if not exists is_chat_room integer not null default 0;
 alter table forum_categories add column if not exists room_thread_id integer references forum_threads(id) on delete set null;
+
+
+-- ===== 20261021010000_signup_volunteer_list_open.sql =====
+-- A real request: "volunteer lists, click on a list and add... enable
+-- button when you click it members can signup on the list. Enable button
+-- turns into disable button. If you click disable button nobody can
+-- signup on the list but they can still view the link. Make these
+-- changes for signup lists page as well." Both list types default open
+-- (existing lists keep working exactly as before) - closing one only
+-- blocks the member-facing claim/signup action (routes/signup-volunteer-
+-- lists.js), never the GET view.
+alter table volunteer_signup_lists add column if not exists is_open integer not null default 1;
+alter table sign_up_lists add column if not exists is_open integer not null default 1;
+
+
+-- ===== 20261021020000_event_volunteer_donation_food_requirement_scope.sql =====
+-- A real request: "On volunteer, donations and food signup pages there
+-- should also be a question that says Require for each attendees or each
+-- family. Radio buttons that say attendees, and family." Each of the 3
+-- sections' own "how many items should be selected" setting (volunteer_
+-- selection_count etc., see 20260901060000_event_guest_food_sections.sql)
+-- already only ever applied loosely per the hint text ("each family/
+-- individual registration") - this makes that choice explicit and
+-- actually enforced (utils/events.js's registerForEvent). Defaults to
+-- 'family' - the wording every section's existing hint text already used
+-- before this setting existed.
+alter table events add column if not exists volunteer_requirement_scope text not null default 'family' check (volunteer_requirement_scope in ('attendee', 'family'));
+alter table events add column if not exists donation_requirement_scope text not null default 'family' check (donation_requirement_scope in ('attendee', 'family'));
+alter table events add column if not exists food_requirement_scope text not null default 'family' check (food_requirement_scope in ('attendee', 'family'));

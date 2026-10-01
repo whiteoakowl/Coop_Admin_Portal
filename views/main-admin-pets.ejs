@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Pets</h1>
+    <p class="subtitle">Read-only admin view of Student Portal pet activity.</p>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>All Pets</h2></div>
+      <% if (!petRows.length) { %>
+        <p class="roster-empty">No pets created yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Student</th><th>Pet Name</th><th>Look</th><th>Level</th><th>XP</th><th>Coins</th><th>Hunger</th><th>Happiness</th><th>Cleanliness</th></tr></thead>
+            <tbody>
+              <% petRows.forEach(function(p) { %>
+                <tr>
+                  <td class="roster-name-col"><%= p.memberName %></td>
+                  <td><%= p.petName %></td>
+                  <td><%= p.look.label %></td>
+                  <td><%= p.levelInfo.level %></td>
+                  <td><%= p.levelInfo.xpIntoLevel %> / <%= p.levelInfo.xpForLevel %></td>
+                  <td><%= p.coins %></td>
+                  <td><%= p.stats.hunger %>%</td>
+                  <td><%= p.stats.happiness %>%</td>
+                  <td><%= p.stats.cleanliness %>%</td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </main>
+</body>
+</html>

@@ -152,9 +152,31 @@ router.get('/:id', async (req, res) => {
   const myVolunteerSignups = familyIds.length
     ? await db
         .prepare(
-          `SELECT evs.* FROM event_volunteer_signups evs
+          `SELECT evs.*, evr.role_name AS "roleName" FROM event_volunteer_signups evs
            JOIN event_volunteer_roles evr ON evr.id = evs.volunteer_role_id
            WHERE evr.event_id = ? AND evs.member_id IN (${familyIds.map(() => '?').join(',')})`
+        )
+        .all(event.id, ...familyIds)
+    : [];
+  // A real request: "list volunteer positions signed up for, donations
+  // signed up for and food signed up for" (Parent Portal's own "My
+  // Registration" card) - same family-wide query shape as
+  // myVolunteerSignups above, one per section.
+  const myDonationClaims = familyIds.length
+    ? await db
+        .prepare(
+          `SELECT edc.*, edi.item_name AS "itemName" FROM event_donation_claims edc
+           JOIN event_donation_items edi ON edi.id = edc.donation_item_id
+           WHERE edi.event_id = ? AND edc.member_id IN (${familyIds.map(() => '?').join(',')})`
+        )
+        .all(event.id, ...familyIds)
+    : [];
+  const myFoodClaims = familyIds.length
+    ? await db
+        .prepare(
+          `SELECT efc.*, efi.item_name AS "itemName" FROM event_food_claims efc
+           JOIN event_food_items efi ON efi.id = efc.food_item_id
+           WHERE efi.event_id = ? AND efc.member_id IN (${familyIds.map(() => '?').join(',')})`
         )
         .all(event.id, ...familyIds)
     : [];
@@ -224,7 +246,11 @@ router.get('/:id', async (req, res) => {
     family,
     familyIds,
     registeredMemberIds: myRegistrations.map((r) => r.member_id),
+    myRegistrations,
     volunteeredKey: myVolunteerSignups.map((s) => `${s.volunteer_role_id}:${s.member_id}`),
+    myVolunteerSignups,
+    myDonationClaims,
+    myFoodClaims,
     myGuestRegistrations,
     attachedSignUpLists,
     attachedVolunteerLists,
@@ -282,7 +308,16 @@ router.post('/:id/register', requirePortalAuth, async (req, res) => {
     if (match) answers[match[1]] = value;
   }
   const ticketTypeId = req.body.ticketTypeId ? parseInt(req.body.ticketTypeId, 10) : null;
-  const result = await events.registerForEvent({ eventId, memberId, accountId: req.portalAccount.id, family, answers, ticketTypeId });
+  // A real request: "if these items are selected when editing the event
+  // with options added, then member should be asked when clicking
+  // register along with the extra fields questions" - the Register
+  // dialog (views/events-detail.ejs) now also collects these alongside
+  // tickets/extra fields, same [].concat(... || []) shape a single
+  // checked checkbox vs. several already needs elsewhere in this app.
+  const volunteerRoleIds = [].concat(req.body.volunteerRoleIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  const donationItemIds = [].concat(req.body.donationItemIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  const foodItemIds = [].concat(req.body.foodItemIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  const result = await events.registerForEvent({ eventId, memberId, accountId: req.portalAccount.id, family, answers, ticketTypeId, volunteerRoleIds, donationItemIds, foodItemIds });
   if (!result.ok) {
     if (wantsJson(req)) return res.status(422).json({ ok: false, error: result.error });
     return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent(result.error));
@@ -432,6 +467,24 @@ router.post('/:id/donation-items/:itemId/claim', requirePortalAuth, async (req, 
   res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent(notice));
 });
 
+// A real request (Parent Portal "My Registration" card's own Edit
+// Registration popup): "unassigned what they signed up for and register
+// for something else" - same shape as /volunteer-roles/:roleId/cancel
+// above, for the donation/food sections' own claims (cancelDonationClaim/
+// cancelFoodClaim already existed in utils/events.js but had no route).
+router.post('/:id/donation-claims/:claimId/cancel', requirePortalAuth, async (req, res) => {
+  const eventId = req.params.id;
+  const memberId = parseInt(req.body.memberId, 10);
+  const back = `/events/${eventId}`;
+
+  const family = await familyForAccount(req.portalAccount.id);
+  if (!family.some((m) => m.id === memberId)) {
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('You can only manage your own family\'s donation claims.'));
+  }
+  await events.cancelDonationClaim(req.params.claimId, memberId);
+  res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent('Donation claim cancelled.'));
+});
+
 // Food - a real request: "on the volunteer, donations and food pages..."
 // Mirrors the donation-items claim route above exactly.
 router.post('/:id/food-items/:itemId/claim', requirePortalAuth, async (req, res) => {
@@ -448,6 +501,19 @@ router.post('/:id/food-items/:itemId/claim', requirePortalAuth, async (req, res)
   res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent(notice));
 });
 
+router.post('/:id/food-claims/:claimId/cancel', requirePortalAuth, async (req, res) => {
+  const eventId = req.params.id;
+  const memberId = parseInt(req.body.memberId, 10);
+  const back = `/events/${eventId}`;
+
+  const family = await familyForAccount(req.portalAccount.id);
+  if (!family.some((m) => m.id === memberId)) {
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('You can only manage your own family\'s food claims.'));
+  }
+  await events.cancelFoodClaim(req.params.claimId, memberId);
+  res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent('Food claim cancelled.'));
+});
+
 // A real request: "be able to attach these lists to events" (Main
 // Admin's own Sign-Up Lists/Volunteer Lists, see utils/
 // committeesAndSignupLists.js) - once a list carries this event's own id,
@@ -458,6 +524,11 @@ router.post('/:id/signup-list-items/:itemId/claim', requirePortalAuth, async (re
   const memberId = parseInt(req.body.memberId, 10);
   const back = `/events/${eventId}`;
 
+  const item = await db.prepare('SELECT list_id FROM sign_up_list_items WHERE id = ?').get(req.params.itemId);
+  const list = item ? await signupLists.getSignUpList(item.list_id) : null;
+  if (!list || !list.is_open) {
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('Signups are currently closed for that list.'));
+  }
   const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
     return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('You can only claim an item as yourself or your own family.'));
@@ -472,6 +543,11 @@ router.post('/:id/volunteer-list-shifts/:shiftId/signup', requirePortalAuth, asy
   const memberId = parseInt(req.body.memberId, 10);
   const back = `/events/${eventId}`;
 
+  const shift = await db.prepare('SELECT list_id FROM volunteer_signup_list_shifts WHERE id = ?').get(req.params.shiftId);
+  const list = shift ? await signupLists.getVolunteerList(shift.list_id) : null;
+  if (!list || !list.is_open) {
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('Signups are currently closed for that list.'));
+  }
   const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
     return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('You can only sign up yourself or your own family.'));

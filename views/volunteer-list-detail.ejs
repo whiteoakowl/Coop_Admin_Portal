@@ -25,6 +25,9 @@
 
         <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
         <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+        <%# A real request: "if you click disable button nobody can
+            signup on the list but they can still view the link." %>
+        <% if (!list.is_open) { %><p class="hint">Signups are currently closed for this list &mdash; you can still view it, and cancel an existing signup below.</p><% } %>
 
         <% if (shifts.length === 0) { %>
           <p class="roster-empty">No shifts yet.</p>
@@ -50,7 +53,7 @@
                           <input type="hidden" name="memberId" value="<%= m.id %>" />
                           <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= m.name %>: Cancel</button>
                         </form>
-                      <% } else if (shift.signups.length < shift.slots_needed) { %>
+                      <% } else if (list.is_open && shift.signups.length < shift.slots_needed) { %>
                         <form method="POST" action="/volunteer-lists/<%= list.id %>/shifts/<%= shift.id %>/signup" class="inline-block-form">
                           <input type="hidden" name="memberId" value="<%= m.id %>" />
                           <button type="submit" class="roster-action-btn"><%= m.name %>: Sign Up</button>
