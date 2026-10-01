@@ -1300,6 +1300,19 @@ router.post('/:id/guests/:guestId/status', async (req, res) => {
   res.json({ ok: true });
 });
 
+// A real request: "there should be a trash icon at the end of each
+// member row to delete the registration." Reuses the same
+// cancelRegistration a member's own self-service Unregister button calls
+// (routes/events.js's own /:id/unregister) rather than a hard DELETE -
+// same "cancelled" status, same waitlist-promotion/charge-settlement/
+// volunteer-donation-food-unassign side effects, just triggered from the
+// admin roster instead of the member's own event page.
+router.post('/:id/registrations/:regId/cancel', async (req, res) => {
+  const registration = await db.prepare('SELECT * FROM event_registrations WHERE id = ? AND event_id = ?').get(req.params.regId, req.params.id);
+  if (registration) await events.cancelRegistration(req.params.id, registration.member_id);
+  res.redirect(`/main-admin/events/${req.params.id}/registrations?notice=` + encodeURIComponent('Registration deleted.'));
+});
+
 // A real request: "guest check in shouldn't be [on the Attendance page].
 // that should be under settings for each individual event only. to allow
 // guest to signup, then they will appear on the event roster." The old

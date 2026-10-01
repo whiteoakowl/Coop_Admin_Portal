@@ -547,9 +547,17 @@
             </dialog>
           <% } %>
 
-          <%- include('partials/event-volunteer-section', { event: event, family: family, volunteeredKey: volunteeredKey }) %>
-          <%- include('partials/event-donation-section', { event: event, family: family }) %>
-          <%- include('partials/event-food-section', { event: event, family: family }) %>
+          <%# A real request: "the volunteer, food, etc signups should be
+              on one card after signing up at the bottom for viewing, with
+              edit button if member needs to change their signup, and
+              only asked when signing up." The Volunteer/Donations/Food
+              sections used to also render here, standalone, open to
+              anyone regardless of registration - they no longer do; the
+              event-wide Register dialog above is the only place they're
+              asked now, and the My Registration card's own Edit
+              Registration popup (which still includes these same
+              partials) is the only place to change or add to them
+              afterward. %>
 
           <%# A real request: "be able to attach these lists to events" -
               Main Admin's own Sign-Up Lists/Volunteer Lists (routes/

@@ -1243,6 +1243,26 @@ async function cancelRegistration(eventId, memberId) {
   await db.withTransaction(async (tx) => {
     await tx.prepare("UPDATE event_registrations SET status = 'cancelled', cancelled_at = now_text() WHERE event_id = ? AND member_id = ? AND status IN ('confirmed', 'waitlisted')").run(eventId, memberId);
 
+    // A real request: "if member unregistered, they will be unassigned
+    // for the thing they signed up for so someone else can sign up for
+    // it" - the same volunteer role/donation item/food item slot they
+    // claimed at registration time (utils/events.js's own
+    // registerForEvent) goes back on the table the instant they
+    // unregister, same as cancelling it individually from the Edit
+    // Registration popup would. Scoped to this event's own Volunteer/
+    // Donations/Food sections only - Main Admin's separately-attached
+    // Sign-Up/Volunteer Lists (utils/committeesAndSignupLists.js) aren't
+    // gated by event registration at all, so they're untouched here.
+    await tx
+      .prepare('DELETE FROM event_volunteer_signups WHERE member_id = ? AND volunteer_role_id IN (SELECT id FROM event_volunteer_roles WHERE event_id = ?)')
+      .run(memberId, eventId);
+    await tx
+      .prepare('DELETE FROM event_donation_claims WHERE member_id = ? AND donation_item_id IN (SELECT id FROM event_donation_items WHERE event_id = ?)')
+      .run(memberId, eventId);
+    await tx
+      .prepare('DELETE FROM event_food_claims WHERE member_id = ? AND food_item_id IN (SELECT id FROM event_food_items WHERE event_id = ?)')
+      .run(memberId, eventId);
+
     if (registration && registration.status === 'waitlisted' && registration.waitlist_position != null) {
       await tx
         .prepare("UPDATE event_registrations SET waitlist_position = waitlist_position - 1 WHERE event_id = ? AND status = 'waitlisted' AND waitlist_position > ?")

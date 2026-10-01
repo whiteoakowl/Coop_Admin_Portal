@@ -130,6 +130,7 @@
               <th>Checked In</th>
               <th>Checked Out</th>
               <% if (event.volunteers_enabled) { %><th>Volunteer Signup</th><% } %>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -178,6 +179,19 @@
                   <% if (event.volunteers_enabled) { %>
                     <td><%= (volunteerSignupsByMember.get(r.member_id) || []).join(', ') || '—' %></td>
                   <% } %>
+                  <%# A real request: "there should be a trash icon at the
+                      end of each member row to delete the registration."
+                      Nothing to delete once already cancelled, so the icon
+                      only shows for a still-active (confirmed/waitlisted)
+                      row - same gate the guest row's own Cancel button
+                      above already uses. %>
+                  <td>
+                    <% if (r.status !== 'cancelled') { %>
+                      <form method="POST" action="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/cancel" class="inline-block-form" data-confirm="Delete <%= r.memberName %>&#39;s registration?">
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete registration for <%= r.memberName %>" title="Delete Registration"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    <% } %>
+                  </td>
                 </tr>
                 <% isFirst = false; %>
               <% }); %>
@@ -209,6 +223,7 @@
                   <td><%= g.checked_in_at || '—' %></td>
                   <td><%= g.checked_out_at || '—' %></td>
                   <% if (event.volunteers_enabled) { %><td>—</td><% } %>
+                  <td></td>
                 </tr>
                 <% isFirst = false; %>
               <% }); %>
