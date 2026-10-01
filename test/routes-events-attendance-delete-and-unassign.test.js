@@ -98,7 +98,15 @@ async function createParentAccount() {
   return { cookie, csrfToken: extractCsrf(page.text), memberId: parentInfo.lastInsertRowid };
 }
 
-test('Attendance page: a trash icon renders at the end of each active member row, posting to the new cancel route', async () => {
+// A real follow-up request: "there should also be a cancel button next to
+// each member. When you click cancel they remain on the roster and simply
+// show as canceled" + "when you click the trash button it will delete
+// their name from the roster completely and unregister them." The single
+// trash-icon-that-just-cancels button from the original request is now
+// two separate actions: a Cancel button (soft, stays on the roster,
+// scoped to the above to still-active rows) and a trash icon (hard
+// delete, always available, even on an already-cancelled row).
+test('Attendance page: a Cancel button and a trash icon both render for an active member row, each with its own endpoint', async () => {
   const admin = await loginAsMainAdmin();
   const eventId = await createEvent(admin);
   await publishEvent(admin, eventId);
@@ -108,12 +116,28 @@ test('Attendance page: a trash icon renders at the end of each active member row
   const registration = await db.prepare('SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ?').get(eventId, parent.memberId);
   const page = await request(app).get(`/main-admin/events/${eventId}/registrations`).set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, new RegExp(`action="/main-admin/events/${eventId}/registrations/${registration.id}/cancel"`));
-  assert.match(page.text, /icon-btn icon-btn-danger[^>]*aria-label="Delete registration for Attendance Delete Parent/);
+  assert.match(page.text, new RegExp(`data-cancel-endpoint="/main-admin/events/${eventId}/registrations/${registration.id}/cancel"`));
+  assert.match(page.text, new RegExp(`data-delete-endpoint="/main-admin/events/${eventId}/registrations/${registration.id}/delete"`));
+  assert.match(page.text, /js-registration-cancel[^>]*>Cancel</);
+  assert.match(page.text, /icon-btn icon-btn-danger js-registration-delete[^>]*aria-label="Delete registration for Attendance Delete Parent/);
   assert.match(page.text, /<use href="#icon-trash"\/>/);
 });
 
-test('Attendance page: clicking the trash icon cancels the registration', async () => {
+test('Attendance page: an already-cancelled row still gets a trash icon (so it can be cleaned off the roster), but no Cancel button', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  await publishEvent(admin, eventId);
+  const parent = await createParentAccount();
+  await request(app).post(`/events/${eventId}/register`).set('Cookie', parent.cookie).type('form').send({ memberId: String(parent.memberId), _csrf: parent.csrfToken });
+  const registration = await db.prepare('SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ?').get(eventId, parent.memberId);
+  await db.prepare("UPDATE event_registrations SET status = 'cancelled' WHERE id = ?").run(registration.id);
+
+  const page = await request(app).get(`/main-admin/events/${eventId}/registrations`).set('Cookie', admin.cookie);
+  assert.match(page.text, new RegExp(`data-delete-endpoint="/main-admin/events/${eventId}/registrations/${registration.id}/delete"`));
+  assert.doesNotMatch(page.text, new RegExp(`data-cancel-endpoint="/main-admin/events/${eventId}/registrations/${registration.id}/cancel"`));
+});
+
+test('Attendance page: clicking Cancel keeps the registration row - status flips to cancelled, nothing is deleted', async () => {
   const admin = await loginAsMainAdmin();
   const eventId = await createEvent(admin);
   await publishEvent(admin, eventId);
@@ -127,10 +151,30 @@ test('Attendance page: clicking the trash icon cancels the registration', async 
     .set('Cookie', admin.cookie)
     .type('form')
     .send({ _csrf: admin.csrfToken });
-  assert.equal(res.status, 302);
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { ok: true }, 'a JSON response, not a redirect, so the roster page itself never has to reload');
 
   const cancelled = await db.prepare('SELECT * FROM event_registrations WHERE id = ?').get(registration.id);
   assert.equal(cancelled.status, 'cancelled');
+});
+
+test('Attendance page: clicking the trash icon removes the registration row completely', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  await publishEvent(admin, eventId);
+  const parent = await createParentAccount();
+  await request(app).post(`/events/${eventId}/register`).set('Cookie', parent.cookie).type('form').send({ memberId: String(parent.memberId), _csrf: parent.csrfToken });
+  const registration = await db.prepare('SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ?').get(eventId, parent.memberId);
+
+  const res = await request(app)
+    .post(`/main-admin/events/${eventId}/registrations/${registration.id}/delete`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: admin.csrfToken });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { ok: true });
+
+  assert.equal(await db.prepare('SELECT 1 FROM event_registrations WHERE id = ?').get(registration.id), undefined, 'the row must be gone entirely, not merely marked cancelled');
 });
 
 test('unregistering frees a claimed volunteer role so someone else can sign up for it', async () => {
@@ -181,7 +225,7 @@ test('unregistering frees claimed donation and food items', async () => {
   assert.equal(await db.prepare('SELECT 1 FROM event_food_claims WHERE food_item_id = ? AND member_id = ?').get(foodId, parent.memberId), undefined);
 });
 
-test('Main Admin deleting a registration (trash icon route) also frees that member\'s volunteer signup', async () => {
+test('Main Admin cancelling a registration from the roster (Cancel button route) also frees that member\'s volunteer signup', async () => {
   const admin = await loginAsMainAdmin();
   const eventId = await createEvent(admin);
   const roleId = await addVolunteerRole(admin, eventId, 'Setup Crew', 1);
@@ -203,6 +247,57 @@ test('Main Admin deleting a registration (trash icon route) also frees that memb
     .send({ _csrf: admin.csrfToken });
 
   assert.equal(await db.prepare('SELECT 1 FROM event_volunteer_signups WHERE volunteer_role_id = ? AND member_id = ?').get(roleId, parent.memberId), undefined);
+  const stillThere = await db.prepare('SELECT status FROM event_registrations WHERE id = ?').get(registration.id);
+  assert.equal(stillThere.status, 'cancelled', 'Cancel keeps the row - it must not be deleted');
+});
+
+test('Main Admin deleting a registration from the roster (trash icon route) also frees that member\'s volunteer signup', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  const roleId = await addVolunteerRole(admin, eventId, 'Setup Crew', 1);
+  await publishEvent(admin, eventId);
+  const parent = await createParentAccount();
+
+  await request(app).post(`/events/${eventId}/register`).set('Cookie', parent.cookie).type('form').send({ memberId: String(parent.memberId), _csrf: parent.csrfToken });
+  await request(app)
+    .post(`/events/${eventId}/volunteer-roles/${roleId}/signup`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ memberId: String(parent.memberId), _csrf: parent.csrfToken });
+  const registration = await db.prepare('SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ?').get(eventId, parent.memberId);
+
+  await request(app)
+    .post(`/main-admin/events/${eventId}/registrations/${registration.id}/delete`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: admin.csrfToken });
+
+  assert.equal(await db.prepare('SELECT 1 FROM event_volunteer_signups WHERE volunteer_role_id = ? AND member_id = ?').get(roleId, parent.memberId), undefined);
+  assert.equal(await db.prepare('SELECT 1 FROM event_registrations WHERE id = ?').get(registration.id), undefined, 'the row must be gone entirely');
+});
+
+test('Deleting a confirmed registration promotes the next waitlisted member, same as Cancel does', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin, { capacityValue: '1', capacityType: 'person' });
+  await publishEvent(admin, eventId);
+
+  const first = await createParentAccount();
+  const waitlisted = await createParentAccount();
+  await request(app).post(`/events/${eventId}/register`).set('Cookie', first.cookie).type('form').send({ memberId: String(first.memberId), _csrf: first.csrfToken });
+  await request(app).post(`/events/${eventId}/register`).set('Cookie', waitlisted.cookie).type('form').send({ memberId: String(waitlisted.memberId), _csrf: waitlisted.csrfToken });
+
+  const firstReg = await db.prepare('SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ?').get(eventId, first.memberId);
+  const waitlistedRegBefore = await db.prepare('SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ?').get(eventId, waitlisted.memberId);
+  assert.equal(waitlistedRegBefore.status, 'waitlisted');
+
+  await request(app)
+    .post(`/main-admin/events/${eventId}/registrations/${firstReg.id}/delete`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: admin.csrfToken });
+
+  const waitlistedRegAfter = await db.prepare('SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ?').get(eventId, waitlisted.memberId);
+  assert.equal(waitlistedRegAfter.status, 'confirmed', 'deleting the confirmed registration should open the seat up to the next waitlisted member');
 });
 
 test('Parent Portal event page: Volunteer/Donations/Food sections no longer render standalone - only inside the Register dialog and (once registered) the Edit Registration popup', async () => {

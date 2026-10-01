@@ -179,18 +179,24 @@
                   <% if (event.volunteers_enabled) { %>
                     <td><%= (volunteerSignupsByMember.get(r.member_id) || []).join(', ') || '—' %></td>
                   <% } %>
-                  <%# A real request: "there should be a trash icon at the
-                      end of each member row to delete the registration."
-                      Nothing to delete once already cancelled, so the icon
-                      only shows for a still-active (confirmed/waitlisted)
-                      row - same gate the guest row's own Cancel button
-                      above already uses. %>
+                  <%# A real request: "there should also be a cancel button
+                      next to each member. When you click cancel they
+                      remain on the roster and simply show as canceled."
+                      Cancel only makes sense once (nothing to cancel once
+                      already cancelled); the trash icon always shows -
+                      deleting an already-cancelled row is how it actually
+                      disappears off the roster for good. Both are plain
+                      buttons (not <form> submits) wired up by this page's
+                      own inline script below, so clicking either updates
+                      this row (or removes it) in place instead of a full
+                      page reload. %>
                   <td>
-                    <% if (r.status !== 'cancelled') { %>
-                      <form method="POST" action="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/cancel" class="inline-block-form" data-confirm="Delete <%= r.memberName %>&#39;s registration?">
-                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete registration for <%= r.memberName %>" title="Delete Registration"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                      </form>
-                    <% } %>
+                    <div class="roster-btn-row">
+                      <% if (r.status !== 'cancelled') { %>
+                        <button type="button" class="roster-action-btn roster-action-btn-small js-registration-cancel" data-cancel-endpoint="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/cancel" data-member-name="<%= r.memberName %>">Cancel</button>
+                      <% } %>
+                      <button type="button" class="icon-btn icon-btn-danger js-registration-delete" data-delete-endpoint="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/delete" data-member-name="<%= r.memberName %>" aria-label="Delete registration for <%= r.memberName %>" title="Delete Registration"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </div>
                   </td>
                 </tr>
                 <% isFirst = false; %>
@@ -379,6 +385,52 @@
             headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrf ? csrf.content : '' },
             body: 'status=' + encodeURIComponent(sel.value) + '&_csrf=' + encodeURIComponent(csrf ? csrf.content : ''),
           });
+        });
+      });
+    })();
+
+    // Real requests: "there should also be a cancel button next to each
+    // member. When you click cancel they remain on the roster and simply
+    // show as canceled" + "when you click the trash button it will delete
+    // their name from the roster completely and unregister them. Page does
+    // not refresh." window.confirmAction (public/js/confirm-dialog.js) is
+    // the same sitewide "are you sure?" popup every data-confirm form uses,
+    // just the Promise-returning flavor meant for a plain fetch()-driven
+    // button like these instead of a real <form> submit.
+    (function () {
+      var csrf = document.querySelector('meta[name="csrf-token"]');
+      function post(endpoint) {
+        return fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrf ? csrf.content : '' },
+          body: '_csrf=' + encodeURIComponent(csrf ? csrf.content : ''),
+        });
+      }
+
+      document.querySelectorAll('.js-registration-cancel').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          var confirmed = await window.confirmAction({
+            message: 'Cancel ' + btn.dataset.memberName + '’s registration? They will remain on the roster, shown as Cancelled.',
+            safe: true,
+            yesLabel: 'Yes, Cancel',
+          });
+          if (!confirmed) return;
+          await post(btn.dataset.cancelEndpoint);
+          var row = btn.closest('tr');
+          row.children[1].innerHTML = '<span class="badge-pill badge-pill-gray">Cancelled</span>';
+          btn.remove();
+        });
+      });
+
+      document.querySelectorAll('.js-registration-delete').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          var confirmed = await window.confirmAction({
+            message: 'Permanently delete ' + btn.dataset.memberName + '’s registration? They will be removed from the roster completely - this cannot be undone.',
+            yesLabel: 'Yes, Delete',
+          });
+          if (!confirmed) return;
+          await post(btn.dataset.deleteEndpoint);
+          btn.closest('tr').remove();
         });
       });
     })();

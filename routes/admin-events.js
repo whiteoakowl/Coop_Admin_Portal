@@ -1300,17 +1300,32 @@ router.post('/:id/guests/:guestId/status', async (req, res) => {
   res.json({ ok: true });
 });
 
-// A real request: "there should be a trash icon at the end of each
-// member row to delete the registration." Reuses the same
-// cancelRegistration a member's own self-service Unregister button calls
-// (routes/events.js's own /:id/unregister) rather than a hard DELETE -
-// same "cancelled" status, same waitlist-promotion/charge-settlement/
-// volunteer-donation-food-unassign side effects, just triggered from the
-// admin roster instead of the member's own event page.
+// A real request: "there should be a cancel button next to each member.
+// When you click cancel they remain on the roster and simply show as
+// canceled." Reuses the same cancelRegistration a member's own self-
+// service Unregister button calls (routes/events.js's own /:id/
+// unregister) - same "cancelled" status, same waitlist-promotion/charge-
+// settlement/volunteer-donation-food-unassign side effects, just
+// triggered from the admin roster instead of the member's own event page.
+// JSON response (not a redirect) - the roster's own inline script updates
+// just this row's status badge in place, same "page does not refresh"
+// AJAX pattern its P/A/L select already uses.
 router.post('/:id/registrations/:regId/cancel', async (req, res) => {
   const registration = await db.prepare('SELECT * FROM event_registrations WHERE id = ? AND event_id = ?').get(req.params.regId, req.params.id);
   if (registration) await events.cancelRegistration(req.params.id, registration.member_id);
-  res.redirect(`/main-admin/events/${req.params.id}/registrations?notice=` + encodeURIComponent('Registration deleted.'));
+  res.json({ ok: true });
+});
+
+// A real request: "when you click the trash button it will delete their
+// name from the roster completely and unregister them. Page does not
+// refresh." Distinct from Cancel above - this actually removes the
+// event_registrations row (utils/events.js's own
+// deleteRegistrationCompletely), so the member disappears from the roster
+// outright rather than staying with a Cancelled badge.
+router.post('/:id/registrations/:regId/delete', async (req, res) => {
+  const registration = await db.prepare('SELECT * FROM event_registrations WHERE id = ? AND event_id = ?').get(req.params.regId, req.params.id);
+  if (registration) await events.deleteRegistrationCompletely(req.params.regId);
+  res.json({ ok: true });
 });
 
 // A real request: "guest check in shouldn't be [on the Attendance page].
