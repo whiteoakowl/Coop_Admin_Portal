@@ -71,16 +71,23 @@ test('Finance tab: only an Accounting Category dropdown, no flat Price/Charged P
   assert.doesNotMatch(financeFormMatch[1], /name="pricePer"/, 'the top-of-Finance Charged Per dropdown should be gone');
 });
 
-test('Accounting Categories: manage from the Events Settings tab, pick one on the Finance tab, and it persists', async () => {
+test('Accounting Categories: manage from the Accounting tab (not Events Settings), pick one on the Finance tab, and it persists', async () => {
   const admin = await loginAsMainAdmin();
 
+  // A real request: "add/edit account category button should not be
+  // there [on Events Settings]. That should only be under the accounting
+  // tab."
   const settingsPage = await request(app).get('/main-admin/events?tab=settings').set('Cookie', admin.cookie);
-  assert.match(settingsPage.text, /Add\/Edit Accounting Category/);
-  assert.match(settingsPage.text, /id="manage-accounting-categories-dialog"/);
+  assert.doesNotMatch(settingsPage.text, /Add\/Edit Accounting Category/);
+  assert.doesNotMatch(settingsPage.text, /id="manage-accounting-categories-dialog"/);
 
-  const csrf = extractCsrf(settingsPage.text);
+  const accountingPage = await request(app).get('/main-admin/accounting').set('Cookie', admin.cookie);
+  assert.match(accountingPage.text, /Add\/Edit Accounting Category/);
+  assert.match(accountingPage.text, /id="manage-accounting-categories-dialog"/);
+
+  const csrf = extractCsrf(accountingPage.text);
   await request(app)
-    .post('/main-admin/events/accounting-categories')
+    .post('/main-admin/accounting/accounting-categories')
     .set('Cookie', admin.cookie)
     .type('form')
     .send({ name: 'Fundraising Revenue', _csrf: csrf });

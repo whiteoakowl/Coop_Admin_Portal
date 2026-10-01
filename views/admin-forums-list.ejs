@@ -48,6 +48,7 @@
               <span class="team-info-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
               <h3 class="team-info-title"><a href="/main-admin/forums/<%= c.id %>"><%= c.name %></a></h3>
               <% if (c.scope === 'class') { %><span class="badge-pill">Class: <%= c.class_name %></span><% } else { %><span class="badge-pill badge-pill-green">General</span><% } %>
+              <% if (c.is_chat_room) { %><span class="badge-pill badge-pill-green">Live Chat Room</span><% } %>
               <% if (c.is_locked) { %><span class="badge-pill badge-pill-gray">Locked</span><% } %>
               <%# A real request: "Lock the chat group should be under
                   edit, not on the front of the chat group card" - Lock/
@@ -118,6 +119,15 @@
         <select id="add-forum-category-class" name="classId">
           <% classes.forEach(function(c) { %><option value="<%= c.id %>"><%= c.class_name %></option><% }); %>
         </select>
+      </label>
+      <%# A real request: "add chat room where people can talk to each
+          other in a live continuous feed" - a chat room skips the normal
+          titled-thread list entirely in favor of one continuous message
+          feed (see routes/admin-forums.js and routes/forums.js's own
+          is_chat_room redirect to the group's single underlying thread). %>
+      <label class="checkbox-option">
+        <input type="checkbox" name="isChatRoom" />
+        Make this a live chat room (one continuous message feed, instead of separate discussion threads)
       </label>
     </form>
     <% if (categories.length > 0) { %>

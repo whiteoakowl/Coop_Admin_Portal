@@ -107,7 +107,7 @@ router.get('/print', async (req, res) => {
 // decided.
 router.get('/submit', requirePortalAuth, async (req, res) => {
   const settings = await events.getEventSettings();
-  res.render('events-submit', { title: 'Submit an Event', error: req.query.error || null, submissionsOpen: settings.family_submit_events !== 'no' });
+  res.render('events-submit', { title: 'Submit an Event', error: req.query.error || null, submissionsOpen: settings.family_submit_events === 'yes' });
 });
 
 router.post('/submit', requirePortalAuth, async (req, res) => {

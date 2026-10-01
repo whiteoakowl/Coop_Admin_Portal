@@ -19,11 +19,15 @@
     <p><a href="/main-admin/forums/<%= category.id %>">&larr; <%= category.name %></a></p>
 
     <div class="grid-box-header">
-      <h1><%= thread.title %>
-        <% if (thread.is_pinned) { %> <span class="badge-pill">Pinned</span><% } %>
-        <% if (thread.is_locked) { %> <span class="badge-pill badge-pill-gray">Locked</span><% } %>
-        <% if (thread.status === 'archived') { %> <span class="badge-pill badge-pill-gray">Archived</span><% } %>
-      </h1>
+      <% if (category.is_chat_room) { %>
+        <h1><%= category.name %> <span class="badge-pill badge-pill-green">Live Chat Room</span></h1>
+      <% } else { %>
+        <h1><%= thread.title %>
+          <% if (thread.is_pinned) { %> <span class="badge-pill">Pinned</span><% } %>
+          <% if (thread.is_locked) { %> <span class="badge-pill badge-pill-gray">Locked</span><% } %>
+          <% if (thread.status === 'archived') { %> <span class="badge-pill badge-pill-gray">Archived</span><% } %>
+        </h1>
+      <% } %>
     </div>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
@@ -33,7 +37,7 @@
         <div class="forum-post-header">
           <span class="forum-post-author"><%= p.authorName || 'Unknown' %></span>
           <% if (p.authorAdminTitle) { %><span class="badge-pill" title="Admin Position"><%= p.authorAdminTitle %></span><% } %>
-          <span class="hint"><%= i === 0 ? 'Post' : 'Comment' %> &middot; <%= p.created_at %></span>
+          <span class="hint"><%= category.is_chat_room ? 'Message' : (i === 0 ? 'Post' : 'Comment') %> &middot; <%= p.created_at %></span>
           <% if (p.edited_at) { %><span class="hint">(edited)</span><% } %>
           <% if (p.status === 'removed') { %><span class="badge-pill badge-pill-gray">Removed</span><% } %>
         </div>
@@ -55,7 +59,7 @@
       <% if (p.status === 'active') { %>
         <dialog id="edit-post-<%= p.id %>" class="member-picker-dialog">
           <form method="POST" action="/main-admin/forums/threads/<%= thread.id %>/posts/<%= p.id %>/edit" data-forum-editor>
-            <h3>Edit <%= i === 0 ? 'Post' : 'Comment' %></h3>
+            <h3>Edit <%= category.is_chat_room ? 'Message' : (i === 0 ? 'Post' : 'Comment') %></h3>
             <%- include('partials/forum-editor-toolbar') %>
             <div class="forum-editable" data-forum-editable contenteditable="true"><%- p.body_html %></div>
             <input type="hidden" name="body" data-forum-body-input />

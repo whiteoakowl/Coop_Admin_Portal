@@ -67,8 +67,11 @@ test('Events Settings tab: Add/Edit Category & Location buttons at the top, Expo
   // boxes. the check boxes should be in a single uniform column on the
   // left and the question begins on the same row as the check box." Every
   // former Allow/Do not allow and Yes/No radio pair (that's genuinely
-  // binary, not the 3-way family-submission or Calendar/List view choice)
-  // is now one checkbox, all sharing a single .checkbox-group-stack column.
+  // binary, not the Calendar/List view choice) is now one checkbox, all
+  // sharing a single .checkbox-group-stack column - including the former
+  // 3-way family-submission radio, later split into its own two separate
+  // yes/no checkboxes (see test/routes-main-admin-events-settings-split-
+  // auto-approve.test.js).
   const stackGroup = /<div class="member-form-full checkbox-group checkbox-group-stack">([\s\S]*?)<\/div>\s*<\/div>/.exec(res.text);
   assert.ok(stackGroup, 'expected a single stacked checkbox-group column for the yes/no questions');
   const checkboxCount = (stackGroup[1].match(/type="checkbox"/g) || []).length;
@@ -98,7 +101,7 @@ test('saving Settings persists the new auto-refund setting', async () => {
       defaultCalendarView: 'calendar',
       reminderDaysBefore: '10',
       autoRefundOnFamilyCancel: '1',
-      familySubmitEvents: 'yes',
+      familySubmitEvents: '1',
       _csrf: csrf,
     });
 
@@ -117,7 +120,7 @@ test('a family-submitted event keeps its own chosen visibility, even if the lega
     .post('/main-admin/events/settings')
     .set('Cookie', cookie)
     .type('form')
-    .send({ defaultCalendarView: 'calendar', reminderDaysBefore: '10', familySubmitEvents: 'yes', _csrf: csrf });
+    .send({ defaultCalendarView: 'calendar', reminderDaysBefore: '10', familySubmitEvents: '1', _csrf: csrf });
   // updateEventSettings no longer writes family_events_public_default -
   // force it true directly to simulate a pre-existing row where an admin
   // had once turned it on, before the setting was removed.

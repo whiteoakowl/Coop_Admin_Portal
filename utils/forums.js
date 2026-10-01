@@ -28,11 +28,22 @@ async function categoryForClass(classId) {
   return db.prepare("SELECT id, name FROM forum_categories WHERE scope = 'class' AND class_id = ?").get(classId);
 }
 
+// A real request: "add chat room where people can talk to each other in
+// a live continuous feed" - a chat room category gets exactly one
+// underlying thread (room_thread_id) up front, created with no author
+// and no first post, so its own posts list starts out empty rather than
+// needing a placeholder "Welcome" message. See this file's own header
+// comment and the migration this column came from.
 async function createCategory(data) {
   const info = await db
-    .prepare('INSERT INTO forum_categories (name, description, scope, class_id, position) VALUES (?, ?, ?, ?, ?)')
-    .run(data.name, data.description || null, data.scope, data.scope === 'class' ? data.classId : null, data.position || 0);
-  return info.lastInsertRowid;
+    .prepare('INSERT INTO forum_categories (name, description, scope, class_id, position, is_chat_room) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(data.name, data.description || null, data.scope, data.scope === 'class' ? data.classId : null, data.position || 0, data.isChatRoom ? 1 : 0);
+  const categoryId = info.lastInsertRowid;
+  if (data.isChatRoom) {
+    const threadInfo = await db.prepare('INSERT INTO forum_threads (category_id, title, member_id, account_id) VALUES (?, ?, NULL, NULL)').run(categoryId, data.name);
+    await db.prepare('UPDATE forum_categories SET room_thread_id = ? WHERE id = ?').run(threadInfo.lastInsertRowid, categoryId);
+  }
+  return categoryId;
 }
 
 async function setCategoryLocked(id, locked) {
@@ -205,6 +216,16 @@ async function getPost(id) {
   return db.prepare('SELECT * FROM forum_posts WHERE id = ?').get(id);
 }
 
+// Same shape as a row from listPosts() (author name/admin title joined
+// in) for a single post - the live chat room feed's own AJAX post route
+// uses this to hand back the just-created message without a second round
+// trip through the full thread.
+async function getPostWithAuthor(id) {
+  return db
+    .prepare(`SELECT p.*, m.name AS "authorName", ${ADMIN_TITLE_SUBQUERY} FROM forum_posts p LEFT JOIN members m ON m.id = p.member_id WHERE p.id = ?`)
+    .get(id);
+}
+
 async function editPost(id, bodyHtml) {
   await db.prepare("UPDATE forum_posts SET body_html = ?, updated_at = now_text(), edited_at = now_text() WHERE id = ?").run(sanitizePostBody(bodyHtml), id);
 }
@@ -303,6 +324,7 @@ module.exports = {
   listPosts,
   addPost,
   getPost,
+  getPostWithAuthor,
   editPost,
   removePost,
   restorePost,

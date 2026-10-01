@@ -70,7 +70,13 @@ router.post('/', async (req, res) => {
   const scope = req.body.scope === 'class' ? 'class' : 'general';
   if (!name) return res.redirect('/main-admin/forums?error=' + encodeURIComponent('Name is required.'));
   if (scope === 'class' && !req.body.classId) return res.redirect('/main-admin/forums?error=' + encodeURIComponent('Choose a class for a private class chat.'));
-  await forums.createCategory({ name, description: (req.body.description || '').trim(), scope, classId: req.body.classId ? parseInt(req.body.classId, 10) : null });
+  await forums.createCategory({
+    name,
+    description: (req.body.description || '').trim(),
+    scope,
+    classId: req.body.classId ? parseInt(req.body.classId, 10) : null,
+    isChatRoom: req.body.isChatRoom === 'on',
+  });
   res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Chat group added.'));
 });
 
@@ -160,6 +166,9 @@ router.post('/threads/:threadId/unarchive', async (req, res) => {
 router.get('/:id', async (req, res) => {
   const category = await forums.getCategory(req.params.id);
   if (!category) return res.status(404).render('404', { title: 'Not Found' });
+  // A chat room has exactly one underlying thread (its own live feed) -
+  // skip straight to it instead of showing a thread list with one row.
+  if (category.is_chat_room) return res.redirect(`/main-admin/forums/threads/${category.room_thread_id}`);
   const threads = await forums.listThreads(category.id);
   res.render('admin-forums-category', {
     title: category.name,

@@ -13,6 +13,7 @@ const { requirePortalAuth, requirePortal, requirePortalPermission } = require('.
 const payments = require('../utils/payments');
 const auditLog = require('../utils/auditLog');
 const { byLastName } = require('../utils/members');
+const events = require('../utils/events');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_finances'));
 
@@ -28,7 +29,32 @@ router.get('/', async (req, res) => {
   const rows = [];
   for (const m of members) rows.push({ ...m, balanceCents: await payments.balanceForMember(m.id) });
   const allMembers = (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).sort(byLastName);
-  res.render('admin-accounting-list', { title: 'Accounting', members: rows, allMembers, notice: req.query.notice || null, formatCents: payments.formatCents });
+  const accountingCategories = await events.listAccountingCategories();
+  res.render('admin-accounting-list', { title: 'Accounting', members: rows, allMembers, accountingCategories, notice: req.query.notice || null, error: req.query.error || null, formatCents: payments.formatCents });
+});
+
+// A real request: "add/edit account category button should not be [on
+// Events Settings]. That should only be under the accounting tab." -
+// moved here from routes/admin-events.js, same event_accounting_categories
+// table/functions (utils/events.js) the Events Finance tab's own dropdown
+// still reads from.
+router.post('/accounting-categories', async (req, res) => {
+  const name = (req.body.name || '').trim();
+  if (!name) return res.redirect('/main-admin/accounting?error=' + encodeURIComponent('Accounting category name is required.'));
+  await events.createAccountingCategory(name);
+  res.redirect('/main-admin/accounting?notice=' + encodeURIComponent('Accounting category added.'));
+});
+
+router.post('/accounting-categories/:id/update', async (req, res) => {
+  const name = (req.body.name || '').trim();
+  if (!name) return res.redirect('/main-admin/accounting?error=' + encodeURIComponent('Accounting category name is required.'));
+  await events.updateAccountingCategory(req.params.id, name);
+  res.redirect('/main-admin/accounting?notice=' + encodeURIComponent('Accounting category updated.'));
+});
+
+router.post('/accounting-categories/:id/delete', async (req, res) => {
+  await events.deleteAccountingCategory(req.params.id);
+  res.redirect('/main-admin/accounting?notice=' + encodeURIComponent('Accounting category removed.'));
 });
 
 router.get('/members/:memberId', async (req, res) => {

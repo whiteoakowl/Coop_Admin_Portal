@@ -43,6 +43,7 @@
               <span class="team-info-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
               <h3 class="team-info-title"><a href="/forums/<%= c.id %>"><%= c.name %></a></h3>
               <% if (c.scope === 'class') { %><span class="badge-pill">Class: <%= c.class_name %></span><% } %>
+              <% if (c.is_chat_room) { %><span class="badge-pill badge-pill-green">Live Chat Room</span><% } %>
               <% if (c.is_locked) { %><span class="badge-pill badge-pill-gray">Locked</span><% } %>
               <% if (c.description) { %><p class="hint"><%= c.description %></p><% } %>
             </div>

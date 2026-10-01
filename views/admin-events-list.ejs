@@ -164,13 +164,14 @@
       <%# A real request: "add/edit categories, add/edit locations buttons
           should be at the top of the page" - moved above General
           Settings (Item 8's original placement was below the form). %>
+      <%# A real request: "add/edit account category button should not be
+          there [on Events Settings]. That should only be under the
+          accounting tab." - moved to views/admin-accounting-list.ejs;
+          Category/Location management (unrelated to accounting) stays
+          here. %>
       <div class="roster-btn-row events-category-location-row no-print">
         <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-categories-dialog').showModal()">Add/Edit Category</button>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-locations-dialog').showModal()">Add/Edit Location</button>
-        <%# A real request: "add a drop down menu for choosing accounting
-            category" (the Finance tab's own dropdown) - the list itself
-            is managed here, same place/pattern as Categories/Locations. %>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-accounting-categories-dialog').showModal()">Add/Edit Accounting Category</button>
       </div>
 
       <%# Item 9 - General Settings, same fields/shape as the reference
@@ -201,10 +202,14 @@
           "Do not allow"/"No" - routes/admin-events.js's own
           `req.body.X === '1'` already treats a missing (unchecked) field
           as false, so no backend change was needed. Default Calendar
-          View (Calendar vs. List) and "allow families to submit calendar
-          items" (Yes/Auto-Approve/No) aren't yes/no questions - a
-          checkbox can't represent 3 states or a non-boolean choice - so
-          those two stay as radio groups. %>
+          View (Calendar vs. List) isn't a yes/no question - a checkbox
+          can't represent a non-boolean choice - so it stays a radio
+          group. "Allow families to submit calendar items" used to be a
+          3-way Yes/Auto-Approve/No radio for the same reason, but a
+          later real request split it into two genuine yes/no questions
+          ("it should just say yes or no... [auto-approve] should be its
+          own question") - both now live as ordinary checkboxes in the
+          stack below, same as everything else here. %>
       <form method="POST" action="/main-admin/events/settings" class="stack-form member-form-page-panel">
         <h2>General Settings</h2>
         <div class="member-form-grid">
@@ -222,18 +227,19 @@
               <% }); %>
             </select>
           </label>
-          <div class="member-form-full">
-            <span class="class-form-field-label">Allow families to submit calendar of events items?</span>
-            <div class="checkbox-group">
-              <label class="checkbox-option"><input type="radio" name="familySubmitEvents" value="yes" <%= eventSettings.family_submit_events === 'yes' ? 'checked' : '' %> /> Yes</label>
-              <label class="checkbox-option"><input type="radio" name="familySubmitEvents" value="auto_approve" <%= eventSettings.family_submit_events === 'auto_approve' ? 'checked' : '' %> /> Automatically Approve</label>
-              <label class="checkbox-option"><input type="radio" name="familySubmitEvents" value="no" <%= eventSettings.family_submit_events === 'no' ? 'checked' : '' %> /> No</label>
-            </div>
-          </div>
           <label class="member-form-full">Email Notifications To
             <input type="email" name="submitNotificationEmail" value="<%= eventSettings.submit_notification_email || '' %>" placeholder="admin@example.com" />
           </label>
+          <%# A real request: "under allow families to submit events
+              calendar events? It should just say yes or no. Automatically
+              approve event member submit, yes or no, should be it's own
+              question." Previously one 3-way Yes/Auto-Approve/No radio
+              group - now a genuine yes/no, so it joins the single
+              checkbox column below like every other yes/no question here,
+              with auto-approve as its own separate checkbox right after it. %>
           <div class="member-form-full checkbox-group checkbox-group-stack">
+            <label class="checkbox-option"><input type="checkbox" name="familySubmitEvents" value="1" <%= eventSettings.family_submit_events === 'yes' ? 'checked' : '' %> /> Allow families to submit calendar of events items?</label>
+            <label class="checkbox-option"><input type="checkbox" name="autoApproveFamilySubmissions" value="1" <%= eventSettings.auto_approve_family_submissions ? 'checked' : '' %> /> Automatically approve event member submissions?</label>
             <label class="checkbox-option"><input type="checkbox" name="showWaitlistPosition" value="1" <%= eventSettings.show_waitlist_position ? 'checked' : '' %> /> Allow families to see their waiting list position?</label>
             <label class="checkbox-option"><input type="checkbox" name="creditOnFamilyCancel" value="1" <%= eventSettings.credit_on_family_cancel ? 'checked' : '' %> /> When registrations are cancelled by a Family, allow an automated credit adjustment to the family's accounting statement?</label>
             <label class="checkbox-option"><input type="checkbox" name="creditOnAdminCancel" value="1" <%= eventSettings.credit_on_admin_cancel ? 'checked' : '' %> /> When registrations are cancelled/deleted by an Admin, or by the System for nonpayment, allow an automated credit adjustment?</label>
@@ -306,52 +312,6 @@
                   </td>
                   <td>
                     <form method="POST" action="/main-admin/events/categories/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete this category? Events using it will just show no category.">
-                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
-                    </form>
-                  </td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
-      <% } %>
-      <div class="notes-dialog-actions">
-        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
-      </div>
-    </dialog>
-
-    <dialog id="manage-accounting-categories-dialog" class="member-picker-dialog">
-      <h3>Accounting Categories</h3>
-      <p class="hint">A fixed list an event's Finance tab picks one of, for internal bookkeeping - separate from the public-facing Category above.</p>
-      <form method="POST" action="/main-admin/events/accounting-categories" class="stack-form">
-        <div class="member-form-grid">
-          <label>Category Name
-            <input type="text" name="name" placeholder="e.g. Fundraising Revenue" required />
-          </label>
-        </div>
-        <div class="member-form-footer">
-          <div class="member-form-footer-edit">
-            <button type="submit" class="primary-btn">+ Add Accounting Category</button>
-          </div>
-        </div>
-      </form>
-
-      <% if (accountingCategories.length === 0) { %>
-        <p class="roster-empty">No accounting categories yet - add one above.</p>
-      <% } else { %>
-        <div class="roster-scroll">
-          <table class="roster-table condensed-table">
-            <thead><tr><th>Category</th><th></th></tr></thead>
-            <tbody>
-              <% accountingCategories.forEach(function(c) { %>
-                <tr>
-                  <td>
-                    <form method="POST" action="/main-admin/events/accounting-categories/<%= c.id %>/update" class="inline-block-form">
-                      <input type="text" name="name" value="<%= c.name %>" onchange="this.form.submit()" aria-label="Name for <%= c.name %>" />
-                    </form>
-                  </td>
-                  <td>
-                    <form method="POST" action="/main-admin/events/accounting-categories/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete this accounting category? Events using it will just show no category.">
                       <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
                     </form>
                   </td>

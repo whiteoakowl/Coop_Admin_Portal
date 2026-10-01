@@ -617,7 +617,7 @@ async function updateEventSettings(data) {
         default_calendar_view = ?, show_waitlist_position = ?, reminder_days_before = ?,
         credit_on_family_cancel = ?, credit_on_admin_cancel = ?, auto_refund_on_family_cancel = ?,
         subadmin_edit_locations = ?, subadmin_edit_categories = ?,
-        family_submit_events = ?, submit_notification_email = ?,
+        family_submit_events = ?, auto_approve_family_submissions = ?, submit_notification_email = ?,
         family_manage_price_options = ?, family_manage_own_events = ?,
         updated_at = now_text()
       WHERE id = 1`
@@ -631,7 +631,8 @@ async function updateEventSettings(data) {
       data.autoRefundOnFamilyCancel ? 1 : 0,
       data.subadminEditLocations ? 1 : 0,
       data.subadminEditCategories ? 1 : 0,
-      ['yes', 'auto_approve', 'no'].includes(data.familySubmitEvents) ? data.familySubmitEvents : 'yes',
+      data.familySubmitEvents ? 'yes' : 'no',
+      data.autoApproveFamilySubmissions ? 1 : 0,
       (data.submitNotificationEmail || '').trim() || null,
       data.familyManagePriceOptions ? 1 : 0,
       data.familyManageOwnEvents ? 1 : 0
@@ -645,18 +646,21 @@ async function updateEventSettings(data) {
 // event starts 'draft' either way, so a pending submission never shows
 // up anywhere but the submitter's own "my submissions" and the Main
 // Admin approval queue until it's actually decided. Settings-gated per
-// item 9's "Allow families to submit calendar of events items?" (Yes /
-// Automatically Approve / No). A later real request removed the
-// "Make events submitted by families public by default?" override that
-// used to live here - a submitted event now always keeps whatever
-// visibility the submitter picked.
+// item 9's "Allow families to submit calendar of events items?" (Yes/No)
+// and its own separate "Automatically approve event member submissions?"
+// (Yes/No) - a real request split these into two independent questions
+// ("it should just say yes or no... should be its own question"),
+// previously one 3-way Yes/Auto-Approve/No radio. A later real request
+// removed the "Make events submitted by families public by default?"
+// override that used to live here - a submitted event now always keeps
+// whatever visibility the submitter picked.
 async function submitEvent(data, accountId) {
   const settings = await getEventSettings();
-  if (settings.family_submit_events === 'no') return null;
+  if (settings.family_submit_events !== 'yes') return null;
   return createEvent(
     data,
     accountId,
-    settings.family_submit_events === 'auto_approve'
+    settings.auto_approve_family_submissions
       ? { submittedByAccountId: accountId, approvalStatus: 'approved' }
       : { submittedByAccountId: accountId }
   );

@@ -29,6 +29,14 @@ const notifications = require('../utils/notifications');
 
 router.use(requirePortalAuth);
 
+// Same convention routes/events.js's own AJAX endpoints use - an
+// Accept: application/json header, not a bespoke flag - so the chat room
+// feed's fetch()-based post (public/js/chat-room-feed.js) can get JSON
+// back instead of a redirect.
+function wantsJson(req) {
+  return !!(req.headers.accept && req.headers.accept.includes('application/json'));
+}
+
 async function canModerate(req) {
   if (req.portalPermissions.has('manage_forum')) return true;
   if (!req.category) return false;
@@ -74,11 +82,15 @@ router.get('/', async (req, res) => {
 });
 
 router.get('/:categoryId', loadCategory, async (req, res) => {
+  // A chat room has exactly one underlying thread (its own live feed) -
+  // land straight on it instead of a thread list with one row.
+  if (req.category.is_chat_room) return res.redirect(`/forums/threads/${req.category.room_thread_id}`);
   const threads = await forums.listThreads(req.category.id);
   res.render('forums-category', { title: req.category.name, category: req.category, threads, canModerate: await canModerate(req) });
 });
 
 router.get('/:categoryId/new', loadCategory, async (req, res) => {
+  if (req.category.is_chat_room) return res.redirect(`/forums/threads/${req.category.room_thread_id}`);
   if (req.category.is_locked && !(await canModerate(req))) {
     return res.status(403).render('403', { title: 'Not Authorized', message: 'This chat is locked - only moderators can start new threads.', backHref: `/forums/${req.category.id}`, backLabel: 'Back' });
   }
@@ -86,6 +98,7 @@ router.get('/:categoryId/new', loadCategory, async (req, res) => {
 });
 
 router.post('/:categoryId/threads', loadCategory, async (req, res) => {
+  if (req.category.is_chat_room) return res.redirect(`/forums/threads/${req.category.room_thread_id}`);
   if (req.category.is_locked && !(await canModerate(req))) {
     return res.status(403).render('403', { title: 'Not Authorized', message: 'This chat is locked.', backHref: `/forums/${req.category.id}`, backLabel: 'Back' });
   }
@@ -113,26 +126,48 @@ router.get('/threads/:threadId', loadThread, async (req, res) => {
   });
 });
 
+// A real request: "add chat room where people can talk to each other in
+// a live continuous feed" - public/js/chat-room-feed.js polls this to
+// pick up messages posted by other people without a page reload. Same
+// access check as the thread page itself (loadThread), just JSON instead
+// of HTML.
+router.get('/threads/:threadId/feed.json', loadThread, async (req, res) => {
+  const posts = await forums.listPosts(req.thread.id);
+  res.json({ posts });
+});
+
 router.post('/threads/:threadId/posts', loadThread, async (req, res) => {
   const moderator = await canModerate(req);
   if ((req.thread.status !== 'active' || req.thread.is_locked) && !moderator) {
-    return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent('This thread is locked.'));
+    const message = 'This thread is locked.';
+    if (wantsJson(req)) return res.status(422).json({ ok: false, error: message });
+    return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent(message));
   }
   // Moderate tab's own "allow comments" checkbox (utils/forums.js's
   // updateCategorySettings) - a category with it off is announcement-
   // only: moderators can still reply, everyone else can only read.
   if (!req.category.allow_comments && !moderator) {
-    return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent('Comments are turned off for this chat.'));
+    const message = 'Comments are turned off for this chat.';
+    if (wantsJson(req)) return res.status(422).json({ ok: false, error: message });
+    return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent(message));
   }
   const body = (req.body.body || '').trim();
-  if (!body) return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent('A message is required.'));
+  if (!body) {
+    const message = 'A message is required.';
+    if (wantsJson(req)) return res.status(422).json({ ok: false, error: message });
+    return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent(message));
+  }
   const self = await memberForAccount(req.portalAccount.id);
-  await forums.addPost(req.thread.id, body, self.id, req.portalAccount.id);
+  const postId = await forums.addPost(req.thread.id, body, self.id, req.portalAccount.id);
   // Notify the thread's own starter, not the replier - and never notify
   // someone replying to their own thread.
   if (req.thread.account_id && req.thread.account_id !== req.portalAccount.id) {
     await notifications.notify(req.thread.account_id, 'forum_reply', { title: `New reply: ${req.thread.title}`, body: 'Someone replied to your thread.', linkUrl: `/forums/threads/${req.thread.id}` });
   }
+  // The live chat room feed posts here via fetch() so it can append the
+  // new message without a full page reload - everyone else (the normal
+  // threaded-reply form) still gets the usual redirect.
+  if (wantsJson(req)) return res.json({ post: await forums.getPostWithAuthor(postId) });
   res.redirect(`/forums/threads/${req.thread.id}`);
 });
 

@@ -356,7 +356,6 @@ router.get('/', async (req, res) => {
   // Calendar and Drafts tabs too.
   const categories = await events.listCategories();
   const locations = await events.listLocations();
-  const accountingCategories = await events.listAccountingCategories();
   const eventSettings = await events.getEventSettings();
   if (activeTab === 'calendar') {
     // A real request: "cancel event button should leave the event on the
@@ -397,7 +396,6 @@ router.get('/', async (req, res) => {
     attendance,
     categories,
     locations,
-    accountingCategories,
     eventSettings,
     notice: req.query.notice || null,
     error: req.query.error || null,
@@ -423,28 +421,12 @@ router.post('/categories/:id/delete', async (req, res) => {
   res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Category removed.'));
 });
 
-// --- Accounting Categories - a real request: "add a drop down menu for
-// choosing accounting category" (Finance tab) - same shape as Categories
-// above, just a plain name list (no color/allow-sync). ---
-
-router.post('/accounting-categories', async (req, res) => {
-  const name = (req.body.name || '').trim();
-  if (!name) return res.redirect('/main-admin/events?tab=settings&error=' + encodeURIComponent('Accounting category name is required.'));
-  await events.createAccountingCategory(name);
-  res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Accounting category added.'));
-});
-
-router.post('/accounting-categories/:id/update', async (req, res) => {
-  const name = (req.body.name || '').trim();
-  if (!name) return res.redirect('/main-admin/events?tab=settings&error=' + encodeURIComponent('Accounting category name is required.'));
-  await events.updateAccountingCategory(req.params.id, name);
-  res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Accounting category updated.'));
-});
-
-router.post('/accounting-categories/:id/delete', async (req, res) => {
-  await events.deleteAccountingCategory(req.params.id);
-  res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Accounting category removed.'));
-});
+// Accounting Categories management (Add/Edit Accounting Category) moved
+// to routes/admin-accounting.js - a real request: "add/edit account
+// category button should not be there [on Events Settings]. That should
+// only be under the accounting tab." listAccountingCategories() itself
+// stays exported from utils/events.js - this page's own Finance tab
+// dropdown (admin-events-builder.ejs) still reads from it.
 
 // --- Locations (item 8) ---
 
@@ -479,7 +461,8 @@ router.post('/settings', async (req, res) => {
     autoRefundOnFamilyCancel: req.body.autoRefundOnFamilyCancel === '1',
     subadminEditLocations: req.body.subadminEditLocations === '1',
     subadminEditCategories: req.body.subadminEditCategories === '1',
-    familySubmitEvents: req.body.familySubmitEvents,
+    familySubmitEvents: req.body.familySubmitEvents === '1',
+    autoApproveFamilySubmissions: req.body.autoApproveFamilySubmissions === '1',
     submitNotificationEmail: req.body.submitNotificationEmail,
     familyManagePriceOptions: req.body.familyManagePriceOptions === '1',
     familyManageOwnEvents: req.body.familyManageOwnEvents === '1',

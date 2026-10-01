@@ -4075,3 +4075,33 @@ create table if not exists event_organizers (
 );
 create index if not exists idx_event_organizers_event on event_organizers(event_id);
 
+
+-- ===== 20261020010000_event_settings_split_auto_approve.sql =====
+-- A real request: "Main admin, events, settings, under allow families to
+-- submit events calendar events? It should just say yes or no.
+-- Automatically approve event member submit, yes or no, should be it's
+-- own question." event_settings.family_submit_events used to be a 3-way
+-- enum ('yes', 'auto_approve', 'no') cramming two separate yes/no
+-- questions into one radio group - split into its own independent
+-- boolean column instead, same integer-boolean shape every other
+-- checkbox-backed column on this table already uses (show_waitlist_
+-- position, credit_on_family_cancel, etc.). Any row already set to
+-- 'auto_approve' keeps meaning exactly what it did before: submissions
+-- allowed AND auto-approved.
+alter table event_settings add column if not exists auto_approve_family_submissions integer not null default 0;
+update event_settings set auto_approve_family_submissions = 1, family_submit_events = 'yes' where family_submit_events = 'auto_approve';
+alter table event_settings drop constraint if exists event_settings_family_submit_events_check;
+alter table event_settings add constraint event_settings_family_submit_events_check check (family_submit_events in ('yes', 'no'));
+
+
+-- ===== 20261020020000_forum_chat_room.sql =====
+-- A real request: "main admin, chat tab, add chat room where people can
+-- talk to each other in a live continuous feed." A chat room is a
+-- forum_categories row with is_chat_room=1 - instead of members starting
+-- their own titled threads (the normal Chat Group behavior), a chat room
+-- eagerly gets exactly one underlying forum_threads row (room_thread_id)
+-- whose posts ARE the live feed. Reuses forum_posts/forum_threads and
+-- all their existing sanitization/moderation/notification plumbing
+-- rather than a parallel messages table.
+alter table forum_categories add column if not exists is_chat_room integer not null default 0;
+alter table forum_categories add column if not exists room_thread_id integer references forum_threads(id) on delete set null;

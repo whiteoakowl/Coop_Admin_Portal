@@ -25,16 +25,20 @@
     <p><a href="/forums/<%= category.id %>">&larr; <%= category.name %></a></p>
 
     <div class="grid-box-header">
-      <h1><%= thread.title %>
-        <% if (thread.is_pinned) { %> <span class="badge-pill">Pinned</span><% } %>
-        <% if (thread.is_locked) { %> <span class="badge-pill badge-pill-gray">Locked</span><% } %>
-        <% if (thread.status === 'archived') { %> <span class="badge-pill badge-pill-gray">Archived</span><% } %>
-      </h1>
+      <% if (category.is_chat_room) { %>
+        <h1><%= category.name %> <span class="badge-pill badge-pill-green">Live Chat Room</span></h1>
+      <% } else { %>
+        <h1><%= thread.title %>
+          <% if (thread.is_pinned) { %> <span class="badge-pill">Pinned</span><% } %>
+          <% if (thread.is_locked) { %> <span class="badge-pill badge-pill-gray">Locked</span><% } %>
+          <% if (thread.status === 'archived') { %> <span class="badge-pill badge-pill-gray">Archived</span><% } %>
+        </h1>
+      <% } %>
     </div>
 
-    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (error) { %><div class="alert alert-error" data-chat-room-error><%= error %></div><% } %>
 
-    <% if (canModerate) { %>
+    <% if (canModerate && !category.is_chat_room) { %>
       <div class="roster-toolbar">
         <div class="roster-btn-row">
           <% if (thread.is_pinned) { %>
@@ -56,76 +60,90 @@
       </div>
     <% } %>
 
-    <% posts.forEach(function(p) { %>
-      <div class="forum-post <%= p.status === 'removed' ? 'forum-post-removed' : '' %>">
-        <div class="forum-post-header">
-          <span class="forum-post-author"><%= p.authorName || 'Unknown' %></span>
-          <% if (p.authorAdminTitle) { %><span class="badge-pill" title="Admin Position"><%= p.authorAdminTitle %></span><% } %>
-          <span class="hint"><%= p.created_at %></span>
-          <% if (p.edited_at) { %><span class="hint">(edited)</span><% } %>
-          <% if (p.status === 'removed') { %><span class="badge-pill badge-pill-gray">Removed</span><% } %>
-        </div>
-        <% if (p.status === 'active') { %>
-          <div class="forum-post-body"><%- p.body_html %></div>
-        <% } else { %>
-          <p class="hint">This post was removed by a moderator.</p>
-        <% } %>
-        <div class="roster-btn-row" style="margin-top: 0.5rem;">
-          <% if (p.member_id === selfMemberId && p.status === 'active') { %>
-            <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-post-<%= p.id %>').showModal()">Edit</button>
-          <% } %>
-          <% if (canModerate) { %>
-            <% if (p.status === 'active') { %>
-              <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/remove" class="inline-block-form"><button type="submit" class="roster-action-btn roster-action-btn-danger">Remove</button></form>
-            <% } else { %>
-              <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/restore" class="inline-block-form"><button type="submit" class="roster-action-btn">Restore</button></form>
-            <% } %>
-          <% } %>
-        </div>
-      </div>
-
-      <% if (p.status === 'active') { %>
-        <dialog id="edit-post-<%= p.id %>" class="member-picker-dialog">
-          <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/edit" data-forum-editor>
-            <h3>Edit Post</h3>
-            <%- include('partials/forum-editor-toolbar') %>
-            <div class="forum-editable" data-forum-editable contenteditable="true"><%- p.body_html %></div>
-            <input type="hidden" name="body" data-forum-body-input />
-            <div class="notes-dialog-actions">
-              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-              <button type="submit" class="primary-btn">Save</button>
+    <%
+    // A real request: "add chat room where people can talk to each other
+    // in a live continuous feed." See public/js/chat-room-feed.js - with
+    // JS enabled, this wrapper is where new messages (from polling
+    // /forums/threads/:id/feed.json) get appended and where the Reply
+    // form below posts via fetch() instead of a page reload. Without JS
+    // it degrades to the exact same page every other forum thread
+    // already is.
+    %>
+    <div <% if (category.is_chat_room) { %>data-chat-room-feed data-thread-id="<%= thread.id %>" data-self-member-id="<%= selfMemberId || '' %>"<% } %>>
+      <div data-chat-room-messages class="<%= category.is_chat_room ? 'forum-chat-room-messages' : '' %>">
+        <% posts.forEach(function(p) { %>
+          <div class="forum-post <%= p.status === 'removed' ? 'forum-post-removed' : '' %>" data-post-id="<%= p.id %>">
+            <div class="forum-post-header">
+              <span class="forum-post-author"><%= p.authorName || 'Unknown' %></span>
+              <% if (p.authorAdminTitle) { %><span class="badge-pill" title="Admin Position"><%= p.authorAdminTitle %></span><% } %>
+              <span class="hint"><%= p.created_at %></span>
+              <% if (p.edited_at) { %><span class="hint">(edited)</span><% } %>
+              <% if (p.status === 'removed') { %><span class="badge-pill badge-pill-gray">Removed</span><% } %>
             </div>
+            <% if (p.status === 'active') { %>
+              <div class="forum-post-body"><%- p.body_html %></div>
+            <% } else { %>
+              <p class="hint">This post was removed by a moderator.</p>
+            <% } %>
+            <div class="roster-btn-row" style="margin-top: 0.5rem;">
+              <% if (p.member_id === selfMemberId && p.status === 'active') { %>
+                <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-post-<%= p.id %>').showModal()">Edit</button>
+              <% } %>
+              <% if (canModerate) { %>
+                <% if (p.status === 'active') { %>
+                  <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/remove" class="inline-block-form"><button type="submit" class="roster-action-btn roster-action-btn-danger">Remove</button></form>
+                <% } else { %>
+                  <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/restore" class="inline-block-form"><button type="submit" class="roster-action-btn">Restore</button></form>
+                <% } %>
+              <% } %>
+            </div>
+          </div>
+
+          <% if (p.status === 'active') { %>
+            <dialog id="edit-post-<%= p.id %>" class="member-picker-dialog">
+              <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/edit" data-forum-editor>
+                <h3>Edit Post</h3>
+                <%- include('partials/forum-editor-toolbar') %>
+                <div class="forum-editable" data-forum-editable contenteditable="true"><%- p.body_html %></div>
+                <input type="hidden" name="body" data-forum-body-input />
+                <div class="notes-dialog-actions">
+                  <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+                  <button type="submit" class="primary-btn">Save</button>
+                </div>
+              </form>
+            </dialog>
+          <% } %>
+        <% }); %>
+      </div>
+
+      <% if (!category.is_chat_room && canModerate) { %>
+        <div class="manage-section">
+          <div class="grid-box-header"><h2>Move Thread</h2></div>
+          <form method="POST" action="/forums/threads/<%= thread.id %>/move" class="inline-block-form">
+            <input type="number" name="categoryId" placeholder="Target chat ID" required />
+            <button type="submit" class="roster-action-btn">Move</button>
           </form>
-        </dialog>
+        </div>
       <% } %>
-    <% }); %>
 
-    <% if (canModerate) { %>
-      <div class="manage-section">
-        <div class="grid-box-header"><h2>Move Thread</h2></div>
-        <form method="POST" action="/forums/threads/<%= thread.id %>/move" class="inline-block-form">
-          <input type="number" name="categoryId" placeholder="Target chat ID" required />
-          <button type="submit" class="roster-action-btn">Move</button>
-        </form>
-      </div>
-    <% } %>
-
-    <% if (thread.status === 'active' && (!thread.is_locked || canModerate) && (category.allow_comments || canModerate)) { %>
-      <div class="manage-section">
-        <div class="grid-box-header"><h2>Reply</h2></div>
-        <form method="POST" action="/forums/threads/<%= thread.id %>/posts" data-forum-editor>
-          <%- include('partials/forum-editor-toolbar') %>
-          <div class="forum-editable" data-forum-editable contenteditable="true"></div>
-          <input type="hidden" name="body" data-forum-body-input />
-          <button type="submit" class="primary-btn" style="margin-top: 0.75rem;">Post Reply</button>
-        </form>
-      </div>
-    <% } else if (thread.status === 'active' && !category.allow_comments) { %>
-      <p class="hint">Comments are turned off for this chat.</p>
-    <% } else { %>
-      <p class="hint">This thread is locked - no new replies.</p>
-    <% } %>
+      <% if (thread.status === 'active' && (!thread.is_locked || canModerate) && (category.allow_comments || canModerate)) { %>
+        <div class="manage-section">
+          <% if (!category.is_chat_room) { %><div class="grid-box-header"><h2>Reply</h2></div><% } %>
+          <form method="POST" action="/forums/threads/<%= thread.id %>/posts" data-forum-editor <% if (category.is_chat_room) { %>data-chat-room-form<% } %>>
+            <%- include('partials/forum-editor-toolbar') %>
+            <div class="forum-editable" data-forum-editable contenteditable="true"></div>
+            <input type="hidden" name="body" data-forum-body-input />
+            <button type="submit" class="primary-btn" style="margin-top: 0.75rem;"><%= category.is_chat_room ? 'Send' : 'Post Reply' %></button>
+          </form>
+        </div>
+      <% } else if (thread.status === 'active' && !category.allow_comments) { %>
+        <p class="hint">Comments are turned off for this chat.</p>
+      <% } else { %>
+        <p class="hint">This thread is locked - no new replies.</p>
+      <% } %>
+    </div>
   </main>
   <script src="/js/forum-editor.js"></script>
+  <% if (category.is_chat_room) { %><script src="/js/chat-room-feed.js"></script><% } %>
 </body>
 </html>

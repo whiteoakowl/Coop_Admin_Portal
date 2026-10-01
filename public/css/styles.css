@@ -9405,6 +9405,14 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .forum-post-body blockquote { border-left: 3px solid var(--border); margin: 0.5rem 0; padding-left: 0.75rem; color: var(--muted); }
 .forum-post-body ul, .forum-post-body ol { padding-left: 1.4rem; }
 
+/* A real request: "add chat room where people can talk to each other in
+   a live continuous feed" - a tall, scrollable message panel (vs. a plain
+   thread's unbounded page scroll) so the room reads like a chat window,
+   not a forum thread with one post. public/js/chat-room-feed.js appends
+   new messages at the bottom of this same element. */
+.forum-chat-room-messages { max-height: 60vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem; background: var(--brand-soft); }
+.forum-chat-room-messages .forum-post:last-child { margin-bottom: 0; }
+
 .site-announcement-list { display: flex; flex-direction: column; gap: 1rem; margin-top: 1.5rem; }
 .site-announcement-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1.5rem; text-align: left; }
 .site-announcement-card h3 { margin: 0 0 0.35rem; font-size: 1.05rem; color: var(--ink); }
