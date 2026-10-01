@@ -285,14 +285,47 @@
                   var dialogHasTicket = !!(event.ticketTypes && event.ticketTypes.length);
                   var dialogHasPayment = dialogHasTicket || event.price_cents != null;
                 %>
-                <dialog id="event-register-dialog" class="notes-dialog event-register-dialog">
-                  <form id="event-register-dialog-form" method="POST" action="/events/<%= event.id %>/register" class="member-form-grid">
-                    <h3 class="member-form-full">Register <span id="event-register-dialog-member-name"></span></h3>
-                    <input type="hidden" name="memberId" id="event-register-dialog-member-id" />
+                <%# A real request: "when signing up multiple members, if it
+                    requires questions/food signups/volunteer signups or
+                    donation signups, when you click register it will only
+                    ask those questions once [per member] on the first
+                    popup. Next popup page will ask the questions for the
+                    first individual member, then the next individual
+                    member. After completing the information for each
+                    member, it will go to the ticket page and show each
+                    member you are registering and a dropdown ticket option
+                    next to each of them. Once a ticket has been selected
+                    for each member, a register now button will appear and
+                    go to a future payment screen." This dialog is now a
+                    single wizard instance (public/js/events-detail-
+                    register.js's own startWizard/queue) reused for however
+                    many members were checked - the Details step repeats
+                    once per queued member (reusing these same fields,
+                    reset between members, see resetDetailsFields), then
+                    Tickets and Payment are each a single shared step
+                    listing every queued member, built by JS once (the
+                    static per-event ticketTypes/flat-price data below is
+                    just handed to JS as JSON/data attributes - nothing
+                    here renders per member at page-load time since the
+                    wizard doesn't know which members will be queued until
+                    a real Register click happens). %>
+                <dialog
+                  id="event-register-dialog"
+                  class="notes-dialog event-register-dialog"
+                  data-has-details="<%= dialogHasDetails ? '1' : '0' %>"
+                  data-has-tickets="<%= dialogHasTicket ? '1' : '0' %>"
+                  data-has-payment="<%= dialogHasPayment ? '1' : '0' %>"
+                  data-flat-price-cents="<%= event.price_cents != null ? event.price_cents : '' %>"
+                  data-flat-price-per="<%= event.price_per || '' %>"
+                >
+                  <script type="application/json" id="event-register-ticket-types-data"><%- JSON.stringify(event.ticketTypes || []) %></script>
+                  <form id="event-register-dialog-form" class="member-form-grid">
+                    <h3 class="member-form-full">Register</h3>
                     <p class="alert alert-error member-form-full" id="event-register-dialog-error" hidden></p>
 
                     <% if (dialogHasDetails) { %>
                       <div class="register-dialog-step" data-step="details">
+                        <h4 class="member-form-full">For <span id="event-register-dialog-member-name"></span></h4>
                         <%# A real request: "extra fields is where you can
                             add extra form type questions for people
                             signing up for an event" - answers[] here comes
@@ -300,7 +333,12 @@
                             named answers[f<fieldId>] - the "f" prefix
                             keeps qs's body parser from reading a purely-
                             numeric bracket key as an ARRAY index instead
-                            of an object key. %>
+                            of an object key. These same fields are reused
+                            (and reset - events-detail-register.js's own
+                            resetDetailsFields) once per queued member,
+                            rather than one static copy per member, since
+                            the queue's own membership is only known at
+                            click time. %>
                         <% (event.extraFields || []).forEach(function(field) { %>
                           <label class="member-form-full"><%= field.label %><% if (field.required) { %> *<% } %>
                             <% if (field.field_type === 'textarea') { %>
@@ -352,41 +390,27 @@
                         <% } %>
                         <div class="notes-dialog-actions member-form-full">
                           <button type="button" class="btn-secondary" id="event-register-dialog-cancel">Cancel</button>
-                          <% if (dialogHasPayment) { %>
-                            <button type="button" class="primary-btn js-dialog-next">Next</button>
-                          <% } else { %>
-                            <button type="submit" class="primary-btn">Register</button>
-                          <% } %>
+                          <button type="button" class="primary-btn" id="event-register-details-next">Next</button>
                         </div>
                       </div>
                     <% } %>
 
                     <% if (dialogHasTicket) { %>
-                      <%# "You are taken to a ticket view and selection
-                          screen" - a real step of its own now, radio cards
-                          instead of the old plain <select>, so the chosen
-                          ticket's price can also drive the Payment step's
-                          summary text just below. %>
-                      <div class="register-dialog-step" data-step="ticket" <%= dialogHasDetails ? 'hidden' : '' %>>
-                        <h3 class="member-form-full">Select Your Ticket</h3>
-                        <div class="member-form-full ticket-select-list">
-                          <% event.ticketTypes.forEach(function(t, i) { %>
-                            <label class="ticket-select-option">
-                              <input type="radio" name="ticketTypeId" value="<%= t.id %>" data-price-label="<%= t.title %> &ndash; $<%= (t.price_cents / 100).toFixed(2) %> / <%= t.price_per %>" <%= i === 0 ? 'checked' : '' %> required />
-                              <span class="ticket-select-info">
-                                <strong><%= t.title %></strong>
-                                <span class="hint">$<%= (t.price_cents / 100).toFixed(2) %> / <%= t.price_per %></span>
-                              </span>
-                            </label>
-                          <% }); %>
-                        </div>
+                      <%# "Show each member you are registering and a
+                          dropdown ticket option next to each of them...
+                          once a ticket has been selected for each member,
+                          a register now button will appear." One shared
+                          step for the whole queue - events-detail-
+                          register.js's own buildTicketsStep populates
+                          #event-register-ticket-rows with one row+<select>
+                          per queued member, and the Register Now button
+                          stays hidden until every row has a choice. %>
+                      <div class="register-dialog-step" data-step="tickets" hidden>
+                        <h3 class="member-form-full">Select a Ticket for Each Member</h3>
+                        <div class="member-form-full" id="event-register-ticket-rows"></div>
                         <div class="notes-dialog-actions member-form-full">
-                          <% if (dialogHasDetails) { %>
-                            <button type="button" class="btn-secondary js-dialog-back">Back</button>
-                          <% } else { %>
-                            <button type="button" class="btn-secondary" id="event-register-dialog-cancel">Cancel</button>
-                          <% } %>
-                          <button type="button" class="primary-btn js-dialog-next">Next</button>
+                          <button type="button" class="btn-secondary" id="event-register-tickets-cancel">Cancel</button>
+                          <button type="button" class="primary-btn" id="event-register-tickets-submit" hidden>Register Now</button>
                         </div>
                       </div>
                     <% } %>
@@ -395,20 +419,22 @@
                       <%# "Click submit and you are taken to a payment
                           screen. We stop there because there is no
                           processor for payment yet. For now it creates an
-                          invoice and registration is completed." This
-                          step is always last - its submit really posts
-                          the form (events-detail-register.js's existing
-                          submit handler), which is what actually runs
-                          registerForEvent and its charge/"invoice". %>
+                          invoice and registration is completed." Always
+                          the last step - events-detail-register.js's own
+                          finishRegistration() is what actually posts each
+                          queued member's registration (registerForEvent's
+                          existing charge logic is already the "invoice"
+                          this creates, so nothing new was needed server-
+                          side for that part). buildPaymentStep fills in
+                          #event-register-payment-summary with one line per
+                          member plus a total. %>
                       <div class="register-dialog-step" data-step="payment" hidden>
                         <h3 class="member-form-full">Payment</h3>
-                        <p class="member-form-full" id="event-register-payment-summary">
-                          <% if (!dialogHasTicket) { %>$<%= (event.price_cents / 100).toFixed(2) %> / <%= event.price_per %><% } %>
-                        </p>
-                        <p class="hint member-form-full">Online payment isn't set up yet. Clicking Complete Registration below will finish your registration and create an invoice for this amount &ndash; we'll follow up separately on how to pay it.</p>
+                        <div class="member-form-full" id="event-register-payment-summary"></div>
+                        <p class="hint member-form-full">Online payment isn't set up yet. Clicking Complete Registration below will finish your registration(s) and create an invoice for this amount &ndash; we'll follow up separately on how to pay it.</p>
                         <div class="notes-dialog-actions member-form-full">
-                          <button type="button" class="btn-secondary js-dialog-back">Back</button>
-                          <button type="submit" class="primary-btn">Complete Registration</button>
+                          <button type="button" class="btn-secondary" id="event-register-payment-cancel">Cancel</button>
+                          <button type="button" class="primary-btn" id="event-register-payment-complete">Complete Registration</button>
                         </div>
                       </div>
                     <% } %>

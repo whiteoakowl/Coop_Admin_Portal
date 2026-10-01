@@ -169,7 +169,7 @@ test('registering for an event with ticket types requires a selection, and charg
   const detailPage = await request(app).get(`/events/${eventId}`).set('Cookie', parent.cookie);
   assert.match(detailPage.text, /General Admission/);
   assert.match(detailPage.text, /VIP/);
-  assert.match(detailPage.text, /name="ticketTypeId"/);
+  assert.match(detailPage.text, /id="event-register-ticket-types-data"/);
 
   const missingTicket = await request(app)
     .post(`/events/${eventId}/register`)

@@ -262,7 +262,7 @@ test('an event with a ticket type still offers checkboxes/a bulk button for a mu
   assert.match(page.text, /id="event-register-selected-btn"/);
   assert.match(page.text, /class="event-register-member-checkbox"/);
   assert.match(page.text, /id="event-register-dialog"/);
-  assert.match(page.text, /name="ticketTypeId"/);
+  assert.match(page.text, /id="event-register-ticket-types-data"/);
 });
 
 test('an event with a ticket type and only ONE eligible family member gets no bulk button - nothing to select between', async () => {
