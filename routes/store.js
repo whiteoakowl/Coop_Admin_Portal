@@ -27,28 +27,21 @@ router.use(requirePortalAuth);
 
 // A real request: "change shop product card to look similar [to a
 // reference design: image left, In Stock/Out of Stock badge, price and
-// stock count on one row, a prominent order button]." A product WITH
-// options is in stock as long as at least one of its enabled options
-// still has room (or is unlimited - quantity null); a stock COUNT is
-// only shown for the simple no-options case, where inventory_count is a
-// single real number rather than one per option.
-async function withStockInfo(product) {
-  const groups = await store.optionGroupsForProduct(product.id);
-  const hasOptions = groups.length > 0;
-  // In stock only if every group still has at least one enabled, in-stock
-  // value to pick from - a group with nothing left to choose makes the
-  // whole product unbuyable, same as buildOrderLines' own "Choose a
-  // {group} for..." requirement.
-  const inStock = hasOptions
-    ? groups.every((g) => g.values.some((v) => v.enabled && (v.quantity == null || v.quantity > 0)))
-    : product.inventory_count == null || product.inventory_count > 0;
-  const stockCount = !hasOptions && product.inventory_count != null ? product.inventory_count : null;
-  return { ...withImageUrl(product), inStock, stockCount };
+// stock count on one row, a prominent order button]." Stock computation
+// itself lives in utils/store.js's own withStockInfo, shared with the
+// Main Admin product cards (routes/admin-store.js) so the two never
+// disagree.
+async function withStockAndImage(product) {
+  return withImageUrl(await store.withStockInfo(product));
 }
 
 router.get('/', async (req, res) => {
+  const settings = await store.getStoreSettings();
+  if (!settings.store_enabled) {
+    return res.render('store-list', { title: 'Store', storeClosed: true, welcomeMessage: null, products: [] });
+  }
   const products = await store.listProducts({ status: 'active', availability: 'online' });
-  res.render('store-list', { title: 'Store', products: await Promise.all(products.map(withStockInfo)) });
+  res.render('store-list', { title: 'Store', storeClosed: false, welcomeMessage: settings.welcome_message, products: await Promise.all(products.map(withStockAndImage)) });
 });
 
 router.get('/orders', async (req, res) => {
@@ -66,10 +59,17 @@ router.get('/orders/:id', async (req, res) => {
   if (!family.some((m) => m.id === order.member_id)) {
     return res.status(403).render('403', { title: 'Not Authorized', message: "That's not your order.", backHref: '/store/orders', backLabel: 'Back to My Orders' });
   }
-  res.render('store-order-detail', { title: `Order #${order.id}`, order });
+  const settings = await store.getStoreSettings();
+  res.render('store-order-detail', { title: `Order #${order.id}`, order, pickupInstructions: settings.pickup_instructions });
 });
 
 router.get('/:id', async (req, res) => {
+  const settings = await store.getStoreSettings();
+  // "Shop open for online purchases?" (Main Admin > Shop > Settings) -
+  // closed means the whole member-facing storefront is off, not just the
+  // homepage, so a bookmarked/shared product link doesn't become a back
+  // door around it.
+  if (!settings.store_enabled) return res.redirect('/store');
   const product = await store.getProduct(req.params.id);
   if (!product || product.status !== 'active' || (product.availability !== 'online' && product.availability !== 'both')) {
     return res.status(404).render('404', { title: 'Not Found' });
@@ -80,6 +80,8 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/:id/buy', async (req, res) => {
+  const settings = await store.getStoreSettings();
+  if (!settings.store_enabled) return res.redirect('/store');
   const family = await familyForAccount(req.portalAccount.id);
   const memberId = parseInt(req.body.memberId, 10);
   if (!family.some((m) => m.id === memberId)) {

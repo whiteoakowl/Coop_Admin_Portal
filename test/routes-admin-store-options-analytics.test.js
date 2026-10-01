@@ -92,20 +92,58 @@ async function createParentAccount() {
   return { cookie, csrfToken: extractCsrf(page.text), memberId: parentInfo.lastInsertRowid };
 }
 
-test('Settings tab is gone; Add/Edit Category lives on Products, not a separate list', async () => {
+test('Add/Edit Category still lives on Products (not the Settings tab), not a separate list', async () => {
   const admin = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/store').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
-  assert.doesNotMatch(page.text, /store\?tab=settings">Settings/);
   assert.match(page.text, />Add\/Edit Category</);
   // A real request: "categories isn't listed on product page. just the
   // product cards" - no standalone Categories section/heading outside
   // the popup.
   assert.doesNotMatch(page.text, /<h2>Categories<\/h2>/);
+});
 
-  const settingsUrl = await request(app).get('/main-admin/store?tab=settings').set('Cookie', admin.cookie);
-  // An unrecognized tab value falls back to Products, same as before.
-  assert.match(settingsUrl.text, /\+ New Product/);
+test('a real request: "Main admin portal. Shop. Add a subpage called settings. This where general store settings will happen" - a real Settings tab, not a fallback to Products', async () => {
+  const admin = await loginAsMainAdmin();
+  const nav = await request(app).get('/main-admin/store').set('Cookie', admin.cookie);
+  assert.match(nav.text, /href="\/main-admin\/store\?tab=settings">Settings</);
+
+  const settingsPage = await request(app).get('/main-admin/store?tab=settings').set('Cookie', admin.cookie);
+  assert.equal(settingsPage.status, 200);
+  assert.doesNotMatch(settingsPage.text, /\+ New Product/, 'tab=settings must render the real Settings form, not fall back to Products');
+  assert.match(settingsPage.text, /name="storeEnabled"/);
+  assert.match(settingsPage.text, /name="welcomeMessage"/);
+  assert.match(settingsPage.text, /name="pickupInstructions"/);
+  assert.match(settingsPage.text, /name="orderNotificationEmail"/);
+  // store_settings seeds store_enabled = 1 by default - the checkbox
+  // should start checked, not silently off.
+  assert.match(settingsPage.text, /name="storeEnabled" value="1" checked/);
+
+  const csrf = extractCsrf(settingsPage.text);
+  await request(app)
+    .post('/main-admin/store/settings')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ welcomeMessage: 'Back-to-school sale all September!', pickupInstructions: 'Pick up at the front office, Mon-Fri 9-3.', orderNotificationEmail: 'shop@coop.local', _csrf: csrf });
+  // storeEnabled is intentionally omitted (an unchecked checkbox submits
+  // nothing) - saving should turn the shop OFF, same as every other
+  // checkbox-backed setting in this app.
+  const reloaded = await request(app).get('/main-admin/store?tab=settings').set('Cookie', admin.cookie);
+  assert.doesNotMatch(reloaded.text, /name="storeEnabled" value="1" checked/);
+  assert.match(reloaded.text, /Back-to-school sale all September!/);
+  assert.match(reloaded.text, /Pick up at the front office/);
+  assert.match(reloaded.text, /value="shop@coop\.local"/);
+
+  // The member-facing storefront must actually reflect store_enabled = 0,
+  // not just the Main Admin's own settings form.
+  const parent = await createParentAccount();
+  const storefront = await request(app).get('/store').set('Cookie', parent.cookie);
+  assert.match(storefront.text, /shop is currently closed/i);
+
+  // Re-enable for every other test in this file - store_settings is a
+  // singleton, and every other test here assumes an open storefront.
+  const reopenCsrf = await freshCsrf(admin, '?tab=settings');
+  await request(app).post('/main-admin/store/settings').set('Cookie', admin.cookie).type('form').send({ storeEnabled: '1', _csrf: reopenCsrf });
 });
 
 test('Product Options: add a group of value rows with title/price/qty/enabled, save, and see them pre-filled on reload', async () => {
@@ -161,6 +199,63 @@ test('Product Options: add a group of value rows with title/price/qty/enabled, s
   await activateProduct(admin, productId);
   const detail = await request(app).get(`/main-admin/store/${productId}/edit`).set('Cookie', admin.cookie);
   assert.equal(detail.status, 200);
+});
+
+// A real bug report: "member view of product is not showing the multiple
+// options and values" + "store page, product card says product is out of
+// stock and it is not. When you click on the product it shows what is in
+// stock correctly." Both traced to the same root cause: views/admin-
+// store-edit.ejs pairs a hidden <input name="...[enabled]" value="0">
+// with a same-named checkbox (value="1"), so an unchecked box still
+// submits something - but a REAL browser form submits BOTH fields when
+// the box IS checked, and express's qs-based body parser merges two
+// same-named fields into an array ({enabled: ['0', '1']}), not the plain
+// string '1' routes/admin-store.js used to compare against with `===`.
+// supertest's own .send({...object}) (used in the test just above this
+// one) can only ever send ONE value per key, so it never actually
+// exercised this exact collision - this test sends a raw, pre-built
+// request body instead, the only way to reproduce two fields sharing one
+// name the way a real <form> does.
+test('a REAL browser\'s hidden-input + checkbox pair for "Enabled" (both fields submit when checked) still saves as enabled, not silently disabled', async () => {
+  const admin = await loginAsMainAdmin();
+  const productId = await createProduct(admin, { name: 'Enabled Checkbox Mug' });
+  const csrf = await freshCsrf(admin);
+
+  const rawBody = [
+    'name=' + encodeURIComponent('Enabled Checkbox Mug'),
+    'price=10.00',
+    'groups[0][name]=' + encodeURIComponent('Color'),
+    'groups[0][values][0][name]=' + encodeURIComponent('Blue'),
+    'groups[0][values][0][qty]=5',
+    // The exact shape a real browser sends: the hidden fallback (0) AND
+    // the checked checkbox (1) for the SAME field name, in DOM order.
+    'groups[0][values][0][enabled]=0',
+    'groups[0][values][0][enabled]=1',
+    '_csrf=' + encodeURIComponent(csrf),
+  ].join('&');
+
+  await request(app)
+    .post(`/main-admin/store/${productId}`)
+    .set('Cookie', admin.cookie)
+    .set('Content-Type', 'application/x-www-form-urlencoded')
+    .send(rawBody);
+
+  const group = await db.prepare('SELECT * FROM store_product_option_groups WHERE product_id = ?').get(productId);
+  const row = await db.prepare('SELECT * FROM store_product_options WHERE group_id = ?').get(group.id);
+  assert.equal(row.enabled, 1, 'checking "Enabled" in a real browser must actually save as enabled');
+
+  // Closes the loop on both symptoms: once truly enabled, the option
+  // shows on the member-facing detail page, and the list page's in-stock
+  // badge (which also reads this same enabled flag) is no longer wrong.
+  await activateProduct(admin, productId);
+  const member = await createParentAccount();
+  const listPage = await request(app).get('/store').set('Cookie', member.cookie);
+  const card = listPage.text.slice(listPage.text.lastIndexOf('<a class="store-product-card"', listPage.text.indexOf('Enabled Checkbox Mug')), listPage.text.indexOf('</a>', listPage.text.indexOf('Enabled Checkbox Mug')));
+  assert.match(card, /store-product-card-stock store-in-stock">\s*<span class="store-stock-dot"><\/span>In Stock/, 'a product with an actually-enabled, in-stock option must not show Out of Stock');
+
+  const detailPage = await request(app).get(`/store/${productId}`).set('Cookie', member.cookie);
+  assert.match(detailPage.text, /name="optionValues\[\d+\]"/, 'the option group dropdown must render for the member, not be filtered down to nothing');
+  assert.match(detailPage.text, /Blue/);
 });
 
 test('a real request: "add option will be a drop down menu... sub categories to add variables, each with their own price" - multiple groups, summed pricing', async () => {
@@ -331,6 +426,34 @@ test('Fulfillment Totals: sums quantity across every paid order, grouped by prod
   assert.match(dialogMatch[0], /<td>5<\/td>/); // 3 + 2 = 5, still 'paid' (not yet fulfilled)
 });
 
+test('a real bug report: "Shop Orders subpage the buttons and list overlap" - Fulfill/Cancel render in their own <div>, not a grid directly on the <td>, with a real width floor for the table\'s own column math', async () => {
+  const admin = await loginAsMainAdmin();
+  const productId = await createProduct(admin, { name: 'Overlap Check Item' });
+  await activateProduct(admin, productId);
+  const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Overlap Buyer', 'overlap-buyer', 'parent')").run()).lastInsertRowid;
+  const csrf = await freshCsrf(admin, '?tab=orders');
+  await request(app)
+    .post('/main-admin/store/orders/in-person')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ memberId: String(memberId), 'items[0][productId]': String(productId), 'items[0][quantity]': '1', _csrf: csrf });
+
+  const ordersPage = await request(app).get('/main-admin/store?tab=orders').set('Cookie', admin.cookie);
+  // Putting .roster-btn-row's own class (mobile: display: grid) directly
+  // on a <td> broke the table's column-width math - it must live on a
+  // <div> inside the cell, matching every other table/card in the app.
+  assert.doesNotMatch(ordersPage.text, /<td class="roster-btn-row">/);
+  assert.match(ordersPage.text, /<td class="store-orders-actions-col">\s*<div class="roster-btn-row">/);
+  // .roster-action-btn/.roster-btn-row both zero out min-width on mobile
+  // (styles.css), which also strips the signal <table>'s own auto layout
+  // needs to give this column real room - store-orders-actions-col
+  // restores an explicit floor, and roster-table-fit-content lets the
+  // table actually grow to use it instead of being forced to exactly
+  // 100% width no matter what its cells need.
+  assert.match(ordersPage.text, /<table class="[^"]*\broster-table-fit-content\b[^"]*">/);
+  assert.match(ordersPage.text, /<th class="store-orders-actions-col"><\/th>/);
+});
+
 test('Analytics tab: date-range dropdown, a sales chart, and per-product/option totals', async () => {
   const admin = await loginAsMainAdmin();
   const productId = await createProduct(admin, { name: 'Analytics Gadget' });
@@ -371,17 +494,43 @@ test('Analytics tab: date-range dropdown, a sales chart, and per-product/option 
   assert.match(todayPage.text, /Analytics Gadget/, 'a sale placed moments ago should show up under Today too');
 });
 
-test('Product card: no separate Edit button, the whole card links to Edit, status shown next to the name', async () => {
+test('Product card: no separate Edit button, the whole card links to Edit, status shown as a pill at the bottom', async () => {
   const admin = await loginAsMainAdmin();
   const productId = await createProduct(admin, { name: 'Clickable Product' });
 
   const page = await request(app).get('/main-admin/store?tab=products').set('Cookie', admin.cookie);
   assert.doesNotMatch(page.text, /roster-action-btn" href="\/main-admin\/store\/\d+\/edit">Edit</);
-  assert.match(page.text, new RegExp(`<a class="team-info-card store-product-card" href="/main-admin/store/${productId}/edit">`));
-  const cardMatch = new RegExp(`<a class="team-info-card store-product-card" href="/main-admin/store/${productId}/edit">([\\s\\S]*?)</a>`).exec(page.text);
+  assert.match(page.text, new RegExp(`<a class="store-admin-product-card" href="/main-admin/store/${productId}/edit">`));
+  const cardMatch = new RegExp(`<a class="store-admin-product-card" href="/main-admin/store/${productId}/edit">([\\s\\S]*?)</a>`).exec(page.text);
   assert.ok(cardMatch);
   assert.match(cardMatch[1], /Clickable Product/);
-  assert.match(cardMatch[1], /badge-pill-orange">Draft/);
+  assert.match(cardMatch[1], /badge-pill-orange store-admin-card-status">Draft/);
+});
+
+test('a real request: "Main admin portal product card should look exactly like this" - category row, In Person Sales count, and In Stock', async () => {
+  const admin = await loginAsMainAdmin();
+  const catCsrf = await freshCsrf(admin);
+  await request(app).post('/main-admin/store/categories').set('Cookie', admin.cookie).type('form').send({ name: 'Drinkware', _csrf: catCsrf });
+  const category = await db.prepare("SELECT id FROM store_categories WHERE name = 'Drinkware'").get();
+
+  const productId = await createProduct(admin, { name: 'Water Bottle', categoryId: String(category.id), inventoryCount: '5' });
+  await activateProduct(admin, productId);
+
+  const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Sales Buyer', 'sales-buyer', 'parent')").run()).lastInsertRowid;
+  const saleCsrf = await freshCsrf(admin, '?tab=orders');
+  await request(app)
+    .post('/main-admin/store/orders/in-person')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ memberId: String(memberId), 'items[0][productId]': String(productId), 'items[0][quantity]': '3', _csrf: saleCsrf });
+
+  const page = await request(app).get('/main-admin/store?tab=products').set('Cookie', admin.cookie);
+  const cardMatch = new RegExp(`<a class="store-admin-product-card" href="/main-admin/store/${productId}/edit">([\\s\\S]*?)</a>`).exec(page.text);
+  assert.ok(cardMatch);
+  assert.match(cardMatch[1], /Category: Drinkware/);
+  assert.match(cardMatch[1], /In Person Sales: 3/);
+  assert.match(cardMatch[1], /store-product-card-stock store-in-stock">\s*<span class="store-stock-dot"><\/span>In Stock/);
+  assert.match(cardMatch[1], /badge-pill-green store-admin-card-status">✓ Active/);
 });
 
 test('Filter label says "Filter" (not "Filter by category"), and a View Member Store button links to /store', async () => {

@@ -35,16 +35,19 @@
       <% } %>
     </div>
 
-    <%# Products/Orders/Archived/Analytics now live as subpages under the
-        orange bar's own Shop item (views/partials/portal-nav.ejs) instead
-        of a trigger+dialog here. %>
+    <%# Products/Orders/Archived/Analytics/Settings now live as subpages
+        under the orange bar's own Shop item (views/partials/portal-
+        nav.ejs) instead of a trigger+dialog here. %>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <% if (activeTab === 'products') { %>
-      <%# A real request: "filter by category should just say filter." %>
-      <form method="GET" action="/main-admin/store" class="inline-block-form">
+      <%# A real request: "filter by category should just say filter." A
+          follow-up bug report: "the buttons and dropdowns overlap. There
+          should be some space in between" - this form sat directly under
+          .grid-box-header's own button row with no margin of its own. %>
+      <form method="GET" action="/main-admin/store" class="inline-block-form" style="display: block; margin: 1rem 0;">
         <input type="hidden" name="tab" value="products" />
         <label>Filter
           <select name="category" onchange="this.form.submit()">
@@ -62,22 +65,33 @@
 
       <%# A real request: "not [no] edit button on the product, clicking
           the product takes you to the edit page" - the whole card is now
-          the link, nothing left inside it needs its own click target. %>
-      <div class="team-card-grid">
+          the link, nothing left inside it needs its own click target.
+          "Main admin portal product card should look exactly like this"
+          (reference image): photo on top, name, a price + In Stock/Out
+          of Stock row (same dot style as the member storefront card),
+          a plain "Category: X" row, a plain "In Person Sales: N" row,
+          and a status pill at the very bottom of the card. %>
+      <div class="store-product-grid">
         <% products.forEach(function(p) { %>
-          <div class="team-col">
-            <a class="team-info-card store-product-card" href="/main-admin/store/<%= p.id %>/edit">
+          <a class="store-admin-product-card" href="/main-admin/store/<%= p.id %>/edit">
+            <div class="store-product-card-image-wrap">
               <% if (p.imageUrl) { %>
-                <img src="<%= p.imageUrl %>" alt="" style="width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: var(--radius); margin-bottom: 0.5rem;" />
+                <img class="store-product-card-image" src="<%= p.imageUrl %>" alt="" />
               <% } %>
-              <h3 class="team-info-title">
-                <%= p.name %>
-                <span class="badge-pill badge-pill-<%= p.status === 'active' ? 'green' : 'orange' %>"><%= p.status.charAt(0).toUpperCase() + p.status.slice(1) %></span>
-              </h3>
-              <% if (p.categoryName) { %><span class="badge-pill"><%= p.categoryName %></span><% } %>
-              <p class="hint">$<%= (p.price_cents / 100).toFixed(2) %> &middot; <%= p.availability.replace('_', '-') %><% if (p.inventory_count != null) { %> &middot; <%= p.inventory_count %> in stock<% } %></p>
-            </a>
-          </div>
+            </div>
+            <div class="store-product-card-body">
+              <h3 class="store-product-card-name"><%= p.name %></h3>
+              <div class="store-product-card-price-row">
+                <span class="store-product-card-price">$<%= (p.price_cents / 100).toFixed(2) %></span>
+                <span class="store-product-card-stock <%= p.inStock ? 'store-in-stock' : 'store-out-of-stock' %>">
+                  <span class="store-stock-dot"></span><%= p.inStock ? 'In Stock' : 'Out of Stock' %>
+                </span>
+              </div>
+              <span class="store-admin-card-meta-row"><svg class="icon"><use href="#icon-folder"/></svg>Category: <%= p.categoryName || 'Uncategorized' %></span>
+              <span class="store-admin-card-meta-row"><svg class="icon"><use href="#icon-users"/></svg>In Person Sales: <%= p.inPersonSales %></span>
+              <span class="badge-pill badge-pill-<%= p.status === 'active' ? 'green' : 'orange' %> store-admin-card-status"><%= p.status === 'active' ? '✓ Active' : p.status.charAt(0).toUpperCase() + p.status.slice(1) %></span>
+            </div>
+          </a>
         <% }); %>
       </div>
 
@@ -165,7 +179,7 @@
         <p class="roster-empty">No orders yet.</p>
       <% } else { %>
         <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
+          <table class="roster-table members-table condensed-table roster-table-fit-content">
             <thead>
               <tr>
                 <th>Order</th>
@@ -174,7 +188,7 @@
                 <th>Total</th>
                 <th>Status</th>
                 <th>Date</th>
-                <th></th>
+                <th class="store-orders-actions-col"></th>
               </tr>
             </thead>
             <tbody>
@@ -186,17 +200,39 @@
                   <td>$<%= (o.total_cents / 100).toFixed(2) %></td>
                   <td><span class="badge-pill badge-pill-<%= o.status === 'fulfilled' || o.status === 'paid' ? 'green' : o.status === 'cancelled' ? 'gray' : 'orange' %>"><%= o.status %></span></td>
                   <td><%= o.created_at %></td>
-                  <td class="roster-btn-row">
-                    <% if (o.status === 'paid') { %>
-                      <form method="POST" action="/main-admin/store/orders/<%= o.id %>/fulfill" class="inline-block-form">
-                        <button type="submit" class="roster-action-btn">Fulfill</button>
-                      </form>
-                    <% } %>
-                    <% if (o.status !== 'cancelled' && o.status !== 'fulfilled') { %>
-                      <form method="POST" action="/main-admin/store/orders/<%= o.id %>/cancel" class="inline-block-form" data-confirm="Cancel order #<%= o.id %>?">
-                        <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>
-                      </form>
-                    <% } %>
+                  <td class="store-orders-actions-col">
+                    <%# A real bug report: "the buttons and list overlap and
+                        need space between rows" - two things were wrong.
+                        First, putting .roster-btn-row's class (mobile:
+                        display: grid, see public/js/roster-btn-row-grid.js)
+                        directly on a <td> broke the table's own column-
+                        width math - every other table/card in the app
+                        instead wraps .roster-btn-row in its own <div>
+                        inside the cell, never on the cell itself. Second,
+                        and the real cause of the squashed/overlapping
+                        Fulfill+Cancel text: that same mobile CSS zeroes out
+                        min-width on both the row and its buttons (so a
+                        short toolbar can still split evenly into equal-
+                        width columns) - but a <table> with the default
+                        auto layout sizes each COLUMN off its cells' own
+                        reported minimum width, so a min-width: 0 action
+                        column got allocated almost none of the table's
+                        width, no matter how much room the table actually
+                        had. .store-orders-actions-col below (public/css/
+                        styles.css) gives this one column back an explicit
+                        floor the table layout can see. %>
+                    <div class="roster-btn-row">
+                      <% if (o.status === 'paid') { %>
+                        <form method="POST" action="/main-admin/store/orders/<%= o.id %>/fulfill" class="inline-block-form">
+                          <button type="submit" class="roster-action-btn">Fulfill</button>
+                        </form>
+                      <% } %>
+                      <% if (o.status !== 'cancelled' && o.status !== 'fulfilled') { %>
+                        <form method="POST" action="/main-admin/store/orders/<%= o.id %>/cancel" class="inline-block-form" data-confirm="Cancel order #<%= o.id %>?">
+                          <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>
+                        </form>
+                      <% } %>
+                    </div>
                   </td>
                 </tr>
               <% }); %>
@@ -373,6 +409,37 @@
           </div>
         <% } %>
       </div>
+    <% } %>
+
+    <%# A real request: "Main admin portal. Shop. Add a subpage called
+        settings. This where general store settings will happen." Same
+        singleton-row shape and layout as the Events Settings tab
+        (views/admin-events-list.ejs) - routes/admin-store.js's own
+        updateStoreSettings. %>
+    <% if (activeTab === 'settings') { %>
+      <form method="POST" action="/main-admin/store/settings" class="stack-form member-form-page-panel">
+        <h2>General Settings</h2>
+        <div class="member-form-grid">
+          <div class="member-form-full checkbox-group checkbox-group-stack">
+            <label class="checkbox-option"><input type="checkbox" name="storeEnabled" value="1" <%= storeSettings.store_enabled ? 'checked' : '' %> /> Shop open for online purchases?</label>
+          </div>
+          <p class="hint member-form-full">Turning this off hides the member-facing Shop and product pages without archiving any products - recording an In-Person Sale from the Orders tab still works either way.</p>
+          <label class="member-form-full">Welcome Message <span class="hint">(shown at the top of the member Shop homepage)</span>
+            <textarea name="welcomeMessage" rows="3"><%= storeSettings.welcome_message || '' %></textarea>
+          </label>
+          <label class="member-form-full">Pickup Instructions <span class="hint">(shown on a member's own order page)</span>
+            <textarea name="pickupInstructions" rows="3"><%= storeSettings.pickup_instructions || '' %></textarea>
+          </label>
+          <label class="member-form-full">Order Notification Email
+            <input type="email" name="orderNotificationEmail" value="<%= storeSettings.order_notification_email || '' %>" placeholder="admin@example.com" />
+          </label>
+        </div>
+        <div class="member-form-footer">
+          <div class="member-form-footer-edit">
+            <button type="submit" class="primary-btn">Save Settings</button>
+          </div>
+        </div>
+      </form>
     <% } %>
   </main>
 </body>

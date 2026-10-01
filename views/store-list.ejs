@@ -27,37 +27,46 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Store</h1>
 
-    <% if (products.length === 0) { %>
-      <p class="roster-empty">Nothing for sale online right now.</p>
+    <%# A real request: "add a subpage called settings. This where general
+        store settings will happen" - "Shop open for online purchases?"
+        closes the whole member storefront without archiving every
+        product one at a time (routes/store.js). %>
+    <% if (storeClosed) { %>
+      <p class="roster-empty">The shop is currently closed. Check back soon!</p>
     <% } else { %>
-      <%# A real request: "change shop product card to look similar [to a
-          reference design]" - photo on the left, an In Stock/Out of
-          Stock badge, price and stock count on one row, and a prominent
-          order button, replacing the old top-image/plain-text
-          .event-card layout this page borrowed before. %>
+      <% if (welcomeMessage) { %>
+        <p class="store-welcome-message"><%= welcomeMessage %></p>
+      <% } %>
+      <% if (products.length === 0) { %>
+        <p class="roster-empty">Nothing for sale online right now.</p>
+      <% } else { %>
+      <%# A real request: "storefront view of product should look exactly
+          like this" (reference image) - a vertical card: a tall photo on
+          top (with a soft tinted background behind it even when there's
+          no real photo yet), name, a price/in-stock row (a dot + text,
+          not a pill badge), and a full-width rounded View button. %>
       <div class="store-product-grid">
         <% products.forEach(function(p) { %>
           <a class="store-product-card" href="/store/<%= p.id %>">
-            <% if (p.imageUrl) { %>
-              <img class="store-product-card-image" src="<%= p.imageUrl %>" alt="" />
-            <% } %>
+            <div class="store-product-card-image-wrap">
+              <% if (p.imageUrl) { %>
+                <img class="store-product-card-image" src="<%= p.imageUrl %>" alt="" />
+              <% } %>
+            </div>
             <div class="store-product-card-body">
-              <div class="store-product-card-header">
-                <h3><%= p.name %></h3>
-                <span class="badge-pill <%= p.inStock ? 'badge-pill-green' : 'badge-pill-gray' %>"><%= p.inStock ? 'In Stock' : 'Out of Stock' %></span>
-              </div>
+              <h3 class="store-product-card-name"><%= p.name %></h3>
               <div class="store-product-card-price-row">
                 <span class="store-product-card-price">$<%= (p.price_cents / 100).toFixed(2) %></span>
-                <% if (p.stockCount != null) { %>
-                  <span class="store-product-card-divider"></span>
-                  <span class="store-product-card-stock"><%= p.stockCount %> in stock</span>
-                <% } %>
+                <span class="store-product-card-stock <%= p.inStock ? 'store-in-stock' : 'store-out-of-stock' %>">
+                  <span class="store-stock-dot"></span><%= p.inStock ? 'In Stock' : 'Out of Stock' %>
+                </span>
               </div>
-              <span class="store-product-card-cta">View &amp; Order <svg class="icon"><use href="#icon-arrow-right"/></svg></span>
+              <span class="store-product-card-cta">View</span>
             </div>
           </a>
         <% }); %>
       </div>
+      <% } %>
     <% } %>
   </main>
 </body>

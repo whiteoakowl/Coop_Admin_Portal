@@ -46,6 +46,9 @@
       </table>
     </div>
     <p><strong>Total: $<%= (order.total_cents / 100).toFixed(2) %></strong></p>
+    <% if (pickupInstructions) { %>
+      <div class="alert alert-info"><strong>Pickup Instructions:</strong> <%= pickupInstructions %></div>
+    <% } %>
     <p><a href="/accounting">View balance in Accounting</a></p>
   </main>
 </body>

@@ -58,6 +58,25 @@ async function getProduct(id) {
   return db.prepare('SELECT p.*, c.name AS "categoryName" FROM store_products p LEFT JOIN store_categories c ON c.id = p.category_id WHERE p.id = ?').get(id);
 }
 
+// Shared by the member storefront (routes/store.js) and the Main Admin
+// product cards (routes/admin-store.js), so "In Stock"/"Out of Stock"
+// never disagrees between the two - see this file's own
+// availableOptionGroupsForProduct for the same "enabled AND still in
+// stock" rule a real order is actually held to. A product WITH options
+// is in stock as long as at least one of its enabled options still has
+// room (or is unlimited - quantity null); a stock COUNT is only shown
+// for the simple no-options case, where inventory_count is a single real
+// number rather than one per option.
+async function withStockInfo(product) {
+  const groups = await optionGroupsForProduct(product.id);
+  const hasOptions = groups.length > 0;
+  const inStock = hasOptions
+    ? groups.every((g) => g.values.some((v) => v.enabled && (v.quantity == null || v.quantity > 0)))
+    : product.inventory_count == null || product.inventory_count > 0;
+  const stockCount = !hasOptions && product.inventory_count != null ? product.inventory_count : null;
+  return { ...product, inStock, stockCount };
+}
+
 async function createProduct(data, accountId) {
   const info = await db
     .prepare('INSERT INTO store_products (name, description, price_cents, inventory_count, availability, category_id, sizes, created_by_account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
@@ -281,6 +300,27 @@ async function allOrders() {
 // only ever moves a 'paid' order to 'fulfilled'), grouped by product +
 // option since that's the shape a bulk prep run actually needs counted
 // in ("product title, option, qty").
+// "Main admin portal product card... 👥 In Person Sales: 42" - a bulk
+// query (one for the whole Products tab, not one per card) of how many
+// units of each product have sold in-person, across every non-cancelled
+// in-person order. Returns a Map<productId, qty> - a product with no
+// in-person sales simply has no entry, so callers treat a missing key as
+// 0 rather than this returning rows for every product.
+async function inPersonSalesCountsByProduct() {
+  const rows = await db
+    .prepare(
+      `SELECT i.product_id AS "productId", SUM(i.quantity) AS qty
+       FROM store_order_items i
+       JOIN store_orders o ON o.id = i.order_id
+       WHERE o.sale_type = 'in_person' AND o.status != 'cancelled' AND i.product_id IS NOT NULL
+       GROUP BY i.product_id`
+    )
+    .all();
+  const map = new Map();
+  rows.forEach((r) => map.set(r.productId, Number(r.qty)));
+  return map;
+}
+
 async function fulfillmentTotals() {
   const rows = await db
     .prepare(
@@ -354,6 +394,31 @@ async function salesAnalytics(range) {
   };
 }
 
+// --- Settings - one singleton row, same shape/reasoning as
+// event_settings (utils/events.js's own getEventSettings/
+// updateEventSettings) - a Main Admin can edit these without touching
+// code. ---
+
+async function getStoreSettings() {
+  return db.prepare('SELECT * FROM store_settings WHERE id = 1').get();
+}
+
+async function updateStoreSettings(data) {
+  await db
+    .prepare(
+      `UPDATE store_settings SET
+        store_enabled = ?, welcome_message = ?, pickup_instructions = ?, order_notification_email = ?,
+        updated_at = now_text()
+      WHERE id = 1`
+    )
+    .run(
+      data.storeEnabled ? 1 : 0,
+      (data.welcomeMessage || '').trim() || null,
+      (data.pickupInstructions || '').trim() || null,
+      (data.orderNotificationEmail || '').trim() || null
+    );
+}
+
 module.exports = {
   parseSizes,
   listCategories,
@@ -370,15 +435,19 @@ module.exports = {
   deleteProduct,
   optionGroupsForProduct,
   availableOptionGroupsForProduct,
+  withStockInfo,
   setProductOptionGroups,
   placeOnlineOrder,
   recordInPersonSale,
   fulfillOrder,
   fulfillmentTotals,
+  inPersonSalesCountsByProduct,
   salesAnalytics,
   ANALYTICS_RANGE_DAYS,
   cancelOrder,
   getOrder,
   ordersForMember,
+  getStoreSettings,
+  updateStoreSettings,
   allOrders,
 };

@@ -136,7 +136,14 @@
     <div class="manage-section">
       <div class="grid-box-header"><h2>Image</h2></div>
       <% if (imageUrl) { %>
-        <img src="<%= imageUrl %>" alt="" style="max-width: 320px; border-radius: var(--radius); display: block; margin-bottom: 0.75rem;" />
+        <%# A real bug report: "edit product, photo should be within the
+            mobile window. It drifts off the page." max-width alone is a
+            hard pixel ceiling, not a percentage of whatever's actually
+            available - on a phone narrower than 320px (or with side
+            padding eating into it), the image stayed 320px wide and
+            overflowed the viewport. min(320px, 100%) caps it at 320px on
+            a wide screen but never exceeds the container on a narrow one. %>
+        <img src="<%= imageUrl %>" alt="" style="max-width: min(320px, 100%); border-radius: var(--radius); display: block; margin-bottom: 0.75rem;" />
       <% } %>
       <form method="POST" action="/main-admin/store/<%= product.id %>/image" enctype="multipart/form-data" class="roster-btn-row">
         <input type="file" name="image" accept="image/*" required />

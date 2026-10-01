@@ -200,7 +200,7 @@ test('an account cannot buy for a member outside its own family, and cannot view
   assert.equal(view.status, 403);
 });
 
-test('a real request: "change shop product card to look similar" - image left, In Stock/Out of Stock badge, price + stock count row, and an order CTA', async () => {
+test('a real request: "storefront view of product should look exactly like this" - photo on top, name, a price + dot-style in-stock row, and a View button', async () => {
   const admin = await loginAsMainAdmin();
   const inStockId = await createActiveProduct(admin, { name: 'Card In Stock Widget', inventoryCount: '3' });
   const outOfStockId = await createActiveProduct(admin, { name: 'Card Out Of Stock Widget', inventoryCount: '0' });
@@ -212,13 +212,11 @@ test('a real request: "change shop product card to look similar" - image left, I
 
   const inStockStart = page.text.indexOf('Card In Stock Widget');
   const inStockCard = page.text.slice(page.text.lastIndexOf('<a class="store-product-card"', inStockStart), page.text.indexOf('</a>', inStockStart));
-  assert.match(inStockCard, /badge-pill-green">In Stock</);
+  assert.match(inStockCard, /class="store-product-card-stock store-in-stock">\s*<span class="store-stock-dot"><\/span>In Stock/);
   assert.match(inStockCard, /\$15\.00/);
-  assert.match(inStockCard, /3 in stock/);
-  assert.match(inStockCard, /View &amp; Order/);
+  assert.match(inStockCard, />View</);
 
   const outOfStockStart = page.text.indexOf('Card Out Of Stock Widget');
   const outOfStockCard = page.text.slice(page.text.lastIndexOf('<a class="store-product-card"', outOfStockStart), page.text.indexOf('</a>', outOfStockStart));
-  assert.match(outOfStockCard, /badge-pill-gray">Out of Stock</);
-  assert.match(outOfStockCard, /0 in stock/);
+  assert.match(outOfStockCard, /class="store-product-card-stock store-out-of-stock">\s*<span class="store-stock-dot"><\/span>Out of Stock/);
 });

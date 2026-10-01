@@ -44,11 +44,21 @@ function withImage(p) {
   return { ...p, imageUrl: imageUrl(p.image_key), sizeList: store.parseSizes(p.sizes) };
 }
 
+// "Main admin portal product card should look exactly like this" (photo,
+// name, price + In Stock/Out of Stock dot, Category row, In Person Sales
+// row, Active pill) - stock comes from the same utils/store.js helper the
+// member storefront card uses, so the two never disagree; in-person
+// sales counts are looked up once for the whole tab (salesByProduct),
+// not per card.
+async function withAdminCard(p, salesByProduct) {
+  return { ...(await store.withStockInfo(withImage(p))), inPersonSales: salesByProduct.get(p.id) || 0 };
+}
+
 async function withOptions(p) {
   return { ...withImage(p), optionGroups: await store.availableOptionGroupsForProduct(p.id) };
 }
 
-const STORE_TABS = ['products', 'orders', 'archived', 'analytics'];
+const STORE_TABS = ['products', 'orders', 'archived', 'analytics', 'settings'];
 const ANALYTICS_RANGES = [
   { key: 'today', label: 'Today' },
   { key: 'week', label: 'This Week' },
@@ -72,9 +82,13 @@ router.get('/', async (req, res) => {
   let fulfillmentTotals = [];
   let analytics = null;
   let analyticsRange = 'month';
+  const storeSettings = await store.getStoreSettings();
 
   if (activeTab === 'products') {
-    products = (await store.listProducts({ categoryId: selectedCategory })).filter((p) => p.status !== 'archived').map(withImage);
+    const salesByProduct = await store.inPersonSalesCountsByProduct();
+    products = await Promise.all(
+      (await store.listProducts({ categoryId: selectedCategory })).filter((p) => p.status !== 'archived').map((p) => withAdminCard(p, salesByProduct))
+    );
   } else if (activeTab === 'archived') {
     archived = (await store.listProducts({ status: 'archived' })).map(withImage);
   } else if (activeTab === 'orders') {
@@ -104,9 +118,22 @@ router.get('/', async (req, res) => {
     analytics,
     analyticsRange,
     analyticsRanges: ANALYTICS_RANGES,
+    storeSettings,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+// --- Settings ---
+
+router.post('/settings', async (req, res) => {
+  await store.updateStoreSettings({
+    storeEnabled: req.body.storeEnabled === '1',
+    welcomeMessage: req.body.welcomeMessage,
+    pickupInstructions: req.body.pickupInstructions,
+    orderNotificationEmail: req.body.orderNotificationEmail,
+  });
+  res.redirect('/main-admin/store?tab=settings&notice=' + encodeURIComponent('Settings saved.'));
 });
 
 router.post('/', async (req, res) => {
@@ -309,7 +336,20 @@ router.post('/:id', async (req, res) => {
             name: ((v || {}).name || '').trim(),
             priceCents,
             quantity: (v || {}).qty ? parseInt((v || {}).qty, 10) : null,
-            enabled: (v || {}).enabled === '1',
+            // A real bug report: "member view of product is not showing
+            // the multiple options and values." views/admin-store-edit.ejs
+            // pairs a hidden <input name="...[enabled]" value="0"> with a
+            // same-named checkbox (value="1") so an unchecked box still
+            // submits something - but when the box IS checked, both
+            // inputs submit, and express's qs-based body parser merges
+            // two same-named fields into an ARRAY ({enabled: ['0','1']}),
+            // not the plain string '1' this used to compare against. That
+            // made `enabled` false (filtered out of the storefront - see
+            // utils/store.js's own availableOptionGroupsForProduct)
+            // EVERY time, whether the box was checked or not. Normalizing
+            // through [].concat(...) handles both the single-string
+            // (unchecked) and array (checked) shapes the same way.
+            enabled: [].concat((v || {}).enabled || []).includes('1'),
           };
         })
         .filter((v) => v.name),
