@@ -1,16 +1,22 @@
 // Real HTTP-level coverage for a real request: "when deleting floaters
 // and cleanup/signup members from lists it should allow for multiple
-// deletes and then click save before refreshing." Both Floater Teams
-// (routes/admin-volunteers.js's hour-label route) and Setup/Cleanup Teams
-// (routes/admin-setup.js's team edit route) now accept a batch of
-// removeMemberIds riding along with their existing Save submission,
-// instead of each member's own trash icon submitting an immediate,
-// separate POST/reload - this proves the batch actually removes every
-// listed member in one request, and (for Floater Teams specifically) that
-// the removal survives the same later re-sync that a real bug report once
-// silently undid a single removal across (see test/routes-admin-
-// volunteers-floater-remove-sticks.test.js, the fix this batch path
-// reuses).
+// deletes and then click save before refreshing." Floater Teams
+// (routes/admin-volunteers.js's hour-label route) still accepts a batch of
+// removeMemberIds riding along with its existing Save submission, instead
+// of each member's own trash icon submitting an immediate, separate POST/
+// reload - this proves the batch actually removes every listed member in
+// one request, and that the removal survives the same later re-sync that
+// a real bug report once silently undid a single removal across (see
+// test/routes-admin-volunteers-floater-remove-sticks.test.js, the fix this
+// batch path reuses).
+//
+// Setup/Cleanup Teams used to share this exact same batched-removal
+// mechanism, but a later request reversed it there specifically: "if you
+// click the trash button the member name should automatically go away
+// without having to save the team or refreshing the page." Its own trash
+// icon now removes a member immediately via fetch instead (see
+// test/routes-setup-team-instant-member-removal.test.js) - only Floater
+// Teams' own card still uses the batched/staged approach this file covers.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -97,65 +103,8 @@ test('Floater Teams: removing 2 of 3 members in one Save request removes exactly
   });
 });
 
-test('Setup/Cleanup Teams card markup: the trash icon is a plain button wired to a hidden, form-linked checkbox', async () => {
-  const { cookie } = await loginAsAdmin();
-  const { lastInsertRowid: teamId } = await db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'Batch Remove Team')").run();
-  const { lastInsertRowid: memberId } = await db
-    .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Batch Remove Cleanup Member', 'Batch Remove Cleanup Member', 'parent')")
-    .run();
-  await db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(teamId, memberId);
-
-  const res = await request(app).get('/admin/setup/monday/manage').set('Cookie', cookie);
-  assert.match(res.text, new RegExp(`<input type="checkbox" name="removeMemberIds" value="${memberId}" form="team-edit-form-${teamId}" hidden data-member-remove-checkbox`));
-  assert.doesNotMatch(res.text, new RegExp(`action="/admin/setup/monday/teams/${teamId}/remove-member/${memberId}"`));
-  assert.match(res.text, /<script src="\/js\/team-member-remove-toggle\.js"><\/script>/);
-});
-
-test('Setup/Cleanup Teams: removing 2 of 3 members in one Save request (alongside a title change) removes exactly those 2', async () => {
-  const { cookie, csrfToken } = await loginAsAdmin();
-  const { lastInsertRowid: teamId } = await db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'Original Batch Team')").run();
-
-  const ids = [];
-  for (const name of ['Cleanup A', 'Cleanup B', 'Cleanup C']) {
-    const { lastInsertRowid } = await db
-      .prepare('INSERT INTO members (name, barcode, member_type) VALUES (?, ?, ?)')
-      .run(name, name, 'parent');
-    ids.push(lastInsertRowid);
-    await db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(teamId, lastInsertRowid);
-  }
-  const [keepId, removeId1, removeId2] = ids;
-
-  const res = await request(app)
-    .post(`/admin/setup/monday/teams/${teamId}/edit`)
-    .set('Cookie', cookie)
-    .type('form')
-    .send({ title: 'Renamed Batch Team', leaderId: '', removeMemberIds: [String(removeId1), String(removeId2)], _csrf: csrfToken });
-  assert.equal(res.status, 302);
-  assert.match(decodeURIComponent(res.headers.location), /Removed 2 member\(s\)/);
-
-  const teamRow = await db.prepare('SELECT title FROM setup_teams WHERE id = ?').get(teamId);
-  assert.equal(teamRow.title, 'Renamed Batch Team', 'the title edit in the same submission should still have saved');
-
-  const remaining = (await db.prepare('SELECT member_id FROM setup_team_members WHERE team_id = ?').all(teamId)).map((r) => r.member_id);
-  assert.deepEqual(remaining.sort(), [keepId].sort());
-});
-
-test('Saving with no removeMemberIds at all still works exactly as before (no accidental removals)', async () => {
-  const { cookie, csrfToken } = await loginAsAdmin();
-  const { lastInsertRowid: teamId } = await db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'No Removal Team')").run();
-  const { lastInsertRowid: memberId } = await db
-    .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Stays Put', 'Stays Put', 'parent')")
-    .run();
-  await db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(teamId, memberId);
-
-  const res = await request(app)
-    .post(`/admin/setup/monday/teams/${teamId}/edit`)
-    .set('Cookie', cookie)
-    .type('form')
-    .send({ title: 'No Removal Team', leaderId: '', _csrf: csrfToken });
-  assert.equal(res.status, 302);
-  assert.doesNotMatch(decodeURIComponent(res.headers.location), /Removed/);
-
-  const remaining = await db.prepare('SELECT 1 FROM setup_team_members WHERE team_id = ? AND member_id = ?').get(teamId, memberId);
-  assert.ok(remaining, 'the member should still be on the team');
-});
+// Setup/Cleanup Teams' own former batched-removal tests used to live here
+// too (hidden-checkbox markup + a removeMemberIds-bearing Save request) -
+// moved and rewritten for the new instant-removal behavior in
+// test/routes-setup-team-instant-member-removal.test.js, since that card's
+// trash icon no longer stages anything for a later Save at all.

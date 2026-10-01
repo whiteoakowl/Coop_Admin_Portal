@@ -117,14 +117,18 @@
                     below, but still real editable form controls (a
                     <select>, two <input>s) - not the read-only text print
                     uses, since this row is what an admin actually edits. %>
+                <%# A real request: "location and time should be on the
+                    same row next to each other. Team leader name above
+                    that row." Leader now gets its own full-width row
+                    (reads as the card's own byline, same person-icon-only
+                    convention print's own .team-print-meta chip already
+                    uses successfully with no separate "Leader:" label);
+                    Meeting time/location (plus the Setup/Cleanup badge-
+                    scan timing, which was never called out separately)
+                    share a second row below it - still the same flex-wrap
+                    .team-info-meta-row shape as before, just split into
+                    two stacked rows instead of one. %>
                 <div class="team-info-meta-row">
-                  <%# "Leader:" as a spelled-out label (still how the Create
-                      New Team dialog's own <label> reads, and how the
-                      previous full-width stacked row read) doesn't fit
-                      three items onto one balanced row on a phone-width
-                      card - dropped here in favor of the same person-icon-
-                      only convention print's own .team-print-meta chip
-                      already uses successfully with no separate label. %>
                   <div class="team-info-leader">
                     <svg class="icon"><use href="#icon-user"/></svg>
                     <select name="leaderId" class="team-info-leader-select" disabled>
@@ -140,6 +144,8 @@
                       <% }); %>
                     </select>
                   </div>
+                </div>
+                <div class="team-info-meta-row">
                   <%# A real request: "setup/cleanup team cards should have a
                       space for time to meet and meeting location." Free text
                       (same shape/treatment as description above, not a
@@ -190,22 +196,32 @@
                 <% if (t.members.length === 0) { %>
                   <p class="team-card-empty">No members yet.</p>
                 <% } %>
+                <%# A real request: "setup/cleanup teams lists should not
+                    show red highlight for absences. All color highlights
+                    of member only happens on setup/cleanup assignment
+                    page" - this card used to flag an absent member red
+                    the same way the Assignments page's own roster does
+                    (views/partials/setup-assignment-cards.ejs, which
+                    keeps its own absent/checked-in/checked-out
+                    highlighting unchanged); the Teams list itself is just
+                    team membership, not a daily status board, so it's
+                    plain text here now regardless of absentIds. %>
                 <% t.members.forEach(function(m) { %>
-                  <div class="team-member-row<%= absentIds.has(m.id) ? ' team-member-row-absent' : '' %>" data-member-remove-row>
+                  <div class="team-member-row" data-member-remove-row>
                     <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
-                    <span class="team-member-name-col"><span class="team-member-name" title="<%= m.name %><%= absentIds.has(m.id) ? ' (absent today)' : '' %>"><a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span><% if (m.phone) { %><span class="team-member-phone"><%= m.phone %></span><% } %></span>
-                    <%# A real request: "when deleting ... cleanup/signup
-                        members from lists it should allow for multiple
-                        deletes and then click save before refreshing."
-                        This trash icon no longer submits its own form
-                        immediately - it flips a same-named hidden
-                        checkbox tied (via form="...") to the card's own
-                        team-edit-form, so any number of pending removals
-                        ride along with that form's single Save submission
-                        instead of each causing its own round trip/page
-                        reload (public/js/team-member-remove-toggle.js). %>
-                    <input type="checkbox" name="removeMemberIds" value="<%= m.id %>" form="team-edit-form-<%= t.id %>" hidden data-member-remove-checkbox />
-                    <button type="button" class="icon-btn" data-edit-toggle-reveal hidden data-member-remove-btn aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    <span class="team-member-name-col"><span class="team-member-name"><a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span><% if (m.phone) { %><span class="team-member-phone"><%= m.phone %></span><% } %></span>
+                    <%# A real request: "if you click the trash button the
+                        member name should automatically go away without
+                        having to save the team or refreshing the page" -
+                        replaces the old stage-until-Save checkbox (still
+                        how Floater Teams' own trash icon works, unchanged -
+                        see team-member-remove-toggle.js). This button
+                        instead posts straight to its own data-member-
+                        remove-url via fetch (public/js/team-member-instant-
+                        remove.js) and removes the row the moment the
+                        server confirms it, with a confirm prompt first
+                        since there's no more Cancel-before-Save undo. %>
+                    <button type="button" class="icon-btn" data-edit-toggle-reveal hidden data-member-instant-remove-btn data-member-remove-url="/admin/setup/<%= day %>/teams/<%= t.id %>/remove-member/<%= m.id %>" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
                   </div>
                 <% }); %>
               </div>
@@ -287,7 +303,7 @@
     </dialog>
   </main>
   <script src="/js/edit-toggle.js"></script>
-  <script src="/js/team-member-remove-toggle.js"></script>
+  <script src="/js/team-member-instant-remove.js"></script>
   <script src="/js/print-shrink-to-fit.js"></script>
 </body>
 </html>

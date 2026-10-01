@@ -5517,6 +5517,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .setup-assignment-table th:nth-child(2), .setup-assignment-table td:nth-child(2),
 .setup-assignment-table th:nth-child(3), .setup-assignment-table td:nth-child(3) { width: 32%; }
 .setup-assignment-table th { white-space: normal; }
+/* A real request: "shrink font of rows to fit everything in clean rows" -
+   this table packs a member's name (plus infant/absent/checked-out
+   badges) and two full Assign/Unassign slots into three columns, more
+   per row than the base .floater-card-table's 0.82rem was sized for. */
+.setup-assignment-table { font-size: 0.76rem; }
+.setup-assignment-table .floater-assign-form select,
+.setup-assignment-table .setup-task-static { font-size: 0.72rem; }
+.setup-assignment-table .floater-assign-btn { font-size: 0.68rem; padding: 0.25rem 0.45rem; }
 
 .floater-card-footer {
   display: flex;
@@ -5832,6 +5840,26 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     text-overflow: ellipsis;
   }
   .floater-chart-table .floater-assign-btn { align-self: center; flex-shrink: 0; }
+
+  /* Setup/Cleanup Assignments' own version of the row-not-column fix
+     above (a real request: "the assign button should be next to each
+     assignment dropdown") - this table never switched to flex rows the
+     way Floater's own chart did (it stays a plain 3-column table at
+     every width, see .setup-assignment-table), so its Task 1/Task 2
+     cells are even narrower than the Floater Chart's dedicated column
+     and need the same select-shrink/ellipsis treatment just to fit a
+     dropdown and a button on one line at all. */
+  .setup-assignment-table .floater-assign-form { flex-direction: row; align-items: center; }
+  .setup-assignment-table .floater-assign-form select,
+  .setup-assignment-table .setup-task-static {
+    flex: 1 1 0%;
+    min-width: 0;
+    width: auto;
+    max-width: 100%;
+    font-size: 0.65rem;
+    text-overflow: ellipsis;
+  }
+  .setup-assignment-table .floater-assign-btn { align-self: center; flex-shrink: 0; font-size: 0.62rem; padding: 0.2rem 0.4rem; }
 }
 
 /* ---------- Team cards: Floater Teams + Setup/Cleanup share this look ---------- */
@@ -8622,6 +8650,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   padding: 0.15rem 0.4rem;
 }
 
+/* A real request: "make sure on mobile you can still see most of the
+   task text box" - the drag-handle and # columns are fixed-width no
+   matter how narrow the screen gets, so on a small phone they (plus the
+   trash column) could eat enough of a table laid out at 100% width to
+   squeeze the task text itself down to almost nothing. Pinning both to a
+   deliberately small width below the normal column breakpoint keeps the
+   task input the one column that actually grows to fill the rest. */
+@media (max-width: 640px) {
+  .task-list-table .task-list-drag-handle { padding: 0.1rem; }
+  .task-list-table .task-list-drag-handle .icon { width: 0.95rem; height: 0.95rem; }
+  .task-list-num-col { width: 1.75rem; padding-left: 0.35rem !important; padding-right: 0.35rem !important; }
+  .task-list-desc-input { font-size: 0.85rem; }
+}
+
 .task-list-accent-0 .task-list-card-header { background: var(--brand-soft); color: var(--brand-dark); }
 .task-list-accent-1 .task-list-card-header { background: var(--green-bg); color: var(--green); }
 .task-list-accent-2 .task-list-card-header { background: var(--purple-soft); color: var(--purple); }
@@ -8629,12 +8671,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .task-list-accent-4 .task-list-card-header { background: #d7f3f1; color: #1f7a72; }
 
 /* Drag-and-drop reordering (a real request: "be able to rearrange the
-   setup/cleanup task list on desktop and mobile. drag and move.") -
+   setup/cleanup task list on desktop and mobile. drag and move" - later
+   replacing the old up/down move buttons outright: "no arrow to move up
+   and down, should be able to just click the 4 lines... and drag") -
    see public/js/task-list-drag-reorder.js, Edit-mode only (same
-   data-task-list-edit-only gate as the up/down buttons it sits next to
-   - dragging doesn't replace them, just adds a faster way to do the
-   same thing). touch-action: none so a touch-drag on mobile moves the
-   card/row instead of scrolling the page underneath it. */
+   data-task-list-edit-only gate the per-card Edit button toggles).
+   touch-action: none so a touch-drag on mobile moves the card/row
+   instead of scrolling the page underneath it. */
 .task-list-drag-handle {
   display: inline-flex;
   align-items: center;

@@ -278,23 +278,29 @@ test('Setup/Cleanup Task List import - Number, Day, List, Task columns', async (
 });
 
 test('the rendered Task List page never nests a <form> inside another <form>', async () => {
-  // Real production bug: the section/item move+delete forms used to be
-  // literal DOM descendants of the big Save form (task-list-save-form).
-  // Nested forms are invalid HTML, and real browsers don't just flatten
-  // the inner one the way you might expect - clicking a submit button
-  // whose nearest form ancestor is the NESTED form dispatches the
-  // 'submit' event with e.target set to the OUTER form instead, so
-  // document-level delegated listeners (public/js/csrf.js,
-  // public/js/confirm-dialog.js) silently act on the wrong form. csrf.js
-  // ended up adding the hidden _csrf field to the outer form - which
-  // isn't what actually gets submitted - so the real request that hit the
-  // server had no token at all and 403'd every time (see
-  // middleware/csrfProtection.js), with no confirm dialog either. This
-  // can't be caught by a plain supertest POST with _csrf already in the
-  // body (see every other test in this file) - it only shows up by
-  // inspecting the rendered HTML's own form nesting, which is what this
-  // asserts directly: at no point while scanning the document does a
-  // second <form> open before the first one closes.
+  // Real production bug (now structurally impossible, not just avoided):
+  // the section/item move+delete forms used to be literal DOM descendants
+  // of one big page-wide Save form (task-list-save-form). Nested forms
+  // are invalid HTML, and real browsers don't just flatten the inner one
+  // the way you might expect - clicking a submit button whose nearest
+  // form ancestor is the NESTED form dispatches the 'submit' event with
+  // e.target set to the OUTER form instead, so document-level delegated
+  // listeners (public/js/csrf.js, public/js/confirm-dialog.js) silently
+  // act on the wrong form. csrf.js ended up adding the hidden _csrf field
+  // to the outer form - which isn't what actually gets submitted - so the
+  // real request that hit the server had no token at all and 403'd every
+  // time (see middleware/csrfProtection.js), with no confirm dialog
+  // either. A later redesign (per-card Edit/Save instead of one page-wide
+  // pair - "click edit button on each list... check mark... to save")
+  // replaced the single shared form entirely: each card's own title/
+  // team/item inputs now carry no form="" attribute at all, and
+  // public/js/task-list-edit.js posts their current values via fetch
+  // (routes/admin-setup.js's /tasks/save, unchanged - it already only
+  // ever touches whichever sectionTitle_/itemDesc_ keys it's handed).
+  // There's no outer form left for anything to nest inside of, but this
+  // still asserts the general invariant directly: at no point while
+  // scanning the document does a second <form> open before the first one
+  // closes.
   const { cookie } = await loginAsAdmin();
   const section = await db.prepare("INSERT INTO task_list_sections (day, title, position) VALUES ('monday', 'Nesting Check List', 300)").run();
   await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 0)').run(section.lastInsertRowid, 'Nesting check task');
@@ -315,12 +321,31 @@ test('the rendered Task List page never nests a <form> inside another <form>', a
   assert.equal(maxDepth, 1, 'no <form> should ever be nested inside another <form> on this page');
   assert.equal(depth, 0, 'every <form> tag should have a matching close - none left dangling');
 
-  // The section title / item description inputs (and the linked-team
-  // select) live outside task-list-save-form now, tied to it only via
-  // their own form="task-list-save-form" attribute.
-  assert.match(res.text, /name="sectionTitle_\d+"[^>]*form="task-list-save-form"/);
-  assert.match(res.text, /name="itemDesc_\d+"[^>]*form="task-list-save-form"/);
-  assert.match(res.text, /<form id="task-list-save-form" method="POST" action="\/admin\/setup\/monday\/tasks\/save"[^>]*><\/form>/, 'the Save form itself should be empty - it has no DOM children of its own');
+  // The section title / item description inputs carry no form="" wiring
+  // at all now - task-list-edit.js reads their live DOM values directly
+  // and posts them via fetch, so there's no shared page-wide form for
+  // this page to accidentally nest anything inside of any more.
+  assert.doesNotMatch(res.text, /name="sectionTitle_\d+"[^>]*form=/);
+  assert.doesNotMatch(res.text, /name="itemDesc_\d+"[^>]*form=/);
+  assert.doesNotMatch(res.text, /id="task-list-save-form"/);
+});
+
+test('each list card gets its own Edit/Save pair - no single page-wide Edit button', async () => {
+  const { cookie } = await loginAsAdmin();
+  await db.prepare("INSERT INTO task_list_sections (day, title, position) VALUES ('monday', 'Per-Card Edit List A', 310)").run();
+  await db.prepare("INSERT INTO task_list_sections (day, title, position) VALUES ('monday', 'Per-Card Edit List B', 311)").run();
+
+  const res = await request(app).get('/admin/setup/monday/tasks').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+
+  // data-task-list-section also appears a second time per card on its
+  // own item <tbody> - scope this count to the outer card <div> only.
+  const cardCount = (res.text.match(/class="task-list-card[^"]*" data-task-list-section="\d+"/g) || []).length;
+  const editBtnCount = (res.text.match(/data-task-list-edit-btn/g) || []).length;
+  const saveBtnCount = (res.text.match(/data-task-list-save-btn/g) || []).length;
+  assert.ok(cardCount >= 2, 'sanity check: at least the two lists just created should be present');
+  assert.equal(editBtnCount, cardCount, 'every card should get its own Edit button, not one shared page-wide button');
+  assert.equal(saveBtnCount, cardCount, 'every card should get its own (initially hidden) Save/checkmark button');
 });
 
 test('a Delete Task trash button is always visible per task row, not hidden behind Edit mode', async () => {

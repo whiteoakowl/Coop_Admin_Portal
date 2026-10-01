@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { isValidDay, DAY_LABELS, defaultDateFor } = require('../utils/days');
+const { isValidDay, DAY_LABELS } = require('../utils/days');
 const { closestUpcomingDate, formatDateLabel } = require('../utils/dates');
-const { absentMemberIdsForDate } = require('../utils/classSchedule');
 const { teamsForDay, membersForTeam, datesForDay } = require('../utils/setup');
 
 // A real request: the kiosk homepage's Setup/Cleanup button used to jump
@@ -38,11 +37,6 @@ router.get('/setup/:day', async (req, res) => {
     dayLabel: DAY_LABELS[day],
     dateLabel: date ? formatDateLabel(date) : null,
     teams,
-    // Same "only means anything on today's own day" reasoning as the
-    // admin manage page (routes/admin-setup.js) - kiosk-home always links
-    // here with today's own day already (/setup/<%= defaultDay %>), so in
-    // practice this is just "who's absent today".
-    absentIds: await absentMemberIdsForDate(defaultDateFor(day)),
   });
 });
 

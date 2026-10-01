@@ -73,7 +73,7 @@ test('Setup/Cleanup team card: inline edit-in-place markup, no popup dialog', as
 
   await t.test('the delete-team trash icon and the member remove trash icon both start hidden', () => {
     assert.match(res.text, /teams\/\d+\/delete[^]*?data-edit-toggle-reveal hidden/);
-    assert.match(res.text, /data-edit-toggle-reveal hidden data-member-remove-btn/);
+    assert.match(res.text, /data-edit-toggle-reveal hidden data-member-instant-remove-btn/);
   });
 
   await t.test('the Save button is wired to the team-edit-form via the form= attribute, not physically nested inside it', () => {
@@ -153,16 +153,15 @@ test('Setup/Cleanup team card: create/edit save meeting time and location, and t
 
 // A real bug report: "on the setup/cleanup team cards its showing the
 // information circled twice. reduce and clean this up with a
-// professional looking layout, clean, balanced." Root cause was a stale
-// cached stylesheet on the reporting device (public/sw.js's own comment
-// covers that - not something an HTTP-level test can exercise), but the
-// screen layout itself also got tightened up while fixing this: Leader/
-// Meeting time/Meeting location now share one flex-wrap
-// .team-info-meta-row instead of three separate full-width stacked
-// rows, and the leader field dropped its spelled-out "Leader:" label in
-// favor of the same icon-only convention print's own .team-print-meta
-// chip already used.
-test('Setup/Cleanup team card: Leader/Meeting time/Meeting location share one balanced row, not three stacked ones', async (t) => {
+// professional looking layout, clean, balanced." Leader/Meeting time/
+// Meeting location shared one flex-wrap .team-info-meta-row at first, but
+// a later request split it again: "location and time should be on the
+// same row next to each other. Team leader name above that row." - the
+// leader field now gets its own .team-info-meta-row (reading as the
+// card's own byline, no spelled-out "Leader:" label, matching print's own
+// .team-print-meta chip convention), with meeting time/location sharing a
+// second .team-info-meta-row right below it.
+test('Setup/Cleanup team card: leader on its own row, meeting time/location sharing a second row below it', async (t) => {
   const { cookie } = await loginAsAdmin();
 
   const leader = await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Row Leader', 'row-leader-1', 'parent')").run();
@@ -174,12 +173,38 @@ test('Setup/Cleanup team card: Leader/Meeting time/Meeting location share one ba
   const res = await request(app).get('/admin/setup/monday/manage').set('Cookie', cookie);
   assert.equal(res.status, 200);
 
-  await t.test('a team with a leader, time, and location has all three inside one .team-info-meta-row wrapper', () => {
-    const rowMatch = new RegExp(`team-edit-form-${withMeta.lastInsertRowid}"[\\s\\S]*?<div class="team-info-meta-row">([\\s\\S]*?)</div>\\s*</form>`).exec(res.text);
-    assert.ok(rowMatch, 'expected a .team-info-meta-row wrapping the leader/meeting fields');
-    assert.match(rowMatch[1], /team-info-leader/);
-    assert.match(rowMatch[1], /name="meetingTime"/);
-    assert.match(rowMatch[1], /name="meetingLocation"/);
+  // Anchored on the actual <form ...> opening tag specifically (not just
+  // the literal substring "team-edit-form-<id>"", which also appears
+  // earlier in the card as the corner Save button's own form="..."
+  // attribute, well before this form's real content).
+  const cardMatch = new RegExp(`<form method="POST" action="[^"]*teams/${withMeta.lastInsertRowid}/edit" id="team-edit-form-${withMeta.lastInsertRowid}"[\\s\\S]*?</form>`).exec(res.text);
+  assert.ok(cardMatch, 'expected to find this team\'s own edit form');
+  const cardHtml = cardMatch[0];
+  // There are exactly two .team-info-meta-row wrappers now (leader's own
+  // row, then meeting time/location's row) - rather than parse out each
+  // row's own boundary (fragile with team-info-leader's own nested
+  // closing </div>s inside the first row), it's simpler and just as
+  // conclusive to check relative ORDER: the leader select must come
+  // before meetingTime, with no meetingTime/meetingLocation appearing
+  // ahead of it, and meetingTime/meetingLocation must sit back-to-back
+  // with nothing (specifically, no second team-info-meta-row open tag)
+  // between them.
+  const metaRowOpens = [...cardHtml.matchAll(/<div class="team-info-meta-row">/g)];
+  assert.equal(metaRowOpens.length, 2, 'expected exactly two .team-info-meta-row wrappers');
+
+  const leaderIdx = cardHtml.indexOf('name="leaderId"');
+  const meetingTimeIdx = cardHtml.indexOf('name="meetingTime"');
+  const meetingLocationIdx = cardHtml.indexOf('name="meetingLocation"');
+  assert.ok(leaderIdx > -1 && meetingTimeIdx > -1 && meetingLocationIdx > -1, 'expected all three fields present');
+
+  await t.test('the leader field comes before meeting time/location, on its own row', () => {
+    assert.ok(leaderIdx < meetingTimeIdx, 'leader should render above meeting time');
+    assert.ok(leaderIdx < meetingLocationIdx, 'leader should render above meeting location');
+  });
+
+  await t.test('meeting time and meeting location share a second row, with no row break between them', () => {
+    const betweenMeetingFields = cardHtml.slice(meetingTimeIdx, meetingLocationIdx);
+    assert.doesNotMatch(betweenMeetingFields, /team-info-meta-row/, 'no new row should start between meeting time and meeting location');
   });
 
   await t.test('the leader field no longer spells out "Leader:" - icon + select only, matching the print chip\'s own convention', () => {

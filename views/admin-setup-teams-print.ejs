@@ -78,11 +78,16 @@
                   <% if (t.members.length === 0) { %>
                     <p class="team-card-empty">No members yet.</p>
                   <% } %>
+                  <%# A real request: "setup/cleanup teams lists should not
+                      show red highlight for absences. All color highlights
+                      of member only happens on setup/cleanup assignment
+                      page" - plain text here too now, matching the manage
+                      page and the public kiosk view. %>
                   <% t.members.forEach(function(m) { %>
-                    <div class="team-member-row<%= absentIds.has(m.id) ? ' team-member-row-absent' : '' %>">
+                    <div class="team-member-row">
                       <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
                       <span class="team-member-name-col">
-                        <span class="team-member-name" title="<%= m.name %><%= absentIds.has(m.id) ? ' (absent today)' : '' %>"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span>
+                        <span class="team-member-name"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span>
                         <% if (m.phone) { %><span class="team-member-phone"><%= m.phone %></span><% } %>
                       </span>
                     </div>

@@ -30,8 +30,6 @@
         <div class="roster-btn-row roster-btn-row-fit-text">
           <button type="button" class="roster-action-btn" onclick="document.getElementById('new-list-dialog').showModal()">+ Add New List</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('new-task-dialog').showModal()">+ Add New Task</button>
-          <button type="button" class="roster-action-btn" data-task-list-edit-btn>Edit</button>
-          <button type="submit" class="roster-action-btn" form="task-list-save-form" data-task-list-save-btn hidden>Save</button>
           <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('task-import-dialog').showModal()">Import</button>
           <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/tasks/export.csv">Export</a>
           <a class="roster-action-btn print-action-btn" href="/admin/setup/<%= day %>/tasks/print" target="_blank">Print</a>
@@ -42,40 +40,24 @@
         <p class="roster-empty">No task lists yet &mdash; use + Add New List above.</p>
       <% } %>
 
-      <%# task-list-save-form is a real, standalone <form> declared just
-          below (empty - no DOM children of its own). The section/item
-          fields it submits live here instead, tied to it purely via each
-          field's own form="task-list-save-form" attribute, same trick
-          already used for the Save button above and the Schedule archive
-          page's off-page checkboxes (public/js/archive-select-toggle.js).
-          This block also holds the per-row move/delete <form>s (below) -
-          those must NOT be literal DOM descendants of another <form>.
-          Nested forms are invalid HTML, and real browsers don't just
-          "flatten" the inner one the way you'd hope: submitting a form
-          that's nested inside another dispatches the 'submit' event with
-          e.target set to the OUTER form, not the one actually being
-          POSTed - so document-level delegated listeners (csrf.js,
-          confirm-dialog.js) silently act on the wrong form entirely,
-          which is exactly how this used to 403 every trash-can click here
-          (no CSRF token ever reached the real request) with no confirm
-          dialog either. %>
-      <form id="task-list-save-form" method="POST" action="/admin/setup/<%= day %>/tasks/save" hidden></form>
       <div class="task-list-stack" data-task-list-form data-task-list-day="<%= day %>">
         <% sections.forEach(function(s, i) { %>
           <div class="task-list-card task-list-accent-<%= i % 5 %>" data-task-list-section="<%= s.id %>">
             <div class="task-list-card-header">
               <button type="button" class="task-list-drag-handle no-print" data-task-list-section-drag-handle data-task-list-edit-only hidden aria-label="Drag to reorder list &quot;<%= s.title %>&quot;" title="Drag to reorder"><svg class="icon"><use href="#icon-menu"/></svg></button>
-              <input type="text" name="sectionTitle_<%= s.id %>" value="<%= s.title %>" class="task-list-title-input" data-task-list-input readonly form="task-list-save-form" />
-              <div class="task-list-card-actions no-print" data-task-list-edit-only hidden>
-                <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/move" class="inline-block-form">
-                  <input type="hidden" name="direction" value="up" />
-                  <button type="submit" class="icon-btn" aria-label="Move list up" title="Move up" <%= i === 0 ? 'disabled' : '' %>><svg class="icon" style="transform: rotate(180deg);"><use href="#icon-chevron-down"/></svg></button>
-                </form>
-                <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/move" class="inline-block-form">
-                  <input type="hidden" name="direction" value="down" />
-                  <button type="submit" class="icon-btn" aria-label="Move list down" title="Move down" <%= i === sections.length - 1 ? 'disabled' : '' %>><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-                </form>
-                <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/delete" class="inline-block-form" data-confirm="Delete list &quot;<%= s.title %>&quot;? This cannot be undone.">
+              <input type="text" name="sectionTitle_<%= s.id %>" value="<%= s.title %>" class="task-list-title-input" data-task-list-input readonly />
+              <div class="task-list-card-actions no-print">
+                <%# A real request: an Edit button per list card (not one
+                    global page-level Edit) - clicking it unlocks just THIS
+                    card's title/task inputs and reveals its own drag
+                    handles/delete buttons; the checkmark that replaces it
+                    saves just this card (public/js/task-list-edit.js posts
+                    only this section's own fields to the existing /save
+                    route, which already only touches whatever
+                    sectionTitle_/itemDesc_ keys it's given). %>
+                <button type="button" class="icon-btn" data-task-list-edit-btn aria-label="Edit list &quot;<%= s.title %>&quot;" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
+                <button type="button" class="icon-btn" data-task-list-save-btn hidden aria-label="Save list &quot;<%= s.title %>&quot;" title="Save"><svg class="icon"><use href="#icon-check"/></svg></button>
+                <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/delete" class="inline-block-form" data-task-list-edit-only hidden data-confirm="Delete list &quot;<%= s.title %>&quot;? This cannot be undone.">
                   <button type="submit" class="icon-btn" aria-label="Delete list" title="Delete List"><svg class="icon"><use href="#icon-trash"/></svg></button>
                 </form>
               </div>
@@ -83,7 +65,7 @@
 
             <div class="task-list-team-row no-print" data-task-list-edit-only hidden>
               <label class="task-list-team-select">Linked Team
-                <select name="sectionTeam_<%= s.id %>" form="task-list-save-form">
+                <select name="sectionTeam_<%= s.id %>">
                   <option value="">Not linked to a team</option>
                   <% teams.forEach(function(t) { %>
                     <option value="<%= t.id %>" <%= s.team_id === t.id ? 'selected' : '' %>><%= t.title %></option>
@@ -95,10 +77,10 @@
 
             <div class="roster-scroll">
               <table class="roster-table members-table condensed-table task-list-table">
-                <thead><tr><th class="no-print" data-task-list-edit-only hidden></th><th class="task-list-num-col">#</th><th>Task</th><th class="no-print" data-task-list-edit-only hidden></th><th class="no-print"></th></tr></thead>
+                <thead><tr><th class="no-print" data-task-list-edit-only hidden></th><th class="task-list-num-col">#</th><th>Task</th><th class="no-print"></th></tr></thead>
                 <tbody data-task-list-item-tbody data-task-list-section="<%= s.id %>">
                   <% if (s.items.length === 0) { %>
-                    <tr><td colspan="5" class="roster-empty">No tasks yet.</td></tr>
+                    <tr><td colspan="4" class="roster-empty">No tasks yet.</td></tr>
                   <% } %>
                   <% s.items.forEach(function(item, j) { %>
                     <tr data-task-list-item="<%= item.id %>">
@@ -106,19 +88,7 @@
                         <button type="button" class="task-list-drag-handle" data-task-list-item-drag-handle aria-label="Drag to reorder this task" title="Drag to reorder"><svg class="icon"><use href="#icon-menu"/></svg></button>
                       </td>
                       <td class="task-list-num-col"><%= item.number %></td>
-                      <td><input type="text" name="itemDesc_<%= item.id %>" value="<%= item.description %>" class="task-list-desc-input" data-task-list-input readonly form="task-list-save-form" /></td>
-                      <td class="no-print" data-task-list-edit-only hidden>
-                        <div class="actions-btn-row">
-                          <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/items/<%= item.id %>/move" class="inline-block-form">
-                            <input type="hidden" name="direction" value="up" />
-                            <button type="submit" class="icon-btn" aria-label="Move task up" title="Move up" <%= j === 0 ? 'disabled' : '' %>><svg class="icon" style="transform: rotate(180deg);"><use href="#icon-chevron-down"/></svg></button>
-                          </form>
-                          <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/items/<%= item.id %>/move" class="inline-block-form">
-                            <input type="hidden" name="direction" value="down" />
-                            <button type="submit" class="icon-btn" aria-label="Move task down" title="Move down" <%= j === s.items.length - 1 ? 'disabled' : '' %>><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-                          </form>
-                        </div>
-                      </td>
+                      <td><input type="text" name="itemDesc_<%= item.id %>" value="<%= item.description %>" class="task-list-desc-input" data-task-list-input readonly /></td>
                       <td class="no-print actions-cell">
                         <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/items/<%= item.id %>/delete" class="inline-block-form" data-confirm="Delete this task?">
                           <button type="submit" class="icon-btn" aria-label="Delete task" title="Delete Task"><svg class="icon"><use href="#icon-trash"/></svg></button>

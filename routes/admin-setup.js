@@ -3,9 +3,8 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { DAY_LABELS, defaultDay, requireDay, defaultDateFor, parseDayValue } = require('../utils/days');
+const { DAY_LABELS, defaultDay, requireDay, parseDayValue } = require('../utils/days');
 const { isValidISODate, formatDateLabel } = require('../utils/dates');
-const { absentMemberIdsForDate } = require('../utils/classSchedule');
 const {
   teamsForDay,
   setTeamLeader,
@@ -67,11 +66,6 @@ router.get('/setup/:day/manage', requireAdmin, requireDay, async (req, res) => {
     // this is a separate function from the parent-only activeParentOptions
     // the public Absence/Late and Name Tag Request forms still use).
     availableLeaders: await activeParentAndAdminOptions(),
-    // Only actually highlights anyone when today falls on this day - no
-    // date picker here (teams are a standing weekly roster, not tied to a
-    // specific date the admin chooses), so "absent that day" means "absent
-    // today" and only has anything to show while today matches the tab.
-    absentIds: await absentMemberIdsForDate(defaultDateFor(day)),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -98,7 +92,6 @@ router.get('/setup/:day/teams/print', requireAdmin, requireDay, async (req, res)
     day,
     dayLabel: DAY_LABELS[day],
     teams: await teamsWithMembers(day),
-    absentIds: await absentMemberIdsForDate(defaultDateFor(day)),
   });
 });
 
@@ -151,21 +144,11 @@ router.post('/setup/:day/teams/:teamId/edit', requireAdmin, requireDay, async (r
   }
   await updateTeam(teamId, { title, description, leaderId, meetingTime, meetingLocation, taskScanTiming });
 
-  // Batched member removals staged by the card's own trash icons - a real
-  // request: "when deleting ... cleanup/signup members from lists it
-  // should allow for multiple deletes and then click save before
-  // refreshing." Each removal used to be its own immediate POST/reload;
-  // removeMemberIds now piggybacks on this same Save submission (see
-  // admin-setup.ejs's hidden, form-attribute-linked checkboxes) so the
-  // card's other edits and any number of pending removals all land in one
-  // request/one page load.
-  const removeIds = [].concat(req.body.removeMemberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
-  if (removeIds.length) {
-    const placeholders = removeIds.map(() => '?').join(',');
-    await db.prepare(`DELETE FROM setup_team_members WHERE team_id = ? AND member_id IN (${placeholders})`).run(teamId, ...removeIds);
-  }
-
-  res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(removeIds.length ? `"${title}" updated. Removed ${removeIds.length} member(s).` : `"${title}" updated.`));
+  // Member removal is its own immediate action now (the trash icon posts
+  // straight to /remove-member/:memberId below via fetch - see "A real
+  // request" comment there), not something that rides along with this
+  // Save submission.
+  res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`"${title}" updated.`));
 });
 
 router.post('/setup/:day/teams/:teamId/delete', requireAdmin, requireDay, async (req, res) => {
@@ -189,11 +172,21 @@ router.post('/setup/:day/teams/add-member', requireAdmin, requireDay, async (req
   res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent('Member added.'));
 });
 
+// A real request: "if you click the trash button the member name should
+// automatically go away without having to save the team or refreshing
+// the page" - replaces the old staged-until-Save removal (hidden
+// checkbox + removeMemberIds on the /edit route above, which the Floater
+// Teams card still uses unchanged - see team-member-remove-toggle.js's
+// own per-row opt-in). public/js/team-member-instant-remove.js fetches
+// this directly and removes the row from the DOM on success; a plain
+// (non-fetch) request still gets the original redirect for safety.
 router.post('/setup/:day/teams/:teamId/remove-member/:memberId', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const teamId = parseInt(req.params.teamId, 10);
   const memberId = parseInt(req.params.memberId, 10);
+  const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
   await db.prepare('DELETE FROM setup_team_members WHERE team_id = ? AND member_id = ?').run(teamId, memberId);
+  if (wantsJson) return res.json({ ok: true });
   res.redirect(`/admin/setup/${day}/manage`);
 });
 
@@ -510,10 +503,14 @@ router.post('/setup/:day/tasks/:sectionId/items/reorder', requireAdmin, requireD
   res.json({ ok: true });
 });
 
-// Edit mode's one Save button - every section's title/team link and
-// every item's description, all in one POST (see admin-setup-tasks.ejs).
-// Reordering/deleting are their own immediate actions above, not part of
-// this form.
+// Each list card's own checkmark Save button (a real request: "click
+// edit button on each list... check mark is then at the top of the list
+// card to save") posts here via fetch (public/js/task-list-edit.js) with
+// just THAT card's own sectionTitle_/sectionTeam_/itemDesc_ fields - this
+// loop only ever touches whichever keys it's actually given, so one
+// card's save never needs to know or send anything about any other
+// card's title/team/items. Reordering/deleting are their own immediate
+// actions elsewhere, not part of this.
 router.post('/setup/:day/tasks/save', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   for (const key of Object.keys(req.body)) {
