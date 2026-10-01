@@ -93,12 +93,19 @@ test('Co-op Admin Members list per-row Delete', async (t) => {
 test('Co-op Admin Members list bulk actions preserve the list\'s own filter querystring on redirect', async (t) => {
   const cookie = await loginCoopAdmin();
 
-  await t.test('bulk-archive redirects back to the Referer\'s own querystring, not the bare /admin/members', async () => {
+  // bulk-archive/bulk-unarchive used to be covered here too, but a real
+  // request removed the whole Archive feature from Co-op Admin's own
+  // Members page ("remove member archive page, it is not needed on
+  // co-op admin, only main admin") - bulk-delete is the one bulk action
+  // left that still uses this same Referer-preserving redirect helper
+  // (routes/admin-members.js's membersRedirectUrl), so it covers the
+  // same redirect logic now.
+  await t.test('bulk-delete redirects back to the Referer\'s own querystring, not the bare /admin/members', async () => {
     const id = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Bulk Referer One', 'bulk-referer-1', 'student') RETURNING id").get()).id;
     const page = await request(app).get('/admin/members').set('Cookie', cookie);
     const csrfToken = extractCsrf(page.text);
     const res = await request(app)
-      .post('/admin/members/bulk-archive')
+      .post('/admin/members/bulk-delete')
       .set('Cookie', cookie)
       .set('Referer', 'http://localhost/admin/members?filter=parent&page=2')
       .type('form')
@@ -107,7 +114,7 @@ test('Co-op Admin Members list bulk actions preserve the list\'s own filter quer
     assert.match(res.headers.location, /^\/admin\/members\?/);
     assert.match(res.headers.location, /filter=parent/);
     assert.match(res.headers.location, /page=2/);
-    assert.match(res.headers.location, /notice=Archived%201%20member/);
+    assert.match(res.headers.location, /notice=Deleted%201%20member/);
   });
 
   await t.test('with no Referer at all, still falls back to the bare list URL (unchanged behavior)', async () => {
@@ -115,12 +122,12 @@ test('Co-op Admin Members list bulk actions preserve the list\'s own filter quer
     const page = await request(app).get('/admin/members').set('Cookie', cookie);
     const csrfToken = extractCsrf(page.text);
     const res = await request(app)
-      .post('/admin/members/bulk-archive')
+      .post('/admin/members/bulk-delete')
       .set('Cookie', cookie)
       .type('form')
       .send({ _csrf: csrfToken, memberIds: [String(id)] });
     assert.equal(res.status, 302);
-    assert.equal(res.headers.location, '/admin/members?notice=Archived%201%20member(s).');
+    assert.equal(res.headers.location, '/admin/members?notice=Deleted%201%20member(s).');
   });
 
   await t.test('a Referer pointing somewhere else entirely is ignored, not trusted as a redirect target', async () => {
@@ -128,26 +135,13 @@ test('Co-op Admin Members list bulk actions preserve the list\'s own filter quer
     const page = await request(app).get('/admin/members').set('Cookie', cookie);
     const csrfToken = extractCsrf(page.text);
     const res = await request(app)
-      .post('/admin/members/bulk-archive')
+      .post('/admin/members/bulk-delete')
       .set('Cookie', cookie)
       .set('Referer', 'http://localhost/admin/some-other-page?whatever=1')
       .type('form')
       .send({ _csrf: csrfToken, memberIds: [String(id)] });
     assert.equal(res.status, 302);
-    assert.equal(res.headers.location, '/admin/members?notice=Archived%201%20member(s).');
-  });
-
-  await t.test('bulk-unarchive falls back to the archived tab\'s own ?archived=1 when there\'s no Referer', async () => {
-    const id = (await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Bulk Unarchive No Referer', 'bulk-unarchive-no-referer', 'student', 0) RETURNING id").get()).id;
-    const page = await request(app).get('/admin/members').set('Cookie', cookie);
-    const csrfToken = extractCsrf(page.text);
-    const res = await request(app)
-      .post('/admin/members/bulk-unarchive')
-      .set('Cookie', cookie)
-      .type('form')
-      .send({ _csrf: csrfToken, memberIds: [String(id)] });
-    assert.equal(res.status, 302);
-    assert.equal(res.headers.location, '/admin/members?archived=1&notice=Restored%201%20member(s).');
+    assert.equal(res.headers.location, '/admin/members?notice=Deleted%201%20member(s).');
   });
 });
 

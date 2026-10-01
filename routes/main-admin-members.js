@@ -28,12 +28,12 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
-const { formatDateLabel, formatDateNumeric, formatTime, ageFromBirthday, isValidISODate } = require('../utils/dates');
+const { formatDateLabel, formatDateNumeric, formatTime, ageFromBirthday, isChildAge, isValidISODate } = require('../utils/dates');
 const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 const { spreadsheetFileFilter } = require('../utils/uploads');
 const { uploadMemberPhoto, savePhotoFile, deletePhotoFile } = require('../utils/memberPhoto');
-const { allSetupTeams, cleanupTeamIdsForMember } = require('../utils/setup');
+const { allSetupTeams } = require('../utils/setup');
 const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions } = require('../utils/adminPositions');
 const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/spreadsheet');
 const memberImport = require('../utils/memberImport');
@@ -42,7 +42,6 @@ const {
   allFamilies,
   setMemberFamily,
   setPrimaryParent,
-  rostersForMember,
   membersWithDetails,
   byLastName,
   avatarColorFor,
@@ -95,6 +94,23 @@ function formatAttendanceHistory(rows) {
     checkInTime: r.checkInTime ? formatTime(r.checkInTime) : null,
     checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : null,
   }));
+}
+
+// Same shape as routes/admin-members.js's own groupAttendanceByRoster - a
+// real request: "under each person, each of the attendance rosters this
+// member is on will show, then you can click on the class/roster name and
+// it will expand and show attendance and dates for that class."
+function groupAttendanceByRoster(history) {
+  const order = [];
+  const byRoster = new Map();
+  history.forEach((h) => {
+    if (!byRoster.has(h.rosterName)) {
+      byRoster.set(h.rosterName, []);
+      order.push(h.rosterName);
+    }
+    byRoster.get(h.rosterName).push(h);
+  });
+  return order.map((rosterName) => ({ rosterName, rows: byRoster.get(rosterName) }));
 }
 
 // --- List ---
@@ -483,8 +499,14 @@ router.post('/families/:id/delete', async (req, res) => {
 
 // --- Add / edit ---
 
+// A real request: "No parent/student choice on membership forms or
+// profiles. All children are automatically counted as student and adults
+// counted as parents." Same derivation as routes/admin-members.js's own
+// memberFormFields, now that the two portals' edit forms share
+// partials/member-form-fields.ejs - see this file's own top comment.
 function memberFormFields(req) {
-  const memberType = MEMBER_TYPES.includes(req.body.memberType) ? req.body.memberType : 'student';
+  const birthday = (req.body.birthday || '').trim() || null;
+  const memberType = req.body.memberType === 'admin' ? 'admin' : isChildAge(birthday) ? 'student' : 'parent';
   const newFamilyName = (req.body.newFamilyName || '').trim();
   const familyIdRaw = parseInt(req.body.familyId, 10);
   return {
@@ -496,19 +518,15 @@ function memberFormFields(req) {
     zip: (req.body.zip || '').trim() || null,
     phone: (req.body.phone || '').trim() || null,
     email: (req.body.email || '').trim() || null,
-    birthday: memberType === 'student' ? (req.body.birthday || '').trim() || null : null,
+    birthday,
     gradeLevel: memberType === 'student' ? (req.body.gradeLevel || '').trim() || null : null,
     medicalNotes: (req.body.medicalNotes || '').trim() || null,
     familyIdRaw: Number.isInteger(familyIdRaw) ? familyIdRaw : null,
     newFamilyName,
     isPrimaryParent: req.body.isPrimaryParent === '1',
-    // Same shape as routes/admin-members.js's own memberFormFields, now
-    // that the two portals' edit forms share partials/member-form-
-    // fields.ejs - see this file's own top comment.
-    cleanupTeamIds:
-      memberType === 'parent'
-        ? [].concat(req.body.cleanupTeamIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
-        : null,
+    // A real request: "Remove setup/cleanup team section. That is only
+    // done through the setup/cleanup admin pages" - this form no longer
+    // touches setup_team_members at all.
     // req.body.adminPositionsFormPresent (a hidden marker, always
     // submitted alongside these checkboxes - see partials/member-form-
     // fields.ejs's own comment) distinguishes a real form save (resync to
@@ -521,19 +539,6 @@ function memberFormFields(req) {
         ? [].concat(req.body.adminPositionIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
         : undefined,
   };
-}
-
-// Keeps setup_team_members in sync with the Cleanup Team checkboxes on a
-// parent's profile - same shape as routes/admin-members.js's own
-// syncCleanupTeams. Always clears existing rows first (not just when
-// teamIds is a real list) so converting an existing parent to student/
-// admin drops their stale team membership instead of leaving them stuck
-// on a chart they can no longer manage from their own profile.
-async function syncCleanupTeams(memberId, teamIds) {
-  await db.prepare('DELETE FROM setup_team_members WHERE member_id = ?').run(memberId);
-  if (!teamIds) return;
-  const link = db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?) ON CONFLICT (team_id, member_id) DO NOTHING');
-  for (const teamId of teamIds) await link.run(teamId, memberId);
 }
 
 // A typed "new family" name (see main-admin-member-edit.ejs's own field)
@@ -686,7 +691,6 @@ router.get('/:id', async (req, res) => {
     familyName: family ? family.familyName : null,
     familyMembers: [member, ...restOfFamily].sort(byLastName),
     familyRoster,
-    rosters: await rostersForMember(id),
     schedule: await getMemberSchedule(id),
     scheduleFamilyAll,
     familySchedules: scheduleFamilyAll
@@ -702,9 +706,9 @@ router.get('/:id', async (req, res) => {
     // member with no portal account of their own.
     memberPortalRoles: portalStatus.account ? allRoles.filter((r) => portalStatus.roleIds.has(r.id)) : null,
     attendanceFamilyAll,
-    history: attendanceFamilyAll ? null : formatAttendanceHistory(await attendanceHistoryForMember(id)),
+    history: attendanceFamilyAll ? null : groupAttendanceByRoster(formatAttendanceHistory(await attendanceHistoryForMember(id))),
     familyAttendanceHistories: attendanceFamilyAll
-      ? await Promise.all(familyRoster.map(async (m) => ({ member: m, history: formatAttendanceHistory(await attendanceHistoryForMember(m.id)) })))
+      ? await Promise.all(familyRoster.map(async (m) => ({ member: m, history: groupAttendanceByRoster(formatAttendanceHistory(await attendanceHistoryForMember(m.id))) })))
       : null,
   });
 });
@@ -728,8 +732,6 @@ router.get('/:id/edit', async (req, res) => {
     families: await allFamilies(),
     memberFamilyId: member.family_id,
     gradeLevels: GRADE_LEVELS,
-    setupTeams: await allSetupTeams(),
-    memberCleanupTeamIds: await cleanupTeamIdsForMember(id),
     adminPositions: await listAdminPositions(),
     memberAdminPositionIds: await adminPositionIdsForMember(id),
     portalAccount: portalStatus.account,
@@ -767,7 +769,10 @@ router.get('/:id/edit', async (req, res) => {
 // this member (the one whose Edit Profile page the dialog was opened
 // from), same as how the full Add Member form's own single "Family
 // Address" section already applies one shared address to every parent/
-// child in that submission.
+// child in that submission. A further real request removed the explicit
+// Student/Parent choice ("No parent/student choice on membership forms
+// or profiles") - whether the new person is a parent or a student is
+// derived from the Birthday they're given, same as the main Edit form.
 router.post('/:id/quick-add-family-member', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const back = `/main-admin/members/${id}/edit`;
@@ -776,15 +781,14 @@ router.post('/:id/quick-add-family-member', async (req, res) => {
 
   const name = (req.body.name || '').trim();
   if (!name) return res.redirect(back + '?error=' + encodeURIComponent('Name is required.'));
-  const memberType = req.body.memberType === 'parent' ? 'parent' : 'student';
+  const birthday = isValidISODate((req.body.birthday || '').trim()) ? req.body.birthday.trim() : null;
   const address = { address: member.address, city: member.city, state: member.state, zip: member.zip };
 
-  if (memberType === 'parent') {
-    await createParentMember(member.family_id, address, { name, isPrimaryParent: false }, req.portalAccount.id);
-  } else {
-    const birthday = isValidISODate((req.body.birthday || '').trim()) ? req.body.birthday.trim() : null;
+  if (isChildAge(birthday)) {
     const gradeLevel = GRADE_LEVELS.includes(req.body.gradeLevel) ? req.body.gradeLevel : null;
     await createChildMember(member.family_id, address, { name, birthday, gradeLevel, medicalNotes: null });
+  } else {
+    await createParentMember(member.family_id, address, { name, isPrimaryParent: false }, req.portalAccount.id);
   }
 
   res.redirect(back + '?notice=' + encodeURIComponent(`${name} added to the family.`));
@@ -840,7 +844,6 @@ router.post('/:id/edit', uploadMemberPhoto((req) => `/main-admin/members/${req.p
          photo_path = ?, birthday = ?, grade_level = ?, medical_notes = ? WHERE id = ?`
     )
     .run(f.name, f.memberType, f.address, f.city, f.state, f.zip, f.phone, f.email, photoPath, f.birthday, f.gradeLevel, f.medicalNotes, id);
-  await syncCleanupTeams(id, f.cleanupTeamIds);
   await syncMemberAdminPositions(id, f.adminPositionIds);
   await clearVolunteerMembershipIfNotParent(id, f.memberType);
   await setMemberFamily(id, await resolveFamilyId(f));

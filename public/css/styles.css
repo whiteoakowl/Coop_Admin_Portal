@@ -2955,13 +2955,19 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
    font-size) every one of these already shared, so Prev/Next/View All
    still read as one uniform row. A later real request: "make page number
    pages blue instead of purple" - --btn-blue in place of --btn-purple,
-   same shape. */
+   same shape. A further real request: "prev, next and view all buttons
+   should shrink to fit nicely in the button box with border, shrink
+   height" - tighter padding/font-size than the shared --control-padding-
+   compact/--control-font-size-compact (those are tuned for a standalone
+   toolbar button, not three buttons sitting shoulder to shoulder at the
+   bottom of a list), own values just for this row instead. */
 .pagination-btn {
-  padding: var(--control-padding-compact);
+  padding: 0.35rem 0.65rem;
   border: 1px solid var(--btn-blue);
   border-radius: var(--control-radius);
-  font-size: var(--control-font-size-compact);
+  font-size: 0.8rem;
   font-weight: 600;
+  line-height: 1.1;
   color: #fff;
   background: var(--btn-blue);
   text-decoration: none;
@@ -2970,6 +2976,11 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 }
 .pagination-btn:hover { border-color: var(--btn-blue-hover); background: var(--btn-blue-hover); color: #fff; }
 .pagination-btn-disabled { color: var(--muted); background: var(--surface); border-color: var(--border); cursor: default; pointer-events: none; opacity: 0.6; }
+@media (max-width: 640px) {
+  .pagination-btn { padding: 0.3rem 0.55rem; font-size: 0.75rem; }
+  .pagination-page-select-label { font-size: 0.78rem; }
+  .pagination-page-select { padding: 0.15rem 1.4rem 0.15rem 0.35rem; font-size: 0.78rem; }
+}
 
 .link-btn-danger { color: var(--red); }
 
@@ -3576,6 +3587,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   background: var(--surface-alt, #f3f4f6) !important;
   font-size: 0.9rem;
 }
+/* A real request: "search bar should have a go button for easy
+   searching" (Co-op Admin Members page only) - same filled-button look
+   every other button on this page already uses. */
+.members-search-go-btn {
+  flex: 0 0 auto;
+  margin-left: 0.5rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--btn-bg);
+  border-radius: 999px;
+  background: var(--btn-bg);
+  color: #000;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.members-search-go-btn:hover { border-color: var(--btn-bg-hover); background: var(--btn-bg-hover); }
 
 .members-add-family-card {
   display: flex;
@@ -3685,9 +3713,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .member-avatar-blue { background: var(--brand-soft); color: var(--brand-dark); }
 .member-avatar-green { background: var(--green-bg); color: var(--green); }
 .member-avatar-purple { background: var(--purple-soft); color: var(--purple); }
-.member-avatar-red { background: var(--red-bg); color: var(--red); }
 .member-avatar-orange { background: var(--orange-bg); color: var(--accent-dark); }
-.member-avatar-gold { background: var(--yellow-bg); color: var(--yellow); }
 
 .member-row-body { flex: 1; min-width: 0; }
 .member-row-topline { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
@@ -3830,7 +3856,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .member-type-toggle-btn:has(input:disabled) { cursor: default; }
 .member-type-toggle-btn:has(input:disabled) input { cursor: default; }
 
-.member-form-parent-flag { margin: -0.5rem 0 1.25rem; }
+/* A real request: "primary parent selection should be below the profile
+   picture and above the full name entry" - moved from its own standalone
+   full-width row (where the negative top margin below used to compensate
+   for the header above it) into the narrow photo column, right under the
+   upload-a-photo controls - plain top margin instead now that it's just
+   one more stacked item in that column. */
+.member-form-parent-flag { margin: 0.35rem 0 0; }
 .primary-parent-top-option {
   display: inline-flex;
   align-items: center;
@@ -3839,8 +3871,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   color: var(--orange);
   border: 1px solid var(--btn-bg);
   border-radius: 10px;
-  padding: 0.6rem 0.9rem;
+  padding: 0.5rem 0.7rem;
   font-weight: 700;
+  font-size: 0.85rem;
 }
 .primary-parent-top-option .icon { width: 1rem; height: 1rem; }
 .primary-parent-top-option input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--btn-bg); }
@@ -4432,6 +4465,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .members-search-filter-row .members-search-bar {
     flex: 1 1 auto;
     min-width: 0;
+  }
+  .members-search-go-btn {
+    margin-left: 0.35rem;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.78rem;
   }
   .members-search-filter-row .category-filter {
     flex: 0 0 auto;
@@ -7746,6 +7784,49 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .member-profile-list dt { font-weight: 600; color: var(--muted); font-size: 0.85rem; }
 .member-profile-list dd { margin: 0; }
 
+/* Member Profile Attendance tab - a real request: "under each person,
+   each of the attendance rosters this member is on will show, then you
+   can click on the class/roster name and it will expand and show
+   attendance and dates for that class." Same shape as .absence-family-
+   group/.absence-family-toggle (Logs page), accordion behavior (only one
+   open at a time) via public/js/member-attendance-accordion.js. */
+.member-attendance-rosters { display: flex; flex-direction: column; gap: 0.6rem; }
+.member-attendance-roster-group {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.member-attendance-roster-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+}
+.member-attendance-roster-name { font-weight: 700; flex: 1; min-width: 0; }
+.member-attendance-roster-count { background: var(--surface-alt, #f3f4f6); color: #55617a; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 999px; white-space: nowrap; }
+.member-attendance-roster-chevron { width: 16px; height: 16px; flex-shrink: 0; color: var(--muted); transition: transform 0.15s ease; }
+.member-attendance-roster-toggle[aria-expanded="true"] .member-attendance-roster-chevron { transform: rotate(180deg); }
+.member-attendance-roster-panel { padding: 0 1rem 0.85rem; border-top: 1px solid var(--border); }
+.member-attendance-roster-panel .roster-scroll { border: none; margin-top: 0.6rem; }
+
+/* A real request: "the family should be a list in a nice column with
+   parents listed under parent title, and children listed under children
+   title." Shared by both portals' Profile tab (Co-op Admin's <dl> and
+   Main Admin's own card both drop this same block in). */
+.member-profile-family-list { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.3rem; }
+.member-profile-family-group-label { display: block; font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.02em; color: var(--muted); margin-bottom: 0.15rem; }
+.member-profile-family-group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.member-profile-family-group li { font-size: 0.9rem; }
+
 /* ---------- Responsive: narrow phones ---------- */
 
 @media (max-width: 480px) {
@@ -7899,6 +7980,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .schedule-day-columns { grid-template-columns: 1fr; }
 }
 
+/* A real request: "viewing schedules under member profiles. The times and
+   other row information should fit on one clean row. Shrink everything to
+   fit nicely and professionally." Scoped to .view-tab-panel so this only
+   touches the Member Profile's own read-only Schedule tab, not
+   admin-schedule-manage.ejs's editable version of this same table class
+   (which needs its text inputs at full column width). nowrap keeps every
+   row's Time/Class Name/Room on one line - .roster-scroll already handles
+   horizontal overflow if a row is still too wide for the screen. */
+.view-tab-panel .schedule-edit-table { font-size: 0.75rem; }
+.view-tab-panel .schedule-edit-table th,
+.view-tab-panel .schedule-edit-table td { padding: 0.3rem 0.5rem; white-space: nowrap; }
+
 .schedule-print-card {
   break-inside: avoid;
   background: var(--surface);
@@ -7931,10 +8024,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .schedule-print-compact-fit { flex: 1; min-height: 0; overflow: hidden; }
 .schedule-print-member-section { break-inside: avoid; margin-bottom: 0.6rem; }
 .schedule-print-member-section:last-child { margin-bottom: 0; }
-.schedule-print-member-section h3 { margin: 0 0 0.25rem; font-size: 0.95rem; }
+.schedule-print-member-section h3 { margin: 0 0 0.25rem; font-size: 0.88rem; }
 .schedule-print-member-days { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-.schedule-print-member-day-label { font-size: 0.7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; margin: 0 0 0.15rem; }
-.schedule-print-compact-line { font-size: 0.85rem; margin-bottom: 0.2rem; }
+.schedule-print-member-day-label { font-size: 0.68rem; font-weight: 700; color: var(--muted); text-transform: uppercase; margin: 0 0 0.15rem; }
+/* A real request: "shrink the font a bit so that all of one classes
+   information fits on one row" - each class is already one line (time +
+   class name + room), just a touch smaller/tighter so a longer class name
+   never has to wrap mid-line. */
+.schedule-print-compact-line { font-size: 0.78rem; margin-bottom: 0.18rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .schedule-print-compact-line:last-child { margin-bottom: 0; }
 .schedule-print-compact-time { color: var(--muted); margin-right: 0.35rem; }
 .schedule-print-compact-empty { color: var(--muted); }

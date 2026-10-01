@@ -65,16 +65,42 @@
             </p>
           </section>
 
+          <%# A real request: "the family should be a list in a nice
+              column with parents listed under parent title, and children
+              listed under children title. Should show grade levels next
+              to students in parenthesis." Admins count as "Parents" here
+              too (both are adults) - member_type === 'student' is the
+              only thing that puts someone under Children. %>
           <% if (familyMembers.length > 1) { %>
+            <% var famParents = familyMembers.filter(function(m) { return m.member_type !== 'student'; }); %>
+            <% var famChildren = familyMembers.filter(function(m) { return m.member_type === 'student'; }); %>
             <section class="portal-dashboard-card">
               <h2>Family</h2>
-              <ul>
-                <% familyMembers.forEach(function(m) { %>
-                  <li>
-                    <% if (m.id === member.id) { %><strong><%= m.name %></strong> (this member)<% } else { %><a href="/main-admin/members/<%= m.id %>"><%= m.name %></a><% } %>
-                  </li>
-                <% }); %>
-              </ul>
+              <div class="member-profile-family-list">
+                <% if (famParents.length) { %>
+                  <div class="member-profile-family-group">
+                    <span class="member-profile-family-group-label">Parents</span>
+                    <ul>
+                      <% famParents.forEach(function(m) { %>
+                        <li><% if (m.id === member.id) { %><strong><%= m.name %></strong> (this member)<% } else { %><a href="/main-admin/members/<%= m.id %>"><%= m.name %></a><% } %></li>
+                      <% }); %>
+                    </ul>
+                  </div>
+                <% } %>
+                <% if (famChildren.length) { %>
+                  <div class="member-profile-family-group">
+                    <span class="member-profile-family-group-label">Children</span>
+                    <ul>
+                      <% famChildren.forEach(function(m) { %>
+                        <li>
+                          <% if (m.id === member.id) { %><strong><%= m.name %></strong> (this member)<% } else { %><a href="/main-admin/members/<%= m.id %>"><%= m.name %></a><% } %>
+                          <% if (m.grade_level) { %> (<%= m.grade_level %>)<% } %>
+                        </li>
+                      <% }); %>
+                    </ul>
+                  </div>
+                <% } %>
+              </div>
             </section>
           <% } %>
         </div>
@@ -154,13 +180,10 @@
           </div>
           <a class="roster-action-btn print-action-btn no-print" href="/main-admin/members/schedule-print?memberId=<%= member.id %>" target="_blank">Print Schedule</a>
         <% } %>
-
-        <h2>Rosters</h2>
-        <% if (!rosters || rosters.length === 0) { %>
-          <p class="roster-empty">Not on any attendance rosters.</p>
-        <% } else { %>
-          <p><%= rosters.map(function(r) { return r.name; }).join(', ') %></p>
-        <% } %>
+      <%# A real request: "print whole family schedule... Rosters doesn't
+          need to be on this page at all." The Rosters list that used to
+          sit here (which schedule/attendance rosters this member is on)
+          is gone - unrelated to the actual class schedule this tab shows. %>
       <% } else { %>
         <% if (familyRoster.length > 1) { %>
           <div class="category-filter member-profile-family-select">
@@ -177,55 +200,16 @@
           <% familyAttendanceHistories.forEach(function(fa) { %>
             <div class="form-section member-profile-family-schedule">
               <h2 class="member-profile-family-schedule-name"><%= fa.member.name %></h2>
-              <div class="roster-scroll">
-                <table class="roster-table members-table condensed-table">
-                  <thead>
-                    <tr><th>Roster</th><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th></tr>
-                  </thead>
-                  <tbody>
-                    <% if (fa.history.length === 0) { %>
-                      <tr><td colspan="5" class="roster-empty">No attendance recorded yet.</td></tr>
-                    <% } %>
-                    <% fa.history.forEach(function(h) { %>
-                      <tr>
-                        <td><%= h.rosterName %></td>
-                        <td><%= h.dateLabel %></td>
-                        <td><span class="status-badge status-badge-<%= h.status %>"><%= h.statusLabel %></span></td>
-                        <td><%= h.checkInTime || '—' %></td>
-                        <td><%= h.checkOutTime || '—' %></td>
-                      </tr>
-                    <% }); %>
-                  </tbody>
-                </table>
-              </div>
+              <%- include('partials/member-attendance-rosters', { groups: fa.history, uidPrefix: 'fa-member-' + fa.member.id, includeNumberColumn: false }) %>
             </div>
           <% }); %>
         <% } else { %>
-          <div class="roster-scroll">
-            <table class="roster-table members-table condensed-table">
-              <thead>
-                <tr><th>Roster</th><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th></tr>
-              </thead>
-              <tbody>
-                <% if (history.length === 0) { %>
-                  <tr><td colspan="5" class="roster-empty">No attendance recorded yet.</td></tr>
-                <% } %>
-                <% history.forEach(function(h) { %>
-                  <tr>
-                    <td><%= h.rosterName %></td>
-                    <td><%= h.dateLabel %></td>
-                    <td><span class="status-badge status-badge-<%= h.status %>"><%= h.statusLabel %></span></td>
-                    <td><%= h.checkInTime || '—' %></td>
-                    <td><%= h.checkOutTime || '—' %></td>
-                  </tr>
-                <% }); %>
-              </tbody>
-            </table>
-          </div>
+          <%- include('partials/member-attendance-rosters', { groups: history, uidPrefix: 'member-' + member.id, includeNumberColumn: false }) %>
           <p class="hint">Most recent 25 records.</p>
         <% } %>
       <% } %>
     </div>
   </main>
+  <script src="/js/member-attendance-accordion.js"></script>
 </body>
 </html>

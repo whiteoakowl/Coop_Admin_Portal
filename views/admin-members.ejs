@@ -18,10 +18,10 @@
     <%
       // Builds an /admin/members URL preserving every filter dimension
       // except whatever's passed in overrides - one helper instead of
-      // hand-concatenating type/family/day/archived/q query strings at
-      // every link on this page (tabs, filter dropdown, Export).
+      // hand-concatenating type/family/day/role/q query strings at every
+      // link on this page (filter dropdown, Export).
       function memberHref(overrides) {
-        var params = Object.assign({ type: typeFilter, family: familyFilter, day: dayFilter, archived: showArchived ? '1' : '', q: q }, overrides);
+        var params = Object.assign({ type: typeFilter, family: familyFilter, day: dayFilter, role: roleFilter, q: q }, overrides);
         var qs = Object.keys(params).filter(function (k) { return params[k]; }).map(function (k) { return k + '=' + encodeURIComponent(params[k]); }).join('&');
         return '/admin/members' + (qs ? '?' + qs : '');
       }
@@ -40,34 +40,46 @@
         trigger+dialog here. %>
 
     <div class="members-search-filter-row no-print">
+      <%# A real request: "search bar should have a go button for easy
+          searching" - the native type="search" Enter-to-submit behavior
+          stays, this is just an explicit, visible way to do the same thing. %>
       <form method="GET" action="/admin/members" class="members-search-bar">
         <input type="hidden" name="type" value="<%= typeFilter %>" />
         <input type="hidden" name="family" value="<%= familyFilter || '' %>" />
         <input type="hidden" name="day" value="<%= dayFilter %>" />
-        <input type="hidden" name="archived" value="<%= showArchived ? '1' : '' %>" />
+        <input type="hidden" name="role" value="<%= roleFilter %>" />
         <svg class="icon"><use href="#icon-search"/></svg>
         <input type="search" name="q" value="<%= q %>" placeholder="Search members&hellip;" aria-label="Search members" />
+        <button type="submit" class="members-search-go-btn">Go</button>
       </form>
 
       <%# A real request: "filter by family should be under the buttons.
           it should just say filter." Single dropdown, same "one filter
           dimension at a time" model the type/family split already used -
-          now with a Roster Day group alongside Type/Family. %>
+          now with a Roster Day group alongside Type/Family. A further real
+          request: "dropdown member search should include teachers and
+          class assistants" - a Role group alongside Type/Roster Day/Family,
+          since teaching/assisting a class is its own thing (class_staff.role),
+          not a member_type. %>
       <div class="category-filter">
         <label for="type-select">Filter</label>
         <select id="type-select" onchange="window.fullscreenNavigate(this.value)">
-          <option value="<%= memberHref({ type: '', family: '', day: '' }) %>" <%= (!typeFilter && !familyFilter && !dayFilter) ? 'selected' : '' %>>All</option>
-          <option value="<%= memberHref({ type: 'parent', family: '', day: '' }) %>" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
-          <option value="<%= memberHref({ type: 'student', family: '', day: '' }) %>" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
-          <option value="<%= memberHref({ type: 'admin', family: '', day: '' }) %>" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
+          <option value="<%= memberHref({ type: '', family: '', day: '', role: '' }) %>" <%= (!typeFilter && !familyFilter && !dayFilter && !roleFilter) ? 'selected' : '' %>>All</option>
+          <option value="<%= memberHref({ type: 'parent', family: '', day: '', role: '' }) %>" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
+          <option value="<%= memberHref({ type: 'student', family: '', day: '', role: '' }) %>" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
+          <option value="<%= memberHref({ type: 'admin', family: '', day: '', role: '' }) %>" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
           <optgroup label="Roster Day">
-            <option value="<%= memberHref({ type: '', family: '', day: 'monday' }) %>" <%= dayFilter === 'monday' ? 'selected' : '' %>>Monday</option>
-            <option value="<%= memberHref({ type: '', family: '', day: 'wednesday' }) %>" <%= dayFilter === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+            <option value="<%= memberHref({ type: '', family: '', day: 'monday', role: '' }) %>" <%= dayFilter === 'monday' ? 'selected' : '' %>>Monday</option>
+            <option value="<%= memberHref({ type: '', family: '', day: 'wednesday', role: '' }) %>" <%= dayFilter === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+          </optgroup>
+          <optgroup label="Role">
+            <option value="<%= memberHref({ type: '', family: '', day: '', role: 'teacher' }) %>" <%= roleFilter === 'teacher' ? 'selected' : '' %>>Teacher</option>
+            <option value="<%= memberHref({ type: '', family: '', day: '', role: 'assistant' }) %>" <%= roleFilter === 'assistant' ? 'selected' : '' %>>Class Assistant</option>
           </optgroup>
           <% if (families.length > 0) { %>
             <optgroup label="Family">
               <% families.forEach(function(f) { %>
-                <option value="<%= memberHref({ type: '', family: f.id, day: '' }) %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %></option>
+                <option value="<%= memberHref({ type: '', family: f.id, day: '', role: '' }) %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %></option>
               <% }); %>
             </optgroup>
           <% } %>
@@ -90,10 +102,12 @@
         <button type="button" class="roster-action-btn" data-archive-toggle="members-bulk-form" aria-pressed="false">Edit</button>
       </div>
 
-      <%# Edit mode's Select All + Delete/Archive/Restore Selected controls
-          - hidden until the "Edit" toggle button above is clicked (see
+      <%# Edit mode's Select All + Delete Selected controls - hidden until
+          the "Edit" toggle button above is clicked (see
           public/js/archive-select-toggle.js, reused as-is from the Class/
-          Student/Parent Schedule archive grids). %>
+          Student/Parent Schedule archive grids). No Archive/Restore here -
+          a real request: "remove member archive page, it is not needed on
+          co-op admin, only main admin." %>
       <div class="class-schedule-archive-controls" data-archive-controls="members-bulk-form" hidden>
         <label class="checkbox-option class-schedule-select-all">
           <input type="checkbox" data-select-all-for="members-bulk-form" />
@@ -107,27 +121,6 @@
           data-bulk-confirm="Permanently delete the selected member(s)? This removes them from all rosters, volunteer lists, and all attendance history. This cannot be undone."
           data-bulk-confirm-yes-label="Yes, Delete"
         >Delete Selected</button>
-        <% if (showArchived) { %>
-          <button
-            type="submit"
-            form="members-bulk-form"
-            data-bulk-action="/admin/members/bulk-unarchive"
-            class="roster-action-btn"
-            data-bulk-confirm="Restore the selected member(s) to the active Members list?"
-            data-bulk-confirm-yes-label="Yes, Restore"
-            data-bulk-confirm-safe="1"
-          >Restore Selected</button>
-        <% } else { %>
-          <button
-            type="submit"
-            form="members-bulk-form"
-            data-bulk-action="/admin/members/bulk-archive"
-            class="roster-action-btn"
-            data-bulk-confirm="Archive the selected member(s)? They'll be hidden from the active Members list, but nothing is deleted."
-            data-bulk-confirm-yes-label="Yes, Archive"
-            data-bulk-confirm-safe="1"
-          >Archive Selected</button>
-        <% } %>
       </div>
     </div>
 
@@ -146,12 +139,12 @@
         feature now lives exclusively on Main Admin's own Members page. %>
 
     <div class="members-section-label-row">
-      <span class="members-section-label"><%= showArchived ? 'ARCHIVED' : 'MEMBERS' %></span>
+      <span class="members-section-label">MEMBERS</span>
       <span class="members-count-pill"><%= allMembersForPrint.length %> member<%= allMembersForPrint.length === 1 ? '' : 's' %></span>
     </div>
 
     <% if (members.length === 0) { %>
-      <p class="roster-empty"><%= showArchived ? 'No archived members.' : 'No members match this filter yet.' %></p>
+      <p class="roster-empty">No members match this filter yet.</p>
     <% } else { %>
       <div id="members-table">
         <% members.forEach(function(m) { %>
@@ -310,7 +303,7 @@
       // own pagination) - without these, Select All on a multi-page list
       // would silently reach just the current page. Carries the rest of
       // allMembersForPrint (every member matching the current type/family/
-      // archived filter, unpaginated) so Select All can reach every page,
+      // day/role filter, unpaginated) so Select All can reach every page,
       // same pattern as admin-schedule.ejs's own off-page checkboxes.
       var pageIds = members.map(function (m) { return m.id; });
     %>

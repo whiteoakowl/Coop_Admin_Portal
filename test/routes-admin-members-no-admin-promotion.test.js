@@ -6,8 +6,9 @@
 // Two halves:
 // 1. partials/member-form-fields.ejs (Co-op Admin's own Add/Edit Member
 //    form) never renders a way to pick "Admin" - covered here by
-//    checking the rendered HTML has no such radio for a non-admin
-//    member.
+//    checking the rendered HTML has no memberType field at all for a
+//    non-admin member (a later real request removed the Parent/Student
+//    choice too - utils/dates.js's isChildAge derives it from Birthday).
 // 2. routes/admin-members.js's own POST /members/:id/edit rejects a
 //    memberType='admin' submission for a member who isn't already
 //    admin (defense-in-depth for a raw request that skips the form),
@@ -54,12 +55,10 @@ test('Co-op Admin member form never offers Admin as a choosable type', async (t)
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('No Promo Student', 'No Promo Student', 'student')")
     .run();
 
-  await t.test('a Parent/Student member\'s edit form only offers Parent/Student radios', async () => {
+  await t.test('a Parent/Student member\'s edit form offers no memberType field at all - not a radio, not an admin value', async () => {
     const res = await request(app).get(`/admin/members/${studentId}/edit`).set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.doesNotMatch(res.text, /<input type="radio" name="memberType" value="admin"/);
-    assert.match(res.text, /<input type="radio" name="memberType" value="parent"/);
-    assert.match(res.text, /<input type="radio" name="memberType" value="student"/);
+    assert.doesNotMatch(res.text, /name="memberType"/, 'a real request removed the Parent/Student choice entirely - type is derived from Birthday now');
   });
 
   await t.test('submitting memberType=admin through this route does NOT promote the member', async () => {

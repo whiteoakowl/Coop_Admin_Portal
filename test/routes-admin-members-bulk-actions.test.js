@@ -1,10 +1,13 @@
-// Route-level coverage for the Members page's Edit mode: bulk Delete/
-// Archive/Restore Selected and the Edit Families dialog's rename/delete.
-// "Archive" sets active = 0 (a soft, undoable removal from the default
-// list - see routes/admin-members.js's GET /members comment); "Delete" is
-// the existing permanent single-member delete, extended to a batch.
-// Deleting a family (families.id has ON DELETE SET NULL on
-// members.family_id) only ungroups its members, never deletes them.
+// Route-level coverage for the Members page's Edit mode: bulk Delete
+// Selected and the Edit Families dialog's rename/delete. "Delete" is the
+// existing permanent single-member delete, extended to a batch. Deleting a
+// family (families.id has ON DELETE SET NULL on members.family_id) only
+// ungroups its members, never deletes them. Archive/Restore Selected used
+// to live here too, but a real request removed the whole Archive feature
+// from Co-op Admin's own Members page ("remove member archive page, it is
+// not needed on co-op admin, only main admin") - that coverage belongs with
+// Main Admin's own equivalent routes (routes/main-admin-members.js), not
+// here; see the two tests below confirming it's gone from this side.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -39,7 +42,7 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
-test('GET /admin/members only shows active members by default, and only archived ones with ?archived=1', async () => {
+test('GET /admin/members only ever shows active members - ?archived=1 does nothing now (Archive is Main Admin-only)', async () => {
   const { cookie } = await loginAsAdmin();
   const activeId = (await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Active Member', 'active-member', 'student', 1) RETURNING id").get()).id;
   const archivedId = (await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Archived Member', 'archived-member', 'student', 0) RETURNING id").get()).id;
@@ -48,49 +51,31 @@ test('GET /admin/members only shows active members by default, and only archived
   assert.match(activeRes.text, /Active Member/);
   assert.doesNotMatch(activeRes.text, /Archived Member/);
 
-  const archivedRes = await request(app).get('/admin/members?archived=1').set('Cookie', cookie);
-  assert.doesNotMatch(archivedRes.text, /Active Member/);
-  assert.match(archivedRes.text, /Archived Member/);
+  const archivedParamRes = await request(app).get('/admin/members?archived=1').set('Cookie', cookie);
+  assert.match(archivedParamRes.text, /Active Member/, '?archived=1 is a no-op now - still shows active members');
+  assert.doesNotMatch(archivedParamRes.text, /Archived Member/, 'an archived member never shows on this page anymore');
+  assert.doesNotMatch(archivedParamRes.text, /Archive Selected/, 'the Archive Selected button is gone from Co-op Admin');
+  assert.doesNotMatch(archivedParamRes.text, /Restore Selected/, 'the Restore Selected button is gone from Co-op Admin');
 
   await db.prepare('DELETE FROM members WHERE id IN (?, ?)').run(activeId, archivedId);
 });
 
-test('POST /admin/members/bulk-archive sets active = 0 for every selected member, leaving others untouched', async () => {
+test('POST /admin/members/bulk-archive and bulk-unarchive no longer exist on Co-op Admin', async () => {
   const { cookie, csrfToken } = await loginAsAdmin();
-  const id1 = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Archive Bulk One', 'archive-bulk-1', 'student') RETURNING id").get()).id;
-  const id2 = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Archive Bulk Two', 'archive-bulk-2', 'student') RETURNING id").get()).id;
-  const idUnselected = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Archive Bulk Untouched', 'archive-bulk-3', 'student') RETURNING id").get()).id;
+  const id = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Not Archivable', 'not-archivable', 'student') RETURNING id").get()).id;
 
-  const res = await request(app)
-    .post('/admin/members/bulk-archive')
-    .set('Cookie', cookie)
-    .type('form')
-    .send({ _csrf: csrfToken, memberIds: [String(id1), String(id2)] });
-  assert.equal(res.status, 302);
-  assert.match(res.headers.location, /notice=Archived%202%20member/);
-
-  const row1 = await db.prepare('SELECT active FROM members WHERE id = ?').get(id1);
-  const row2 = await db.prepare('SELECT active FROM members WHERE id = ?').get(id2);
-  const rowUntouched = await db.prepare('SELECT active FROM members WHERE id = ?').get(idUnselected);
-  assert.equal(Number(row1.active), 0);
-  assert.equal(Number(row2.active), 0);
-  assert.equal(Number(rowUntouched.active), 1, 'a member not in the selection must stay active');
-});
-
-test('POST /admin/members/bulk-unarchive restores selected members back to active', async () => {
-  const { cookie, csrfToken } = await loginAsAdmin();
-  const id = (await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Restore Bulk One', 'restore-bulk-1', 'student', 0) RETURNING id").get()).id;
-
-  const res = await request(app)
-    .post('/admin/members/bulk-unarchive')
-    .set('Cookie', cookie)
-    .type('form')
-    .send({ _csrf: csrfToken, memberIds: [String(id)] });
-  assert.equal(res.status, 302);
-  assert.match(res.headers.location, /notice=Restored%201%20member/);
+  for (const action of ['bulk-archive', 'bulk-unarchive']) {
+    const res = await request(app)
+      .post(`/admin/members/${action}`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ _csrf: csrfToken, memberIds: [String(id)] });
+    assert.equal(res.status, 404, `${action} should no longer be a route on Co-op Admin`);
+  }
 
   const row = await db.prepare('SELECT active FROM members WHERE id = ?').get(id);
-  assert.equal(Number(row.active), 1);
+  assert.equal(Number(row.active), 1, 'the member must be untouched');
+  await db.prepare('DELETE FROM members WHERE id = ?').run(id);
 });
 
 test('POST /admin/members/bulk-delete permanently removes every selected member, leaving others untouched', async () => {
@@ -112,19 +97,16 @@ test('POST /admin/members/bulk-delete permanently removes every selected member,
   assert.notEqual(await db.prepare('SELECT id FROM members WHERE id = ?').get(idUnselected), undefined, 'a member not in the selection must survive');
 });
 
-test('bulk-delete/bulk-archive/bulk-unarchive with no memberIds redirects back with an error, changing nothing', async () => {
+test('bulk-delete with no memberIds redirects back with an error, changing nothing', async () => {
   const { cookie, csrfToken } = await loginAsAdmin();
   const id = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('No Selection Member', 'no-selection-member', 'student') RETURNING id").get()).id;
 
-  for (const action of ['bulk-delete', 'bulk-archive', 'bulk-unarchive']) {
-    const res = await request(app).post(`/admin/members/${action}`).set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
-    assert.equal(res.status, 302);
-    assert.match(res.headers.location, /error=Select/);
-  }
+  const res = await request(app).post('/admin/members/bulk-delete').set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /error=Select/);
 
   const row = await db.prepare('SELECT active FROM members WHERE id = ?').get(id);
   assert.ok(row, 'the member must not have been deleted');
-  assert.equal(Number(row.active), 1, 'the member must not have been archived');
 });
 
 // Family rename/delete (POST /admin/members/families/:id/rename,

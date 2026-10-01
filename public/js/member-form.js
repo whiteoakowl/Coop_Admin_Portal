@@ -11,14 +11,34 @@ const MEMBER_TYPE_META = {
 };
 const ALL_HEADER_CLASSES = Object.values(MEMBER_TYPE_META).map((m) => m.headerClass);
 const ALL_BOX_CLASSES = Object.values(MEMBER_TYPE_META).map((m) => m.boxClass);
+const ADULT_AGE = 18;
 
-// Toggles the Student-only / Parent-only / Admin-only sections and re-themes
-// the header + Family box (blue for Student, green for Parent, purple for
-// Admin) when the Parent/Student/Admin toggle changes.
+// A real request: "No parent/student choice on membership forms or
+// profiles. All children are automatically counted as student and adults
+// counted as parents." Mirrors utils/dates.js's own isChildAge exactly
+// (same < 18 cutoff, same "no birthday means not a known child") so the
+// live preview here always agrees with what the server actually saves.
+function isChildBirthday(iso) {
+  if (!iso) return false;
+  const birth = new Date(iso + 'T00:00:00');
+  if (Number.isNaN(birth.getTime())) return false;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const hadBirthdayThisYear = today.getMonth() > birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+  if (!hadBirthdayThisYear) age--;
+  return age >= 0 && age < ADULT_AGE;
+}
+
+// Toggles the Parent-only / Admin-only sections and re-themes the header +
+// Family box (blue for Student, green for Parent, purple for Admin) as the
+// Birthday field changes - type is no longer a user choice (see above), so
+// this is a live preview of what the server will derive on save, not the
+// thing that actually decides it.
 function updateMemberFormForType(form) {
-  const checked = form.querySelector('input[name="memberType"]:checked');
-  const type = checked ? checked.value : 'student';
-  const meta = MEMBER_TYPE_META[type] || MEMBER_TYPE_META.student;
+  const lockedAdmin = form.querySelector('input[name="memberType"][value="admin"]');
+  const birthdayInput = form.querySelector('input[name="birthday"]');
+  const type = lockedAdmin ? 'admin' : isChildBirthday(birthdayInput ? birthdayInput.value : '') ? 'student' : 'parent';
+  const meta = MEMBER_TYPE_META[type] || MEMBER_TYPE_META.parent;
 
   form.querySelectorAll('[data-student-only]').forEach((el) => { el.style.display = type === 'student' ? '' : 'none'; });
   form.querySelectorAll('[data-parent-only]').forEach((el) => { el.style.display = type === 'parent' ? '' : 'none'; });
@@ -106,35 +126,30 @@ function initAddFamilyDialog(form) {
 // "add parent/student ... it will ask student or parent, name, if
 // student then it asks birthday and grade. save." Opens the quick-add
 // dialog (main-admin-member-edit.ejs, outside #member-form for the same
-// reason initAddFamilyDialog's own dialog is) and toggles its
-// Birthday/Grade Level fields on or off with the Student/Parent choice -
-// a real submit (no fetch) since there's nothing on this page to patch
-// in place, just a plain page reload showing the result.
+// reason initAddFamilyDialog's own dialog is) - a real submit (no fetch)
+// since there's nothing on this page to patch in place, just a plain page
+// reload showing the result. A further real request ("No parent/student
+// choice on membership forms or profiles") dropped the Student/Parent
+// radio this used to toggle Birthday/Grade Level with - both fields are
+// just always there now, and the server derives parent-vs-student from
+// whatever Birthday comes back.
 function initQuickAddMemberDialog(form) {
   const openBtn = form.querySelector('[data-quick-add-member-open]');
   const dialog = document.querySelector('[data-quick-add-member-dialog]');
   if (!openBtn || !dialog) return;
   const addForm = dialog.querySelector('[data-quick-add-member-form]');
-  const studentFields = dialog.querySelector('[data-quick-add-student-fields]');
-
-  function updateForType() {
-    const checked = dialog.querySelector('[data-quick-add-type]:checked');
-    const isStudent = !checked || checked.value === 'student';
-    if (studentFields) studentFields.style.display = isStudent ? '' : 'none';
-  }
 
   openBtn.addEventListener('click', () => {
     addForm.reset();
-    updateForType();
     dialog.showModal();
   });
-  dialog.querySelectorAll('[data-quick-add-type]').forEach((r) => r.addEventListener('change', updateForType));
 }
 
-// The Setup/Cleanup Team "Add a Team" dropdown (and, the same shape, the
-// Admin Positions "Add a Position" dropdown - a real request: "ability to
-// add unlimited admin positions to a member profile") is a quick-pick
-// convenience on top of the real multi-select checkbox list below it -
+// The Admin Positions "Add a Position" dropdown (the Setup/Cleanup Team
+// box this was also originally built for is gone now - a real request:
+// "Remove setup/cleanup team section [from the member form]. That is only
+// done through the setup/cleanup admin pages") is a quick-pick convenience
+// on top of the real multi-select checkbox list below it -
 // picking an option just checks that box, then resets itself. Generic
 // over which picker/checklist pair so both boxes share one implementation
 // instead of two near-identical copies.
@@ -164,14 +179,14 @@ function initPickerChecklist(form, pickerSelector, checklistSelector) {
 function initMemberFormInteractions(form) {
   initAddFamilyDialog(form);
   initQuickAddMemberDialog(form);
-  initPickerChecklist(form, '[data-team-picker]', '[data-team-checklist]');
   initPickerChecklist(form, '[data-position-picker]', '[data-position-checklist]');
 }
 
 (function () {
   const form = document.getElementById('member-form');
   if (!form) return;
-  form.querySelectorAll('input[name="memberType"]').forEach((r) => r.addEventListener('change', () => updateMemberFormForType(form)));
+  const birthdayInput = form.querySelector('input[name="birthday"]');
+  if (birthdayInput) birthdayInput.addEventListener('input', () => updateMemberFormForType(form));
   updateMemberFormForType(form);
   initMemberFormInteractions(form);
 })();

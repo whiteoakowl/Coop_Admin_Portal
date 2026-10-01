@@ -1,0 +1,52 @@
+<%
+// Shared by both portals' Member Profile Attendance tab (admin-member-
+// profile.ejs, main-admin-member-profile.ejs). A real request: "under
+// each person, each of the attendance rosters this member is on will
+// show, then you can click on the class/roster name and it will expand
+// and show attendance and dates for that class. When you click on
+// another class. The old class closes." - public/js/member-attendance-
+// accordion.js enforces the one-open-at-a-time part, same pattern as
+// public/js/absence-log-accordion.js.
+//
+// locals: groups (from routes' own groupAttendanceByRoster - [{rosterName,
+// rows}]), uidPrefix (must be unique per member on the page, since the
+// "All" family view puts more than one member's own roster list on the
+// same page), includeNumberColumn (Co-op Admin's own attendance history
+// has a Number column; Main Admin's doesn't - see each route's own
+// attendanceHistoryForMember).
+%>
+<% if (groups.length === 0) { %>
+  <p class="roster-empty">No attendance recorded yet.</p>
+<% } else { %>
+  <div class="member-attendance-rosters">
+    <% groups.forEach(function(g, i) { %>
+      <div class="member-attendance-roster-group">
+        <button type="button" class="member-attendance-roster-toggle" aria-expanded="false" aria-controls="<%= uidPrefix %>-roster-<%= i %>">
+          <span class="member-attendance-roster-name"><%= g.rosterName %></span>
+          <span class="member-attendance-roster-count"><%= g.rows.length %> record<%= g.rows.length === 1 ? '' : 's' %></span>
+          <svg class="icon member-attendance-roster-chevron"><use href="#icon-chevron-down"/></svg>
+        </button>
+        <div class="member-attendance-roster-panel" id="<%= uidPrefix %>-roster-<%= i %>" hidden>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table">
+              <thead>
+                <tr><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th><% if (includeNumberColumn) { %><th>Number</th><% } %></tr>
+              </thead>
+              <tbody>
+                <% g.rows.forEach(function(h) { %>
+                  <tr>
+                    <td><%= h.dateLabel %></td>
+                    <td><span class="status-badge status-badge-<%= h.status %>"><%= h.statusLabel %></span></td>
+                    <td><%= h.checkInTime || '—' %></td>
+                    <td><%= h.checkOutTime || '—' %></td>
+                    <% if (includeNumberColumn) { %><td><%= h.number ?? '—' %></td><% } %>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+<% } %>

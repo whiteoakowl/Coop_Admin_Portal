@@ -334,6 +334,15 @@ async function teacherMemberIds() {
   return new Set(rows.map((r) => r.member_id));
 }
 
+// Same shape as teacherMemberIds, for class_staff.role = 'assistant' - the
+// Co-op Admin Members page's own Filter dropdown ("dropdown member search
+// should include teachers and class assistants") needs both roles as
+// filterable groups, not just the member_type column.
+async function assistantMemberIds() {
+  const rows = await db.prepare("SELECT DISTINCT member_id FROM class_staff WHERE role = 'assistant'").all();
+  return new Set(rows.map((r) => r.member_id));
+}
+
 // Family is now a named entity (families.name, e.g. "Anderson") rather
 // than a list of everyone else sharing family_id - a plain left join gets
 // each member's family surname in one query instead of the old per-member
@@ -381,10 +390,13 @@ async function generateMemberCode(dbHandle = db) {
 // list (a real request, with a reference screenshot, showing each row
 // with a different colored initials avatar) - keyed off the member's own
 // id so it's the same color every reload rather than reshuffling, and
-// with no "assigned color" column to add just for this. Six colors is
-// plenty to make adjacent rows read as visually distinct; repeating past
-// six members is fine since nothing depends on uniqueness.
-const AVATAR_COLORS = ['blue', 'green', 'purple', 'red', 'orange', 'gold'];
+// with no "assigned color" column to add just for this. A later real
+// request narrowed this to exactly "the pastel orange, purple, blue and
+// green found throughout the website" (dropping red/gold, which read as
+// alert/warning colors elsewhere in the app, not identity colors). Four
+// colors is still plenty to make adjacent rows read as visually distinct;
+// repeating past four members is fine since nothing depends on uniqueness.
+const AVATAR_COLORS = ['blue', 'green', 'purple', 'orange'];
 function avatarColorFor(memberId) {
   return AVATAR_COLORS[memberId % AVATAR_COLORS.length];
 }
@@ -410,6 +422,7 @@ module.exports = {
   sortMembersByFamily,
   membersWithDetails,
   teacherMemberIds,
+  assistantMemberIds,
   lastNameOf,
   byLastName,
   generateMemberCode,

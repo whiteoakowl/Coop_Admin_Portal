@@ -57,16 +57,11 @@
       ] },
       { href: '/admin/training', icon: 'graduation-cap', label: 'Training' },
     ];
-    // Members' own Members/Archived toggle is a ?archived=1 param, not
-    // ?tab= - public/js/admin-nav-accordion.js's own active-subpage
-    // matcher now compares whatever query param(s) a subpage's own href
-    // declares (not just ?tab=), so this works the same way every ?tab=
-    // group already does.
     const adminFullAdminNavLinks = [
-      { href: '/admin/members', icon: 'user-check', label: 'Members', subpages: [
-        { href: '/admin/members', label: 'Members' },
-        { href: '/admin/members?archived=1', label: 'Archived' },
-      ] },
+      // No Archived subpage here - a real request: "remove member archive
+      // page, it is not needed on co-op admin, only main admin." Main
+      // Admin's own Members nav (portal-nav.ejs) still has its Archive tab.
+      { href: '/admin/members', icon: 'user-check', label: 'Members' },
       { href: '/admin/library', icon: 'book', label: 'Library', subpages: [
         { href: '/admin/library?tab=checkin', label: 'Check In' },
         { href: '/admin/library?tab=checkout', label: 'Check Out' },

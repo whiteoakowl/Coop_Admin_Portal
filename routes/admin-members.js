@@ -4,7 +4,7 @@ const multer = require('multer');
 const db = require('../db');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/spreadsheet');
-const { formatDateLabel, formatDateNumeric, formatTime, ageFromBirthday, isValidISODate } = require('../utils/dates');
+const { formatDateLabel, formatDateNumeric, formatTime, ageFromBirthday, isChildAge, isValidISODate } = require('../utils/dates');
 const { spreadsheetFileFilter } = require('../utils/uploads');
 const { uploadMemberPhoto, savePhotoFile, deletePhotoFile } = require('../utils/memberPhoto');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
@@ -22,9 +22,11 @@ const {
   membersWithDetails,
   byLastName,
   avatarColorFor,
+  teacherMemberIds,
+  assistantMemberIds,
 } = require('../utils/members');
 const { GRADE_LEVELS } = require('../utils/classSchedule');
-const { allSetupTeams, cleanupTeamIdsForMember } = require('../utils/setup');
+const { allSetupTeams } = require('../utils/setup');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
@@ -75,37 +77,59 @@ function formatAttendanceHistory(rows) {
   }));
 }
 
+// A real request: "under each person, each of the attendance rosters this
+// member is on will show, then you can click on the class/roster name and
+// it will expand and show attendance and dates for that class." Groups
+// formatAttendanceHistory's already-date-desc-sorted flat rows by roster
+// name, preserving each roster's own date order - groups come out in
+// order of whichever roster's most recent attendance record is newest,
+// since that's the order their rows first appear in the flat list.
+function groupAttendanceByRoster(history) {
+  const order = [];
+  const byRoster = new Map();
+  history.forEach((h) => {
+    if (!byRoster.has(h.rosterName)) {
+      byRoster.set(h.rosterName, []);
+      order.push(h.rosterName);
+    }
+    byRoster.get(h.rosterName).push(h);
+  });
+  return order.map((rosterName) => ({ rosterName, rows: byRoster.get(rosterName) }));
+}
+
 // --- Members page (the full member list) ---
 
 router.get('/members', async (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   const familyFilter = parseInt(req.query.family, 10) || null;
   const dayFilter = ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '';
+  // A real request: "dropdown member search should include teachers and
+  // class assistants" - teacher/assistant are class_staff roles, not a
+  // member_type, so this is its own filter dimension alongside Type/Day/
+  // Family rather than another MEMBER_TYPES value.
+  const roleFilter = ['teacher', 'assistant'].includes(req.query.role) ? req.query.role : '';
   // A real request, with a reference screenshot, for a search bar on the
   // Members page - same "filter the already-fetched list by name" shape
   // Main Admin's own Members page (routes/main-admin-members.js) already
   // uses, just added here too for parity.
   const q = (req.query.q || '').trim().toLowerCase();
-  // "Archive" (see /members/bulk-archive below) sets active = 0 on a
-  // member rather than deleting them - a soft, undoable removal from the
-  // active list, unlike the "Delete Selected" button which is permanent.
-  // membersWithDetails itself doesn't filter by active (it's used
-  // elsewhere for full lookups that need every member regardless), so the
-  // default/archived split happens here instead - same "one boolean flag,
-  // two mutually exclusive views" shape as nameTagSubmissions'
-  // showArchived above.
-  const showArchived = req.query.archived === '1';
+  // A real request: "remove member archive page, it is not needed on
+  // co-op admin, only main admin" - Co-op Admin's Members page only ever
+  // shows active members now; archiving/restoring a member is Main
+  // Admin's own feature (routes/main-admin-members.js's Archive tab).
   // Cards/Schedule dialog content (badge HTML, schedule-card HTML,
   // getMemberSchedule()) used to be computed here for every member on
   // every page load - two renderBadgeElements() calls and a DB query
   // each, whether or not their row's dialog was ever opened. Now fetched
   // on demand instead - see /members/:id/cards-fragment and
   // /members/:id/schedule-fragment below, and public/js/members-dialogs.js.
-  const filteredMembers = (await membersWithDetails(typeFilter, familyFilter)).filter((m) => (showArchived ? Number(m.active) === 0 : Number(m.active) === 1));
+  const filteredMembers = (await membersWithDetails(typeFilter, familyFilter)).filter((m) => Number(m.active) === 1);
   // A real request: "this will then add their admin title label next to
   // their name... on member lists." Batched (not per-row) for the same
   // N+1 reason as nameTagData.js's own bulk-print title lookup.
   const adminTitlesByMember = await adminPositionTitlesForMembers(filteredMembers.map((m) => m.id));
+  const teacherIds = roleFilter === 'teacher' ? await teacherMemberIds() : null;
+  const assistantIds = roleFilter === 'assistant' ? await assistantMemberIds() : null;
   // Mobile shows which day(s) a member is actually on instead of the
   // Type column (a real request: "on mobile the column type shouldn't
   // be there. It should read whether they are on Wednesday or Monday
@@ -119,6 +143,8 @@ router.get('/members', async (req, res) => {
     rosterDays: [...new Set(m.rosters.map((r) => r.schedule_day).filter(Boolean))],
   }));
   if (dayFilter) withRosters = withRosters.filter((m) => m.rosterDays.includes(dayFilter));
+  if (teacherIds) withRosters = withRosters.filter((m) => teacherIds.has(m.id));
+  if (assistantIds) withRosters = withRosters.filter((m) => assistantIds.has(m.id));
   if (q) withRosters = withRosters.filter((m) => m.name.toLowerCase().includes(q));
   // The on-screen table only gets the current page's slice - the print
   // table (admin-members.ejs's separate .members-print-table) still gets
@@ -149,12 +175,12 @@ router.get('/members', async (req, res) => {
       (typeFilter ? `type=${typeFilter}&` : '') +
       (familyFilter ? `family=${familyFilter}&` : '') +
       (dayFilter ? `day=${dayFilter}&` : '') +
-      (showArchived ? `archived=1&` : '') +
+      (roleFilter ? `role=${roleFilter}&` : '') +
       (q ? `q=${encodeURIComponent(q)}&` : ''),
     typeFilter,
     familyFilter,
     dayFilter,
-    showArchived,
+    roleFilter,
     q: req.query.q || '',
     families: await allFamilies(),
     error: req.query.error || null,
@@ -209,8 +235,17 @@ router.get('/members/export.csv', async (req, res) => {
   sendCsv(res, `members${typeFilter ? '-' + typeFilter : ''}.csv`, lines);
 });
 
+// A real request: "No parent/student choice on membership forms or
+// profiles. All children are automatically counted as student and adults
+// counted as parents." memberType is no longer read from a submitted
+// radio - it's derived from the submitted birthday (utils/dates.js's
+// isChildAge), except for an existing Admin, who still submits a locked
+// hidden memberType=admin field (see partials/member-form-fields.ejs) that
+// this never overrides - the POST /:id/edit handler below also still
+// refuses to let a raw request change TO or FROM admin either way.
 function memberFormFields(req) {
-  const memberType = MEMBER_TYPES.includes(req.body.memberType) ? req.body.memberType : 'student';
+  const birthday = (req.body.birthday || '').trim() || null;
+  const memberType = req.body.memberType === 'admin' ? 'admin' : isChildAge(birthday) ? 'student' : 'parent';
   const familyIdRaw = parseInt(req.body.familyId, 10);
   return {
     name: (req.body.name || '').trim(),
@@ -221,7 +256,7 @@ function memberFormFields(req) {
     zip: (req.body.zip || '').trim() || null,
     phone: (req.body.phone || '').trim() || null,
     email: (req.body.email || '').trim() || null,
-    birthday: memberType === 'student' ? (req.body.birthday || '').trim() || null : null,
+    birthday,
     gradeLevel: memberType === 'student' ? (req.body.gradeLevel || '').trim() || null : null,
     // Medical/Allergy Notes is on both the Parent and Student Membership
     // Forms (not student-only anymore - see the mockup), so it's captured
@@ -229,15 +264,13 @@ function memberFormFields(req) {
     medicalNotes: (req.body.medicalNotes || '').trim() || null,
     familyId: Number.isInteger(familyIdRaw) ? familyIdRaw : null,
     isPrimaryParent: req.body.isPrimaryParent === '1',
-    cleanupTeamIds:
-      memberType === 'parent'
-        ? [].concat(req.body.cleanupTeamIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
-        : null,
+    // A real request: "Remove setup/cleanup team section. That is only
+    // done through the setup/cleanup admin pages" - this form no longer
+    // touches setup_team_members at all; whatever team membership a
+    // member already has stays untouched when their profile is saved here.
     // A real request: "ability to add unlimited admin positions to a
     // member profile" - superseded the old single adminPositionId (a
-    // plain <select>) with a checkbox multi-select, same "array of ids,
-    // gated to the one member type that actually shows the field" shape
-    // as cleanupTeamIds just above.
+    // plain <select>) with a checkbox multi-select.
     // req.body.adminPositionsFormPresent (a hidden marker, always
     // submitted alongside these checkboxes - see partials/member-form-
     // fields.ejs's own comment) distinguishes a real form save (resync to
@@ -249,20 +282,6 @@ function memberFormFields(req) {
         ? [].concat(req.body.adminPositionIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
         : undefined,
   };
-}
-
-// Keeps setup_team_members in sync with the Cleanup Team checkboxes on a
-// parent's profile, so editing it there is reflected on the actual
-// Setup/Cleanup team charts (and vice versa - both read/write the same
-// table). Always clears existing rows first (not just when teamIds is a
-// real list) so converting an existing parent to student/admin drops their
-// stale team membership instead of leaving them stuck on a chart they can
-// no longer manage from their own profile.
-async function syncCleanupTeams(memberId, teamIds) {
-  await db.prepare('DELETE FROM setup_team_members WHERE member_id = ?').run(memberId);
-  if (!teamIds) return;
-  const link = db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?) ON CONFLICT (team_id, member_id) DO NOTHING');
-  for (const teamId of teamIds) await link.run(teamId, memberId);
 }
 
 // A family only shows up on the "Choose a Family" dropdown once it's been
@@ -447,7 +466,12 @@ router.get('/members/:id', async (req, res) => {
     member,
     tab,
     familyName: family ? family.familyName : null,
-    familyMembers: restOfFamily.map((m) => m.name),
+    // A real request: "the family should be a list in a nice column with
+    // parents listed under parent title, and children listed under
+    // children title. Should show grade levels next to students in
+    // parenthesis." Full member records now (not just names), so the view
+    // can group by member_type and read each student's grade_level.
+    familyMembers: restOfFamily,
     memberSections: allSections.filter((s) => memberSectionIds.has(s.id)),
     portalRoles: portalStatus.account ? allRoles.filter((r) => portalStatus.roleIds.has(r.id)) : null,
     // Includes the member being viewed (not just the rest of the family)
@@ -462,10 +486,10 @@ router.get('/members/:id', async (req, res) => {
       ? await Promise.all(familyRoster.map(async (m) => ({ member: m, schedule: await getMemberSchedule(m.id) })))
       : null,
     attendanceFamilyAll,
-    history: attendanceFamilyAll ? null : formatAttendanceHistory(await attendanceHistoryForMember(id)),
+    history: attendanceFamilyAll ? null : groupAttendanceByRoster(formatAttendanceHistory(await attendanceHistoryForMember(id))),
     familyAttendanceHistories: attendanceFamilyAll
       ? await Promise.all(
-          familyRoster.map(async (m) => ({ member: m, history: formatAttendanceHistory(await attendanceHistoryForMember(m.id)) }))
+          familyRoster.map(async (m) => ({ member: m, history: groupAttendanceByRoster(formatAttendanceHistory(await attendanceHistoryForMember(m.id))) }))
         )
       : null,
   });
@@ -483,8 +507,6 @@ router.get('/members/:id/edit', async (req, res) => {
     families: await allFamilies(),
     memberFamilyId: member.family_id,
     gradeLevels: GRADE_LEVELS,
-    setupTeams: await allSetupTeams(),
-    memberCleanupTeamIds: await cleanupTeamIdsForMember(id),
     adminPositions: await listAdminPositions(),
     memberAdminPositionIds: await adminPositionIdsForMember(id),
     error: req.query.error || null,
@@ -547,7 +569,6 @@ router.post('/members/:id/edit', uploadMemberPhoto((req) => `/admin/members/${re
     f.medicalNotes,
     id
   );
-  await syncCleanupTeams(id, f.cleanupTeamIds);
   await syncMemberAdminPositions(id, f.adminPositionIds);
   await clearVolunteerMembershipIfNotParent(id, f.memberType);
   await setMemberFamily(id, f.familyId);
@@ -722,11 +743,13 @@ function memberIdsFromBody(body) {
   return [...new Set([].concat(body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean))];
 }
 
-// --- Members page bulk actions (Edit mode's Select All + Delete/Archive/
-// Restore Selected - see admin-members.ejs's own comment and
-// public/js/archive-select-toggle.js, reused as-is from the Class/
-// Student/Parent Schedule archive grids' identical Select-All-across-
-// every-page mechanics). ---
+// --- Members page bulk actions (Edit mode's Select All + Delete Selected -
+// see admin-members.ejs's own comment and public/js/archive-select-toggle.js,
+// reused as-is from the Class/Student/Parent Schedule archive grids'
+// identical Select-All-across-every-page mechanics). Archive/Restore is
+// Main Admin's own feature now (routes/main-admin-members.js) - a real
+// request: "remove member archive page, it is not needed on co-op admin,
+// only main admin." ---
 
 // A real request: "any pages, do not refresh the page when clicking
 // button or icons... stay on the screen so you don't have to search for
@@ -768,26 +791,6 @@ router.post('/members/bulk-delete', async (req, res) => {
     if (await deleteMemberById(id)) count++;
   }
   res.redirect(membersRedirectUrl(req, '', { notice: `Deleted ${count} member(s).` }));
-});
-
-router.post('/members/bulk-archive', async (req, res) => {
-  const memberIds = memberIdsFromBody(req.body);
-  if (memberIds.length === 0) {
-    return res.redirect(membersRedirectUrl(req, '', { error: 'Select at least one member to archive.' }));
-  }
-  const placeholders = memberIds.map(() => '?').join(',');
-  await db.prepare(`UPDATE members SET active = 0 WHERE id IN (${placeholders})`).run(...memberIds);
-  res.redirect(membersRedirectUrl(req, '', { notice: `Archived ${memberIds.length} member(s).` }));
-});
-
-router.post('/members/bulk-unarchive', async (req, res) => {
-  const memberIds = memberIdsFromBody(req.body);
-  if (memberIds.length === 0) {
-    return res.redirect(membersRedirectUrl(req, 'archived=1', { error: 'Select at least one member to restore.' }));
-  }
-  const placeholders = memberIds.map(() => '?').join(',');
-  await db.prepare(`UPDATE members SET active = 1 WHERE id IN (${placeholders})`).run(...memberIds);
-  res.redirect(membersRedirectUrl(req, 'archived=1', { notice: `Restored ${memberIds.length} member(s).` }));
 });
 
 // A real request: "Co-op admin portal, members, remove manage families

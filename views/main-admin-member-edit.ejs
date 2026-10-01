@@ -23,7 +23,7 @@
         class="member-edit-form member-edit-form-page"
         data-add-family-url="/main-admin/members/families/new"
       >
-        <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, setupTeams, memberCleanupTeamIds, gradeLevels, adminPositions, memberAdminPositionIds }) %>
+        <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, gradeLevels, adminPositions, memberAdminPositionIds }) %>
 
         <%# A real request: "when editing a member profile, there is a
             button that says add parent/student. when you click this
@@ -126,34 +126,28 @@
           /:id/quick-add-family-member - simplest way to show the result
           (a fresh page load re-rendering this same Edit Profile page with
           a success/error banner), consistent with how every other action
-          on this page already reports back. %>
+          on this page already reports back. A further real request: "No
+          parent/student choice on membership forms or profiles. All
+          children are automatically counted as student and adults
+          counted as parents." - no more Student/Parent radio here either;
+          Birthday is the only thing that decides it (grade level is only
+          ever meaningful for a child, but asking for it costs nothing on
+          the rare case someone leaves it blank for an adult). %>
       <dialog class="member-picker-dialog" data-quick-add-member-dialog>
         <form method="POST" action="/main-admin/members/<%= member.id %>/quick-add-family-member" data-quick-add-member-form>
           <h3>Add Parent/Student</h3>
-          <div class="member-type-toggle" role="group" aria-label="Member type">
-            <label class="member-type-toggle-btn member-type-toggle-student">
-              <input type="radio" name="memberType" value="student" checked data-quick-add-type />
-              <svg class="icon"><use href="#icon-graduation-cap"/></svg> Student
-            </label>
-            <label class="member-type-toggle-btn member-type-toggle-parent">
-              <input type="radio" name="memberType" value="parent" data-quick-add-type />
-              <svg class="icon"><use href="#icon-user"/></svg> Parent
-            </label>
-          </div>
           <label>Name
             <input type="text" name="name" placeholder="Full name" required />
           </label>
-          <div data-quick-add-student-fields>
-            <label>Birthday
-              <input type="date" name="birthday" />
-            </label>
-            <label>Grade Level
-              <select name="gradeLevel">
-                <option value="">Select grade level</option>
-                <% gradeLevels.forEach(function(g) { %><option value="<%= g %>"><%= g %></option><% }); %>
-              </select>
-            </label>
-          </div>
+          <label>Birthday <span class="hint">(leave blank for an adult/parent)</span>
+            <input type="date" name="birthday" />
+          </label>
+          <label>Grade Level <span class="hint">(students only)</span>
+            <select name="gradeLevel">
+              <option value="">Select grade level</option>
+              <% gradeLevels.forEach(function(g) { %><option value="<%= g %>"><%= g %></option><% }); %>
+            </select>
+          </label>
           <div class="notes-dialog-actions">
             <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
             <button type="submit" class="primary-btn">Save</button>

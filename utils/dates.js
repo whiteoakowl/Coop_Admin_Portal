@@ -295,6 +295,19 @@ function ageFromBirthday(iso) {
   return ageAsOfDate(iso, todayISO());
 }
 
+// A real request: "No parent/student choice on membership forms or
+// profiles. All children are automatically counted as student and adults
+// counted as parents." member_type is no longer a manual radio choice
+// (see utils/members.js's own member-type comment history) - it's derived
+// from this instead. No birthday on file defaults to false (adult/parent) -
+// parents have never been required to enter one, so a missing birthday
+// reads as "not a known child," never as "unknown, so ask again."
+const ADULT_AGE = 18;
+function isChildAge(birthdayIso) {
+  const age = ageFromBirthday(birthdayIso);
+  return age != null && age < ADULT_AGE;
+}
+
 // Picks "today, or the closest date coming up" out of an unsorted list of
 // ISO dates - a real request for the public kiosk Floater Assignments/
 // Setup-Cleanup pages, which used to only ever show something on the
@@ -326,6 +339,7 @@ module.exports = {
   formatFriendlyDateAndTime,
   formatDateAndTime,
   ageFromBirthday,
+  isChildAge,
   ageAsOfDate,
   closestUpcomingDate,
   easternInputToUtcText,

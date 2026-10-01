@@ -1,11 +1,13 @@
 <%
-// Shared Membership Form fields - included by the full Add/Edit page
-// (views/admin-member-edit.ejs) for both 'create' and 'edit' modes, so
-// the two never drift apart. Field layout/wording follows the
-// Student/Parent Membership Form reference design exactly.
+// Shared Membership Form fields - included by the full Edit page
+// (views/admin-member-edit.ejs, views/main-admin-member-edit.ejs), always
+// in 'edit' mode (an existing member who already has a member_type/
+// birthday on file - new members are created through member-intake-
+// form.ejs's separate parent/child sections instead, which never had this
+// toggle to begin with). Field layout/wording follows the Student/Parent
+// Membership Form reference design.
 //
-// locals: member, mode ('create'|'edit'), families (with memberCount),
-// memberFamilyId, setupTeams (with memberCount), memberCleanupTeamIds,
+// locals: member, mode, families (with memberCount), memberFamilyId,
 // gradeLevels, adminPositions, memberAdminPositionIds
 //
 // A real request: "There should not be admin check box on any of the
@@ -17,15 +19,21 @@
 // utils/adminPositions.js's own syncMemberAdminStatus, which also grants
 // the Main Admin portal role itself the moment someone holds any
 // position - the same reason a separate Roles & Permissions tab isn't
-// needed anymore either). The toggle below is only ever a 2-way Parent/
-// Student choice now; an already-Admin member gets a locked, hidden
-// "admin" value instead (see further down) so saving this form for
-// something unrelated - name, phone, whatever - can never silently
-// demote them.
+// needed anymore either). An already-Admin member gets a locked, hidden
+// "admin" value (see further down) so saving this form for something
+// unrelated - name, phone, whatever - can never silently demote them.
+//
+// A further real request: "No parent/student choice on membership forms
+// or profiles. All children are automatically counted as student and
+// adults counted as parents." There's no Parent/Student toggle here
+// anymore either - public/js/member-form.js recomputes it live as the
+// Birthday field changes (same < 18 cutoff as utils/dates.js's own
+// isChildAge, which is what the server actually saves on submit); isParent
+// below is just this page's own starting point, from whatever member_type
+// was already computed and saved the last time this member was edited.
 const isParent = member.member_type === 'parent';
 // 'admin' - co-op staff/leaders who mainly just need a printable badge
-// (see members.member_type's own schema comment) - a real request added
-// this as a 3rd member type alongside the original Parent/Student toggle.
+// (see members.member_type's own schema comment).
 const isAdmin = member.member_type === 'admin';
 const uid = 'mf-' + mode + '-' + (member.id || 'new');
 const typeLabel = isAdmin ? 'Admin' : isParent ? 'Parent' : 'Student';
@@ -53,38 +61,19 @@ const US_STATES = [
   </div>
   <%# A real request: "There should not be admin check box on any of the
       membership form or profiles. Just parent/student and primary
-      parent." Neither portal's form can pick Admin anymore - the only
-      choice here is Parent/Student. An existing Admin (assigned from
-      Main Admin > Settings > Admins) gets a locked, hidden "admin" value
-      instead (not simply omitted) so the header/theme stays correctly
-      "Admin" (public/js/member-form.js reads whichever radio is
-      :checked, so a plain hidden input works just as well with nothing
-      to check) and saving this form for something unrelated - name,
-      phone, whatever - never silently demotes them back to Student. %>
-  <div class="member-type-toggle" role="group" aria-label="Member type">
-    <% if (isAdmin) { %>
-      <span class="member-type-toggle-btn member-type-toggle-admin" aria-hidden="true">
-        <input type="hidden" name="memberType" value="admin" />
-        <svg class="icon"><use href="#icon-badge"/></svg> Admin
-      </span>
-    <% } else { %>
-      <label class="member-type-toggle-btn member-type-toggle-parent">
-        <input type="radio" name="memberType" value="parent" <%= isParent ? 'checked' : '' %> />
-        <svg class="icon"><use href="#icon-user"/></svg> Parent
-      </label>
-      <label class="member-type-toggle-btn member-type-toggle-student">
-        <input type="radio" name="memberType" value="student" <%= !isParent ? 'checked' : '' %> />
-        <svg class="icon"><use href="#icon-graduation-cap"/></svg> Student
-      </label>
-    <% } %>
-  </div>
-</div>
-
-<div class="member-form-parent-flag" data-parent-only style="<%= isParent ? '' : 'display:none;' %>">
-  <label class="checkbox-option primary-parent-top-option">
-    <input type="checkbox" name="isPrimaryParent" value="1" <%= member.is_primary_parent ? 'checked' : '' %> />
-    <svg class="icon"><use href="#icon-star"/></svg> Primary Parent
-  </label>
+      parent." - and a further real request removed Parent/Student from
+      here too: "No parent/student choice on membership forms or
+      profiles." An existing Admin (assigned from Main Admin > Settings >
+      Admins) still gets a locked, hidden "admin" value (not simply
+      omitted) so the header/theme stays correctly "Admin" and saving this
+      form for something unrelated - name, phone, whatever - never
+      silently demotes them back to Parent/Student; everyone else submits
+      no memberType field at all now; see routes/admin-members.js's and
+      routes/main-admin-members.js's own memberFormFields for how it's
+      derived from Birthday instead. %>
+  <% if (isAdmin) { %>
+    <input type="hidden" name="memberType" value="admin" />
+  <% } %>
 </div>
 
 <div class="member-form-card">
@@ -101,6 +90,19 @@ const US_STATES = [
       <input type="file" name="photo" id="<%= uid %>-photo" accept="image/*" hidden />
       <label class="member-photo-upload-link" for="<%= uid %>-photo">Upload a photo</label>
       <span class="member-photo-hint">JPG, PNG up to 5MB</span>
+      <%# A real request: "Member profile, primary parent selection should
+          be below the profile picture and above the full name entry."
+          Moved from its own standalone row above this whole card down
+          into the photo column, right after the photo controls - the
+          Full Name field is the first thing in .member-fields-col right
+          next to it, so this still reads "below the picture, above the
+          name" in document order. %>
+      <div class="member-form-parent-flag" data-parent-only style="<%= isParent ? '' : 'display:none;' %>">
+        <label class="checkbox-option primary-parent-top-option">
+          <input type="checkbox" name="isPrimaryParent" value="1" <%= member.is_primary_parent ? 'checked' : '' %> />
+          <svg class="icon"><use href="#icon-star"/></svg> Primary Parent
+        </label>
+      </div>
     </div>
     <div class="member-fields-col">
       <div class="class-form-row">
@@ -159,12 +161,21 @@ const US_STATES = [
       <textarea name="medicalNotes" rows="3" placeholder="Enter any medical conditions, allergies, or important notes"><%= member.medical_notes || '' %></textarea>
     </div>
   </div>
-  <div class="class-form-row" data-student-only style="<%= (!isParent && !isAdmin) ? '' : 'display:none;' %>">
+  <%# A real request: "No parent/student choice on membership forms or
+      profiles. All children are automatically counted as student and
+      adults counted as parents." Birthday is no longer student-only - it
+      has to be visible/editable for everyone now, since it's what decides
+      student vs. parent (see utils/dates.js's own isChildAge and this
+      form's own top comment); public/js/member-form.js listens for it
+      changing to re-theme the header and toggle Grade Level live. Grade
+      Level itself is still only meaningful for a student, so it stays
+      gated behind data-student-only. %>
+  <div class="class-form-row">
     <div class="class-form-field">
-      <span class="class-form-field-label required">Birthday</span>
+      <span class="class-form-field-label">Birthday</span>
       <input type="date" name="birthday" value="<%= member.birthday || '' %>" />
     </div>
-    <div class="class-form-field">
+    <div class="class-form-field" data-student-only style="<%= (!isParent && !isAdmin) ? '' : 'display:none;' %>">
       <span class="class-form-field-label required">Grade Level</span>
       <select name="gradeLevel">
         <option value="">Select grade level</option>
@@ -190,31 +201,12 @@ const US_STATES = [
     <button type="button" class="btn-secondary member-form-add-family-btn" data-add-family-open>+ Add New Family</button>
   </div>
 
-  <div class="manage-section member-form-section-box member-form-section-green" id="parent-only-fields" data-parent-only style="<%= isParent ? '' : 'display:none;' %>">
-    <h2><svg class="icon"><use href="#icon-broom"/></svg> Setup / Cleanup Team</h2>
-    <% if (setupTeams.length === 0) { %>
-      <p class="hint">No Setup/Cleanup teams exist yet.</p>
-    <% } else { %>
-      <label class="member-form-full">Add a Team
-        <select data-team-picker>
-          <option value="">Choose from available teams</option>
-          <% setupTeams.forEach(function(t) { %>
-            <option value="<%= t.id %>"><%= t.day === 'monday' ? 'Monday' : 'Wednesday' %> &ndash; <%= t.title %></option>
-          <% }); %>
-        </select>
-      </label>
-      <div class="member-form-checklist" data-team-checklist>
-        <% setupTeams.forEach(function(t) { %>
-          <label class="member-form-checklist-row<%= memberCleanupTeamIds.includes(t.id) ? ' is-checked' : '' %>">
-            <input type="checkbox" name="cleanupTeamIds" value="<%= t.id %>" class="member-form-checklist-checkbox" <%= memberCleanupTeamIds.includes(t.id) ? 'checked' : '' %> />
-            <span class="member-form-checklist-box"><svg class="icon"><use href="#icon-check"/></svg></span>
-            <span class="member-form-checklist-name"><%= t.day === 'monday' ? 'Monday' : 'Wednesday' %> &ndash; <%= t.title %></span>
-            <span class="member-form-checklist-count"><%= t.memberCount %> member<%= t.memberCount === 1 ? '' : 's' %></span>
-          </label>
-        <% }); %>
-      </div>
-    <% } %>
-  </div>
+  <%# A real request: "Member profile and form. Remove setup/cleanup team
+      section. That is only done through the setup/cleanup admin pages."
+      The Setup/Cleanup Team box that used to live here (an "Add a Team"
+      picker + checklist, parent-only) is gone - managing which team a
+      member is on is exclusively a Setup/Cleanup admin page task now
+      (views/admin-setup.ejs), not something this form touches at all. %>
 
   <%# A real request: "ability to add unlimited admin positions to a
       member profile" - was a single <select> (member.admin_position_id),

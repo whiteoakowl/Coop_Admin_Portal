@@ -6,7 +6,7 @@ const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { isValidISODate, easternInputToUtcText, formatTimestamp } = require('../utils/dates');
+const { isValidISODate, easternInputToUtcText, formatTimestamp, ageFromBirthday } = require('../utils/dates');
 const { listWindows, createWindow, deleteWindow } = require('../utils/registrationWindows');
 const { defaultDateFor, parseDayValue } = require('../utils/days');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
@@ -744,13 +744,33 @@ router.get('/schedule/print', requireFullAdmin, async (req, res) => {
     memberId: req.query.memberId ? parseInt(req.query.memberId, 10) : null,
     familyId,
   };
-  const rows = await scheduleList(filters);
+  let rows = await scheduleList(filters);
   // A family's "View All" print (routes/admin-members.js's Class Schedule
   // tab) uses a compact one-row-per-member table instead of the normal
   // one-card-per-member layout below - a family of even 3-4 people
   // already runs each member's own two full 4-row day tables past a
   // single printed page, which defeats the entire point of printing them
   // together.
+  // A real request: "List parents first, then students starting with the
+  // oldest." scheduleList's own default order is just byLastName - only
+  // reordered here, for this one family print, not the Class Schedules
+  // page's own list.
+  if (familyId) {
+    rows = [...rows].sort((a, b) => {
+      const aIsStudent = a.member.member_type === 'student';
+      const bIsStudent = b.member.member_type === 'student';
+      if (aIsStudent !== bIsStudent) return aIsStudent ? 1 : -1;
+      if (aIsStudent) {
+        const aAge = ageFromBirthday(a.member.birthday);
+        const bAge = ageFromBirthday(b.member.birthday);
+        if (aAge == null && bAge == null) return 0;
+        if (aAge == null) return 1;
+        if (bAge == null) return -1;
+        return bAge - aAge;
+      }
+      return 0;
+    });
+  }
   res.render('admin-schedule-print', { title: 'Print Schedules', rows, compact: !!familyId });
 });
 

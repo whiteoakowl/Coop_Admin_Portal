@@ -44,7 +44,9 @@
           <div class="schedule-print-compact-list">
             <% rows.forEach(function(r) { %>
               <div class="schedule-print-member-section">
-                <h3><%= r.member.name %></h3>
+                <%# A real request: "show grade level next to each
+                    students[.]" %>
+                <h3><%= r.member.name %><% if (r.member.member_type === 'student' && r.member.grade_level) { %> (<%= r.member.grade_level %>)<% } %></h3>
                 <div class="schedule-print-member-days">
                   <% [['Monday', r.monday], ['Wednesday', r.wednesday]].forEach(function (entry) { %>
                     <% var label = entry[0], lines = classLines(entry[1]); %>
