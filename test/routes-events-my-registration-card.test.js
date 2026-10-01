@@ -114,13 +114,17 @@ test('after registering, the My Registration card lists the member with no regis
 
   const page = await request(app).get(`/events/${eventId}`).set('Cookie', parent.cookie);
   assert.match(page.text, /<h2>My Registration<\/h2>/);
-  assert.match(page.text, /class="event-my-registration-row"[^<]*My Reg Parent/);
+  assert.match(page.text, /class="event-my-registration-member">My Reg Parent/);
   assert.match(page.text, />Edit Registration</);
   assert.match(page.text, /id="edit-registration-dialog"/);
+  // A real request: "a new card appears...showing everything the member
+  // signed up for, date of registration and what the member paid."
+  assert.match(page.text, /Registered [A-Z][a-z]+ \d{1,2}, \d{4}/);
 
   // No register/unregister button inside the My Registration card's own
-  // member column - only a plain name row.
-  const memberColumn = page.text.split('<div class="event-my-registration-column">')[1].split('</div>')[0];
+  // member column (up to the Edit Registration dialog, which legitimately
+  // has its own Sign Up/Cancel buttons) - only a plain name + meta row.
+  const memberColumn = page.text.split('<div class="event-my-registration-column">')[1].split('<dialog id="edit-registration-dialog"')[0];
   assert.doesNotMatch(memberColumn, /roster-action-btn|<button|<form/, 'the My Registration summary column must not carry a register/unregister button');
 });
 

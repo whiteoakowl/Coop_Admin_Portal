@@ -243,7 +243,14 @@ test('an event with only one eligible member shows no "Register Selected" bulk b
   assert.doesNotMatch(page.text, /id="event-register-selected-btn"/);
 });
 
-test('an event with a ticket type opens a dialog instead of checkboxes - no bulk button, dialog markup present', async () => {
+// A real request: "registration for event should be checkboxes next to
+// each name. Select which family members you want to register and click
+// register" - checkboxes/the bulk button now show for a multi-member
+// family even when the event needs a dialog (tickets/extra fields/
+// volunteer/donation/food); public/js/events-detail-register.js's own
+// bulk handler opens that same dialog once per selected member in
+// sequence rather than skipping the whole bulk flow outright.
+test('an event with a ticket type still offers checkboxes/a bulk button for a multi-member family, alongside the per-person dialog', async () => {
   const admin = await loginAsMainAdmin();
   const eventId = await createEvent(admin);
   await addTicketType(admin, eventId, 'General Admission', 10);
@@ -252,10 +259,22 @@ test('an event with a ticket type opens a dialog instead of checkboxes - no bulk
 
   const page = await request(app).get(`/events/${eventId}`).set('Cookie', parent.cookie);
   assert.match(page.text, /id="event-register-member-list"[^>]*data-needs-dialog="1"/);
-  assert.doesNotMatch(page.text, /id="event-register-selected-btn"/);
-  assert.doesNotMatch(page.text, /class="event-register-member-checkbox"/);
+  assert.match(page.text, /id="event-register-selected-btn"/);
+  assert.match(page.text, /class="event-register-member-checkbox"/);
   assert.match(page.text, /id="event-register-dialog"/);
   assert.match(page.text, /name="ticketTypeId"/);
+});
+
+test('an event with a ticket type and only ONE eligible family member gets no bulk button - nothing to select between', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  await addTicketType(admin, eventId, 'General Admission', 10);
+  await publishEvent(admin, eventId);
+  const parent = await createParentAccount(0);
+
+  const page = await request(app).get(`/events/${eventId}`).set('Cookie', parent.cookie);
+  assert.doesNotMatch(page.text, /id="event-register-selected-btn"/);
+  assert.match(page.text, /id="event-register-dialog"/);
 });
 
 test('plain event: a registered member\'s row says "Unregister" (not "Registered") and keeps its checkbox, marked data-registered="1"', async () => {

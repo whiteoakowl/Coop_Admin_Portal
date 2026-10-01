@@ -41,6 +41,37 @@
     });
     if (dialogSteps[index] && dialogSteps[index].dataset.step === 'payment') updatePaymentSummary();
   }
+
+  // A real request: "checkboxes next to each name. Select which family
+  // members you want to register and click register" - extended to the
+  // needs-a-dialog case (tickets/extra fields/volunteer/donation/food),
+  // where each person still genuinely needs their own ticket/extra-field
+  // answers asked (merging several people's different answers into one
+  // submission isn't something registerForEvent supports, and shouldn't
+  // silently assume they all want the same ticket). Register Selected
+  // instead opens the same shared dialog once per selected, not-yet-
+  // registered member, one after another - pendingResolve is how the
+  // dialog's own submit/close handlers below report each one's outcome
+  // back to this sequential loop without a second, parallel copy of that
+  // logic. suppressThankYou keeps the per-member "Thank You!" popup from
+  // firing (and needing to be closed) after every single person in a
+  // multi-person run - one summary alert at the end instead.
+  let pendingResolve = null;
+  let suppressThankYou = false;
+  function openDialogForMemberAndWait(memberId, memberName) {
+    return new Promise((resolve) => {
+      pendingResolve = resolve;
+      document.getElementById('event-register-dialog-member-id').value = memberId;
+      document.getElementById('event-register-dialog-member-name').textContent = memberName;
+      const err = document.getElementById('event-register-dialog-error');
+      if (err) {
+        err.hidden = true;
+        err.textContent = '';
+      }
+      showStep(0);
+      dialog.showModal();
+    });
+  }
   // The ticket step's chosen price drives the Payment step's summary -
   // the flat (no-ticket-types) case already has its static amount
   // rendered server-side, so there's nothing to compute here then.
@@ -141,15 +172,10 @@
       const row = registerBtn.closest('.event-register-member-row');
       const memberId = row.dataset.memberId;
       if (needsDialog && dialog) {
-        document.getElementById('event-register-dialog-member-id').value = memberId;
-        document.getElementById('event-register-dialog-member-name').textContent = row.dataset.memberName;
-        const err = document.getElementById('event-register-dialog-error');
-        if (err) {
-          err.hidden = true;
-          err.textContent = '';
-        }
-        showStep(0);
-        dialog.showModal();
+        // markRegistered happens inside the dialog's own submit handler
+        // below once it actually succeeds - nothing else to do here but
+        // open it.
+        openDialogForMemberAndWait(memberId, row.dataset.memberName);
         return;
       }
       registerBtn.disabled = true;
@@ -195,7 +221,15 @@
       // capacity/waitlist checks a single Register/Unregister click would,
       // and firing them one at a time keeps that server-side accounting
       // (registrationCount, family_capacity) correct in request order
-      // instead of racing several at once against the same event.
+      // instead of racing several at once against the same event. When a
+      // dialog is needed, each selected person genuinely needs their own
+      // ticket/extra-field answers asked, so this opens #event-register-
+      // dialog once per person and waits for it to close before moving to
+      // the next one (openDialogForMemberAndWait above) - suppressThankYou
+      // holds off the per-person "Thank You!" popup until the whole batch
+      // is done, so a 3-person run doesn't need the popup dismissed 3 times.
+      let dialogRegisteredCount = 0;
+      if (needsDialog && dialog && mode === 'register') suppressThankYou = true;
       for (const checkbox of checkboxes) {
         const row = checkbox.closest('.event-register-member-row');
         const rowIsRegistered = row.dataset.registered === '1';
@@ -203,10 +237,17 @@
           const data = await unregisterMember(checkbox.value);
           if (data.ok) markUnregistered(row);
         } else if (mode === 'register' && !rowIsRegistered) {
-          const data = await registerMember(checkbox.value);
-          if (data.ok) markRegistered(row);
+          if (needsDialog && dialog) {
+            const ok = await openDialogForMemberAndWait(checkbox.value, row.dataset.memberName);
+            if (ok) dialogRegisteredCount++;
+          } else {
+            const data = await registerMember(checkbox.value);
+            if (data.ok) markRegistered(row);
+          }
         }
       }
+      suppressThankYou = false;
+      if (dialogRegisteredCount > 0 && thankYouDialog) thankYouDialog.showModal();
       updateSelectedButtonState();
     });
   }
@@ -237,7 +278,19 @@
 
     if (cancelBtn) cancelBtn.addEventListener('click', () => dialog.close());
 
-    dialog.addEventListener('close', () => showStep(0));
+    // A cancel/Esc/backdrop close never reaches the submit handler below -
+    // this is the only place that outcome can be reported back to a
+    // pending bulk-sequence wait (openDialogForMemberAndWait above), so a
+    // cancelled member is simply skipped and the loop moves on to the
+    // next one instead of hanging forever.
+    dialog.addEventListener('close', () => {
+      showStep(0);
+      if (pendingResolve) {
+        const resolve = pendingResolve;
+        pendingResolve = null;
+        resolve(false);
+      }
+    });
 
     dialogForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -248,10 +301,17 @@
       const data = await postAction(`/events/${eventId}/register`, params);
       submitBtn.disabled = false;
       if (data.ok) {
+        // Resolve (and clear) BEFORE dialog.close() fires its own 'close'
+        // listener above, so that listener's own resolve(false) guard sees
+        // nothing left pending and never fires a second, contradicting
+        // resolution for the same wait.
+        const resolve = pendingResolve;
+        pendingResolve = null;
         dialog.close();
         const row = list.querySelector(`.event-register-member-row[data-member-id="${memberId}"]`);
         if (row) markRegistered(row);
-        if (thankYouDialog) thankYouDialog.showModal();
+        if (thankYouDialog && !suppressThankYou) thankYouDialog.showModal();
+        if (resolve) resolve(true);
       } else {
         const err = document.getElementById('event-register-dialog-error');
         if (err) {

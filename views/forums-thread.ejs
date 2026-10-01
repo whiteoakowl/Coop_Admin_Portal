@@ -72,34 +72,50 @@
     <div <% if (category.is_chat_room) { %>data-chat-room-feed data-thread-id="<%= thread.id %>" data-self-member-id="<%= selfMemberId || '' %>"<% } %>>
       <div data-chat-room-messages class="<%= category.is_chat_room ? 'forum-chat-room-messages' : '' %>">
         <% posts.forEach(function(p) { %>
+          <%
+          // A real request: "remove the edit and delete buttons on chat
+          // room posts. Only admins can edit or delete posts." - a chat
+          // room's own author no longer gets a self-edit button (see the
+          // matching server-side gate in routes/forums.js's own edit
+          // route); a normal threaded forum reply is unaffected and still
+          // lets its author edit it. Delete (Remove/Restore below) was
+          // already moderator-only either way.
+          const canEditThisPost = category.is_chat_room ? canModerate : (p.member_id === selfMemberId);
+          %>
           <div class="forum-post <%= p.status === 'removed' ? 'forum-post-removed' : '' %>" data-post-id="<%= p.id %>">
             <div class="forum-post-header">
-              <span class="forum-post-author"><%= p.authorName || 'Unknown' %></span>
-              <% if (p.authorAdminTitle) { %><span class="badge-pill" title="Admin Position"><%= p.authorAdminTitle %></span><% } %>
-              <span class="hint"><%= category.is_chat_room ? p.createdAtLabel : p.created_at %></span>
-              <% if (p.edited_at) { %><span class="hint">(edited)</span><% } %>
-              <% if (p.status === 'removed') { %><span class="badge-pill badge-pill-gray">Removed</span><% } %>
+              <div class="forum-post-name-row">
+                <span class="forum-post-author"><%= p.authorName || 'Unknown' %></span>
+                <% if (p.authorAdminTitle) { %><span class="badge-pill forum-post-admin-badge" title="Admin Position"><%= p.authorAdminTitle %></span><% } %>
+              </div>
+              <div class="forum-post-meta-row">
+                <span class="hint"><%= category.is_chat_room ? p.createdAtLabel : p.created_at %></span>
+                <% if (p.edited_at) { %><span class="hint">(edited)</span><% } %>
+                <% if (p.status === 'removed') { %><span class="badge-pill badge-pill-gray">Removed</span><% } %>
+              </div>
             </div>
             <% if (p.status === 'active') { %>
               <div class="forum-post-body"><%- p.body_html %></div>
             <% } else { %>
               <p class="hint">This post was removed by a moderator.</p>
             <% } %>
-            <div class="roster-btn-row" style="margin-top: 0.5rem;">
-              <% if (p.member_id === selfMemberId && p.status === 'active') { %>
-                <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-post-<%= p.id %>').showModal()">Edit</button>
-              <% } %>
-              <% if (canModerate) { %>
-                <% if (p.status === 'active') { %>
-                  <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/remove" class="inline-block-form"><button type="submit" class="roster-action-btn roster-action-btn-danger">Remove</button></form>
-                <% } else { %>
-                  <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/restore" class="inline-block-form"><button type="submit" class="roster-action-btn">Restore</button></form>
+            <% if ((canEditThisPost && p.status === 'active') || canModerate) { %>
+              <div class="roster-btn-row" style="margin-top: 0.5rem;">
+                <% if (canEditThisPost && p.status === 'active') { %>
+                  <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-post-<%= p.id %>').showModal()">Edit</button>
                 <% } %>
-              <% } %>
-            </div>
+                <% if (canModerate) { %>
+                  <% if (p.status === 'active') { %>
+                    <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/remove" class="inline-block-form"><button type="submit" class="roster-action-btn roster-action-btn-danger">Remove</button></form>
+                  <% } else { %>
+                    <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/restore" class="inline-block-form"><button type="submit" class="roster-action-btn">Restore</button></form>
+                  <% } %>
+                <% } %>
+              </div>
+            <% } %>
           </div>
 
-          <% if (p.status === 'active') { %>
+          <% if (p.status === 'active' && canEditThisPost) { %>
             <dialog id="edit-post-<%= p.id %>" class="member-picker-dialog">
               <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/edit" data-forum-editor>
                 <h3>Edit Post</h3>

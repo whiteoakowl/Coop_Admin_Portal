@@ -146,8 +146,26 @@ router.get('/:id', async (req, res) => {
     return res.status(404).render('404', { title: 'Not Found' });
   }
   const familyIds = family.map((m) => m.id);
+  // A real request: "a new card appears on the event for the member...
+  // showing everything the member signed up for, date of registration and
+  // what the member paid, what tickets they purchased for each member." -
+  // joins the chosen ticket's own title and the charge registerForEvent
+  // creates for it (utils/events.js's own chargeForConfirmedRegistration -
+  // "we'll follow up separately on how to pay it" means amount_cents/
+  // status here is what's OWED, not necessarily settled, same as every
+  // other invoice in this app until a real payment processor exists).
   const myRegistrations = familyIds.length
-    ? await db.prepare(`SELECT * FROM event_registrations WHERE event_id = ? AND status != 'cancelled' AND member_id IN (${familyIds.map(() => '?').join(',')})`).all(event.id, ...familyIds)
+    ? (
+        await db
+          .prepare(
+            `SELECT er.*, tt.title AS "ticketTitle", pc.amount_cents AS "chargeAmountCents", pc.status AS "chargeStatus"
+             FROM event_registrations er
+             LEFT JOIN event_ticket_types tt ON tt.id = er.ticket_type_id
+             LEFT JOIN payment_charges pc ON pc.id = er.charge_id
+             WHERE er.event_id = ? AND er.status != 'cancelled' AND er.member_id IN (${familyIds.map(() => '?').join(',')})`
+          )
+          .all(event.id, ...familyIds)
+      ).map((r) => ({ ...r, registeredAtLabel: formatFriendlyTimestamp(r.created_at) }))
     : [];
   const myVolunteerSignups = familyIds.length
     ? await db
@@ -195,10 +213,22 @@ router.get('/:id', async (req, res) => {
 
   // "If it allows for showing who has registered that will be listed
   // below the register button" - show_registrants_to_members is the
-  // existing builder checkbox (previously stored but never read).
-  const registrants = event.show_registrants_to_members
-    ? (await events.registrationsForEvent(event.id)).filter((r) => r.status !== 'cancelled')
-    : [];
+  // existing builder checkbox (previously stored but never read). A real
+  // follow-up request: "when showing all members that are registered for
+  // event it should be organized by family. Click on family to expand and
+  // show more members of that family that are registered." Reuses the
+  // exact same family-grouping routes/admin-events-registrations.js
+  // already built for the admin roster (utils/events.js's own
+  // familyGroupedRegistrationsForEvent) - that query doesn't filter by
+  // status (the admin roster wants cancelled rows visible too), so
+  // cancelled members/guests are filtered back out here, and any group
+  // left with nobody active in it is dropped entirely.
+  let registrantFamilyGroups = [];
+  if (event.show_registrants_to_members) {
+    registrantFamilyGroups = (await events.familyGroupedRegistrationsForEvent(event.id))
+      .map((group) => ({ members: group.members.filter((r) => r.status !== 'cancelled'), guests: group.guests }))
+      .filter((group) => group.members.length || group.guests.length);
+  }
 
   // A real request: "if the event starts and ends the same day we only
   // need to see one date. Time should be stacked under date with a clock
@@ -254,7 +284,8 @@ router.get('/:id', async (req, res) => {
     myGuestRegistrations,
     attachedSignUpLists,
     attachedVolunteerLists,
-    registrants,
+    registrantFamilyGroups,
+    eligibilityLabel: events.eligibilitySummary(event),
     isRegistrationWindowOpen: await events.isRegistrationWindowOpen(event),
     priceLabel: event.price_cents == null ? null : `$${(event.price_cents / 100).toFixed(2)} per ${event.price_per}`,
     error: req.query.error || null,

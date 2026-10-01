@@ -447,3 +447,66 @@ test('Public event detail page: Register list is a clean column (no name-on-butt
     .send({ memberId: String(parent.memberId), _csrf: csrfToken });
   assert.match(decodeURIComponent(rejected.headers.location), /limited to specific ages/);
 });
+
+// A real request: "event details at top should show grades and/or ages
+// selected for the event. If none are selected it will say all ages."
+test('Public event detail page: header shows "All ages" with no restriction, and the actual grades/ages once locked', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin, { visibility: 'public' });
+  await publishEvent(admin, eventId);
+
+  const noLockPage = await request(app).get(`/events/${eventId}`);
+  assert.match(noLockPage.text, /All ages/);
+
+  await db.prepare('UPDATE events SET lock_registration_to_grade = 1, age_group = ? WHERE id = ?').run('K, 1st', eventId);
+  const gradeLockPage = await request(app).get(`/events/${eventId}`);
+  assert.match(gradeLockPage.text, /Grades: K, 1st/);
+  assert.doesNotMatch(gradeLockPage.text, /All ages/);
+
+  await db.prepare('UPDATE events SET lock_registration_to_age = 1, age_group_restriction = ? WHERE id = ?').run('5, 6', eventId);
+  const bothLocksPage = await request(app).get(`/events/${eventId}`);
+  assert.match(bothLocksPage.text, /Grades: K, 1st/);
+  assert.match(bothLocksPage.text, /Ages: 5, 6/);
+
+  // A lock switched on with nothing actually picked lets everyone through
+  // (ageGroupAllowsMember/ageBucketAllowsMember's own fallback) - the
+  // summary must agree and still say "All ages", not falsely claim a
+  // restriction nobody would actually hit.
+  await db.prepare('UPDATE events SET age_group = ?, age_group_restriction = ? WHERE id = ?').run('', '', eventId);
+  const emptyListsPage = await request(app).get(`/events/${eventId}`);
+  assert.match(emptyListsPage.text, /All ages/);
+});
+
+// A real request: "when showing all members that are registered for event
+// it should be organized by family. Click on family to expand and show
+// more members of that family that are registered."
+test('Public event detail page: Who\'s Registered groups a family behind a "+N more" expander, and leaves a solo registrant alone', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin, { visibility: 'public' });
+  await db.prepare('UPDATE events SET show_registrants_to_members = 1 WHERE id = ?').run(eventId);
+  await publishEvent(admin, eventId);
+
+  const family = await createParentAccount(1);
+  const familyChildId = family.familyMemberIds[0];
+  const familyParentName = (await db.prepare('SELECT name FROM members WHERE id = ?').get(family.memberId)).name;
+  const familyChildName = (await db.prepare('SELECT name FROM members WHERE id = ?').get(familyChildId)).name;
+  await request(app).post(`/events/${eventId}/register`).set('Cookie', family.cookie).type('form').send({ memberId: String(family.memberId), _csrf: family.csrfToken });
+  await request(app).post(`/events/${eventId}/register`).set('Cookie', family.cookie).type('form').send({ memberId: String(familyChildId), _csrf: family.csrfToken });
+
+  const solo = await createParentAccount(0);
+  const soloName = (await db.prepare('SELECT name FROM members WHERE id = ?').get(solo.memberId)).name;
+  await request(app).post(`/events/${eventId}/register`).set('Cookie', solo.cookie).type('form').send({ memberId: String(solo.memberId), _csrf: solo.csrfToken });
+
+  const page = await request(app).get(`/events/${eventId}`).set('Cookie', solo.cookie);
+  assert.match(page.text, /<h3>Who's Registered<\/h3>/);
+  // The 2-person family collapses behind a <details> "+1 more" expander,
+  // with its own second member only inside the nested, initially-closed list.
+  const familyBlockRegex = new RegExp(
+    `<details class="event-registrant-family">\\s*<summary>${familyParentName} <span class="hint">\\+1 more</span></summary>\\s*<ul class="portal-dashboard-list">\\s*<li>${familyChildName}</li>`
+  );
+  assert.match(page.text, familyBlockRegex);
+  // The solo registrant (nothing else in their group) is a plain list
+  // item, not wrapped in its own <details>/expander.
+  assert.match(page.text, new RegExp(`<li>${soloName}</li>`));
+  assert.doesNotMatch(page.text, new RegExp(`<summary>${soloName}`));
+});

@@ -175,7 +175,14 @@ router.post('/threads/:threadId/posts/:postId/edit', loadThread, async (req, res
   const post = await forums.getPost(req.params.postId);
   const self = await memberForAccount(req.portalAccount.id);
   const isAuthor = post && self && post.member_id === self.id;
-  if (!post || (!isAuthor && !(await canModerate(req)))) {
+  const moderator = await canModerate(req);
+  // Chat rooms (the live continuous feed) are a real request: "only
+  // admins can edit or delete posts" - unlike a normal threaded forum
+  // reply, a chat room post's own author no longer gets an author bypass
+  // here, matching views/forums-thread.ejs no longer showing them an Edit
+  // button there either.
+  const allowed = req.category.is_chat_room ? moderator : (isAuthor || moderator);
+  if (!post || !allowed) {
     return res.status(403).render('403', { title: 'Not Authorized', message: 'You can only edit your own posts.', backHref: `/forums/threads/${req.thread.id}`, backLabel: 'Back' });
   }
   const body = (req.body.body || '').trim();

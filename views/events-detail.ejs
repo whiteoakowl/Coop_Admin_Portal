@@ -95,6 +95,13 @@
           <p class="site-hero-meta"><svg class="icon"><use href="#icon-clock"/></svg> <%= timeLine %></p>
           <% if (event.location) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= event.location %></p><% } %>
           <% if (priceLabel) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-tag"/></svg> <%= priceLabel %></p><% } %>
+          <%# A real request: "event details at top should show grades
+              and/or ages selected for the event. If none are selected it
+              will say all ages." eligibilityLabel (routes/events.js's own
+              events.eligibilitySummary) is always "All ages" when neither
+              restriction is actually on, so this always has something to
+              show. %>
+          <p class="site-hero-meta"><svg class="icon"><use href="#icon-users"/></svg> <%= eligibilityLabel %></p>
           <%
             // A real request: "Organized by should be a drop down to
             // choose Sanford Homeschoolers or a parent name. Can select
@@ -201,10 +208,19 @@
               // flips its own label/action based on what's checked), so it
               // needs to show whenever there's more than one member to act
               // on at all, not just when there's more than one still
-              // unregistered.
+              // unregistered. A real follow-up request: "registration for
+              // event should be checkboxes next to each name. Select which
+              // family members you want to register and click register" -
+              // this used to be scoped to !needsDialog only (a plain
+              // register/unregister call has nothing else to ask, so a
+              // bulk click could fire them all at once); now it shows
+              // whenever there's more than one member either way - when a
+              // dialog IS needed, public/js/events-detail-register.js's own
+              // bulk handler just opens it once per selected member in
+              // sequence instead of skipping the checkboxes/button outright.
               var eligibleCount = family.filter(function(m) { return eligibleForRegistration.has(m.id); }).length;
             %>
-              <% if (!needsDialog && eligibleCount > 1) { %>
+              <% if (eligibleCount > 1) { %>
                 <div class="roster-btn-row" style="margin-bottom: 0.75rem;">
                   <button type="button" id="event-register-selected-btn" class="roster-action-btn" disabled>Register Selected</button>
                 </div>
@@ -220,7 +236,7 @@
                           checkbox now (not just an unregistered one), so
                           they can be picked up by the same bulk button for
                           a bulk "Unregister Selected". %>
-                      <% if (!needsDialog && isEligible) { %>
+                      <% if (isEligible) { %>
                         <input type="checkbox" class="event-register-member-checkbox" value="<%= m.id %>" />
                       <% } %>
                       <span class="event-register-member-name"><%= m.name %></span>
@@ -420,15 +436,44 @@
                 registered that will be listed below the register button" -
                 show_registrants_to_members is the existing builder
                 checkbox (views/admin-events-builder.ejs) that used to be
-                stored but never actually read anywhere; registrants (from
-                routes/events.js's own GET /:id) is only ever populated
-                when it's on. %>
-            <% if (event.show_registrants_to_members && registrants && registrants.length) { %>
+                stored but never actually read anywhere; registrantFamilyGroups
+                (from routes/events.js's own GET /:id) is only ever
+                populated when it's on. A follow-up request: "when showing
+                all members that are registered for event it should be
+                organized by family. Click on family to expand and show
+                more members of that family that are registered." A
+                one-member group just shows that name, same as before; a
+                group with more than one member/guest collapses to the
+                group's own first (primary) name plus a "+N more" count,
+                using a plain <details>/<summary> (no JS needed) for the
+                click-to-expand - same idiom this app already uses
+                elsewhere (e.g. views/parent-classes.ejs's own Filter). %>
+            <% if (event.show_registrants_to_members && registrantFamilyGroups && registrantFamilyGroups.length) { %>
               <div class="manage-section" style="margin-top: 1rem;">
                 <h3>Who's Registered</h3>
-                <ul class="portal-dashboard-list">
-                  <% registrants.forEach(function(r) { %>
-                    <li><%= r.memberName %><% if (r.status === 'waitlisted') { %> <span class="hint">(waitlisted)</span><% } %></li>
+                <ul class="portal-dashboard-list event-registrant-family-list">
+                  <% registrantFamilyGroups.forEach(function(group) {
+                    // One flat, ordered list per group (members first, then
+                    // guests - same order the admin roster already uses) so
+                    // "first" and "the rest" are always the same single list,
+                    // regardless of how many members vs. guests a group has.
+                    var items = group.members.map(function(r) {
+                      return r.memberName + (r.status === 'waitlisted' ? ' (waitlisted)' : '');
+                    }).concat(group.guests.map(function(g) { return g.guest_name + ' (Guest)'; }));
+                    var rest = items.slice(1);
+                  %>
+                    <% if (rest.length) { %>
+                      <li>
+                        <details class="event-registrant-family">
+                          <summary><%= items[0] %> <span class="hint">+<%= rest.length %> more</span></summary>
+                          <ul class="portal-dashboard-list">
+                            <% rest.forEach(function(label) { %><li><%= label %></li><% }); %>
+                          </ul>
+                        </details>
+                      </li>
+                    <% } else { %>
+                      <li><%= items[0] %></li>
+                    <% } %>
                   <% }); %>
                 </ul>
               </div>
@@ -491,11 +536,25 @@
                 <h2>My Registration</h2>
                 <button type="button" class="roster-action-btn roster-action-btn-fit" onclick="document.getElementById('edit-registration-dialog').showModal()">Edit Registration</button>
               </div>
+              <%# A real request: "showing everything the member signed up
+                  for, date of registration and what the member paid, what
+                  tickets they purchased for each member." myRegistrations
+                  (routes/events.js's own GET /:id) now joins the chosen
+                  ticket type and its charge, so each row can show all of
+                  that without a second lookup. %>
               <div class="event-my-registration-column">
                 <% myRegistrations.forEach(function(r) {
                   var m = family.find(function(fm) { return fm.id === r.member_id; });
+                  var amountLabel = r.chargeAmountCents != null ? `$${(r.chargeAmountCents / 100).toFixed(2)}${r.chargeStatus === 'paid' ? ' (Paid)' : ' (Owed)'}` : null;
                 %>
-                  <p class="event-my-registration-row"><%= m ? m.name : 'Member' %><% if (r.status === 'waitlisted') { %> <span class="hint">(waitlisted)</span><% } %></p>
+                  <div class="event-my-registration-row">
+                    <p class="event-my-registration-member"><%= m ? m.name : 'Member' %><% if (r.status === 'waitlisted') { %> <span class="hint">(waitlisted)</span><% } %></p>
+                    <p class="hint">
+                      Registered <%= r.registeredAtLabel %>
+                      <% if (r.ticketTitle) { %> &middot; Ticket: <%= r.ticketTitle %><% } %>
+                      <% if (amountLabel) { %> &middot; <%= amountLabel %><% } %>
+                    </p>
+                  </div>
                 <% }); %>
               </div>
               <% if (myVolunteerSignups.length) { %>

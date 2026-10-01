@@ -32,16 +32,19 @@
     var div = document.createElement('div');
     div.className = 'forum-post' + (p.status === 'removed' ? ' forum-post-removed' : '');
     div.setAttribute('data-post-id', p.id);
-    var authorTitle = p.authorAdminTitle ? '<span class="badge-pill" title="Admin Position">' + escapeHtml(p.authorAdminTitle) + '</span>' : '';
+    var authorTitle = p.authorAdminTitle ? '<span class="badge-pill forum-post-admin-badge" title="Admin Position">' + escapeHtml(p.authorAdminTitle) + '</span>' : '';
     var body = p.status === 'active' ? '<div class="forum-post-body">' + p.body_html + '</div>' : '<p class="hint">This post was removed by a moderator.</p>';
     div.innerHTML =
-      '<div class="forum-post-header"><span class="forum-post-author">' +
+      '<div class="forum-post-header">' +
+      '<div class="forum-post-name-row"><span class="forum-post-author">' +
       escapeHtml(p.authorName || 'Unknown') +
       '</span>' +
       authorTitle +
-      '<span class="hint">' +
+      '</div>' +
+      '<div class="forum-post-meta-row"><span class="hint">' +
       escapeHtml(p.createdAtLabel || p.created_at) +
       '</span></div>' +
+      '</div>' +
       body;
     return div;
   }

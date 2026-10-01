@@ -106,6 +106,28 @@ function ageBucketAllowsMember(event, member) {
   return age != null && allowed.includes(String(age));
 }
 
+// A real request: "event details at top should show grades and/or ages
+// selected for the event. If none are selected it will say all ages." -
+// same two independent restrictions ageGroupAllowsMember/ageBucketAllowsMember
+// above actually enforce (grade lock + age lock can both be on at once),
+// summarized into one line for the event detail page's own header. An
+// "on" lock with nothing actually picked already means "no restriction"
+// to those two functions (see their own `allowed.length === 0` fallback),
+// so it's treated the same way here - never claims a restriction exists
+// when it would let every member through anyway.
+function eligibilitySummary(event) {
+  const parts = [];
+  if (event.lock_registration_to_grade) {
+    const grades = parseAgeGroupList(event.age_group);
+    if (grades.length) parts.push(`Grades: ${grades.join(', ')}`);
+  }
+  if (event.lock_registration_to_age) {
+    const ages = parseAgeGroupList(event.age_group_restriction);
+    if (ages.length) parts.push(`Ages: ${ages.join(', ')}`);
+  }
+  return parts.length ? parts.join(' · ') : 'All ages';
+}
+
 // "adult" = parent/admin member_type, "child" = student - matches
 // members.member_type's own three-way vocabulary (parent/student/admin).
 function memberIsAdult(member) {
@@ -1446,6 +1468,17 @@ async function addVolunteerRole(eventId, data) {
   await db
     .prepare('INSERT INTO event_volunteer_roles (event_id, role_name, slots_needed, time_label, location, description, position) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .run(eventId, data.roleName, data.slotsNeeded || 1, data.timeLabel || null, data.location || null, data.description || null, position);
+  // A real bug report: "Registration popup did not show volunteer
+  // positions needing to be filled" - traced to this: adding a role here
+  // never flipped the separate "Include this section?" checkbox
+  // (views/admin-events-builder.ejs's own Volunteers-settings form), so
+  // volunteers_enabled stayed off even with real roles sitting there, and
+  // the member-facing Register dialog's own needsDialog/dialogHasDetails
+  // gates (routes/events.js, views/events-detail.ejs) both check that
+  // same flag before ever showing them. Adding the first role is itself
+  // the admin's "I want this section on" signal - this no longer requires
+  // a second, easy-to-miss trip to a different form to actually work.
+  await db.prepare('UPDATE events SET volunteers_enabled = 1 WHERE id = ?').run(eventId);
 }
 
 async function updateVolunteerRole(roleId, data) {
@@ -1486,6 +1519,10 @@ async function addDonationItem(eventId, data) {
   await db
     .prepare('INSERT INTO event_donation_items (event_id, item_name, quantity_needed, deadline, notes, position) VALUES (?, ?, ?, ?, ?, ?)')
     .run(eventId, data.itemName, data.quantityNeeded || 1, data.deadline || null, data.notes || null, position);
+  // Same fix as addVolunteerRole's own comment above - adding an item is
+  // the admin's "I want this section on" signal, not a separate trip to
+  // the Donations-settings form's "Include this section?" checkbox.
+  await db.prepare('UPDATE events SET donations_enabled = 1 WHERE id = ?').run(eventId);
 }
 
 async function updateDonationItem(itemId, data) {
@@ -1531,6 +1568,10 @@ async function addFoodItem(eventId, data) {
   await db
     .prepare('INSERT INTO event_food_items (event_id, item_name, quantity_needed, deadline, notes, position) VALUES (?, ?, ?, ?, ?, ?)')
     .run(eventId, data.itemName, data.quantityNeeded || 1, data.deadline || null, data.notes || null, position);
+  // Same fix as addVolunteerRole's own comment above - adding an item is
+  // the admin's "I want this section on" signal, not a separate trip to
+  // the Food-settings form's "Include this section?" checkbox.
+  await db.prepare('UPDATE events SET food_enabled = 1 WHERE id = ?').run(eventId);
 }
 
 async function updateFoodItem(itemId, data) {
@@ -1715,6 +1756,7 @@ module.exports = {
   sortByLastNameField,
   ageGroupAllowsMember,
   ageBucketAllowsMember,
+  eligibilitySummary,
   parseAgeGroupList,
   memberIsAdult,
   registrationWindowStatus,

@@ -168,6 +168,47 @@ test('the Register dialog offers open volunteer roles and donation items alongsi
   assert.match(page.text, /Setup Crew/);
 });
 
+// A real bug report: "Registration popup did not show volunteer positions
+// needing to be filled." Traced to utils/events.js's own addVolunteerRole/
+// addDonationItem/addFoodItem never flipping the section's own *_enabled
+// flag - an admin who just used "+ Add Role" (never separately visiting
+// the "Include this section?" checkbox/Save button) ended up with real
+// roles that the Register dialog's own needsDialog/dialogHasDetails gates
+// silently never showed, since both check that same flag. These three
+// never call saveVolunteerSettings/saveDonationSettings/saveFoodSettings
+// at all - only the add-item route - to prove the fix holds without it.
+test('adding a volunteer role turns the section on by itself - no separate "Include this section?" trip required', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  await addVolunteerRole(admin, eventId, 'Unassisted Setup Crew');
+  await publishEvent(admin, eventId);
+  const parent = await createParentAccount();
+
+  const row = await db.prepare('SELECT volunteers_enabled FROM events WHERE id = ?').get(eventId);
+  assert.equal(Number(row.volunteers_enabled), 1);
+
+  const page = await request(app).get(`/events/${eventId}`).set('Cookie', parent.cookie);
+  assert.match(page.text, /data-needs-dialog="1"/);
+  assert.match(page.text, /name="volunteerRoleIds" value="\d+"/);
+  assert.match(page.text, /Unassisted Setup Crew/);
+});
+
+test('adding a donation item turns donations_enabled on by itself', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  await addDonationItem(admin, eventId, 'Unassisted Paper Cups');
+  const row = await db.prepare('SELECT donations_enabled FROM events WHERE id = ?').get(eventId);
+  assert.equal(Number(row.donations_enabled), 1);
+});
+
+test('adding a food item turns food_enabled on by itself', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  await request(app).post(`/main-admin/events/${eventId}/food-items`).set('Cookie', admin.cookie).type('form').send({ itemName: 'Unassisted Cookies', quantityNeeded: '5', _csrf: admin.csrfToken });
+  const row = await db.prepare('SELECT food_enabled FROM events WHERE id = ?').get(eventId);
+  assert.equal(Number(row.food_enabled), 1);
+});
+
 test('attendee scope: each registering family member must individually meet the minimum', async () => {
   const admin = await loginAsMainAdmin();
   const eventId = await createEvent(admin);

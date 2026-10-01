@@ -313,3 +313,69 @@ test('chat room messages render inside the smaller-text .forum-chat-room-message
   assert.ok(wrapper, 'expected the chat room messages wrapper');
   assert.match(wrapper[1], /forum-chat-room-messages/);
 });
+
+// A real request: "remove the edit and delete buttons on chat room posts.
+// Only admins can edit or delete posts." A normal threaded forum reply
+// (not a chat room) is unaffected - its own author can still edit it, as
+// already covered by test/routes-forums.test.js.
+test('a chat room message\'s own author no longer sees (or can use) an Edit button - only an admin/moderator can edit it', async () => {
+  const admin = await loginAsMainAdmin();
+  const category = await createChatRoom(admin, 'Author Edit Room');
+  const member = await createParentAccount();
+
+  const postRes = await request(app)
+    .post(`/forums/threads/${category.room_thread_id}/posts`)
+    .set('Cookie', member.cookie)
+    .set('Accept', 'application/json')
+    .type('form')
+    .send({ body: '<p>Original message</p>', _csrf: member.csrfToken });
+  const postId = postRes.body.post.id;
+
+  const view = await request(app).get(`/forums/threads/${category.room_thread_id}`).set('Cookie', member.cookie);
+  assert.doesNotMatch(view.text, />Edit</, 'the author should not see an Edit button on their own chat room post');
+
+  const editAttempt = await request(app)
+    .post(`/forums/threads/${category.room_thread_id}/posts/${postId}/edit`)
+    .set('Cookie', member.cookie)
+    .type('form')
+    .send({ body: '<p>Trying to self-edit</p>', _csrf: member.csrfToken });
+  assert.equal(editAttempt.status, 403, 'the author-bypass must not apply inside a chat room');
+
+  const stored = await db.prepare('SELECT body_html FROM forum_posts WHERE id = ?').get(postId);
+  assert.match(stored.body_html, /Original message/);
+  assert.doesNotMatch(stored.body_html, /Trying to self-edit/);
+
+  // An admin/moderator CAN still edit it, and sees the Edit button for it.
+  const adminView = await request(app).get(`/forums/threads/${category.room_thread_id}`).set('Cookie', admin.cookie);
+  assert.match(adminView.text, />Edit</, 'a moderator should still see an Edit button on someone else\'s chat room post');
+
+  const adminEdit = await request(app)
+    .post(`/forums/threads/${category.room_thread_id}/posts/${postId}/edit`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ body: '<p>Edited by admin</p>', _csrf: admin.csrfToken });
+  assert.equal(adminEdit.status, 302);
+  const editedStored = await db.prepare('SELECT body_html FROM forum_posts WHERE id = ?').get(postId);
+  assert.match(editedStored.body_html, /Edited by admin/);
+});
+
+// A real request: "if the member has an admin title bubble it should
+// appear next to their name in the same row."
+test('a chat room poster holding an admin position shows their title bubble next to their name', async () => {
+  const { addAdminPosition, addAdminPositionForMember } = require('../utils/adminPositions');
+  const admin = await loginAsMainAdmin();
+  const category = await createChatRoom(admin, 'Admin Badge Room');
+  const member = await createParentAccount();
+
+  const positionId = await addAdminPosition('Treasurer');
+  await addAdminPositionForMember(member.memberId, positionId);
+
+  await request(app)
+    .post(`/forums/threads/${category.room_thread_id}/posts`)
+    .set('Cookie', member.cookie)
+    .type('form')
+    .send({ body: '<p>Budget update inside</p>', _csrf: member.csrfToken });
+
+  const view = await request(app).get(`/forums/threads/${category.room_thread_id}`).set('Cookie', admin.cookie);
+  assert.match(view.text, /<div class="forum-post-name-row">\s*<span class="forum-post-author">Chat Room Parent \d+<\/span>\s*<span class="badge-pill forum-post-admin-badge"[^>]*>Treasurer<\/span>/);
+});
