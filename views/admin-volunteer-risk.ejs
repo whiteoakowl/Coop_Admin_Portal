@@ -21,8 +21,9 @@
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">
         <div class="day-toggle">
-          <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/admin/volunteers/monday/risk">Monday</a>
-          <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/volunteers/wednesday/risk">Wednesday</a>
+          <% activeDays.forEach(function(d) { %>
+            <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/admin/volunteers/<%= d %>/risk"><%= dayLabels[d] %></a>
+          <% }); %>
         </div>
         <div class="roster-btn-row">
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>

@@ -3,6 +3,7 @@ const { formatDateLabel } = require('./dates');
 const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
 const { byLastName } = require('./members');
 const { getActiveKioskSemesterId } = require('./kioskSettings');
+const { isValidClassDay } = require('./classDays');
 
 // A real request: "the kiosk can be changed each semester seamlessly" -
 // each semester gets its own fully separate Floater List per day (own
@@ -23,13 +24,11 @@ async function getListByDay(day, semesterId) {
   const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
   const existing = await db.prepare('SELECT * FROM volunteer_lists WHERE day = ? AND semester_id IS NOT DISTINCT FROM ?').get(day, sid);
   if (existing) return existing;
-  // A real request ("Full 7 day expansion...") widened the Classes grid
-  // itself to any day of the week, but Volunteers' own day column is
-  // still Monday/Wednesday-only (Phase 2, not done yet) - every caller
-  // here still expects a day outside that pair to come back undefined
-  // (the same "no list for this day" shape getListByDay has always had),
-  // not a DB CHECK-constraint crash from trying to create one.
-  if (!isValidDay(day)) return undefined;
+  // Guards against a genuinely bogus day value (volunteer_lists.day is
+  // now widened to any day of the week - 20261026010000) coming back as
+  // "no list for this day" (the shape getListByDay has always had)
+  // instead of a DB CHECK-constraint crash from trying to create one.
+  if (!isValidClassDay(day)) return undefined;
   const info = await db.prepare('INSERT INTO volunteer_lists (day, semester_id) VALUES (?, ?)').run(day, sid);
   const listId = info.lastInsertRowid;
   for (let i = 1; i <= 4; i++) {

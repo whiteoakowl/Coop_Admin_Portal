@@ -7,8 +7,11 @@ const { isValidISODate, formatDateLabel, formatDateLong, todayISO, weekdayOf } =
 const { parseNamesFromUpload, findMemberByName, hasInfantChild, activeParentAndAdminOptions } = require('../utils/members');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter } = require('../utils/uploads');
-const { defaultDay, requireDay } = require('../utils/days');
 const {
+  CLASS_DAY_LABELS_FULL: DAY_LABELS,
+  CLASS_DAY_WEEKDAY_FULL,
+  requireClassDay,
+  listActiveClassDays,
   hoursForDay,
   syncDayMemberRosters,
   syncMemberSchedulesForDay,
@@ -18,7 +21,6 @@ const {
   checkedInMemberIdsForDate,
 } = require('../utils/classSchedule');
 const {
-  DAY_LABELS,
   RANKS,
   RANK_LABELS,
   getListByDay,
@@ -64,8 +66,15 @@ function dialogParam(req) {
   return EDIT_DIALOGS.includes(req.query.dialog) ? req.query.dialog : null;
 }
 
-// Floater Assignments is the landing page for Volunteers.
-router.get('/volunteers', requireAdmin, (req, res) => res.redirect(`/admin/volunteers/${defaultDay()}/manage`));
+// Floater Assignments is the landing page for Volunteers. Lands on
+// whichever day of the week (Settings > Day Settings) is first in
+// calendar order, same catalog the Classes grid's own tabs use - falls
+// back to Monday on the vanishingly unlikely chance no day has ever been
+// activated at all.
+router.get('/volunteers', requireAdmin, async (req, res) => {
+  const activeDays = await listActiveClassDays();
+  res.redirect(`/admin/volunteers/${activeDays[0] || 'monday'}/manage`);
+});
 
 // Shared by the full manage page below and its own /fragment route (see
 // that route's own comment for why a second, cards-only endpoint exists) -
@@ -136,12 +145,12 @@ async function buildHourSections(day, selectedDate) {
 // card on the Schedules day grid (and its own manage page's Teachers &
 // Assistants roster), so these are just graceful redirects for anyone with
 // an old link/bookmark rather than a still-maintained separate view.
-router.get('/volunteers/:day/teachers', requireAdmin, requireDay, (req, res) => res.redirect(`/admin/class-schedule/${req.params.day}`));
-router.get('/volunteers/:day/assistants', requireAdmin, requireDay, (req, res) => res.redirect(`/admin/class-schedule/${req.params.day}`));
+router.get('/volunteers/:day/teachers', requireAdmin, requireClassDay, (req, res) => res.redirect(`/admin/class-schedule/${req.params.day}`));
+router.get('/volunteers/:day/assistants', requireAdmin, requireClassDay, (req, res) => res.redirect(`/admin/class-schedule/${req.params.day}`));
 
 // --- Floater Assignments: position/room/name planning grid + Substitutes Needed ---
 
-router.get('/volunteers/:day/manage', requireAdmin, requireDay, async (req, res) => {
+router.get('/volunteers/:day/manage', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   // getListByDay can return undefined if this day's volunteer_lists row
@@ -194,6 +203,8 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, async (req, res)
     tab: 'floater',
     day,
     dayLabel: DAY_LABELS[day],
+    activeDays: await listActiveClassDays(),
+    dayLabels: DAY_LABELS,
     hours,
     dates: dates.map((d, i) => ({ date: d, label: dateLabels[i], archived: archivedSet.has(d) })),
     dateLabels,
@@ -219,7 +230,7 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, async (req, res)
 // because one assignment can change OTHER slots' own candidate lists
 // this same hour (see buildHourSections' own "used this hour" dedup
 // comment above), so the whole grid has to be recomputed either way.
-router.get('/volunteers/:day/fragment', requireAdmin, requireDay, async (req, res) => {
+router.get('/volunteers/:day/fragment', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.status(404).send('Not found');
@@ -232,7 +243,7 @@ router.get('/volunteers/:day/fragment', requireAdmin, requireDay, async (req, re
   res.render('floater-chart-cards-fragment', { day, dayLabel: DAY_LABELS[day], selectedDate, hourSections });
 });
 
-router.post('/volunteers/:day/dates/add', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/dates/add', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.redirect(manageUrl(day, { error: 'Floater list not found.' }));
@@ -244,7 +255,7 @@ router.post('/volunteers/:day/dates/add', requireAdmin, requireDay, async (req, 
   res.redirect(manageUrl(day, { notice: `Added ${dates.length} date(s).`, dialog: dialogParam(req) }));
 });
 
-router.post('/volunteers/:day/dates/:date/remove', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/dates/:date/remove', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.redirect(manageUrl(day, { error: 'Floater list not found.' }));
@@ -262,7 +273,7 @@ router.post('/volunteers/:day/dates/:date/remove', requireAdmin, requireDay, asy
 // deletes the date and its job assignments outright: archiving just
 // moves it off this page's Choose Date dropdown and onto the read-only
 // Archive tab, keeping everything intact).
-router.post('/volunteers/:day/dates/:date/archive', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/dates/:date/archive', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.redirect(manageUrl(day, { error: 'Floater list not found.' }));
@@ -274,7 +285,7 @@ router.post('/volunteers/:day/dates/:date/archive', requireAdmin, requireDay, as
 // The Archive tab's own per-row Restore button - undoes an archive
 // without touching the date's own job assignments, in case it was
 // archived by mistake.
-router.post('/volunteers/:day/archive/:date/unarchive', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/archive/:date/unarchive', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.redirect(`/admin/volunteers/${day}/archive?error=${encodeURIComponent('Floater list not found.')}`);
@@ -283,7 +294,7 @@ router.post('/volunteers/:day/archive/:date/unarchive', requireAdmin, requireDay
   res.redirect(`/admin/volunteers/${day}/archive?notice=${encodeURIComponent(`Restored ${formatDateLabel(date)}.`)}`);
 });
 
-router.get('/volunteers/:day/export.csv', requireAdmin, requireDay, async (req, res) => {
+router.get('/volunteers/:day/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.status(404).send('Not found');
@@ -322,7 +333,7 @@ async function loadArchivedDate(day, date) {
   return (await archivedDatesForList(list.id)).includes(date);
 }
 
-router.get('/volunteers/:day/archive', requireAdmin, requireDay, async (req, res) => {
+router.get('/volunteers/:day/archive', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.status(404).render('404', { title: 'Not Found' });
@@ -336,6 +347,8 @@ router.get('/volunteers/:day/archive', requireAdmin, requireDay, async (req, res
     tab: 'floater',
     day,
     dayLabel: DAY_LABELS[day],
+    activeDays: await listActiveClassDays(),
+    dayLabels: DAY_LABELS,
     dateOptions: archivedDates.map((d) => ({ date: d, label: formatDateLong(d) })),
     dateFilter,
     rows: rows.map((r) => ({ ...r, label: formatDateLong(r.date) })),
@@ -344,7 +357,7 @@ router.get('/volunteers/:day/archive', requireAdmin, requireDay, async (req, res
   });
 });
 
-router.get('/volunteers/:day/archive/:date/view-fragment', requireAdmin, requireDay, async (req, res) => {
+router.get('/volunteers/:day/archive/:date/view-fragment', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
   if (!(await loadArchivedDate(day, date))) return res.status(404).send('Not found');
@@ -358,7 +371,7 @@ router.get('/volunteers/:day/archive/:date/view-fragment', requireAdmin, require
   });
 });
 
-router.get('/volunteers/:day/archive/:date/print', requireAdmin, requireDay, async (req, res) => {
+router.get('/volunteers/:day/archive/:date/print', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
   if (!(await loadArchivedDate(day, date))) return res.status(404).send('Not found');
@@ -372,7 +385,7 @@ router.get('/volunteers/:day/archive/:date/print', requireAdmin, requireDay, asy
   });
 });
 
-router.get('/volunteers/:day/archive/:date/export.csv', requireAdmin, requireDay, async (req, res) => {
+router.get('/volunteers/:day/archive/:date/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
   if (!(await loadArchivedDate(day, date))) return res.status(404).send('Not found');
@@ -393,25 +406,25 @@ router.get('/volunteers/:day/archive/:date/export.csv', requireAdmin, requireDay
 // exactly the kind of thing someone planning floaters wants to see
 // without leaving this page). ---
 
-const RISK_DAY_WEEKDAY = { monday: 1, wednesday: 3 };
-
-router.get('/volunteers/:day/risk', requireAdmin, requireDay, async (req, res) => {
+router.get('/volunteers/:day/risk', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const today = todayISO();
-  const alertDate = weekdayOf(today) === RISK_DAY_WEEKDAY[day] ? today : null;
+  const alertDate = weekdayOf(today) === CLASS_DAY_WEEKDAY_FULL[day] ? today : null;
 
   res.render('admin-volunteer-risk', {
     title: `${DAY_LABELS[day]} Class Cancellation Risk`,
     tab: 'floater',
     day,
     dayLabel: DAY_LABELS[day],
+    activeDays: await listActiveClassDays(),
+    dayLabels: DAY_LABELS,
     classesAtRisk: await classesAtRiskForDay(day, alertDate),
   });
 });
 
 // --- Floater Teams: who's on the list for each hour, ranked ---
 
-router.get('/volunteers/:day/teams', requireAdmin, requireDay, async (req, res) => {
+router.get('/volunteers/:day/teams', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.status(404).render('404', { title: 'Not Found' });
@@ -436,6 +449,8 @@ router.get('/volunteers/:day/teams', requireAdmin, requireDay, async (req, res) 
     tab: 'floater',
     day,
     dayLabel: DAY_LABELS[day],
+    activeDays: await listActiveClassDays(),
+    dayLabels: DAY_LABELS,
     teams,
     ranks: RANKS,
     rankLabels: RANK_LABELS,
@@ -455,7 +470,7 @@ router.get('/volunteers/:day/teams', requireAdmin, requireDay, async (req, res) 
 // button used to call window.print() directly on itself with no review
 // step - lands on a dedicated read-only preview page instead, matching
 // every other print button site-wide.
-router.get('/volunteers/:day/teams/print', requireAdmin, requireDay, async (req, res) => {
+router.get('/volunteers/:day/teams/print', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.status(404).render('404', { title: 'Not Found' });
@@ -489,7 +504,7 @@ router.get('/volunteers/:day/teams/print', requireAdmin, requireDay, async (req,
 // removeNonPrimaryParentsFromFloaterTeams's own comment for why nothing
 // else ever removes these automatically. Re-runnable any time; a no-op
 // once nothing is left to remove.
-router.post('/volunteers/:day/teams/cleanup', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/teams/cleanup', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const removed = await removeNonPrimaryParentsFromFloaterTeams(day);
   const notice = removed
@@ -501,7 +516,7 @@ router.post('/volunteers/:day/teams/cleanup', requireAdmin, requireDay, async (r
 // A real request: "when adding floaters to teams it should have check
 // boxes with each hour so you can choose multiple and save." One Add now
 // places a member on every hour checked at once instead of just one.
-router.post('/volunteers/:day/teams/add-member', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/teams/add-member', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));
@@ -521,7 +536,7 @@ router.post('/volunteers/:day/teams/add-member', requireAdmin, requireDay, async
 // edits) - one card's Save, so this only ever touches that one hour's
 // position (saveHourLabel, not the bulk saveHourLabels every position at
 // once), and re-syncs schedule cards the same way that dialog does.
-router.post('/volunteers/:day/teams/:sectionId/hour-label', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/teams/:sectionId/hour-label', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));
@@ -568,7 +583,7 @@ router.post('/volunteers/:day/teams/:sectionId/hour-label', requireAdmin, requir
   res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent(removeIds.length ? `Hour updated. Removed ${removeIds.length} member(s).` : 'Hour renamed.'));
 });
 
-router.post('/volunteers/:day/teams/:sectionId/members/:memberId/rank', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/teams/:sectionId/members/:memberId/rank', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));
@@ -576,7 +591,7 @@ router.post('/volunteers/:day/teams/:sectionId/members/:memberId/rank', requireA
   res.redirect(`/admin/volunteers/${day}/teams`);
 });
 
-router.post('/volunteers/:day/teams/:sectionId/members/:memberId/remove', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/teams/:sectionId/members/:memberId/remove', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));
@@ -585,7 +600,7 @@ router.post('/volunteers/:day/teams/:sectionId/members/:memberId/remove', requir
   res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent('Removed from team.'));
 });
 
-router.get('/volunteers/:day/teams/export.csv', requireAdmin, requireDay, async (req, res) => {
+router.get('/volunteers/:day/teams/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.status(404).send('Not found');
@@ -606,7 +621,7 @@ router.get('/volunteers/:day/teams/export.csv', requireAdmin, requireDay, async 
   sendCsv(res, `${day}-floater-teams.csv`, lines);
 });
 
-router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('file'), async (req, res) => {
+router.post('/volunteers/:day/import', requireAdmin, requireClassDay, upload.single('file'), async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));

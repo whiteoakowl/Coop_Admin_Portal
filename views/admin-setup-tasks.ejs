@@ -24,8 +24,9 @@
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">
         <div class="day-toggle">
-          <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/admin/setup/monday/tasks">Monday</a>
-          <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/setup/wednesday/tasks">Wednesday</a>
+          <% activeDays.forEach(function(d) { %>
+            <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/admin/setup/<%= d %>/tasks"><%= dayLabels[d] %></a>
+          <% }); %>
         </div>
         <div class="roster-btn-row roster-btn-row-fit-text">
           <button type="button" class="roster-action-btn" onclick="document.getElementById('new-list-dialog').showModal()">+ Add New List</button>

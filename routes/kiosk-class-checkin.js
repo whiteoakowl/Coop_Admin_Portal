@@ -23,7 +23,7 @@ const router = express.Router();
 const db = require('../db');
 const { todayISO, formatDateLong } = require('../utils/dates');
 const { isValidDay, DAY_LABELS } = require('../utils/days');
-const { allClassesList, ensureDayRoster, HOUR_POSITIONS } = require('../utils/classSchedule');
+const { allClassesList, ensureDayRoster, HOUR_POSITIONS, CLASS_DAY_LABELS_FULL, listActiveClassDays } = require('../utils/classSchedule');
 const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
 const { buildRosterGridData, rosterDates } = require('../utils/rosterGrid');
 const { verifyClassCheckinPin } = require('../utils/classCheckinPin');
@@ -102,11 +102,14 @@ router.post('/lock', (req, res) => {
   res.redirect('/kiosk');
 });
 
-// Day picker - two large Monday/Wednesday buttons, the top level of the
-// unlocked flow (also where "Done" lives, same spot it occupied on the
-// old flat class list).
-router.get('/classes', requireUnlocked, (req, res) => {
-  res.render('kiosk-class-checkin-days', { title: 'Class Check-In' });
+// Day picker - a card per day of the week, the top level of the unlocked
+// flow (also where "Done" lives, same spot it occupied on the old flat
+// class list). A real request ("Full 7 day expansion...") widened this
+// from a hardcoded Monday/Wednesday pair to every day activated on
+// Settings > Day Settings.
+router.get('/classes', requireUnlocked, async (req, res) => {
+  const days = (await listActiveClassDays()).map((d) => ({ value: d, label: CLASS_DAY_LABELS_FULL[d] }));
+  res.render('kiosk-class-checkin-days', { title: 'Class Check-In', days });
 });
 
 // That day's classes, with an Hour dropdown to narrow the list - mirrors

@@ -1,16 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const { closestUpcomingDate, formatDateLabel } = require('../utils/dates');
-const { isValidDay, getListByDay, DAY_LABELS, datesForList } = require('../utils/volunteers');
+const { getListByDay, datesForList } = require('../utils/volunteers');
+const { CLASS_DAY_LABELS_FULL: DAY_LABELS, isValidClassDay, listActiveClassDays } = require('../utils/classSchedule');
 const { publicFloaterCardsForDate } = require('../utils/substitutes');
 
 // A real request: the kiosk homepage's Floater Assignments button used to
-// jump straight to a single auto-picked day - now it shows Monday/
-// Wednesday choice buttons first, same "pick a day" step Class Check-In's
-// own kiosk flow already uses (kiosk-class-checkin-days.ejs), and lands
-// on that day's chart (below) after.
-router.get('/volunteers', (req, res) => {
-  res.render('kiosk-day-picker', { title: 'Floater Assignments', heading: 'Floater Assignments', basePath: '/volunteers', icon: 'icon-users' });
+// jump straight to a single auto-picked day - now it shows a choice of
+// every day activated on Settings > Day Settings (not just a hardcoded
+// Monday/Wednesday pair - a real request: "Full 7 day expansion..."),
+// same "pick a day" step Class Check-In's own kiosk flow already uses
+// (kiosk-class-checkin-days.ejs), and lands on that day's chart (below)
+// after.
+router.get('/volunteers', async (req, res) => {
+  const days = (await listActiveClassDays()).map((d) => ({ value: d, label: DAY_LABELS[d] }));
+  res.render('kiosk-day-picker', { title: 'Floater Assignments', heading: 'Floater Assignments', basePath: '/volunteers', icon: 'icon-users', days });
 });
 
 // Public, no-login kiosk-style view: shows the floater assignment chart
@@ -22,7 +26,7 @@ router.get('/volunteers', (req, res) => {
 // under-2 annotations (those are admin-only assign-tool context).
 router.get('/volunteers/:day', async (req, res) => {
   const day = req.params.day;
-  if (!isValidDay(day)) return res.status(404).render('404', { title: 'Not Found' });
+  if (!isValidClassDay(day)) return res.status(404).render('404', { title: 'Not Found' });
 
   // getListByDay now creates this day's list (for whatever semester is
   // currently active - utils/kioskSettings.js) on demand if it doesn't

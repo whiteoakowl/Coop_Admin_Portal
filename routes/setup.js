@@ -1,15 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const { isValidDay, DAY_LABELS } = require('../utils/days');
+const { CLASS_DAY_LABELS_FULL: DAY_LABELS, isValidClassDay, listActiveClassDays } = require('../utils/classSchedule');
 const { closestUpcomingDate, formatDateLabel } = require('../utils/dates');
 const { teamsForDay, membersForTeam, datesForDay } = require('../utils/setup');
 
 // A real request: the kiosk homepage's Setup/Cleanup button used to jump
-// straight to a single auto-picked day - now it shows Monday/Wednesday
-// choice buttons first, same "pick a day" step Class Check-In's own kiosk
-// flow already uses, and lands on that day's team list (below) after.
-router.get('/setup', (req, res) => {
-  res.render('kiosk-day-picker', { title: 'Setup/Cleanup Teams', heading: 'Setup/Cleanup Teams', basePath: '/setup', icon: 'icon-broom' });
+// straight to a single auto-picked day - now it shows a choice of every
+// day activated on Settings > Day Settings (not just a hardcoded Monday/
+// Wednesday pair - a real request: "Full 7 day expansion..."), same "pick
+// a day" step Class Check-In's own kiosk flow already uses, and lands on
+// that day's team list (below) after.
+router.get('/setup', async (req, res) => {
+  const days = (await listActiveClassDays()).map((d) => ({ value: d, label: DAY_LABELS[d] }));
+  res.render('kiosk-day-picker', { title: 'Setup/Cleanup Teams', heading: 'Setup/Cleanup Teams', basePath: '/setup', icon: 'icon-broom', days });
 });
 
 // Public, no-login kiosk-style view: a real request - "setup/cleanup team
@@ -22,7 +25,7 @@ router.get('/setup', (req, res) => {
 // "assignments" this member-facing page should leave off now).
 router.get('/setup/:day', async (req, res) => {
   const day = req.params.day;
-  if (!isValidDay(day)) return res.status(404).render('404', { title: 'Not Found' });
+  if (!isValidClassDay(day)) return res.status(404).render('404', { title: 'Not Found' });
 
   const teams = await Promise.all((await teamsForDay(day)).map(async (t) => ({ ...t, members: await membersForTeam(t.id) })));
   // A real request: "should show the next upcoming date like floater

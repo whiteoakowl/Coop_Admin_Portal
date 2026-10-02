@@ -18,8 +18,9 @@
       <div class="roster-toolbar no-print">
         <div class="roster-toolbar-left">
           <div class="day-toggle">
-            <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/admin/volunteers/monday/manage">Monday</a>
-            <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/volunteers/wednesday/manage">Wednesday</a>
+            <% activeDays.forEach(function(d) { %>
+              <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/admin/volunteers/<%= d %>/manage"><%= dayLabels[d] %></a>
+            <% }); %>
           </div>
         </div>
         <div class="roster-btn-row">

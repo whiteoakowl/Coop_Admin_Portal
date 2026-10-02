@@ -12,15 +12,18 @@
     <h1><%= heading %></h1>
     <p class="subtitle">Choose a day to view.</p>
 
+    <%# A real request: "Full 7 day expansion so multiple semesters can be
+        created and managed." These two cards used to be a hardcoded
+        Monday/Wednesday pair - days is every day of the week activated on
+        Settings > Day Settings (utils/classSchedule.js's own
+        listActiveClassDays), same catalog the Classes grid's own tabs use. %>
     <div class="landing-grid landing-grid-two">
-      <a class="landing-card landing-card-purple" href="<%= basePath %>/monday">
-        <span class="landing-icon"><svg class="icon"><use href="#<%= icon %>"/></svg></span>
-        <span class="landing-label">Monday</span>
-      </a>
-      <a class="landing-card landing-card-purple" href="<%= basePath %>/wednesday">
-        <span class="landing-icon"><svg class="icon"><use href="#<%= icon %>"/></svg></span>
-        <span class="landing-label">Wednesday</span>
-      </a>
+      <% days.forEach(function(d) { %>
+        <a class="landing-card landing-card-purple" href="<%= basePath %>/<%= d.value %>">
+          <span class="landing-icon"><svg class="icon"><use href="#<%= icon %>"/></svg></span>
+          <span class="landing-label"><%= d.label %></span>
+        </a>
+      <% }); %>
     </div>
   </main>
   <script src="/js/fullscreen-nav.js"></script>

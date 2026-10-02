@@ -3,7 +3,12 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { DAY_LABELS, defaultDay, requireDay, parseDayValue } = require('../utils/days');
+const {
+  CLASS_DAY_LABELS_FULL: DAY_LABELS,
+  requireClassDay,
+  listActiveClassDays,
+  parseClassDayValue,
+} = require('../utils/classSchedule');
 const { isValidISODate, formatDateLabel } = require('../utils/dates');
 const {
   teamsForDay,
@@ -40,18 +45,24 @@ const uploadTasks = multer({ storage: multer.memoryStorage(), limits: { fileSize
 
 // Lands on Assignments first, same as Floater Assignments' own /volunteers
 // redirect - Assignments is the first of the 4 Setup/Cleanup tabs now
-// (see partials/setup-tabs.ejs), not Teams.
-router.get('/setup', requireAdmin, (req, res) => res.redirect(`/admin/setup/${defaultDay()}/assignments`));
+// (see partials/setup-tabs.ejs), not Teams. Same day-catalog/fallback
+// reasoning as that redirect too.
+router.get('/setup', requireAdmin, async (req, res) => {
+  const activeDays = await listActiveClassDays();
+  res.redirect(`/admin/setup/${activeDays[0] || 'monday'}/assignments`);
+});
 
 // --- Manage page: create/edit/delete teams, add/remove members per team ---
 
-router.get('/setup/:day/manage', requireAdmin, requireDay, async (req, res) => {
+router.get('/setup/:day/manage', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
 
   res.render('admin-setup', {
     title: `${DAY_LABELS[day]} Setup/Cleanup Teams`,
     day,
     dayLabel: DAY_LABELS[day],
+    activeDays: await listActiveClassDays(),
+    dayLabels: DAY_LABELS,
     teams: await teamsWithMembers(day),
     // availableParents: the Add Member dialog's member picker. Used to be
     // parent-only by design, but a broader follow-up request widened
@@ -86,7 +97,7 @@ router.get('/setup/:day/manage', requireAdmin, requireDay, async (req, res) => {
 // markup, same shrink-to-fit script, just without any of the manage
 // page's editable form controls that a read-only preview has no business
 // showing.
-router.get('/setup/:day/teams/print', requireAdmin, requireDay, async (req, res) => {
+router.get('/setup/:day/teams/print', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   res.render('admin-setup-teams-print', {
     title: `${DAY_LABELS[day]} Setup/Cleanup Teams`,
@@ -96,7 +107,7 @@ router.get('/setup/:day/teams/print', requireAdmin, requireDay, async (req, res)
   });
 });
 
-router.post('/setup/:day/teams', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/teams', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const title = (req.body.title || '').trim();
   const description = (req.body.description || '').trim();
@@ -120,7 +131,7 @@ router.post('/setup/:day/teams', requireAdmin, requireDay, async (req, res) => {
 
 // Leader dropdown auto-submits on change, same pattern as a Floater
 // Teams rank select - no separate "edit" step.
-router.post('/setup/:day/teams/:teamId/leader', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/teams/:teamId/leader', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const teamId = parseInt(req.params.teamId, 10);
   const leaderId = parseInt(req.body.leaderId, 10) || null;
@@ -131,7 +142,7 @@ router.post('/setup/:day/teams/:teamId/leader', requireAdmin, requireDay, async 
 // Team cards are view-only until Edit is clicked - title/description/
 // leader/meeting time+location all save together from that one popup,
 // replacing the old inline-editable card.
-router.post('/setup/:day/teams/:teamId/edit', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/teams/:teamId/edit', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const teamId = parseInt(req.params.teamId, 10);
   const title = (req.body.title || '').trim();
@@ -152,7 +163,7 @@ router.post('/setup/:day/teams/:teamId/edit', requireAdmin, requireDay, async (r
   res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`"${title}" updated.`));
 });
 
-router.post('/setup/:day/teams/:teamId/delete', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/teams/:teamId/delete', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const teamId = parseInt(req.params.teamId, 10);
   await db.prepare('DELETE FROM setup_teams WHERE id = ? AND day = ?').run(teamId, day);
@@ -161,7 +172,7 @@ router.post('/setup/:day/teams/:teamId/delete', requireAdmin, requireDay, async 
 
 // Single "+ Add Member" popup (toolbar, not per-card) - member + team
 // dropdowns, so adding someone doesn't require opening a specific card.
-router.post('/setup/:day/teams/add-member', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/teams/add-member', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const teamId = parseInt(req.body.teamId, 10);
   const memberId = parseInt(req.body.memberId, 10);
@@ -181,7 +192,7 @@ router.post('/setup/:day/teams/add-member', requireAdmin, requireDay, async (req
 // own per-row opt-in). public/js/team-member-instant-remove.js fetches
 // this directly and removes the row from the DOM on success; a plain
 // (non-fetch) request still gets the original redirect for safety.
-router.post('/setup/:day/teams/:teamId/remove-member/:memberId', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/teams/:teamId/remove-member/:memberId', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const teamId = parseInt(req.params.teamId, 10);
   const memberId = parseInt(req.params.memberId, 10);
@@ -191,7 +202,7 @@ router.post('/setup/:day/teams/:teamId/remove-member/:memberId', requireAdmin, r
   res.redirect(`/admin/setup/${day}/manage`);
 });
 
-router.get('/setup/:day/export.csv', requireAdmin, requireDay, async (req, res) => {
+router.get('/setup/:day/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const teams = await teamsWithMembers(day);
 
@@ -214,7 +225,7 @@ router.get('/setup/:day/export.csv', requireAdmin, requireDay, async (req, res) 
 // routes/admin-volunteers.js), just simpler - no hours/positions/rooms,
 // one flat per-member suggestion instead. ---
 
-router.get('/setup/:day/assignments', requireAdmin, requireDay, async (req, res) => {
+router.get('/setup/:day/assignments', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const dates = await datesForDay(day);
   const { upcoming } = splitDatesByToday(dates);
@@ -224,6 +235,8 @@ router.get('/setup/:day/assignments', requireAdmin, requireDay, async (req, res)
     title: `${DAY_LABELS[day]} Setup/Cleanup Assignments`,
     day,
     dayLabel: DAY_LABELS[day],
+    activeDays: await listActiveClassDays(),
+    dayLabels: DAY_LABELS,
     dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
     upcomingDates: upcoming.map((d) => ({ date: d, label: formatDateLabel(d) })),
     selectedDate,
@@ -252,7 +265,7 @@ async function renderDatesFragment(req, res, day) {
   res.render('setup-dates-fragment', { day, dates });
 }
 
-router.post('/setup/:day/dates/add', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/dates/add', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))];
   await addSetupDates(day, dates);
@@ -260,7 +273,7 @@ router.post('/setup/:day/dates/add', requireAdmin, requireDay, async (req, res) 
   res.redirect(`/admin/setup/${day}/assignments?notice=` + encodeURIComponent(`Added ${dates.length} date(s).`));
 });
 
-router.post('/setup/:day/dates/:date/remove', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/dates/:date/remove', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
   await removeSetupDate(day, date);
@@ -291,7 +304,7 @@ router.post('/setup/:day/dates/:date/remove', requireAdmin, requireDay, async (r
 // cards (see /assignments/fragment below) instead of a full page
 // navigation; a plain, non-fetch form submit still gets the original
 // redirect.
-router.post('/setup/:day/assignments/:memberId/task', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/assignments/:memberId/task', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const memberId = parseInt(req.params.memberId, 10);
   const date = req.body.date;
@@ -316,7 +329,7 @@ router.post('/setup/:day/assignments/:memberId/task', requireAdmin, requireDay, 
 // (or take) a task another member's own dropdown was suggesting - same
 // reasoning as routes/admin-volunteers.js's own /fragment route for the
 // Floater Chart.
-router.get('/setup/:day/assignments/fragment', requireAdmin, requireDay, async (req, res) => {
+router.get('/setup/:day/assignments/fragment', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const dates = await datesForDay(day);
   const { upcoming } = splitDatesByToday(dates);
@@ -325,7 +338,7 @@ router.get('/setup/:day/assignments/fragment', requireAdmin, requireDay, async (
   res.render('setup-assignment-live-fragment', { day, dayLabel: DAY_LABELS[day], selectedDate, cards });
 });
 
-router.get('/setup/:day/assignments/export.csv', requireAdmin, requireDay, async (req, res) => {
+router.get('/setup/:day/assignments/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const date = req.query.date;
   const cards = date && isValidISODate(date) ? await assignmentCardsForDate(day, date) : [];
@@ -348,7 +361,7 @@ router.get('/setup/:day/assignments/export.csv', requireAdmin, requireDay, async
 // nothing to clear since a past date's assignments were never in the way
 // of a future one to begin with). ---
 
-router.get('/setup/:day/archive', requireAdmin, requireDay, async (req, res) => {
+router.get('/setup/:day/archive', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const dates = await datesForDay(day);
   const { past } = splitDatesByToday(dates);
@@ -359,13 +372,15 @@ router.get('/setup/:day/archive', requireAdmin, requireDay, async (req, res) => 
     title: `${DAY_LABELS[day]} Setup/Cleanup Archive`,
     day,
     dayLabel: DAY_LABELS[day],
+    activeDays: await listActiveClassDays(),
+    dayLabels: DAY_LABELS,
     dateOptions: pastSorted.map((d) => ({ date: d, label: formatDateLabel(d) })),
     dateFilter,
     rows: (dateFilter ? [dateFilter] : pastSorted).map((d) => ({ date: d, label: formatDateLabel(d) })),
   });
 });
 
-router.get('/setup/:day/archive/:date/view-fragment', requireAdmin, requireDay, async (req, res) => {
+router.get('/setup/:day/archive/:date/view-fragment', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
   const dates = await datesForDay(day);
@@ -380,7 +395,7 @@ router.get('/setup/:day/archive/:date/view-fragment', requireAdmin, requireDay, 
   });
 });
 
-router.get('/setup/:day/archive/:date/export.csv', requireAdmin, requireDay, async (req, res) => {
+router.get('/setup/:day/archive/:date/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
   const dates = await datesForDay(day);
@@ -398,7 +413,7 @@ router.get('/setup/:day/archive/:date/export.csv', requireAdmin, requireDay, asy
   sendCsv(res, `${day}-setup-cleanup-assignments-${date}.csv`, lines);
 });
 
-router.get('/setup/:day/archive/:date/print', requireAdmin, requireDay, async (req, res) => {
+router.get('/setup/:day/archive/:date/print', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
   const dates = await datesForDay(day);
@@ -417,12 +432,14 @@ router.get('/setup/:day/archive/:date/print', requireAdmin, requireDay, async (r
 // --- Task List tab: stacked numbered task lists, optionally each tied
 // to a Setup/Cleanup team (see utils/taskList.js taskSectionForTeam) ---
 
-router.get('/setup/:day/tasks', requireAdmin, requireDay, async (req, res) => {
+router.get('/setup/:day/tasks', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   res.render('admin-setup-tasks', {
     title: `${DAY_LABELS[day]} Task List`,
     day,
     dayLabel: DAY_LABELS[day],
+    activeDays: await listActiveClassDays(),
+    dayLabels: DAY_LABELS,
     sections: await taskListSectionsForDay(day),
     teams: await teamsForDay(day),
     error: req.query.error || null,
@@ -430,7 +447,7 @@ router.get('/setup/:day/tasks', requireAdmin, requireDay, async (req, res) => {
   });
 });
 
-router.post('/setup/:day/tasks/new', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/tasks/new', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const title = (req.body.title || '').trim();
   const teamId = parseInt(req.body.teamId, 10) || null;
@@ -441,13 +458,13 @@ router.post('/setup/:day/tasks/new', requireAdmin, requireDay, async (req, res) 
   res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent(`"${title}" created.`));
 });
 
-router.post('/setup/:day/tasks/:sectionId/delete', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/tasks/:sectionId/delete', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   await deleteSection(parseInt(req.params.sectionId, 10));
   res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent('List deleted.'));
 });
 
-router.post('/setup/:day/tasks/:sectionId/move', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/tasks/:sectionId/move', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const sectionId = parseInt(req.params.sectionId, 10);
   const direction = req.body.direction === 'up' ? 'up' : 'down';
@@ -460,7 +477,7 @@ router.post('/setup/:day/tasks/:sectionId/move', requireAdmin, requireDay, async
 // (same pattern as public/js/room-row-reorder.js), not a full form
 // submit. Doesn't replace the /move buttons above, just adds a faster
 // way to do the same thing.
-router.post('/setup/:day/tasks/reorder', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/tasks/reorder', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const sectionIds = [].concat(req.body.sectionIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   await reorderSections(day, sectionIds);
@@ -469,7 +486,7 @@ router.post('/setup/:day/tasks/reorder', requireAdmin, requireDay, async (req, r
 
 // Single "+ Add Task" popup (toolbar, not per-card) - description +
 // which list dropdown, same pattern as Teams' "+ Add Member" popup.
-router.post('/setup/:day/tasks/add-item', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/tasks/add-item', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const sectionId = parseInt(req.body.sectionId, 10);
   const description = (req.body.description || '').trim();
@@ -482,13 +499,13 @@ router.post('/setup/:day/tasks/add-item', requireAdmin, requireDay, async (req, 
   res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent('Task added.'));
 });
 
-router.post('/setup/:day/tasks/:sectionId/items/:itemId/delete', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/tasks/:sectionId/items/:itemId/delete', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   await deleteItem(parseInt(req.params.itemId, 10));
   res.redirect(`/admin/setup/${day}/tasks`);
 });
 
-router.post('/setup/:day/tasks/:sectionId/items/:itemId/move', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/tasks/:sectionId/items/:itemId/move', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const sectionId = parseInt(req.params.sectionId, 10);
   const itemId = parseInt(req.params.itemId, 10);
@@ -497,7 +514,7 @@ router.post('/setup/:day/tasks/:sectionId/items/:itemId/move', requireAdmin, req
   res.redirect(`/admin/setup/${day}/tasks`);
 });
 
-router.post('/setup/:day/tasks/:sectionId/items/reorder', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/tasks/:sectionId/items/reorder', requireAdmin, requireClassDay, async (req, res) => {
   const sectionId = parseInt(req.params.sectionId, 10);
   const itemIds = [].concat(req.body.itemIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   await reorderItems(sectionId, itemIds);
@@ -512,7 +529,7 @@ router.post('/setup/:day/tasks/:sectionId/items/reorder', requireAdmin, requireD
 // card's save never needs to know or send anything about any other
 // card's title/team/items. Reordering/deleting are their own immediate
 // actions elsewhere, not part of this.
-router.post('/setup/:day/tasks/save', requireAdmin, requireDay, async (req, res) => {
+router.post('/setup/:day/tasks/save', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   for (const key of Object.keys(req.body)) {
     const sectionMatch = /^sectionTitle_(\d+)$/.exec(key);
@@ -535,7 +552,7 @@ router.post('/setup/:day/tasks/save', requireAdmin, requireDay, async (req, res)
   res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent('Task list updated.'));
 });
 
-router.get('/setup/:day/tasks/import-template.xlsx', requireAdmin, requireDay, (req, res) => {
+router.get('/setup/:day/tasks/import-template.xlsx', requireAdmin, requireClassDay, (req, res) => {
   const buffer = buildTemplateWorkbook(
     ['Number', 'Day', 'List', 'Task'],
     [
@@ -549,16 +566,16 @@ router.get('/setup/:day/tasks/import-template.xlsx', requireAdmin, requireDay, (
   res.send(buffer);
 });
 
-// Day tolerates "Mon"/"Wed" abbreviations, not just the full word (see
-// utils/days.js's parseDayValue) - falls back to whichever day tab Import
-// was clicked from when the column's blank, same convention the Class
-// Schedule Import uses. Matches each row to an existing list by day + title
+// Day tolerates "Mon"/"Tue"/etc. abbreviations, not just the full word
+// (see utils/classSchedule.js's parseClassDayValue) - falls back to
+// whichever day tab Import was clicked from when the column's blank, same
+// convention the Class Schedule Import uses. Matches each row to an existing list by day + title
 // (case-insensitive), creating the list (unlinked to any team) if it
 // doesn't exist yet. Number controls only the ORDER rows land in their
 // list - it's never itself stored, since a list's Number column is always
 // just position (see itemsForSection); a row with no Number lands after
 // every numbered row in that same list, in file order.
-router.post('/setup/:day/tasks/import', requireAdmin, requireDay, uploadTasks.single('file'), async (req, res) => {
+router.post('/setup/:day/tasks/import', requireAdmin, requireClassDay, uploadTasks.single('file'), async (req, res) => {
   const day = req.params.day;
   if (!req.file) {
     return res.redirect(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('Please choose a file to import.'));
@@ -580,7 +597,7 @@ router.post('/setup/:day/tasks/import', requireAdmin, requireDay, uploadTasks.si
       const rawDay = dayKey ? String(row[dayKey]).trim() : '';
       const number = numberKey ? parseInt(row[numberKey], 10) : NaN;
       return {
-        day: rawDay ? parseDayValue(rawDay) : day,
+        day: rawDay ? parseClassDayValue(rawDay) : day,
         list: listKey ? String(row[listKey]).trim() : '',
         task: taskKey ? String(row[taskKey]).trim() : '',
         number: Number.isFinite(number) ? number : null,
@@ -622,7 +639,7 @@ router.post('/setup/:day/tasks/import', requireAdmin, requireDay, uploadTasks.si
   res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent(`Imported ${added} task(s).`));
 });
 
-router.get('/setup/:day/tasks/export.csv', requireAdmin, requireDay, async (req, res) => {
+router.get('/setup/:day/tasks/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const sections = await taskListSectionsForDay(day);
   const lines = [toCsvRow(['List', 'Number', 'Task'])];
@@ -636,7 +653,7 @@ router.get('/setup/:day/tasks/export.csv', requireAdmin, requireDay, async (req,
   sendCsv(res, `${day}-task-list.csv`, lines);
 });
 
-router.get('/setup/:day/tasks/print', requireAdmin, requireDay, async (req, res) => {
+router.get('/setup/:day/tasks/print', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   res.render('admin-setup-tasks-print', {
     title: `${DAY_LABELS[day]} Task List`,

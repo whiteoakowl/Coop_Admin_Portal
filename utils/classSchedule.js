@@ -1,6 +1,15 @@
 const db = require('../db');
 const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
 const { appSetting, setAppSetting } = require('./appSettings');
+const {
+  CLASS_DAYS,
+  CLASS_DAY_ORDER,
+  CLASS_DAY_LABELS_FULL,
+  CLASS_DAY_WEEKDAY_FULL,
+  parseClassDayValue,
+  isValidClassDay,
+  requireClassDay,
+} = require('./classDays');
 const { getListByDay, sectionsForList, membersForList, removeMemberFromSection, addMemberToSection, excludedFloaterPairsForList } = require('./volunteers');
 const { byLastName } = require('./members');
 const { amountPaidForCharge, cancelCharge } = require('./payments');
@@ -770,29 +779,17 @@ async function setClassSemester(id, semesterId) {
 
 // --- Day Settings (class_schedules) - a real request: "Full 7 day
 // expansion so multiple semesters can be created and managed... now day
-// settings. So we can create multiple semester schedule grids." Phase 1
-// of generalizing the app's hardcoded Monday/Wednesday pair: a
+// settings. So we can create multiple semester schedule grids." A
 // class_schedules row records that a given day of the week has been
 // activated as a Classes grid tab (title/semester/date-range are
 // historical metadata shown on the Day Settings tab, not per-tab display
 // state - the grid tab itself stays keyed by the plain day_of_week value,
 // same as Monday/Wednesday always have been, so existing ?tab=monday/
 // ?tab=wednesday links and the Semester filter dropdown inside each grid
-// keep working completely unchanged). Independent of utils/days.js's own
-// DAYS (still just Monday/Wednesday) - that file is shared by Volunteers
-// and Setup/Cleanup, whose own day columns aren't widened yet.
-const CLASS_DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-const CLASS_DAY_ORDER = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
-const CLASS_DAY_LABELS_FULL = {
-  sunday: 'Sunday',
-  monday: 'Monday',
-  tuesday: 'Tuesday',
-  wednesday: 'Wednesday',
-  thursday: 'Thursday',
-  friday: 'Friday',
-  saturday: 'Saturday',
-};
-
+// keep working completely unchanged). CLASS_DAYS/isValidClassDay/etc. live
+// in utils/classDays.js, a standalone leaf module, so utils/volunteers.js
+// can validate a day without a circular require back to this file (which
+// already depends on utils/volunteers.js for getListByDay et al).
 async function listClassSchedules() {
   return db.prepare('SELECT * FROM class_schedules ORDER BY created_at DESC, id DESC').all();
 }
@@ -847,21 +844,6 @@ async function updateClassSchedule(id, { title, dayOfWeek, semesterId, startDate
 
 async function deleteClassSchedule(id) {
   await db.prepare('DELETE FROM class_schedules WHERE id = ?').run(id);
-}
-
-// A Classes-specific isValidDay/requireDay, independent of utils/days.js's
-// own (still Monday/Wednesday-only - Phase 2 scope). routes/admin-class-
-// schedule.js's :day-gated routes (Edit Hours, Bulk Edit, Archive,
-// Import, Export, Print) use these instead, so a newly-activated day
-// (e.g. Tuesday) works on all of them immediately rather than 404ing on
-// the shared middleware everywhere but the grid's own top-level page.
-function isValidClassDay(day) {
-  return CLASS_DAYS.includes(day);
-}
-
-function requireClassDay(req, res, next) {
-  if (!isValidClassDay(req.params.day)) return res.status(404).send('Not found');
-  next();
 }
 
 // A real request: "# of students, # of teachers, # of class assistants
@@ -2296,6 +2278,8 @@ module.exports = {
   assignUnassignedClassesToSemester,
   CLASS_DAYS,
   CLASS_DAY_LABELS_FULL,
+  CLASS_DAY_WEEKDAY_FULL,
+  parseClassDayValue,
   isValidClassDay,
   requireClassDay,
   listClassSchedules,

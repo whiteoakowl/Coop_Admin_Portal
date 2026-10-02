@@ -39,7 +39,11 @@ test.after(() => {
 
 test('GET /volunteers/:day', async (t) => {
   await t.test('an invalid day 404s', async () => {
-    const res = await request(app).get('/volunteers/tuesday');
+    // Tuesday used to be the go-to example of "not a real day this app
+    // supports" - a real request ("Full 7 day expansion...") made every
+    // day of the week a valid day string, so this now has to reach for a
+    // value that isn't a day at all.
+    const res = await request(app).get('/volunteers/someday');
     assert.equal(res.status, 404);
   });
 

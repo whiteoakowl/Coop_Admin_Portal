@@ -15,15 +15,16 @@
     <h1>Class Check-In</h1>
     <p class="subtitle">Choose a day to see its class rosters.</p>
 
+    <%# A real request: "Full 7 day expansion..." - these cards used to be
+        a hardcoded Monday/Wednesday pair; days is every day activated on
+        Settings > Day Settings. %>
     <div class="landing-grid landing-grid-two">
-      <a class="landing-card landing-card-purple" href="/kiosk/class-checkin/classes/monday">
-        <span class="landing-icon"><svg class="icon"><use href="#icon-clipboard-list"/></svg></span>
-        <span class="landing-label">Monday</span>
-      </a>
-      <a class="landing-card landing-card-purple" href="/kiosk/class-checkin/classes/wednesday">
-        <span class="landing-icon"><svg class="icon"><use href="#icon-clipboard-list"/></svg></span>
-        <span class="landing-label">Wednesday</span>
-      </a>
+      <% days.forEach(function(d) { %>
+        <a class="landing-card landing-card-purple" href="/kiosk/class-checkin/classes/<%= d.value %>">
+          <span class="landing-icon"><svg class="icon"><use href="#icon-clipboard-list"/></svg></span>
+          <span class="landing-label"><%= d.label %></span>
+        </a>
+      <% }); %>
     </div>
   </main>
   <script src="/js/fullscreen-nav.js"></script>
