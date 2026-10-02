@@ -20,12 +20,17 @@
         partials/admin-nav.ejs) instead of a trigger+dialog here. %>
 
     <div class="view-tab-panel">
-      <% if (tab === 'monday' || tab === 'wednesday') { %>
+      <% if (typeof activeDays !== 'undefined') { %>
+        <%# A real request: "Full 7 day expansion so multiple semesters
+            can be created and managed... now day settings." This toggle
+            used to be a hardcoded Monday/Wednesday pair - it's now every
+            day activated on Settings > Day Settings, in calendar order. %>
         <div class="day-toggle no-print schedule-day-toggle">
-          <a class="day-toggle-option<%= tab === 'monday' ? ' active' : '' %>" href="/admin/schedule?tab=monday">Monday</a>
-          <a class="day-toggle-option<%= tab === 'wednesday' ? ' active' : '' %>" href="/admin/schedule?tab=wednesday">Wednesday</a>
+          <% activeDays.forEach(function(d) { %>
+            <a class="day-toggle-option<%= tab === d ? ' active' : '' %>" href="/admin/schedule?tab=<%= d %>"><%= classDayLabels[d] %></a>
+          <% }); %>
         </div>
-        <%- include('partials/class-schedule-grid', { day, dayLabel, error, notice, selectedDate, hours, roomGrid, rooms, gradeLevels, ageOptions, colorPalette, availableStaff, sections, absentIds, basePath: `/admin/schedule?tab=${tab}`, readOnly: !isFullAdmin }) %>
+        <%- include('partials/class-schedule-grid', { day, dayLabel, activeDays, classDayLabels, error, notice, selectedDate, hours, roomGrid, rooms, gradeLevels, ageOptions, colorPalette, availableStaff, sections, absentIds, basePath: `/admin/schedule?tab=${tab}`, readOnly: !isFullAdmin }) %>
       <% } else if (tab === 'archive') { %>
         <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
         <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
@@ -153,6 +158,7 @@
           <a class="day-toggle-option<%= settingsTab === 'semester' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=semester">Semester</a>
           <a class="day-toggle-option<%= settingsTab === 'registration' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=registration">Registration Schedule</a>
           <a class="day-toggle-option<%= settingsTab === 'kiosk' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=kiosk">Kiosk</a>
+          <a class="day-toggle-option<%= settingsTab === 'days' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=days">Day Settings</a>
         </div>
 
       <% if (settingsTab === 'general') { %>
@@ -325,7 +331,7 @@
             </div>
           <% } %>
         </section>
-      <% } else { %>
+      <% } else if (settingsTab === 'kiosk') { %>
 
         <%# A real request: "Add a tab in co-op admin portal settings
             called kiosk. There will be a drop down picker for choosing a
@@ -356,6 +362,93 @@
         <% if (semesters.length === 0) { %>
           <p class="roster-empty">No semesters yet - add one on the Semester tab first.</p>
         <% } %>
+      <% } else { %>
+
+        <%# A real request: "Full 7 day expansion so multiple semesters
+            can be created and managed... now day settings. So we can
+            create multiple semester schedule grids and all the floater
+            and setup cleanup features for each to go with it." Activating
+            a day here adds it to the Classes grid's own day-tab row (see
+            utils/classSchedule.js's listActiveClassDays) - re-activating
+            an already-used day for a different semester is also allowed
+            (its own separate record), since the tab itself is keyed by
+            day of week, not by which semester first created it. %>
+        <p class="hint">Add a day of the week to the Classes grid, or keep a record of which semester a day has been used for. The grid's own tabs always show every day that's ever been added here, regardless of which semester you're viewing - use each grid's own Semester filter (or the Kiosk tab, for Floater/Setup-Cleanup) to scope what you see day to day.</p>
+
+        <section class="portal-dashboard-card portal-dashboard-card-wide">
+          <h2>Add a Day</h2>
+          <form method="POST" action="/admin/schedule/class-schedules" class="member-form-grid">
+            <label class="member-form-full">Title
+              <input type="text" name="title" placeholder="e.g. Tuesday Enrichment" required />
+            </label>
+            <label>Semester
+              <select name="semesterId">
+                <option value="">No Semester</option>
+                <% semesters.forEach(function(s) { %>
+                  <option value="<%= s.id %>"><%= s.title %></option>
+                <% }); %>
+              </select>
+            </label>
+            <label>Day of Week
+              <select name="dayOfWeek" required>
+                <% classDays.forEach(function(d) { %>
+                  <option value="<%= d %>"><%= classDayLabels[d] %></option>
+                <% }); %>
+              </select>
+            </label>
+            <label>Start Date
+              <input type="date" name="startDate" />
+            </label>
+            <label>End Date
+              <input type="date" name="endDate" />
+            </label>
+            <div class="member-form-full">
+              <button type="submit" class="primary-btn">Add Day</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="portal-dashboard-section">
+          <% if (classSchedules.length === 0) { %>
+            <p class="roster-empty">No days added yet.</p>
+          <% } else { %>
+            <div class="roster-scroll">
+              <table class="roster-table members-table condensed-table">
+                <thead>
+                  <tr><th>Title</th><th>Day</th><th>Semester</th><th>Start Date</th><th>End Date</th><th></th><th></th></tr>
+                </thead>
+                <tbody>
+                  <%# Each row's edit fields live outside their <form> (a
+                      lone <form> directly spanning multiple <td>s isn't
+                      valid HTML) and link back to it via the HTML5 form=
+                      attribute instead - same "every field posts together
+                      as one save" result as a normal <form>-wrapped row. %>
+                  <% classSchedules.forEach(function(cs) { %>
+                    <tr>
+                      <td class="roster-name-col"><input type="text" name="title" form="edit-schedule-<%= cs.id %>" value="<%= cs.title %>" aria-label="Rename <%= cs.title %>" required /></td>
+                      <td><%= classDayLabels[cs.day_of_week] %></td>
+                      <td><%= (semesters.find(function(s) { return s.id === cs.semester_id; }) || {}).title || 'No Semester' %></td>
+                      <td><input type="date" name="startDate" form="edit-schedule-<%= cs.id %>" value="<%= cs.start_date || '' %>" aria-label="Start date" /></td>
+                      <td><input type="date" name="endDate" form="edit-schedule-<%= cs.id %>" value="<%= cs.end_date || '' %>" aria-label="End date" /></td>
+                      <td>
+                        <button type="submit" form="edit-schedule-<%= cs.id %>" class="roster-action-btn">Save</button>
+                        <form id="edit-schedule-<%= cs.id %>" method="POST" action="/admin/schedule/class-schedules/<%= cs.id %>">
+                          <input type="hidden" name="dayOfWeek" value="<%= cs.day_of_week %>" />
+                          <input type="hidden" name="semesterId" value="<%= cs.semester_id || '' %>" />
+                        </form>
+                      </td>
+                      <td class="actions-cell">
+                        <form method="POST" action="/admin/schedule/class-schedules/<%= cs.id %>/delete" data-confirm="Remove the &quot;<%= cs.title %>&quot; day schedule? The day stays on the Classes grid if another schedule still uses it.">
+                          <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                        </form>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </section>
       <% } %>
       <% } else { %>
         <%

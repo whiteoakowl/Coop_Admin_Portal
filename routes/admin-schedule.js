@@ -22,7 +22,13 @@ const {
 } = require('../utils/schedule');
 const { byLastName, allFamilies } = require('../utils/members');
 const {
-  DAY_LABELS: CLASS_DAY_LABELS,
+  CLASS_DAYS,
+  CLASS_DAY_LABELS_FULL: CLASS_DAY_LABELS,
+  listClassSchedules,
+  listActiveClassDays,
+  createClassSchedule,
+  updateClassSchedule,
+  deleteClassSchedule,
   hoursForDay,
   roomGridForDay,
   roomsForDay,
@@ -76,8 +82,8 @@ const uploadDesignImage = multer({
   fileFilter: imageFileFilter,
 });
 
-const SCHEDULE_TABS = ['monday', 'wednesday', 'members', 'archive', 'settings'];
-const SETTINGS_SUBTABS = ['general', 'semester', 'registration', 'kiosk'];
+const SPECIAL_SCHEDULE_TABS = ['members', 'archive', 'settings'];
+const SETTINGS_SUBTABS = ['general', 'semester', 'registration', 'kiosk', 'days'];
 const ARCHIVE_TYPES = ['class', 'student', 'parent'];
 const MEMBER_TYPE_FILTERS = ['student', 'parent'];
 const PAGE_SIZE = 25;
@@ -99,15 +105,23 @@ router.get('/schedule', requireAdmin, async (req, res) => {
     return res.redirect('/admin/schedule?' + qs.toString());
   }
 
-  let tab = SCHEDULE_TABS.includes(req.query.tab) ? req.query.tab : 'monday';
+  // A real request: "Full 7 day expansion so multiple semesters can be
+  // created and managed... now day settings." The day-tab list is no
+  // longer the hardcoded Monday/Wednesday pair - it's every day of the
+  // week that's ever been activated via a class_schedules row (Settings >
+  // Day Settings, below), in calendar order. ?tab=monday/?tab=wednesday
+  // keep working exactly as before since those two are always seeded.
+  const activeDays = await listActiveClassDays();
+  const defaultTab = activeDays[0] || 'monday';
+  let tab = SPECIAL_SCHEDULE_TABS.includes(req.query.tab) || activeDays.includes(req.query.tab) ? req.query.tab : defaultTab;
 
   // Member Schedules, the Class Archive, and Settings are all
   // full-Admin-only. A Co-op Admin only gets the read-only day grid.
   if ((tab === 'members' || tab === 'archive' || tab === 'settings') && !res.locals.isFullAdmin) {
-    tab = 'monday';
+    tab = defaultTab;
   }
 
-  if (tab === 'monday' || tab === 'wednesday') {
+  if (CLASS_DAYS.includes(tab)) {
     const selectedDate = isValidISODate(req.query.date) ? req.query.date : defaultDateFor(tab);
     return res.render('admin-schedule', {
       title: 'Schedules',
@@ -115,6 +129,8 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       topTab: 'schedules',
       day: tab,
       dayLabel: CLASS_DAY_LABELS[tab],
+      activeDays,
+      classDayLabels: CLASS_DAY_LABELS,
       hours: await hoursForDay(tab),
       roomGrid: await roomGridForDay(tab),
       rooms: await roomsForDay(tab),
@@ -192,6 +208,14 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       // features are linked to [this semester]... this way the kiosk can
       // be changed each semester seamlessly." See utils/kioskSettings.js.
       activeKioskSemesterId: await getActiveKioskSemesterId(),
+      // Settings > Day Settings - a real request: "Full 7 day expansion
+      // so multiple semesters can be created and managed... now day
+      // settings." classDays is every weekday CLASS_DAY_LABELS can offer
+      // in the Add/Edit Day Schedule dialog; classSchedules is the
+      // existing list (title/day/semester/dates) shown and edited here.
+      classDays: CLASS_DAYS,
+      classDayLabels: CLASS_DAY_LABELS,
+      classSchedules: await listClassSchedules(),
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -375,6 +399,47 @@ router.post('/schedule/semesters/assign-missing', requireFullAdmin, async (req, 
   }
   const count = await assignUnassignedClassesToSemester(semesterId);
   res.redirect(back + sep + 'notice=' + encodeURIComponent(count === 0 ? 'No classes were missing a semester.' : `Assigned ${count} class${count === 1 ? '' : 'es'} with no semester.`));
+});
+
+// --- Classes > Settings: Day Settings (class_schedules) - a real
+// request: "Full 7 day expansion so multiple semesters can be created and
+// managed... now day settings. So we can create multiple semester
+// schedule grids." Activating a day here (or re-activating it for a new
+// semester) is what adds it to the Classes grid's own day-tab row - see
+// utils/classSchedule.js's own listActiveClassDays/createClassSchedule.
+function classScheduleFields(req) {
+  return {
+    title: req.body.title,
+    dayOfWeek: req.body.dayOfWeek,
+    semesterId: req.body.semesterId ? parseInt(req.body.semesterId, 10) : null,
+    startDate: isValidISODate(req.body.startDate) ? req.body.startDate : null,
+    endDate: isValidISODate(req.body.endDate) ? req.body.endDate : null,
+  };
+}
+
+router.post('/schedule/class-schedules', requireFullAdmin, async (req, res) => {
+  const back = '/admin/schedule?tab=settings&settingsTab=days';
+  try {
+    await createClassSchedule(classScheduleFields(req));
+  } catch (err) {
+    return res.redirect(back + '&error=' + encodeURIComponent(err.message));
+  }
+  res.redirect(back + '&notice=' + encodeURIComponent('Day schedule added.'));
+});
+
+router.post('/schedule/class-schedules/:id', requireFullAdmin, async (req, res) => {
+  const back = '/admin/schedule?tab=settings&settingsTab=days';
+  try {
+    await updateClassSchedule(parseInt(req.params.id, 10), classScheduleFields(req));
+  } catch (err) {
+    return res.redirect(back + '&error=' + encodeURIComponent(err.message));
+  }
+  res.redirect(back + '&notice=' + encodeURIComponent('Day schedule updated.'));
+});
+
+router.post('/schedule/class-schedules/:id/delete', requireFullAdmin, async (req, res) => {
+  await deleteClassSchedule(parseInt(req.params.id, 10));
+  res.redirect('/admin/schedule?tab=settings&settingsTab=days&notice=' + encodeURIComponent('Day schedule removed.'));
 });
 
 // A real request rebuilt Co-op Class Settings entirely: "Remove [the

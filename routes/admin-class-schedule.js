@@ -6,7 +6,7 @@ const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { requireDay, isValidDay, parseDayValue } = require('../utils/days');
+const { parseDayValue } = require('../utils/days');
 const { ageFromBirthday, formatFriendlyTimestamp, formatDateNumeric, formatDateLabel } = require('../utils/dates');
 const {
   assignmentsForClass,
@@ -72,6 +72,8 @@ const {
   removeStaff,
   activeStudents,
   activeMembersForStaff,
+  isValidClassDay,
+  requireClassDay,
 } = require('../utils/classSchedule');
 const { classSectionIds } = require('../utils/sections');
 
@@ -234,7 +236,7 @@ router.get('/class-schedule/quiz-review', requireFullAdmin, async (req, res) => 
 // targets (so none of them need to change), but have it immediately
 // redirect again to the real tabbed page - carrying every existing query
 // param (date/error/notice) through unchanged.
-router.get('/class-schedule/:day', requireAdmin, requireDay, (req, res) => {
+router.get('/class-schedule/:day', requireAdmin, requireClassDay, (req, res) => {
   const params = new URLSearchParams(req.query);
   params.set('tab', req.params.day);
   res.redirect(`/admin/schedule?${params.toString()}`);
@@ -242,7 +244,7 @@ router.get('/class-schedule/:day', requireAdmin, requireDay, (req, res) => {
 
 // Single "Edit" dialog covers both hour labels and room renames in one
 // Save, instead of two separate toolbar buttons/dialogs/routes.
-router.post('/class-schedule/:day/edit', requireFullAdmin, requireDay, async (req, res) => {
+router.post('/class-schedule/:day/edit', requireFullAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const labels = [].concat(req.body.labels || []);
   const startTimes = [].concat(req.body.startTimes || []);
@@ -278,7 +280,7 @@ router.post('/class-schedule/:day/edit', requireFullAdmin, requireDay, async (re
 // from public/js/room-row-reorder.js right after a drag ends, not a full
 // form submit, so reordering stays a single smooth interaction instead of
 // a page reload.
-router.post('/class-schedule/:day/rooms/reorder', requireFullAdmin, requireDay, async (req, res) => {
+router.post('/class-schedule/:day/rooms/reorder', requireFullAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const rooms = [].concat(req.body.rooms || []).map((r) => String(r));
   await saveRoomOrder(day, rooms);
@@ -291,7 +293,7 @@ router.post('/class-schedule/:day/rooms/reorder', requireFullAdmin, requireDay, 
 // instead of a route param. Falls back to the day-scoped page on error so
 // the admin lands back where they started.
 router.post('/class-schedule/classes/new', requireFullAdmin, async (req, res) => {
-  const day = isValidDay(req.body.day) ? req.body.day : null;
+  const day = isValidClassDay(req.body.day) ? req.body.day : null;
   const className = (req.body.className || '').trim();
   const hourPosition = parseInt(req.body.hourPosition, 10);
   if (!day || !className || !HOUR_POSITIONS.includes(hourPosition)) {
@@ -784,7 +786,7 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single(
 // why that distinction matters (a blank field must never clobber every
 // selected class's existing value).
 router.post('/class-schedule/:day/bulk-edit', requireFullAdmin, async (req, res) => {
-  const day = isValidDay(req.params.day) ? req.params.day : 'monday';
+  const day = isValidClassDay(req.params.day) ? req.params.day : 'monday';
   const ids = (req.body.classIds || '')
     .split(',')
     .map((v) => parseInt(v, 10))
@@ -845,7 +847,7 @@ router.post('/class-schedule/classes/:id/delete', requireFullAdmin, async (req, 
 // on a corrected file, without losing the record of what was there.
 // Moves them out of the live schedule and into the Class Archive tab -
 // see archiveClasses' own comment.
-router.post('/class-schedule/:day/archive', requireFullAdmin, requireDay, async (req, res) => {
+router.post('/class-schedule/:day/archive', requireFullAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const classIds = [].concat(req.body.classIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (classIds.length === 0) {
@@ -1212,7 +1214,7 @@ function buildAutoHourPositions(rows) {
   return positions;
 }
 
-router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.single('file'), async (req, res) => {
+router.post('/class-schedule/:day/import', requireFullAdmin, requireClassDay, upload.single('file'), async (req, res) => {
   const day = req.params.day;
   if (!req.file) {
     return res.redirect(`/admin/class-schedule/${day}?error=` + encodeURIComponent('Please choose a file to import.'));
@@ -1321,7 +1323,7 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
   );
 });
 
-router.get('/class-schedule/:day/export.csv', requireAdmin, requireDay, async (req, res) => {
+router.get('/class-schedule/:day/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const grid = await gridForDay(day);
 
@@ -1337,7 +1339,7 @@ router.get('/class-schedule/:day/export.csv', requireAdmin, requireDay, async (r
   sendCsv(res, `${day}-class-schedule.csv`, lines);
 });
 
-router.get('/class-schedule/:day/print', requireAdmin, requireDay, async (req, res) => {
+router.get('/class-schedule/:day/print', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   res.render('admin-class-schedule-print', {
     title: `${DAY_LABELS[day]} Schedule`,

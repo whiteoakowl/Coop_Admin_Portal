@@ -768,6 +768,102 @@ async function setClassSemester(id, semesterId) {
   await db.prepare('UPDATE classes SET semester_id = ? WHERE id = ?').run(semesterId || null, id);
 }
 
+// --- Day Settings (class_schedules) - a real request: "Full 7 day
+// expansion so multiple semesters can be created and managed... now day
+// settings. So we can create multiple semester schedule grids." Phase 1
+// of generalizing the app's hardcoded Monday/Wednesday pair: a
+// class_schedules row records that a given day of the week has been
+// activated as a Classes grid tab (title/semester/date-range are
+// historical metadata shown on the Day Settings tab, not per-tab display
+// state - the grid tab itself stays keyed by the plain day_of_week value,
+// same as Monday/Wednesday always have been, so existing ?tab=monday/
+// ?tab=wednesday links and the Semester filter dropdown inside each grid
+// keep working completely unchanged). Independent of utils/days.js's own
+// DAYS (still just Monday/Wednesday) - that file is shared by Volunteers
+// and Setup/Cleanup, whose own day columns aren't widened yet.
+const CLASS_DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const CLASS_DAY_ORDER = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+const CLASS_DAY_LABELS_FULL = {
+  sunday: 'Sunday',
+  monday: 'Monday',
+  tuesday: 'Tuesday',
+  wednesday: 'Wednesday',
+  thursday: 'Thursday',
+  friday: 'Friday',
+  saturday: 'Saturday',
+};
+
+async function listClassSchedules() {
+  return db.prepare('SELECT * FROM class_schedules ORDER BY created_at DESC, id DESC').all();
+}
+
+// The Classes grid's own tab list - every day_of_week that's ever been
+// activated via a class_schedules row, in calendar order (not creation
+// order, so a newly-added Tuesday lands between Monday and Wednesday
+// rather than always at the end).
+async function listActiveClassDays() {
+  const rows = await db.prepare('SELECT DISTINCT day_of_week FROM class_schedules').all();
+  return rows.map((r) => r.day_of_week).sort((a, b) => CLASS_DAY_ORDER[a] - CLASS_DAY_ORDER[b]);
+}
+
+// Lazily backs a newly-activated day with its own 4 default Hour rows
+// (class_schedule_hours), same shape db/bootstrapPg.js always seeded
+// eagerly for Monday/Wednesday - a no-op once a day already has any.
+async function ensureClassScheduleHours(day) {
+  const existing = await db.prepare('SELECT 1 FROM class_schedule_hours WHERE day = ? LIMIT 1').get(day);
+  if (existing) return;
+  for (let i = 1; i <= 4; i++) {
+    await db.prepare('INSERT INTO class_schedule_hours (day, position, label) VALUES (?, ?, ?)').run(day, i, `Hour ${i}`);
+  }
+}
+
+async function createClassSchedule({ title, dayOfWeek, semesterId, startDate, endDate }) {
+  const trimmedTitle = (title || '').trim();
+  if (!trimmedTitle) throw new Error('A title is required.');
+  if (!CLASS_DAYS.includes(dayOfWeek)) throw new Error('Choose a valid day of the week.');
+  const sid = semesterId || null;
+  const existing = await db.prepare('SELECT 1 FROM class_schedules WHERE day_of_week = ? AND semester_id IS NOT DISTINCT FROM ?').get(dayOfWeek, sid);
+  if (existing) throw new Error(`A ${CLASS_DAY_LABELS_FULL[dayOfWeek]} schedule already exists for that semester.`);
+  await ensureClassScheduleHours(dayOfWeek);
+  await db
+    .prepare('INSERT INTO class_schedules (title, day_of_week, semester_id, start_date, end_date) VALUES (?, ?, ?, ?, ?)')
+    .run(trimmedTitle, dayOfWeek, sid, startDate || null, endDate || null);
+}
+
+async function updateClassSchedule(id, { title, dayOfWeek, semesterId, startDate, endDate }) {
+  const trimmedTitle = (title || '').trim();
+  if (!trimmedTitle) throw new Error('A title is required.');
+  if (!CLASS_DAYS.includes(dayOfWeek)) throw new Error('Choose a valid day of the week.');
+  const sid = semesterId || null;
+  const existing = await db
+    .prepare('SELECT 1 FROM class_schedules WHERE day_of_week = ? AND semester_id IS NOT DISTINCT FROM ? AND id != ?')
+    .get(dayOfWeek, sid, id);
+  if (existing) throw new Error(`A ${CLASS_DAY_LABELS_FULL[dayOfWeek]} schedule already exists for that semester.`);
+  await ensureClassScheduleHours(dayOfWeek);
+  await db
+    .prepare('UPDATE class_schedules SET title = ?, day_of_week = ?, semester_id = ?, start_date = ?, end_date = ? WHERE id = ?')
+    .run(trimmedTitle, dayOfWeek, sid, startDate || null, endDate || null, id);
+}
+
+async function deleteClassSchedule(id) {
+  await db.prepare('DELETE FROM class_schedules WHERE id = ?').run(id);
+}
+
+// A Classes-specific isValidDay/requireDay, independent of utils/days.js's
+// own (still Monday/Wednesday-only - Phase 2 scope). routes/admin-class-
+// schedule.js's :day-gated routes (Edit Hours, Bulk Edit, Archive,
+// Import, Export, Print) use these instead, so a newly-activated day
+// (e.g. Tuesday) works on all of them immediately rather than 404ing on
+// the shared middleware everywhere but the grid's own top-level page.
+function isValidClassDay(day) {
+  return CLASS_DAYS.includes(day);
+}
+
+function requireClassDay(req, res, next) {
+  if (!isValidClassDay(req.params.day)) return res.status(404).send('Not found');
+  next();
+}
+
 // A real request: "# of students, # of teachers, # of class assistants
 // options should move to the top of staff and roster page" - out of the
 // Class Details form and onto the Staff & Roster tab's own form instead,
@@ -2198,6 +2294,15 @@ module.exports = {
   setClassSemester,
   countClassesMissingSemester,
   assignUnassignedClassesToSemester,
+  CLASS_DAYS,
+  CLASS_DAY_LABELS_FULL,
+  isValidClassDay,
+  requireClassDay,
+  listClassSchedules,
+  listActiveClassDays,
+  createClassSchedule,
+  updateClassSchedule,
+  deleteClassSchedule,
   updateClassSlots,
   deleteClass,
   archiveClasses,
