@@ -201,6 +201,22 @@ test('Tour Check-In subpage: purple Check In button, Copy Link, shows every regi
   assert.match(afterPage.text, /Checked In/);
 });
 
+// A real request: "orientation check in subpage and tour check in
+// subpage, on mobile. Check in and copy link buttons should be on the
+// same row, similar size but fit text nicely, and centered in mobile. On
+// desktop check in buttons on the far left and copy link button on far
+// right." public/css/styles.css's own .orientation-checkin-btn-row rules
+// are what deliver that layout - this just locks in the markup contract
+// those rules are scoped to, on both check-in subpages.
+test('Tour Check-In and Orientation Check-In toolbars carry the orientation-checkin-btn-row class their mobile/desktop layout CSS is scoped to', async () => {
+  const admin = await loginAsAdmin();
+  for (const url of ['/admin/orientation/tour-checkin', '/admin/orientation/orientation-checkin']) {
+    const page = await request(app).get(url).set('Cookie', admin.cookie);
+    assert.equal(page.status, 200, url);
+    assert.match(page.text, /class="roster-btn-row orientation-checkin-btn-row"/, url);
+  }
+});
+
 // A real request: "Orientation video column should say parent
 // orientation, teacher training should say teacher orientation, add a
 // column for open house. If the column title has two words stack them

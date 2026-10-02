@@ -4575,6 +4575,45 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   }
 }
 
+/* A real request (Orientation Check-In / Tour Check-In toolbars): "check
+   in and copy link buttons should be on the same row... centered in
+   mobile. On desktop check in button on the far left and copy link
+   button on far right." Both buttons already sit at their own natural
+   (not stretched) width - .class-checkin-btn never opts into
+   .roster-action-btn's flex: 1 0 auto, and this overrides that for Copy
+   Link too - so space-between alone pushes them to the two edges. This
+   toolbar is the only child of its own .roster-toolbar (itself a flex
+   row), which otherwise leaves it sized to its own content instead of
+   the toolbar's full width - flex: 1 1 auto makes it actually stretch
+   edge to edge so "far left"/"far right" (and mobile centering) has the
+   full row width to work with. */
+.orientation-checkin-btn-row {
+  flex: 1 1 auto;
+  justify-content: space-between;
+}
+.orientation-checkin-btn-row .roster-action-btn {
+  flex: 0 0 auto;
+}
+
+/* Must come after the generic .roster-btn-row mobile grid rules above -
+   equal single-class specificity, so later source order wins. Switches
+   back to a single centered flex row instead of the generic stacked
+   grid, sized to each button's own content instead of width: 100%. */
+@media (max-width: 640px) {
+  .orientation-checkin-btn-row {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  .orientation-checkin-btn-row .class-checkin-btn,
+  .orientation-checkin-btn-row .roster-action-btn {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+}
+
 /* ---------- Manage roster page ---------- */
 
 .manage-header-row {
