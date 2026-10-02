@@ -5613,6 +5613,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   overflow: hidden;
   break-inside: avoid;
 }
+/* A real bug report, worst on a phone-width Setup/Cleanup Assignments
+   page: the whole card (Assign buttons included) sat past the right edge
+   of the screen with no way to scroll to it. .floater-card's own
+   overflow: hidden normally stops a grid item from growing past its
+   track by zeroing its automatic minimum size - but the actual grid item
+   here is .floater-print-page (added later, print-only, for "one team
+   per page"; see partials/setup-assignment-cards.ejs's own header
+   comment), one level OUTSIDE .floater-card, with no on-screen CSS of
+   its own at all. A grid item's default min-width is auto, not 0, so its
+   un-shrinkable content (a 2-column task table whose Assign row can't
+   compress past its button's own width) was free to force this wrapper
+   - and everything inside it - wider than its 1fr column. Shared by
+   every .floater-cards-grid use (Floater Assignments, the Floater Chart,
+   and Setup/Cleanup), not Setup/Cleanup-specific. */
+.floater-print-page { min-width: 0; }
 .floater-card-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 0.75rem; flex-wrap: wrap; }
 .floater-card-header h3 { margin: 0; font-size: 0.95rem; }
 .floater-card-icon { display: inline-flex; flex-shrink: 0; }
