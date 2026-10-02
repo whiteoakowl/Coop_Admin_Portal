@@ -16,15 +16,11 @@
 
     <h1>Floater Assignments</h1>
 
-    <%- include('partials/floater-tabs', { day, activeFloaterTab: 'risk' }) %>
+    <%- include('partials/floater-tabs', { day, activeFloaterTab: 'risk', semesterId }) %>
 
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">
-        <div class="day-toggle">
-          <% activeDays.forEach(function(d) { %>
-            <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/admin/volunteers/<%= d %>/risk"><%= dayLabels[d] %></a>
-          <% }); %>
-        </div>
+        <%- include('partials/schedule-combo-picker', { combos, basePrefix: '/admin/volunteers', pathSuffix: '/risk', selectedComboId }) %>
         <div class="roster-btn-row">
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
         </div>

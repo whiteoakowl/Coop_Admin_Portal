@@ -19,6 +19,7 @@ const {
   classesAtRiskForDay,
   removeNonPrimaryParentsFromFloaterTeams,
   checkedInMemberIdsForDate,
+  listScheduleCombos,
 } = require('../utils/classSchedule');
 const {
   RANKS,
@@ -44,6 +45,7 @@ const {
   groupedPermanentJobsForDay,
   groupedTemporaryJobsForDayDate,
 } = require('../utils/substitutes');
+const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
@@ -64,6 +66,62 @@ function manageUrl(day, params) {
 }
 function dialogParam(req) {
   return EDIT_DIALOGS.includes(req.query.dialog) ? req.query.dialog : null;
+}
+
+// A real request: "I need to be able to switch between semester views on
+// floaters, setup cleanup, attendance, classes etc." - the new semester+
+// day combo picker's own selection, read back off ?semesterId= so every
+// route on this page (not just the GET page view - every POST action
+// too) stays scoped to the exact semester being viewed, never silently
+// falling back to whatever Settings > Kiosk has active. undefined (the
+// param isn't present at all) means "use the normal default" - every
+// Floater util function's own existing fallback to the active Kiosk
+// semester, unchanged for any link/bookmark that predates this picker.
+// 'none' (the picker's own value for an untagged combo) means "no
+// semester," explicitly distinct from "not specified."
+function comboSemesterId(req) {
+  const v = req.query.semesterId;
+  if (v === undefined) return undefined;
+  if (v === '' || v === 'none') return null;
+  const n = parseInt(v, 10);
+  return Number.isNaN(n) ? undefined : n;
+}
+// The inverse of comboSemesterId, for building a redirect/link's own
+// ?semesterId= value: undefined stays undefined (manageUrl's own
+// params-object filtering already drops it, so there's nothing to carry
+// forward), an explicit "no semester" becomes the picker's own 'none'.
+function qsSemester(semesterId) {
+  return semesterId === null ? 'none' : semesterId;
+}
+// Appends the current combo selection to a redirect/link URL so the next
+// page load (after a POST action, or a sub-tab link like Manage -> Teams)
+// stays on the same semester+day combo instead of resetting to whatever
+// the normal default would resolve to. No-ops when semesterId is
+// undefined (the admin never picked an explicit combo, so there's nothing
+// to carry forward) - manageUrl's own `params` object handles this same
+// job for the main manage page's own redirects, which already thread
+// arbitrary query params through.
+function appendSemester(url, semesterId) {
+  if (semesterId === undefined) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}semesterId=${qsSemester(semesterId)}`;
+}
+// The exact class_schedules row (if any) a day+resolved-semesterId pair
+// corresponds to - the combo picker preselects by this id rather than by
+// day/semesterId separately, so there's no risk of two combos somehow
+// looking selected at once.
+function findComboId(combos, day, semesterId) {
+  const match = combos.find((c) => c.day === day && c.semesterId === (semesterId ?? null));
+  return match ? match.id : null;
+}
+// A page like Risk that never calls getListByDay itself (it has no
+// volunteer_lists row of its own to read an authoritative .semester_id
+// back off, the way the picker preselects on every other Floater page)
+// still needs to preselect its own combo picker correctly - resolves the
+// exact same way getListByDay's own default does, so the dropdown always
+// shows whichever combo this page is actually using.
+async function resolveSemesterId(semesterId) {
+  return semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
 }
 
 // Floater Assignments is the landing page for Volunteers. Lands on
@@ -152,7 +210,8 @@ router.get('/volunteers/:day/assistants', requireAdmin, requireClassDay, (req, r
 
 router.get('/volunteers/:day/manage', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
+  const semesterId = comboSemesterId(req);
+  const list = await getListByDay(day, semesterId);
   // getListByDay can return undefined if this day's volunteer_lists row
   // hasn't been seeded yet (db/bootstrapPg.js) - normally impossible once
   // app.ready has resolved, guarded here the same as every other lookup-
@@ -197,6 +256,7 @@ router.get('/volunteers/:day/manage', requireAdmin, requireClassDay, async (req,
 
   const positionGroups = await groupedPermanentJobsForDay(day);
   const temporaryPositionGroups = selectedDate ? await groupedTemporaryJobsForDayDate(day, selectedDate) : [];
+  const combos = await listScheduleCombos();
 
   res.render('admin-volunteers', {
     title: `${DAY_LABELS[day]} Floater Assignments`,
@@ -205,6 +265,9 @@ router.get('/volunteers/:day/manage', requireAdmin, requireClassDay, async (req,
     dayLabel: DAY_LABELS[day],
     activeDays: await listActiveClassDays(),
     dayLabels: DAY_LABELS,
+    combos,
+    selectedComboId: findComboId(combos, day, list.semester_id),
+    semesterId: qsSemester(list.semester_id),
     hours,
     dates: dates.map((d, i) => ({ date: d, label: dateLabels[i], archived: archivedSet.has(d) })),
     dateLabels,
@@ -232,7 +295,8 @@ router.get('/volunteers/:day/manage', requireAdmin, requireClassDay, async (req,
 // comment above), so the whole grid has to be recomputed either way.
 router.get('/volunteers/:day/fragment', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
+  const semesterId = comboSemesterId(req);
+  const list = await getListByDay(day, semesterId);
   if (!list) return res.status(404).send('Not found');
   const activeDates = await activeDatesForList(list.id);
   const today = todayISO();
@@ -240,31 +304,33 @@ router.get('/volunteers/:day/fragment', requireAdmin, requireClassDay, async (re
   const defaultDate = upcomingActiveDates[0] || activeDates[activeDates.length - 1] || null;
   const selectedDate = activeDates.includes(req.query.date) ? req.query.date : defaultDate;
   const hourSections = await buildHourSections(day, selectedDate);
-  res.render('floater-chart-cards-fragment', { day, dayLabel: DAY_LABELS[day], selectedDate, hourSections });
+  res.render('floater-chart-cards-fragment', { day, dayLabel: DAY_LABELS[day], selectedDate, hourSections, semesterId: qsSemester(list.semester_id) });
 });
 
 router.post('/volunteers/:day/dates/add', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
-  if (!list) return res.redirect(manageUrl(day, { error: 'Floater list not found.' }));
+  const semesterId = comboSemesterId(req);
+  const list = await getListByDay(day, semesterId);
+  if (!list) return res.redirect(manageUrl(day, { error: 'Floater list not found.', semesterId: qsSemester(semesterId) }));
   const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))];
   const insertDate = db.prepare(
     'INSERT INTO volunteer_dates (volunteer_list_id, session_date) VALUES (?, ?) ON CONFLICT (volunteer_list_id, session_date) DO NOTHING'
   );
   for (const d of dates) await insertDate.run(list.id, d);
-  res.redirect(manageUrl(day, { notice: `Added ${dates.length} date(s).`, dialog: dialogParam(req) }));
+  res.redirect(manageUrl(day, { notice: `Added ${dates.length} date(s).`, dialog: dialogParam(req), semesterId: qsSemester(semesterId) }));
 });
 
 router.post('/volunteers/:day/dates/:date/remove', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
-  if (!list) return res.redirect(manageUrl(day, { error: 'Floater list not found.' }));
+  const semesterId = comboSemesterId(req);
+  const list = await getListByDay(day, semesterId);
+  if (!list) return res.redirect(manageUrl(day, { error: 'Floater list not found.', semesterId: qsSemester(semesterId) }));
   const date = req.params.date;
   await db.withTransaction(async (tx) => {
     await tx.prepare('DELETE FROM volunteer_dates WHERE volunteer_list_id = ? AND session_date = ?').run(list.id, date);
     await tx.prepare("DELETE FROM substitute_assignments WHERE session_date = ? AND slot_type = 'job'").run(date);
   });
-  res.redirect(manageUrl(day, { notice: `Removed ${formatDateLabel(date)}.`, dialog: dialogParam(req) }));
+  res.redirect(manageUrl(day, { notice: `Removed ${formatDateLabel(date)}.`, dialog: dialogParam(req), semesterId: qsSemester(semesterId) }));
 });
 
 // A real request: "choose date drop down should show all of the dates so
@@ -275,11 +341,12 @@ router.post('/volunteers/:day/dates/:date/remove', requireAdmin, requireClassDay
 // Archive tab, keeping everything intact).
 router.post('/volunteers/:day/dates/:date/archive', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
-  if (!list) return res.redirect(manageUrl(day, { error: 'Floater list not found.' }));
+  const semesterId = comboSemesterId(req);
+  const list = await getListByDay(day, semesterId);
+  if (!list) return res.redirect(manageUrl(day, { error: 'Floater list not found.', semesterId: qsSemester(semesterId) }));
   const date = req.params.date;
   await archiveDate(list.id, date);
-  res.redirect(manageUrl(day, { notice: `Archived ${formatDateLabel(date)}.`, dialog: dialogParam(req) }));
+  res.redirect(manageUrl(day, { notice: `Archived ${formatDateLabel(date)}.`, dialog: dialogParam(req), semesterId: qsSemester(semesterId) }));
 });
 
 // The Archive tab's own per-row Restore button - undoes an archive
@@ -287,16 +354,17 @@ router.post('/volunteers/:day/dates/:date/archive', requireAdmin, requireClassDa
 // archived by mistake.
 router.post('/volunteers/:day/archive/:date/unarchive', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
-  if (!list) return res.redirect(`/admin/volunteers/${day}/archive?error=${encodeURIComponent('Floater list not found.')}`);
+  const semesterId = comboSemesterId(req);
+  const list = await getListByDay(day, semesterId);
+  if (!list) return res.redirect(appendSemester(`/admin/volunteers/${day}/archive?error=${encodeURIComponent('Floater list not found.')}`, semesterId));
   const date = req.params.date;
   await unarchiveDate(list.id, date);
-  res.redirect(`/admin/volunteers/${day}/archive?notice=${encodeURIComponent(`Restored ${formatDateLabel(date)}.`)}`);
+  res.redirect(appendSemester(`/admin/volunteers/${day}/archive?notice=${encodeURIComponent(`Restored ${formatDateLabel(date)}.`)}`, semesterId));
 });
 
 router.get('/volunteers/:day/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
+  const list = await getListByDay(day, comboSemesterId(req));
   if (!list) return res.status(404).send('Not found');
   const dates = await datesForList(list.id);
   const grid = await jobAssignmentGrid(day, dates);
@@ -326,21 +394,23 @@ router.get('/volunteers/:day/export.csv', requireAdmin, requireClassDay, async (
 // routes below from a tampered/stale date in the URL surfacing a
 // still-active (still-editable-via-Substitutes-Needed) date under the
 // read-only Archive routes.
-async function loadArchivedDate(day, date) {
+async function loadArchivedDate(day, date, semesterId) {
   if (!isValidISODate(date)) return false;
-  const list = await getListByDay(day);
+  const list = await getListByDay(day, semesterId);
   if (!list) return false;
   return (await archivedDatesForList(list.id)).includes(date);
 }
 
 router.get('/volunteers/:day/archive', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
+  const semesterId = comboSemesterId(req);
+  const list = await getListByDay(day, semesterId);
   if (!list) return res.status(404).render('404', { title: 'Not Found' });
   const archivedDates = await archivedDatesForList(list.id);
 
   const dateFilter = archivedDates.includes(req.query.date) ? req.query.date : null;
   const rows = await archivedDateSummaries(day, dateFilter ? [dateFilter] : archivedDates);
+  const combos = await listScheduleCombos();
 
   res.render('admin-volunteer-archive', {
     title: `${DAY_LABELS[day]} Floater Archive`,
@@ -349,6 +419,9 @@ router.get('/volunteers/:day/archive', requireAdmin, requireClassDay, async (req
     dayLabel: DAY_LABELS[day],
     activeDays: await listActiveClassDays(),
     dayLabels: DAY_LABELS,
+    combos,
+    selectedComboId: findComboId(combos, day, list.semester_id),
+    semesterId: qsSemester(list.semester_id),
     dateOptions: archivedDates.map((d) => ({ date: d, label: formatDateLong(d) })),
     dateFilter,
     rows: rows.map((r) => ({ ...r, label: formatDateLong(r.date) })),
@@ -360,13 +433,15 @@ router.get('/volunteers/:day/archive', requireAdmin, requireClassDay, async (req
 router.get('/volunteers/:day/archive/:date/view-fragment', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
-  if (!(await loadArchivedDate(day, date))) return res.status(404).send('Not found');
+  const semesterId = comboSemesterId(req);
+  if (!(await loadArchivedDate(day, date, semesterId))) return res.status(404).send('Not found');
 
   res.render('volunteer-archive-view-fragment', {
     day,
     dayLabel: DAY_LABELS[day],
     date,
     dateLabel: formatDateLong(date),
+    semesterId: qsSemester(semesterId === undefined ? null : semesterId),
     cards: await dailyAssignmentCardsWithLabels(day, date),
   });
 });
@@ -374,7 +449,7 @@ router.get('/volunteers/:day/archive/:date/view-fragment', requireAdmin, require
 router.get('/volunteers/:day/archive/:date/print', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
-  if (!(await loadArchivedDate(day, date))) return res.status(404).send('Not found');
+  if (!(await loadArchivedDate(day, date, comboSemesterId(req)))) return res.status(404).send('Not found');
 
   res.render('volunteer-archive-print', {
     title: `${DAY_LABELS[day]} Floater Assignments — ${formatDateLong(date)}`,
@@ -388,7 +463,7 @@ router.get('/volunteers/:day/archive/:date/print', requireAdmin, requireClassDay
 router.get('/volunteers/:day/archive/:date/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
-  if (!(await loadArchivedDate(day, date))) return res.status(404).send('Not found');
+  if (!(await loadArchivedDate(day, date, comboSemesterId(req)))) return res.status(404).send('Not found');
 
   const cards = await dailyAssignmentCardsWithLabels(day, date);
   const lines = [toCsvRow(['Hour', 'Position', 'Room', 'Floater Assigned'])];
@@ -410,6 +485,8 @@ router.get('/volunteers/:day/risk', requireAdmin, requireClassDay, async (req, r
   const day = req.params.day;
   const today = todayISO();
   const alertDate = weekdayOf(today) === CLASS_DAY_WEEKDAY_FULL[day] ? today : null;
+  const combos = await listScheduleCombos();
+  const resolvedSemesterId = await resolveSemesterId(comboSemesterId(req));
 
   res.render('admin-volunteer-risk', {
     title: `${DAY_LABELS[day]} Class Cancellation Risk`,
@@ -418,6 +495,17 @@ router.get('/volunteers/:day/risk', requireAdmin, requireClassDay, async (req, r
     dayLabel: DAY_LABELS[day],
     activeDays: await listActiveClassDays(),
     dayLabels: DAY_LABELS,
+    combos,
+    semesterId: qsSemester(resolvedSemesterId),
+    // Risk's own classesAtRiskForDay (utils/classSchedule.js) still loads
+    // every class for the day regardless of semester - the same "load
+    // everything, filter client-side" model the Classes grid itself still
+    // uses today (not yet converted to a real per-semester query - a
+    // separate, bigger change tracked for the Classes grid's own picker
+    // pass). The combo picker here is for navigation consistency with its
+    // Floater Assignments/Teams/Archive siblings; it doesn't yet change
+    // which classes this one list considers at risk.
+    selectedComboId: findComboId(combos, day, resolvedSemesterId),
     classesAtRisk: await classesAtRiskForDay(day, alertDate),
   });
 });
@@ -426,7 +514,8 @@ router.get('/volunteers/:day/risk', requireAdmin, requireClassDay, async (req, r
 
 router.get('/volunteers/:day/teams', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
+  const semesterId = comboSemesterId(req);
+  const list = await getListByDay(day, semesterId);
   if (!list) return res.status(404).render('404', { title: 'Not Found' });
   const sections = await sectionsForList(list.id);
   const hours = await hoursForDay(day);
@@ -444,6 +533,7 @@ router.get('/volunteers/:day/teams', requireAdmin, requireClassDay, async (req, 
     });
   }
 
+  const combos = await listScheduleCombos();
   res.render('admin-volunteer-teams', {
     title: `${DAY_LABELS[day]} Floater Teams`,
     tab: 'floater',
@@ -451,6 +541,9 @@ router.get('/volunteers/:day/teams', requireAdmin, requireClassDay, async (req, 
     dayLabel: DAY_LABELS[day],
     activeDays: await listActiveClassDays(),
     dayLabels: DAY_LABELS,
+    combos,
+    selectedComboId: findComboId(combos, day, list.semester_id),
+    semesterId: qsSemester(list.semester_id),
     teams,
     ranks: RANKS,
     rankLabels: RANK_LABELS,
@@ -472,7 +565,7 @@ router.get('/volunteers/:day/teams', requireAdmin, requireClassDay, async (req, 
 // every other print button site-wide.
 router.get('/volunteers/:day/teams/print', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
+  const list = await getListByDay(day, comboSemesterId(req));
   if (!list) return res.status(404).render('404', { title: 'Not Found' });
   const sections = await sectionsForList(list.id);
   const hours = await hoursForDay(day);
@@ -506,11 +599,12 @@ router.get('/volunteers/:day/teams/print', requireAdmin, requireClassDay, async 
 // once nothing is left to remove.
 router.post('/volunteers/:day/teams/cleanup', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   const removed = await removeNonPrimaryParentsFromFloaterTeams(day);
   const notice = removed
     ? `Removed ${removed} non-primary parent assignment(s).`
     : 'No non-primary parent assignments found to remove.';
-  res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent(notice));
+  res.redirect(appendSemester(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent(notice), semesterId));
 });
 
 // A real request: "when adding floaters to teams it should have check
@@ -518,8 +612,9 @@ router.post('/volunteers/:day/teams/cleanup', requireAdmin, requireClassDay, asy
 // places a member on every hour checked at once instead of just one.
 router.post('/volunteers/:day/teams/add-member', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
-  if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));
+  const semesterId = comboSemesterId(req);
+  const list = await getListByDay(day, semesterId);
+  if (!list) return res.redirect(appendSemester(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'), semesterId));
   const memberId = parseInt(req.body.memberId, 10);
   const sectionIds = [...new Set([].concat(req.body.sectionIds || []).map((id) => parseInt(id, 10)).filter(Boolean))];
   if (memberId && sectionIds.length > 0) {
@@ -528,7 +623,7 @@ router.post('/volunteers/:day/teams/add-member', requireAdmin, requireClassDay, 
     // syncDayMemberRosters/syncMemberSchedulesForDay in utils/classSchedule.
     await syncDayMemberRosters(day);
   }
-  res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent(`Member added to ${sectionIds.length} hour(s).`));
+  res.redirect(appendSemester(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent(`Member added to ${sectionIds.length} hour(s).`), semesterId));
 });
 
 // Renames the shared hour label a floater team's card displays (the same
@@ -538,12 +633,13 @@ router.post('/volunteers/:day/teams/add-member', requireAdmin, requireClassDay, 
 // once), and re-syncs schedule cards the same way that dialog does.
 router.post('/volunteers/:day/teams/:sectionId/hour-label', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
-  if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));
+  const semesterId = comboSemesterId(req);
+  const list = await getListByDay(day, semesterId);
+  if (!list) return res.redirect(appendSemester(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'), semesterId));
   const sectionId = parseInt(req.params.sectionId, 10);
   const section = (await sectionsForList(list.id)).find((s) => s.id === sectionId);
   if (!section) {
-    return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Team not found.'));
+    return res.redirect(appendSemester(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Team not found.'), semesterId));
   }
   await saveHourLabel(day, section.position, req.body.label);
 
@@ -580,29 +676,31 @@ router.post('/volunteers/:day/teams/:sectionId/hour-label', requireAdmin, requir
   }
 
   await syncMemberSchedulesForDay(day);
-  res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent(removeIds.length ? `Hour updated. Removed ${removeIds.length} member(s).` : 'Hour renamed.'));
+  res.redirect(appendSemester(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent(removeIds.length ? `Hour updated. Removed ${removeIds.length} member(s).` : 'Hour renamed.'), semesterId));
 });
 
 router.post('/volunteers/:day/teams/:sectionId/members/:memberId/rank', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
-  if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));
+  const semesterId = comboSemesterId(req);
+  const list = await getListByDay(day, semesterId);
+  if (!list) return res.redirect(appendSemester(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'), semesterId));
   await setSectionRank(list.id, parseInt(req.params.memberId, 10), parseInt(req.params.sectionId, 10), req.body.rank);
-  res.redirect(`/admin/volunteers/${day}/teams`);
+  res.redirect(appendSemester(`/admin/volunteers/${day}/teams`, semesterId));
 });
 
 router.post('/volunteers/:day/teams/:sectionId/members/:memberId/remove', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
-  if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));
+  const semesterId = comboSemesterId(req);
+  const list = await getListByDay(day, semesterId);
+  if (!list) return res.redirect(appendSemester(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'), semesterId));
   await removeMemberFromSection(list.id, parseInt(req.params.memberId, 10), parseInt(req.params.sectionId, 10));
   await syncDayMemberRosters(day);
-  res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent('Removed from team.'));
+  res.redirect(appendSemester(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent('Removed from team.'), semesterId));
 });
 
 router.get('/volunteers/:day/teams/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
+  const list = await getListByDay(day, comboSemesterId(req));
   if (!list) return res.status(404).send('Not found');
   const sections = await sectionsForList(list.id);
   const hours = await hoursForDay(day);
@@ -623,20 +721,21 @@ router.get('/volunteers/:day/teams/export.csv', requireAdmin, requireClassDay, a
 
 router.post('/volunteers/:day/import', requireAdmin, requireClassDay, upload.single('file'), async (req, res) => {
   const day = req.params.day;
-  const list = await getListByDay(day);
-  if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));
+  const semesterId = comboSemesterId(req);
+  const list = await getListByDay(day, semesterId);
+  if (!list) return res.redirect(appendSemester(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'), semesterId));
   const firstSection = (await sectionsForList(list.id))[0];
   if (!req.file) {
-    return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Please choose a file to import.'));
+    return res.redirect(appendSemester(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Please choose a file to import.'), semesterId));
   }
   if (!firstSection) {
-    return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('No hour sections exist yet.'));
+    return res.redirect(appendSemester(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('No hour sections exist yet.'), semesterId));
   }
   let names;
   try {
     names = await parseNamesFromUpload(req.file.buffer, req.file.originalname);
   } catch (err) {
-    return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
+    return res.redirect(appendSemester(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'), semesterId));
   }
   let added = 0;
   let notFound = 0;
@@ -648,8 +747,11 @@ router.post('/volunteers/:day/import', requireAdmin, requireClassDay, upload.sin
   }
   if (added) await syncDayMemberRosters(day);
   res.redirect(
-    `/admin/volunteers/${day}/teams?notice=` +
-      encodeURIComponent(`Imported ${added} member(s) added to ${firstSection.label}` + (notFound ? `, ${notFound} name(s) not found in Members.` : '.'))
+    appendSemester(
+      `/admin/volunteers/${day}/teams?notice=` +
+        encodeURIComponent(`Imported ${added} member(s) added to ${firstSection.label}` + (notFound ? `, ${notFound} name(s) not found in Members.` : '.')),
+      semesterId
+    )
   );
 });
 

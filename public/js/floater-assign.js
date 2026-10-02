@@ -20,6 +20,7 @@
   const status = document.getElementById('floater-assign-status');
   const main = document.getElementById('main-content');
   const day = main ? main.dataset.day : '';
+  const semesterId = main ? main.dataset.semesterId : '';
 
   function showError(message) {
     if (!status) return;
@@ -34,7 +35,7 @@
 
   async function refreshCards() {
     const date = container.dataset.selectedDate;
-    const res = await fetch(`/admin/volunteers/${day}/fragment?date=${encodeURIComponent(date)}`, {
+    const res = await fetch(`/admin/volunteers/${day}/fragment?date=${encodeURIComponent(date)}&semesterId=${encodeURIComponent(semesterId)}`, {
       headers: { 'X-Requested-With': 'fetch' },
     });
     if (!res.ok) throw new Error('Saved, but could not refresh the board - reload the page to see it.');

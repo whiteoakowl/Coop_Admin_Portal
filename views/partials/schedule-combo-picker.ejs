@@ -1,0 +1,34 @@
+<%
+// Shared semester+day combo picker - a real request: "I need to be able
+// to switch between semester views on floaters, setup cleanup,
+// attendance, classes etc. Drop down on all these pages should be fall
+// 2026 - Monday, fall 2026 Wednesday. The semester and day for all class
+// schedule/semester/day combos." Replaces the plain Monday/Wednesday
+// day-toggle these pages used before - each <option> is one
+// class_schedules row (utils/classSchedule.js's listScheduleCombos),
+// labeled "<Semester> - <Day>" (or just "<Day>" when untagged), and
+// picking one navigates straight to that exact combo's own view. This is
+// a per-admin, per-page VIEW choice only (an explicit ?semesterId= on
+// that page's own URL) - it never touches Settings > Kiosk's own
+// site-wide active semester (a real decision, not an oversight: the
+// public Kiosk screens are deliberately unaffected by what an admin
+// happens to be looking at here).
+//
+// Locals: combos (listScheduleCombos() output), basePrefix (e.g.
+// "/admin/volunteers"), pathSuffix (e.g. "/manage"), selectedComboId
+// (the exact class_schedules.id currently being viewed - matching by id
+// rather than by day/semesterId separately means two combos that somehow
+// share a day+semester pair, which shouldn't happen, still can't both
+// look selected).
+function comboHref(combo) {
+  return basePrefix + '/' + combo.day + pathSuffix + '?semesterId=' + (combo.semesterId == null ? 'none' : combo.semesterId);
+}
+%>
+<div class="category-filter schedule-combo-picker-wrap">
+  <label for="schedule-combo-picker-<%= pathSuffix.replace(/\//g, '') %>">Semester / Day</label>
+  <select id="schedule-combo-picker-<%= pathSuffix.replace(/\//g, '') %>" class="schedule-combo-picker" onchange="window.fullscreenNavigate(this.value)">
+    <% combos.forEach(function(combo) { %>
+      <option value="<%= comboHref(combo) %>" <%= combo.id === selectedComboId ? 'selected' : '' %>><%= combo.label %></option>
+    <% }); %>
+  </select>
+</div>

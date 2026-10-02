@@ -66,7 +66,7 @@ test('Floater Teams: Print button links to a dedicated preview page instead of c
 
   const manage = await request(app).get('/admin/volunteers/monday/teams').set('Cookie', cookie);
   assert.equal(manage.status, 200);
-  assert.match(manage.text, /href="\/admin\/volunteers\/monday\/teams\/print"[^>]*target="_blank"/, 'Print button should link to the preview page, not call window.print() on itself');
+  assert.match(manage.text, /href="\/admin\/volunteers\/monday\/teams\/print\?semesterId=[^"]*"[^>]*target="_blank"/, 'Print button should link to the preview page, not call window.print() on itself');
 
   const preview = await request(app).get('/admin/volunteers/monday/teams/print').set('Cookie', cookie);
   assert.equal(preview.status, 200);

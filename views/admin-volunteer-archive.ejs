@@ -5,7 +5,7 @@
 </head>
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
-  <main id="main-content" tabindex="-1" class="admin-main" data-day="<%= day %>">
+  <main id="main-content" tabindex="-1" class="admin-main" data-day="<%= day %>" data-semester-id="<%= semesterId %>">
     <div class="print-header">
       <img src="/img/logo.png" alt="" />
       <div>
@@ -16,21 +16,17 @@
 
     <h1>Floater Assignments</h1>
 
-    <%- include('partials/floater-tabs', { day, activeFloaterTab: 'archive' }) %>
+    <%- include('partials/floater-tabs', { day, activeFloaterTab: 'archive', semesterId }) %>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">
-        <div class="day-toggle">
-          <% activeDays.forEach(function(d) { %>
-            <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/admin/volunteers/<%= d %>/archive"><%= dayLabels[d] %></a>
-          <% }); %>
-        </div>
+        <%- include('partials/schedule-combo-picker', { combos, basePrefix: '/admin/volunteers', pathSuffix: '/archive', selectedComboId }) %>
         <div class="category-filter" style="margin: 0;">
           <label for="archive-date-select">Choose Date</label>
-          <select id="archive-date-select" onchange="window.fullscreenNavigate('/admin/volunteers/<%= day %>/archive' + (this.value ? '?date=' + this.value : ''))">
+          <select id="archive-date-select" onchange="window.fullscreenNavigate('/admin/volunteers/<%= day %>/archive?semesterId=<%= semesterId %>' + (this.value ? '&date=' + this.value : ''))">
             <option value="">All dates</option>
             <% dateOptions.forEach(function(d) { %>
               <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
@@ -57,7 +53,7 @@
                   <%# A misclicked Archive shouldn't be a dead end - puts
                       the date right back on the manage page's own Choose
                       Date dropdown. %>
-                  <form method="POST" action="/admin/volunteers/<%= day %>/archive/<%= r.date %>/unarchive" class="inline-block-form">
+                  <form method="POST" action="/admin/volunteers/<%= day %>/archive/<%= r.date %>/unarchive?semesterId=<%= semesterId %>" class="inline-block-form">
                     <button type="submit" class="link-btn">Restore</button>
                   </form>
                 </td>

@@ -58,9 +58,15 @@ test('Floater Assignments: a newly-activated day (Thursday) gets its own admin d
 
   const manage = await request(app).get('/admin/volunteers/thursday/manage').set('Cookie', admin.cookie);
   assert.equal(manage.status, 200);
-  assert.match(manage.text, />Thursday<\/a>/);
-  assert.match(manage.text, />Monday<\/a>/);
-  assert.match(manage.text, />Wednesday<\/a>/);
+  // The plain Monday/Wednesday day-toggle (<a>Thursday</a> pill links) is
+  // now the semester+day combo picker (a real request: "I need to be
+  // able to switch between semester views on floaters... drop down on
+  // all these pages") - a <select> whose <option>s are every
+  // class_schedules row. None of these three has a semester tag, so each
+  // just reads its plain day name.
+  assert.match(manage.text, />Thursday<\/option>/);
+  assert.match(manage.text, />Monday<\/option>/);
+  assert.match(manage.text, />Wednesday<\/option>/);
 
   const list = await db.prepare("SELECT * FROM volunteer_lists WHERE day = 'thursday'").get();
   assert.ok(list, 'a volunteer_lists row for Thursday should have been created');

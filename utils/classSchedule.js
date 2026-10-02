@@ -786,6 +786,48 @@ async function listActiveClassDays() {
   return rows.map((r) => r.day_of_week).sort((a, b) => CLASS_DAY_ORDER[a] - CLASS_DAY_ORDER[b]);
 }
 
+// A real request: "I need to be able to switch between semester views on
+// floaters, setup cleanup, attendance, classes etc. Drop down on all
+// these pages should be fall 2026 - Monday, fall 2026 Wednesday. The
+// semester and day for all class schedule/semester/day combos" - every
+// class_schedules row (the "Day Settings" entity Phase 1 of the 7-day
+// expansion built) IS exactly one semester+day combo, each with its own
+// title/date range already - this is the shared list every page's new
+// combo picker renders its <option>s from, replacing the plain Monday/
+// Wednesday day-toggle those pages used before. Picking a combo is a
+// per-page VIEW choice only (an explicit ?semesterId= on that page's own
+// URL) - it never touches Settings > Kiosk's own site-wide active
+// semester, by explicit decision (the public Kiosk screens are
+// deliberately unaffected by what an admin is currently looking at here).
+async function listScheduleCombos() {
+  const rows = await db
+    .prepare(
+      `SELECT cs.id AS id, cs.day_of_week AS day, cs.semester_id AS semester_id, cs.start_date AS start_date, cs.end_date AS end_date, s.title AS semester_title
+       FROM class_schedules cs
+       LEFT JOIN semesters s ON s.id = cs.semester_id`
+    )
+    .all();
+  return rows
+    .map((r) => ({
+      id: r.id,
+      day: r.day,
+      semesterId: r.semester_id,
+      semesterTitle: r.semester_title,
+      startDate: r.start_date,
+      endDate: r.end_date,
+      label: r.semester_title ? `${r.semester_title} - ${CLASS_DAY_LABELS_FULL[r.day]}` : CLASS_DAY_LABELS_FULL[r.day],
+    }))
+    .sort((a, b) => {
+      // Semester-tagged combos before untagged ones, newest semester
+      // first (mirrors utils/semesterAssignment.js's own "most recently
+      // created semester" convention), then calendar day order within
+      // the same semester.
+      if ((a.semesterId == null) !== (b.semesterId == null)) return a.semesterId == null ? 1 : -1;
+      if (a.semesterId !== b.semesterId) return (b.semesterId || 0) - (a.semesterId || 0);
+      return CLASS_DAY_ORDER[a.day] - CLASS_DAY_ORDER[b.day];
+    });
+}
+
 // Lazily backs a newly-activated day with its own 4 default Hour rows
 // (class_schedule_hours), same shape db/bootstrapPg.js always seeded
 // eagerly for Monday/Wednesday - a no-op once a day already has any.
@@ -2265,6 +2307,7 @@ module.exports = {
   requireClassDay,
   listClassSchedules,
   listActiveClassDays,
+  listScheduleCombos,
   createClassSchedule,
   updateClassSchedule,
   deleteClassSchedule,

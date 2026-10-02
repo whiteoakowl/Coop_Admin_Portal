@@ -125,7 +125,7 @@ test('each existing position in the dialog has its own trash-icon delete button'
   const dialogHtml = /<dialog id="add-job-dialog"[\s\S]*?<\/dialog>/.exec(res.text)[0];
   assert.match(
     dialogHtml,
-    new RegExp(`formaction="/admin/volunteers/monday/substitutes/permanent-jobs/group/${jobId}/delete\\?dialog=job"`),
+    new RegExp(`formaction="/admin/volunteers/monday/substitutes/permanent-jobs/group/${jobId}/delete\\?dialog=job&semesterId=`),
     'the Copy Room group should have its own delete button targeting its keyId'
   );
   // The blank "Add New Position" row at the bottom has nothing to delete.

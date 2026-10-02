@@ -6,27 +6,23 @@
 </head>
 <body class="admin-page floater-assignments-print-page">
   <%- include('partials/admin-nav') %>
-  <main id="main-content" tabindex="-1" class="admin-main" data-day="<%= day %>">
+  <main id="main-content" tabindex="-1" class="admin-main" data-day="<%= day %>" data-semester-id="<%= semesterId %>">
     <h1>Floater Assignments</h1>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <%- include('partials/floater-tabs', { day, activeFloaterTab: 'assignments' }) %>
+    <%- include('partials/floater-tabs', { day, activeFloaterTab: 'assignments', semesterId }) %>
 
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">
         <div class="roster-toolbar-left">
-          <div class="day-toggle">
-            <% activeDays.forEach(function(d) { %>
-              <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/admin/volunteers/<%= d %>/manage"><%= dayLabels[d] %></a>
-            <% }); %>
-          </div>
+          <%- include('partials/schedule-combo-picker', { combos, basePrefix: '/admin/volunteers', pathSuffix: '/manage', selectedComboId }) %>
         </div>
         <div class="roster-btn-row">
-          <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/export.csv">Export</a>
+          <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/export.csv?semesterId=<%= semesterId %>">Export</a>
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
-          <a class="roster-action-btn" href="/admin/volunteers/<%= day %>/archive">Archive</a>
+          <a class="roster-action-btn" href="/admin/volunteers/<%= day %>/archive?semesterId=<%= semesterId %>">Archive</a>
         </div>
       </div>
 
@@ -46,7 +42,7 @@
       <div class="roster-toolbar no-print">
         <div class="category-filter" style="margin: 0;">
           <label for="chart-date-select">Choose Date</label>
-          <select id="chart-date-select" onchange="window.fullscreenNavigate('/admin/volunteers/<%= day %>/manage' + (this.value ? '?date=' + this.value : ''))">
+          <select id="chart-date-select" onchange="window.fullscreenNavigate('/admin/volunteers/<%= day %>/manage?semesterId=<%= semesterId %>' + (this.value ? '&date=' + this.value : ''))">
             <% if (activeDates.length === 0) { %><option value="">No dates</option><% } %>
             <% activeDates.forEach(function(d) { %>
               <option value="<%= d.date %>" <%= selectedDate === d.date ? 'selected' : '' %>><%= d.label %></option>
@@ -58,11 +54,11 @@
       <% if (dates.length === 0) { %>
         <p class="roster-empty">Add session dates above first.</p>
       <% } else if (!selectedDate) { %>
-        <p class="roster-empty">Every date has been archived - add one above, or see them on the <a href="/admin/volunteers/<%= day %>/archive">Archive</a> tab.</p>
+        <p class="roster-empty">Every date has been archived - add one above, or see them on the <a href="/admin/volunteers/<%= day %>/archive?semesterId=<%= semesterId %>">Archive</a> tab.</p>
       <% } else { %>
         <div id="floater-assign-status" class="alert alert-error no-print" hidden></div>
         <div id="floater-cards-container" data-selected-date="<%= selectedDate %>">
-          <%- include('partials/floater-chart-cards', { day, dayLabel, selectedDate, hourSections }) %>
+          <%- include('partials/floater-chart-cards', { day, dayLabel, selectedDate, hourSections, semesterId }) %>
         </div>
       <% } %>
     </div>
@@ -86,11 +82,11 @@
                       onto the read-only Archive tab; Remove (still below)
                       deletes it and its job assignments outright. %>
                   <% if (!d.archived) { %>
-                    <form method="POST" action="/admin/volunteers/<%= day %>/dates/<%= d.date %>/archive?dialog=dates" class="inline-block-form">
+                    <form method="POST" action="/admin/volunteers/<%= day %>/dates/<%= d.date %>/archive?dialog=dates&semesterId=<%= semesterId %>" class="inline-block-form">
                       <button type="submit" class="link-btn">Archive</button>
                     </form>
                   <% } %>
-                  <form method="POST" action="/admin/volunteers/<%= day %>/dates/<%= d.date %>/remove?dialog=dates" class="inline-block-form" data-confirm="Remove <%= d.label %>? Any position/room assignments for this date will be deleted too.">
+                  <form method="POST" action="/admin/volunteers/<%= day %>/dates/<%= d.date %>/remove?dialog=dates&semesterId=<%= semesterId %>" class="inline-block-form" data-confirm="Remove <%= d.label %>? Any position/room assignments for this date will be deleted too.">
                     <button type="submit" class="link-btn link-btn-danger">Remove</button>
                   </form>
                 </td>
@@ -99,7 +95,7 @@
           </tbody>
         </table>
       </div>
-      <form method="POST" action="/admin/volunteers/<%= day %>/dates/add?dialog=dates" class="volunteer-date-add-form">
+      <form method="POST" action="/admin/volunteers/<%= day %>/dates/add?dialog=dates&semesterId=<%= semesterId %>" class="volunteer-date-add-form">
         <input type="date" name="dates" onchange="if (this.value) this.form.requestSubmit();" />
       </form>
       <div class="notes-dialog-actions">
@@ -119,7 +115,7 @@
         several positions and adding a brand new one all lands in a
         single request. %>
     <dialog id="add-job-dialog" class="volunteer-edit-dialog position-editor-dialog">
-      <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/save-groups?dialog=job">
+      <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/save-groups?dialog=job&semesterId=<%= semesterId %>">
         <div class="qr-filter-dialog-header">
           <h3>Add/Edit Permanent Positions</h3>
           <div class="qr-filter-dialog-actions">
@@ -144,7 +140,7 @@
                     "Print Barcodes Only" button already uses. %>
                 <button
                   type="submit"
-                  formaction="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/group/<%= g.keyId %>/delete?dialog=job"
+                  formaction="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/group/<%= g.keyId %>/delete?dialog=job&semesterId=<%= semesterId %>"
                   formmethod="POST"
                   formnovalidate
                   class="icon-btn icon-btn-danger"
@@ -190,7 +186,7 @@
         once), just scoped to the currently selected date - see
         routes/admin-substitutes.js's /temporary-jobs/save-groups. %>
     <dialog id="add-temp-job-dialog" class="volunteer-edit-dialog position-editor-dialog">
-      <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/temporary-jobs/save-groups?dialog=temp-job">
+      <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/temporary-jobs/save-groups?dialog=temp-job&semesterId=<%= semesterId %>">
         <div class="qr-filter-dialog-header">
           <h3>Add/Edit Temporary Position</h3>
           <div class="qr-filter-dialog-actions">
@@ -207,7 +203,7 @@
                 <input type="text" name="groups[<%= g.keyId %>][room]" value="<%= g.room %>" placeholder="Room # (optional)" />
                 <button
                   type="submit"
-                  formaction="/admin/volunteers/<%= day %>/substitutes/temporary-jobs/group/<%= g.keyId %>/delete?dialog=temp-job"
+                  formaction="/admin/volunteers/<%= day %>/substitutes/temporary-jobs/group/<%= g.keyId %>/delete?dialog=temp-job&semesterId=<%= semesterId %>"
                   formmethod="POST"
                   formnovalidate
                   class="icon-btn icon-btn-danger"
