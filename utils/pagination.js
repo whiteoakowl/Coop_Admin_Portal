@@ -30,11 +30,67 @@ function parsePageSize(raw, defaultSize) {
   return raw === 'all' ? Infinity : defaultSize;
 }
 
+// A real bug report (Members list, Main Admin and Co-op Admin alike):
+// "the dropdown for the last family on the page is sometimes putting
+// part of the family on the next page. Families should stay together on
+// the member list. Each member list page doesn't have to be an exact
+// number of members." `items` already arrives family-grouped (utils/
+// members.js's own sortMembersByFamily runs before this), but a plain
+// fixed-size slice has no idea where one family's block ends and the
+// next begins - a family that straddled the pageSize boundary got cut
+// mid-group, and the page's own "+N more" accordion toggle (views/
+// admin-members.ejs) under-counted since it only ever saw whichever
+// slice of that family landed on its own page.
+//
+// Walks the whole list ONCE per request computing every page's real
+// [start, end) boundary up front - a page boundary can only be known by
+// actually walking forward from the previous one (does this page's
+// natural pageSize-th item split a group, and if so by how much do we
+// need to grow it?), not computed by simple arithmetic the way a
+// uniform pageSize boundary can. Cheap for the same reason the rest of
+// this file already is - see the header comment above.
+function computeGroupAwarePageBoundaries(items, pageSize, groupKeyFn) {
+  if (items.length === 0) return [[0, 0]];
+  if (pageSize === Infinity) return [[0, items.length]];
+  const boundaries = [];
+  let start = 0;
+  while (start < items.length) {
+    let end = Math.min(start + pageSize, items.length);
+    while (end < items.length && groupKeyFn(items[end]) === groupKeyFn(items[end - 1])) end += 1;
+    boundaries.push([start, end]);
+    start = end;
+  }
+  return boundaries;
+}
+
 // Slices `items` to the requested page, clamping to the last real page if
 // the request is past the end (e.g. a bookmarked ?page=9 after the list
-// shrank) rather than returning an empty page.
-function paginate(items, requestedPage, pageSize = DEFAULT_PAGE_SIZE) {
+// shrank) rather than returning an empty page. `groupKeyFn(item)`, when
+// given, keeps every run of consecutive items sharing the same key on
+// one page together - growing that one page past pageSize rather than
+// splitting the group, exactly the "doesn't have to be an exact number"
+// tradeoff the real request above explicitly asked for. Omitted (the
+// default), this behaves exactly as before - every other caller
+// (Logs/Library/etc.) is unaffected.
+function paginate(items, requestedPage, pageSize = DEFAULT_PAGE_SIZE, groupKeyFn = null) {
   const totalItems = items.length;
+  if (groupKeyFn) {
+    const boundaries = computeGroupAwarePageBoundaries(items, pageSize, groupKeyFn);
+    const totalPages = Math.max(1, boundaries.length);
+    const currentPage = Math.min(Math.max(1, requestedPage), totalPages);
+    const [start, end] = boundaries[currentPage - 1];
+    return {
+      items: items.slice(start, end),
+      currentPage,
+      totalPages,
+      totalItems,
+      pageSize,
+      hasPrev: currentPage > 1,
+      hasNext: currentPage < totalPages,
+      startIndex: totalItems === 0 ? 0 : start + 1,
+      endIndex: end,
+    };
+  }
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const currentPage = Math.min(Math.max(1, requestedPage), totalPages);
   // (currentPage - 1) * pageSize, guarded: with pageSize=Infinity (View
@@ -56,4 +112,13 @@ function paginate(items, requestedPage, pageSize = DEFAULT_PAGE_SIZE) {
   };
 }
 
-module.exports = { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE };
+// The exact same family/solo grouping key utils/members.js's own
+// sortMembersByFamily already uses to decide what counts as "one family
+// block" in the first place - paginate()'s own group-keeping-together
+// pass has to agree with it, or a page break could still land somewhere
+// sortMembersByFamily never actually considered a boundary.
+function memberFamilyGroupKey(member) {
+  return member.family_id != null ? `f${member.family_id}` : `solo${member.id}`;
+}
+
+module.exports = { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE, memberFamilyGroupKey };

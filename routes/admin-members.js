@@ -29,7 +29,7 @@ const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { allSetupTeams } = require('../utils/setup');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
-const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE, memberFamilyGroupKey } = require('../utils/pagination');
 const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions, adminPositionTitlesForMembers } = require('../utils/adminPositions');
 const { portalStatusForMembers, sectionIdsForMembers } = require('../utils/portalPermissions');
 const { resolveFamilyId, createParentMember, createChildMember, uploadIntakePhotos, parseArrayField } = require('../utils/memberIntake');
@@ -154,7 +154,11 @@ router.get('/members', async (req, res) => {
   // also reaches into this same full list for its off-page checkboxes -
   // see admin-members.ejs's own comment, mirroring admin-schedule.ejs's.
   const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
-  const pagination = paginate(withRosters, parsePage(req.query.page), pageSize);
+  // A real bug report: "the dropdown for the last family on the page is
+  // sometimes putting part of the family on the next page. Families
+  // should stay together... each member list page doesn't have to be an
+  // exact number of members" - see utils/pagination.js's own comment.
+  const pagination = paginate(withRosters, parsePage(req.query.page), pageSize, memberFamilyGroupKey);
 
   // A real request: "if they are already on the log, it should say, this
   // member is already on the name tags request log. and the popup

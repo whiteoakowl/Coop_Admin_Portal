@@ -30,7 +30,7 @@ const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const { formatDateLabel, formatDateNumeric, formatTime, ageFromBirthday, isChildAge, isValidISODate } = require('../utils/dates');
 const { GRADE_LEVELS } = require('../utils/classSchedule');
-const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE, memberFamilyGroupKey } = require('../utils/pagination');
 const { spreadsheetFileFilter } = require('../utils/uploads');
 const { uploadMemberPhoto, savePhotoFile, deletePhotoFile } = require('../utils/memberPhoto');
 const { allSetupTeams } = require('../utils/setup');
@@ -162,7 +162,11 @@ router.get('/', async (req, res) => {
   if (q) withRosters = withRosters.filter((m) => m.name.toLowerCase().includes(q));
 
   const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
-  const pagination = paginate(withRosters, parsePage(req.query.page), pageSize);
+  // A real bug report: "the dropdown for the last family on the page is
+  // sometimes putting part of the family on the next page. Families
+  // should stay together... each member list page doesn't have to be an
+  // exact number of members" - see utils/pagination.js's own comment.
+  const pagination = paginate(withRosters, parsePage(req.query.page), pageSize, memberFamilyGroupKey);
 
   // "Edit Permissions" bulk mode - same "current page only" scope as
   // routes/admin-members.js's own version, see that file's own comment.
