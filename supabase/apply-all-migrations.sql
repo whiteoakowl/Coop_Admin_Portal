@@ -4174,3 +4174,172 @@ insert into store_settings (id) values (1) on conflict (id) do nothing;
 alter table orientation_settings alter column link_url drop not null;
 alter table orientation_settings add column if not exists training_id integer references trainings(id) on delete set null;
 
+-- ===== 20261024010000_kiosk_semester_scoping.sql =====
+-- A real request: "Add a tab in co-op admin portal settings called
+-- kiosk. There will be a drop down picker for choosing a semester that
+-- the kiosk page and all of its features are linked too. The floater
+-- list for that semester, the setup/cleanup, check in, check out... This
+-- way the kiosk can be changed each semester seamlessly" - a follow-up
+-- confirmed each semester gets a fully separate Floater List and
+-- Setup/Cleanup Teams (new semester = blank slate), not a shared
+-- structure merely filtered by date range.
+alter table volunteer_lists add column if not exists semester_id integer references semesters(id) on delete cascade;
+alter table setup_teams add column if not exists semester_id integer references semesters(id) on delete cascade;
+alter table task_list_sections add column if not exists semester_id integer references semesters(id) on delete cascade;
+-- The day-scoped session log tables (which dates exist, who's suggested
+-- for what task on which date) have no team_id/list_id of their own to
+-- inherit a semester through - full separation means these need their
+-- own semester_id too, or a brand new semester's fresh Setup Teams would
+-- still see every past semester's dates mixed into the same date picker.
+alter table setup_dates add column if not exists semester_id integer references semesters(id) on delete cascade;
+alter table setup_task_assignments add column if not exists semester_id integer references semesters(id) on delete cascade;
+
+-- Attribute whatever already exists today to the most recently created
+-- semester (if any) rather than leaving it orphaned under "no semester" -
+-- in practice this is the semester currently in active use. Also seeds
+-- the new Kiosk Settings tab's own "active semester" picker so a live
+-- site doesn't suddenly show an empty Floater List/Setup Teams the
+-- moment this migration runs, before an admin has ever opened that tab.
+do $$
+declare
+  latest_semester_id integer;
+begin
+  select id into latest_semester_id from semesters order by id desc limit 1;
+  if latest_semester_id is not null then
+    update volunteer_lists set semester_id = latest_semester_id where semester_id is null;
+    update setup_teams set semester_id = latest_semester_id where semester_id is null;
+    update task_list_sections set semester_id = latest_semester_id where semester_id is null;
+    update setup_dates set semester_id = latest_semester_id where semester_id is null;
+    update setup_task_assignments set semester_id = latest_semester_id where semester_id is null;
+    insert into app_settings (key, value) values ('kiosk_active_semester_id', latest_semester_id::text)
+      on conflict (key) do nothing;
+  end if;
+end $$;
+
+-- volunteer_lists used to be unique on day alone (exactly one Monday
+-- list, one Wednesday list, forever) - now one per (day, semester), so a
+-- brand new semester gets its own fresh Monday/Wednesday Floater List
+-- instead of reusing whatever the previous semester left behind. Same
+-- NULL-collapsing trick as orientation_progress's own semester migration
+-- (20261012010000_orientation_semesters.sql) for any row still without a
+-- semester (a fresh install with no semesters created yet).
+alter table volunteer_lists drop constraint if exists volunteer_lists_day_key;
+create unique index if not exists idx_volunteer_lists_day_semester on volunteer_lists (day, coalesce(semester_id, -1));
+
+-- Same reasoning for setup_dates/setup_task_assignments - their old plain
+-- (day, session_date[, member_id]) primary keys assumed one shared
+-- session-date history per day, forever. Primary key columns can't be
+-- NULL, so (unlike the plain unique index above) these are dropped
+-- entirely in favor of a coalesce-based unique index, same trick.
+alter table setup_dates drop constraint if exists setup_dates_pkey;
+create unique index if not exists idx_setup_dates_day_semester_date on setup_dates (day, coalesce(semester_id, -1), session_date);
+
+alter table setup_task_assignments drop constraint if exists setup_task_assignments_pkey;
+create unique index if not exists idx_setup_task_assignments_day_semester_member_date
+  on setup_task_assignments (day, coalesce(semester_id, -1), member_id, session_date);
+
+-- ===== 20261025010000_class_schedules_day_settings.sql =====
+-- A real request: "Full 7 day expansion so multiple semesters can be
+-- created an managed... now day settings. So we can create multiple
+-- semester schedule grids and all the floater and setup cleanup features
+-- for each to go with it. Then this will work for years to come." Phase
+-- 1 of that: a new class_schedules entity (the "Day Settings" an admin
+-- creates) replaces the hardcoded Monday/Wednesday pair as the catalog of
+-- which days currently have a Classes grid, each scoped to one semester
+-- so a brand new semester can add a day (e.g. Tuesday Enrichment) without
+-- disturbing any other semester's own grids. Volunteers/Setup-Cleanup/
+-- Member Schedules/Name Tags/Rosters/Dashboard follow in later phases -
+-- each has its own hardcoded-day-pair assumptions baked into templates
+-- and CSV formats that need their own dedicated pass.
+create table if not exists class_schedules (
+  id integer generated always as identity primary key,
+  title text not null,
+  day_of_week text not null check (day_of_week in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday')),
+  semester_id integer references semesters(id) on delete cascade,
+  start_date text,
+  end_date text,
+  created_at text not null default now_text()
+);
+-- A plain unique constraint can't use an expression like coalesce() -
+-- same NULL-collapsing trick as volunteer_lists' own semester migration
+-- (20261024010000_kiosk_semester_scoping.sql), as an index instead.
+create unique index if not exists idx_class_schedules_day_semester on class_schedules (day_of_week, coalesce(semester_id, -1));
+
+-- classes.day and class_schedule_hours.day both only ever allowed
+-- 'monday'/'wednesday' - widened to the full week so a class_schedules
+-- row can actually be used. (Volunteers/Setup-Cleanup's own day columns,
+-- widened in a later phase, are untouched here.)
+alter table classes drop constraint if exists classes_day_check;
+alter table classes add constraint classes_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));
+
+alter table class_schedule_hours drop constraint if exists class_schedule_hours_day_check;
+alter table class_schedule_hours add constraint class_schedule_hours_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));
+
+-- Monday/Wednesday are the co-op's always-available meeting days from day
+-- one, independent of whether Semesters has ever been used - unlike every
+-- other day, they must exist even on a brand new install with zero
+-- semesters and zero classes (the "no semester" bucket, same NULL
+-- semester_id every other not-yet-semester-tagged row in this app uses).
+-- Without this, a fresh database would start with an EMPTY class_schedules
+-- table and ?tab=monday/?tab=wednesday would have nothing to resolve to.
+insert into class_schedules (title, day_of_week, semester_id) values ('Monday', 'monday', null)
+  on conflict (day_of_week, coalesce(semester_id, -1)) do nothing;
+insert into class_schedules (title, day_of_week, semester_id) values ('Wednesday', 'wednesday', null)
+  on conflict (day_of_week, coalesce(semester_id, -1)) do nothing;
+
+-- Backfill: one class_schedules row for every (day, semester) pair that
+-- already has at least one real class, titled plainly after its weekday -
+-- every existing Monday/Wednesday grid (across every semester that's
+-- ever had classes) keeps working exactly as it does today, with nothing
+-- to re-create by hand. A semester with classes but no semester_id set at
+-- all (pre-dates the Semesters feature) is already covered by the
+-- unconditional Monday/Wednesday seed just above.
+insert into class_schedules (title, day_of_week, semester_id)
+select initcap(c.day), c.day, c.semester_id
+from (select distinct day, semester_id from classes where semester_id is not null) c
+on conflict (day_of_week, coalesce(semester_id, -1)) do nothing;
+
+-- Also seed Monday/Wednesday for the most-recently-created semester even
+-- if it has no classes yet (e.g. a semester just created on the Semester
+-- tab, about to have its own classes added) - mirrors every other
+-- semester-scoped default this app seeds onto "whichever semester is
+-- newest."
+do $$
+declare
+  latest_semester_id integer;
+begin
+  select id into latest_semester_id from semesters order by id desc limit 1;
+  if latest_semester_id is not null then
+    insert into class_schedules (title, day_of_week, semester_id) values ('Monday', 'monday', latest_semester_id)
+      on conflict (day_of_week, coalesce(semester_id, -1)) do nothing;
+    insert into class_schedules (title, day_of_week, semester_id) values ('Wednesday', 'wednesday', latest_semester_id)
+      on conflict (day_of_week, coalesce(semester_id, -1)) do nothing;
+  end if;
+end $$;
+
+-- ===== 20261026010000_volunteers_setup_day_expansion.sql =====
+-- Phase 2 of the 7-day expansion ("Full 7 day expansion so multiple
+-- semesters can be created and managed... all the floater and setup
+-- cleanup features for each to go with it" - a real request). Phase 1
+-- (20261025010000) let the Classes grid offer any day of the week via a
+-- new class_schedules catalog; this widens Volunteers (Floater
+-- Assignments) and Setup/Cleanup's own day columns the same way, so a day
+-- added there (e.g. Tuesday) can also get its own Floater List and
+-- Setup/Cleanup Teams. Both systems already gained semester_id in
+-- 20261024010000 (Kiosk settings) - only the day value itself was still
+-- capped at 'monday'/'wednesday'.
+alter table volunteer_lists drop constraint if exists volunteer_lists_day_check;
+alter table volunteer_lists add constraint volunteer_lists_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));
+
+alter table setup_teams drop constraint if exists setup_teams_day_check;
+alter table setup_teams add constraint setup_teams_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));
+
+alter table task_list_sections drop constraint if exists task_list_sections_day_check;
+alter table task_list_sections add constraint task_list_sections_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));
+
+alter table setup_dates drop constraint if exists setup_dates_day_check;
+alter table setup_dates add constraint setup_dates_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));
+
+alter table setup_task_assignments drop constraint if exists setup_task_assignments_day_check;
+alter table setup_task_assignments add constraint setup_task_assignments_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));
+
