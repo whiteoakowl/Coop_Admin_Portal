@@ -46,7 +46,7 @@ async function loginAsAdmin() {
 test('Settings tab has an Add a Semester form, and added semesters are listed with a Delete button', async () => {
   const admin = await loginAsAdmin();
 
-  const before = await request(app).get('/admin/schedule?tab=settings').set('Cookie', admin.cookie);
+  const before = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
   assert.match(before.text, /<h2>Semesters<\/h2>/);
   assert.match(before.text, /Add a Semester/);
   assert.match(before.text, /No semesters yet\./);
@@ -57,7 +57,7 @@ test('Settings tab has an Add a Semester form, and added semesters are listed wi
     .type('form')
     .send({ title: 'Fall 2026', _csrf: admin.csrfToken });
 
-  const after = await request(app).get('/admin/schedule?tab=settings').set('Cookie', admin.cookie);
+  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
   assert.match(after.text, /Fall 2026/);
   assert.match(after.text, /admin\/schedule\/semesters\/\d+\/delete/);
 

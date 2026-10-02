@@ -71,7 +71,7 @@ test('a brand new class defaults to the most-recently-created semester, and clas
 
   // The Settings tab should surface the still-unassigned class and offer
   // a one-click fix.
-  const settings = await request(app).get('/admin/schedule?tab=settings').set('Cookie', admin.cookie);
+  const settings = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
   assert.match(settings.text, /Classes With No Semester/);
   assert.match(settings.text, /1 class has no semester assigned/);
 
@@ -83,7 +83,7 @@ test('a brand new class defaults to the most-recently-created semester, and clas
 
   assert.equal((await getClass(earlyClassId)).semester_id, fall2026.id, 'the previously-unassigned class should now be tagged Fall 2026');
 
-  const settingsAfter = await request(app).get('/admin/schedule?tab=settings').set('Cookie', admin.cookie);
+  const settingsAfter = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
   assert.doesNotMatch(settingsAfter.text, /Classes With No Semester/, 'the bulk-assign section should disappear once nothing is missing a semester');
 });
 

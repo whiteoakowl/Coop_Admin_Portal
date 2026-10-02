@@ -141,6 +141,20 @@
         <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
         <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
+        <%# A real request: "There needs to be tabs for this page general,
+            semester, registration schedule. Move all those features to
+            there designated pages only" - General/Semester/Registration
+            Schedule each used to render stacked on one long page; now
+            each one only renders under its own sub-tab, same day-toggle
+            pattern this page's own Archive Class/Student/Parent sub-tabs
+            already use. %>
+        <div class="day-toggle no-print schedule-day-toggle">
+          <a class="day-toggle-option<%= settingsTab === 'general' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=general">General</a>
+          <a class="day-toggle-option<%= settingsTab === 'semester' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=semester">Semester</a>
+          <a class="day-toggle-option<%= settingsTab === 'registration' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=registration">Registration Schedule</a>
+        </div>
+
+      <% if (settingsTab === 'general') { %>
         <%# A real request rebuilt this whole tab: "Co-op admin portal.
             Classes. Class settings subpage. The title should be Co-op
             Class Settings at the top of the page. There should not be a
@@ -203,13 +217,15 @@
             </div>
           </form>
         </section>
+      <% } else if (settingsTab === 'semester') { %>
 
         <%# A real request: "Overall class settings. Add a place to
             create and add new semester titles." Just a title list - each
             class's own assignment is its own Semester dropdown, now on
             that class's own Details tab. %>
         <h2>Semesters</h2>
-        <%- include('partials/semester-manager', { semesters, missingSemesterCount, backUrl: '/admin/schedule?tab=settings' }) %>
+        <%- include('partials/semester-manager', { semesters, missingSemesterCount, backUrl: '/admin/schedule?tab=settings&settingsTab=semester' }) %>
+      <% } else { %>
 
         <%# A real request: "add registration schedule. Be able to
             control who can signup on each schedule grid monday/
@@ -308,6 +324,7 @@
             </div>
           <% } %>
         </section>
+      <% } %>
       <% } else { %>
         <%
           function buildQuery(overrides) {

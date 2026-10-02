@@ -133,7 +133,7 @@ test('Classes > Settings tab: Add a Window form has Schedule Grid and Section fi
   const admin = await loginAsAdmin();
   const sectionId = await createSection('Teen Co-op');
 
-  const page = await request(app).get('/admin/schedule?tab=settings').set('Cookie', admin.cookie);
+  const page = await request(app).get('/admin/schedule?tab=settings&settingsTab=registration').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /Registration Schedule/);
   assert.match(page.text, /<select name="day">/);
@@ -146,7 +146,7 @@ test('Classes > Settings tab: Add a Window form has Schedule Grid and Section fi
     .type('form')
     .send({ label: 'Monday Teen Window', day: 'monday', sectionId: String(sectionId), opensAt: '2020-01-01T00:00', _csrf: admin.csrfToken });
 
-  const after = await request(app).get('/admin/schedule?tab=settings').set('Cookie', admin.cookie);
+  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=registration').set('Cookie', admin.cookie);
   assert.match(after.text, /Monday Teen Window/);
   assert.match(after.text, />Monday</);
   assert.match(after.text, /Teen Co-op/);
@@ -163,7 +163,7 @@ test('Deleting a registration window removes it from Current Windows', async () 
   const win = await db.prepare("SELECT id FROM registration_windows WHERE label = 'To Delete'").get();
 
   await request(app).post(`/admin/schedule/registration-windows/${win.id}/delete`).set('Cookie', admin.cookie).type('form').send({ _csrf: admin.csrfToken });
-  const after = await request(app).get('/admin/schedule?tab=settings').set('Cookie', admin.cookie);
+  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=registration').set('Cookie', admin.cookie);
   assert.doesNotMatch(after.text, /To Delete/);
 });
 

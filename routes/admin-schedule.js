@@ -76,6 +76,7 @@ const uploadDesignImage = multer({
 });
 
 const SCHEDULE_TABS = ['monday', 'wednesday', 'members', 'archive', 'settings'];
+const SETTINGS_SUBTABS = ['general', 'semester', 'registration'];
 const ARCHIVE_TYPES = ['class', 'student', 'parent'];
 const MEMBER_TYPE_FILTERS = ['student', 'parent'];
 const PAGE_SIZE = 25;
@@ -164,12 +165,21 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   // Class Chat, and Semester assignment are all per-class now and live on
   // each class's own Details tab instead (views/admin-class-schedule-
   // manage.ejs) - no more per-class table on this page at all.
+  //
+  // A real request: "There needs to be tabs for this page general,
+  // semester, registration schedule. Move all those features to there
+  // designated pages only" - the three sections used to all render
+  // stacked on one long page; now each one only renders under its own
+  // sub-tab (same ?settingsTab= pattern as this page's own Archive
+  // Class/Student/Parent sub-tabs).
   if (tab === 'settings') {
+    const settingsTab = SETTINGS_SUBTABS.includes(req.query.settingsTab) ? req.query.settingsTab : 'general';
     const windowRows = await listWindows();
     return res.render('admin-schedule', {
       title: 'Co-op Class Settings',
       tab,
       topTab: 'settings',
+      settingsTab,
       dayLabels: CLASS_DAY_LABELS,
       windows: windowRows.map((w) => ({ ...w, opensLabel: formatTimestamp(w.opens_at), closesLabel: formatTimestamp(w.closes_at) })),
       roles: await db.prepare('SELECT key, label FROM roles ORDER BY label').all(),
@@ -279,7 +289,7 @@ router.post('/schedule/registration-windows', requireFullAdmin, async (req, res)
   const label = (req.body.label || '').trim();
   const opensAt = easternInputToUtcText(req.body.opensAt);
   const closesAt = easternInputToUtcText(req.body.closesAt);
-  const back = '/admin/schedule?tab=settings';
+  const back = '/admin/schedule?tab=settings&settingsTab=registration';
   if (!label || !opensAt) {
     return res.redirect(back + '&error=' + encodeURIComponent('A label and an opens-at date/time are required.'));
   }
@@ -296,7 +306,7 @@ router.post('/schedule/registration-windows', requireFullAdmin, async (req, res)
 
 router.post('/schedule/registration-windows/:id/delete', requireFullAdmin, async (req, res) => {
   await deleteWindow(req.params.id);
-  res.redirect('/admin/schedule?tab=settings&notice=' + encodeURIComponent('Registration window removed.'));
+  res.redirect('/admin/schedule?tab=settings&settingsTab=registration&notice=' + encodeURIComponent('Registration window removed.'));
 });
 
 // --- Classes > Settings: Semesters - a real request: "Overall class
@@ -310,7 +320,7 @@ router.post('/schedule/registration-windows/:id/delete', requireFullAdmin, async
 // from instead of always bouncing to the Settings tab.
 function semesterSettingsBack(req) {
   const back = req.body.back || req.query.back;
-  return back && back.startsWith('/admin/schedule') ? back : '/admin/schedule?tab=settings';
+  return back && back.startsWith('/admin/schedule') ? back : '/admin/schedule?tab=settings&settingsTab=semester';
 }
 
 router.post('/schedule/semesters', requireFullAdmin, async (req, res) => {
@@ -381,7 +391,7 @@ router.post('/schedule/class-settings', requireFullAdmin, async (req, res) => {
     autoCreditOnParentOrSystemRemoval: req.body.autoCreditOnParentOrSystemRemoval === '1',
     autoCreditOnAdminRemoval: req.body.autoCreditOnAdminRemoval === '1',
   });
-  res.redirect('/admin/schedule?tab=settings&notice=' + encodeURIComponent('Class settings saved.'));
+  res.redirect('/admin/schedule?tab=settings&settingsTab=general&notice=' + encodeURIComponent('Class settings saved.'));
 });
 
 // --- Member Schedules: bulk import ---
