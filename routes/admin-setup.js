@@ -34,6 +34,7 @@ const {
 const { toCsvRow, sendCsv, readRowsFromFile, buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { activeParentAndAdminOptions } = require('../utils/members');
 const { spreadsheetFileFilter } = require('../utils/uploads');
+const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
 
 const uploadTasks = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
@@ -112,8 +113,8 @@ router.post('/setup/:day/teams', requireAdmin, requireDay, async (req, res) => {
     return res.redirect(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'));
   }
   await db
-    .prepare('INSERT INTO setup_teams (day, title, description, leader_id, meeting_time, meeting_location, task_scan_timing) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(day, title, description || null, leaderId, meetingTime || null, meetingLocation || null, taskScanTiming);
+    .prepare('INSERT INTO setup_teams (day, title, description, leader_id, meeting_time, meeting_location, task_scan_timing, semester_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(day, title, description || null, leaderId, meetingTime || null, meetingLocation || null, taskScanTiming, await getActiveKioskSemesterId());
   res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`Team "${title}" created.`));
 });
 

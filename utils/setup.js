@@ -3,34 +3,45 @@ const { byLastName, hasInfantChild } = require('./members');
 const { todayISO } = require('./dates');
 const { taskSectionForTeam, refreshBadgesForTeam } = require('./taskList');
 const { absentMemberIdsForDate, checkedInMemberIdsForDate, checkedOutMemberIdsForDate } = require('./classSchedule');
+const { getActiveKioskSemesterId } = require('./kioskSettings');
 
-async function teamsForDay(day) {
+// A real request: "the kiosk can be changed each semester seamlessly" -
+// each semester gets its own fully separate Setup/Cleanup Teams per day,
+// not one shared roster reused forever. semesterId defaults to whatever
+// Settings > Kiosk currently has active when not given explicitly, same
+// pattern as utils/volunteers.js's own getListByDay.
+async function teamsForDay(day, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
   return db
     .prepare(
       `SELECT st.*, m.name AS "leaderName"
        FROM setup_teams st
        LEFT JOIN members m ON m.id = st.leader_id AND m.active = 1
-       WHERE st.day = ?
+       WHERE st.day = ? AND st.semester_id IS NOT DISTINCT FROM ?
        ORDER BY LOWER(st.title)`
     )
-    .all(day);
+    .all(day, sid);
 }
 
 // Every Setup/Cleanup team with its member count - shared by both
 // portals' own member Add/Edit form ("Setup Team - 2 members"
 // checklist), pulled out here so routes/admin-members.js and
 // routes/main-admin-members.js can't drift into two different queries
-// for the same list.
-async function allSetupTeams() {
+// for the same list. Scoped to the active Kiosk semester for the same
+// reason teamsForDay is - a member shouldn't see (or be added to) a
+// stale past semester's teams from their own Edit form.
+async function allSetupTeams(semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
   return db
     .prepare(
       `SELECT t.id, t.day, t.title, COUNT(stm.member_id) AS "memberCount"
        FROM setup_teams t
        LEFT JOIN setup_team_members stm ON stm.team_id = t.id
+       WHERE t.semester_id IS NOT DISTINCT FROM ?
        GROUP BY t.id
        ORDER BY t.day, LOWER(t.title)`
     )
-    .all();
+    .all(sid);
 }
 
 async function cleanupTeamIdsForMember(memberId) {
@@ -88,8 +99,9 @@ async function updateTeam(teamId, fields) {
 // scan-a-badge-yourself task, so a leader is exempt from the scan step
 // even on a day they're ALSO listed as a rank-and-file setup_team_members
 // row on that same team.
-async function isSetupTeamLeaderForDay(memberId, day) {
-  const row = await db.prepare('SELECT 1 FROM setup_teams WHERE leader_id = ? AND day = ? LIMIT 1').get(memberId, day);
+async function isSetupTeamLeaderForDay(memberId, day, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+  const row = await db.prepare('SELECT 1 FROM setup_teams WHERE leader_id = ? AND day = ? AND semester_id IS NOT DISTINCT FROM ? LIMIT 1').get(memberId, day, sid);
   return !!row;
 }
 
@@ -105,16 +117,17 @@ async function isSetupTeamLeaderForDay(memberId, day) {
 // day (unusual, but not disallowed) only needs ONE of them set to
 // 'checkin' to be asked at check-in. A team leader is exempt - see
 // isSetupTeamLeaderForDay above.
-async function memberScansTaskAtCheckin(memberId, day) {
-  if (await isSetupTeamLeaderForDay(memberId, day)) return false;
+async function memberScansTaskAtCheckin(memberId, day, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+  if (await isSetupTeamLeaderForDay(memberId, day, sid)) return false;
   const row = await db
     .prepare(
       `SELECT 1 FROM setup_team_members stm
        JOIN setup_teams st ON st.id = stm.team_id
-       WHERE stm.member_id = ? AND st.day = ? AND st.task_scan_timing = 'checkin'
+       WHERE stm.member_id = ? AND st.day = ? AND st.semester_id IS NOT DISTINCT FROM ? AND st.task_scan_timing = 'checkin'
        LIMIT 1`
     )
-    .get(memberId, day);
+    .get(memberId, day, sid);
   return !!row;
 }
 
@@ -128,16 +141,17 @@ async function memberScansTaskAtCheckin(memberId, day) {
 // default) - a 'checkin' team member who somehow reaches checkout without
 // having scanned yet is still handled by routes/checkout.js's own
 // already-logged carryover, not asked again here.
-async function memberNeedsSetupBadgeAtCheckout(memberId, day) {
-  if (await isSetupTeamLeaderForDay(memberId, day)) return false;
+async function memberNeedsSetupBadgeAtCheckout(memberId, day, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+  if (await isSetupTeamLeaderForDay(memberId, day, sid)) return false;
   const row = await db
     .prepare(
       `SELECT 1 FROM setup_team_members stm
        JOIN setup_teams st ON st.id = stm.team_id
-       WHERE stm.member_id = ? AND st.day = ? AND st.task_scan_timing = 'checkout'
+       WHERE stm.member_id = ? AND st.day = ? AND st.semester_id IS NOT DISTINCT FROM ? AND st.task_scan_timing = 'checkout'
        LIMIT 1`
     )
-    .get(memberId, day);
+    .get(memberId, day, sid);
   return !!row;
 }
 
@@ -146,19 +160,27 @@ async function memberNeedsSetupBadgeAtCheckout(memberId, day) {
 // membersForList/assignments shape, just keyed by `day` directly since
 // setup_teams has no single "list" a date belongs to. ---
 
-async function datesForDay(day) {
-  return (await db.prepare('SELECT session_date FROM setup_dates WHERE day = ? ORDER BY session_date ASC').all(day)).map((r) => r.session_date);
+async function datesForDay(day, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+  return (
+    await db.prepare('SELECT session_date FROM setup_dates WHERE day = ? AND semester_id IS NOT DISTINCT FROM ? ORDER BY session_date ASC').all(day, sid)
+  ).map((r) => r.session_date);
 }
 
-async function addSetupDates(day, dates) {
-  const insertDate = db.prepare('INSERT INTO setup_dates (day, session_date) VALUES (?, ?) ON CONFLICT (day, session_date) DO NOTHING');
-  for (const d of dates) await insertDate.run(day, d);
+async function addSetupDates(day, dates, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+  const insertDate = db.prepare(
+    `INSERT INTO setup_dates (day, session_date, semester_id) VALUES (?, ?, ?)
+     ON CONFLICT (day, coalesce(semester_id, -1), session_date) DO NOTHING`
+  );
+  for (const d of dates) await insertDate.run(day, d, sid);
 }
 
-async function removeSetupDate(day, date) {
+async function removeSetupDate(day, date, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
   await db.withTransaction(async (tx) => {
-    await tx.prepare('DELETE FROM setup_dates WHERE day = ? AND session_date = ?').run(day, date);
-    await tx.prepare('DELETE FROM setup_task_assignments WHERE day = ? AND session_date = ?').run(day, date);
+    await tx.prepare('DELETE FROM setup_dates WHERE day = ? AND session_date = ? AND semester_id IS NOT DISTINCT FROM ?').run(day, date, sid);
+    await tx.prepare('DELETE FROM setup_task_assignments WHERE day = ? AND session_date = ? AND semester_id IS NOT DISTINCT FROM ?').run(day, date, sid);
   });
 }
 
@@ -167,13 +189,14 @@ async function removeSetupDate(day, date) {
 // means not in the map" shape as familyAttendanceWindowsForDay elsewhere
 // in this app; either slot on a present member can still individually be
 // null (one job suggested, not two).
-async function taskAssignmentsForDate(day, date) {
+async function taskAssignmentsForDate(day, date, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
   const rows = await db
     .prepare(
       `SELECT member_id AS "memberId", task_item_id AS "taskItemId", task_item_id_2 AS "taskItemId2"
-       FROM setup_task_assignments WHERE day = ? AND session_date = ?`
+       FROM setup_task_assignments WHERE day = ? AND session_date = ? AND semester_id IS NOT DISTINCT FROM ?`
     )
-    .all(day, date);
+    .all(day, date, sid);
   const byMember = {};
   rows.forEach((r) => {
     if (r.taskItemId != null || r.taskItemId2 != null) byMember[r.memberId] = { taskItemId: r.taskItemId, taskItemId2: r.taskItemId2 };
@@ -194,17 +217,22 @@ async function taskAssignmentsForDate(day, date) {
 // only deleted once BOTH slots are empty, keeping
 // taskAssignmentsForDate's "only real suggestions are keys" contract
 // without a separate all-null check there.
-async function setTaskAssignment(day, memberId, date, slot, taskItemId) {
+async function setTaskAssignment(day, memberId, date, slot, taskItemId, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
   const column = slot === 2 ? 'task_item_id_2' : 'task_item_id';
   const otherColumn = slot === 2 ? 'task_item_id' : 'task_item_id_2';
   if (!taskItemId) {
     const existing = await db
-      .prepare(`SELECT ${otherColumn} AS "other" FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?`)
-      .get(day, memberId, date);
+      .prepare(`SELECT ${otherColumn} AS "other" FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ? AND semester_id IS NOT DISTINCT FROM ?`)
+      .get(day, memberId, date, sid);
     if (existing && existing.other != null) {
-      await db.prepare(`UPDATE setup_task_assignments SET ${column} = NULL WHERE day = ? AND member_id = ? AND session_date = ?`).run(day, memberId, date);
+      await db
+        .prepare(`UPDATE setup_task_assignments SET ${column} = NULL WHERE day = ? AND member_id = ? AND session_date = ? AND semester_id IS NOT DISTINCT FROM ?`)
+        .run(day, memberId, date, sid);
     } else {
-      await db.prepare('DELETE FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?').run(day, memberId, date);
+      await db
+        .prepare('DELETE FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ? AND semester_id IS NOT DISTINCT FROM ?')
+        .run(day, memberId, date, sid);
     }
     return;
   }
@@ -218,10 +246,10 @@ async function setTaskAssignment(day, memberId, date, slot, taskItemId) {
   const conflict = await db
     .prepare(
       `SELECT member_id FROM setup_task_assignments
-       WHERE day = ? AND session_date = ? AND member_id != ? AND (task_item_id = ? OR task_item_id_2 = ?)
+       WHERE day = ? AND session_date = ? AND semester_id IS NOT DISTINCT FROM ? AND member_id != ? AND (task_item_id = ? OR task_item_id_2 = ?)
        LIMIT 1`
     )
-    .get(day, date, memberId, taskItemId, taskItemId);
+    .get(day, date, sid, memberId, taskItemId, taskItemId);
   if (conflict) {
     throw new Error('That task has already been assigned to someone else for this date.');
   }
@@ -241,10 +269,10 @@ async function setTaskAssignment(day, memberId, date, slot, taskItemId) {
 
   await db
     .prepare(
-      `INSERT INTO setup_task_assignments (day, member_id, session_date, ${column}) VALUES (?, ?, ?, ?)
-       ON CONFLICT (day, member_id, session_date) DO UPDATE SET ${column} = excluded.${column}`
+      `INSERT INTO setup_task_assignments (day, member_id, session_date, semester_id, ${column}) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (day, coalesce(semester_id, -1), member_id, session_date) DO UPDATE SET ${column} = excluded.${column}`
     )
-    .run(day, memberId, date, taskItemId);
+    .run(day, memberId, date, sid, taskItemId);
 }
 
 // Splits a day's dates into "today or later" (what the Assignments page's
@@ -260,8 +288,8 @@ function splitDatesByToday(dates) {
 // Each team's own linked task list (if any - see task_list_sections.team_id)
 // rides along so its numbered tasks can print right on that team's card
 // (item 31).
-async function teamsWithMembers(day) {
-  const teams = await teamsForDay(day);
+async function teamsWithMembers(day, semesterId) {
+  const teams = await teamsForDay(day, semesterId);
   const result = [];
   for (const t of teams) {
     const members = await membersForTeam(t.id);
@@ -349,9 +377,10 @@ function suggestDistinctTasks(members, allOptions, assignedKey, optionsKey) {
 // or the closest upcoming date (routes/setup.js) - same data, just
 // rendered differently (see partials/setup-assignment-cards.ejs's own
 // `editable` flag).
-async function assignmentCardsForDate(day, date) {
-  const teams = await teamsWithMembers(day);
-  const assignments = date ? await taskAssignmentsForDate(day, date) : {};
+async function assignmentCardsForDate(day, date, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+  const teams = await teamsWithMembers(day, sid);
+  const assignments = date ? await taskAssignmentsForDate(day, date, sid) : {};
   const absentIds = await absentMemberIdsForDate(date);
   // A real request: "highlight the member row red if they check in that
   // day" - lets the Assignments roster flag at a glance who's actually

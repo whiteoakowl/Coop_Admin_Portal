@@ -1,5 +1,6 @@
 const db = require('../db');
 const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
+const { appSetting, setAppSetting } = require('./appSettings');
 const { getListByDay, sectionsForList, membersForList, removeMemberFromSection, addMemberToSection, excludedFloaterPairsForList } = require('./volunteers');
 const { byLastName } = require('./members');
 const { amountPaidForCharge, cancelCharge } = require('./payments');
@@ -1258,8 +1259,19 @@ async function clearRosterManualRemoval(rosterId, memberId) {
 // The Attendance page's Class Rosters log list - every class (optionally
 // filtered to one day), alphabetical by title, each with the grade(s)/
 // day/time/teacher/assistants needed for that one-line summary.
-async function allClassesList(day) {
+// semesterId is an explicit opt-in filter, not a default like utils/
+// volunteers.js's getListByDay/utils/setup.js's teamsForDay - this
+// function is shared by registration-facing portals (parents/teachers/
+// students browsing classes, possibly ahead of their semester becoming
+// the Kiosk's active one), admin printing (name tags/QR codes), and
+// Rosters, none of which should suddenly narrow to "only the active
+// Kiosk semester" just because that setting exists. Only routes/kiosk-
+// class-checkin.js (the live kiosk check-in flow, a real request: "the
+// kiosk page and all of its features are linked to [the active
+// semester]... check in, check out") passes it explicitly.
+async function allClassesList(day, semesterId) {
   const dayParam = day || null;
+  const semesterParam = semesterId !== undefined ? semesterId : null;
   const rows = await db
     .prepare(
       `SELECT c.*, h.label AS "hourLabel",
@@ -1267,9 +1279,10 @@ async function allClassesList(day) {
        FROM classes c
        JOIN class_schedule_hours h ON h.day = c.day AND h.position = c.hour_position
        WHERE (?::text IS NULL OR c.day = ?::text)
+         AND (?::integer IS NULL OR c.semester_id = ?::integer)
        ORDER BY LOWER(c.class_name)`
     )
-    .all(dayParam, dayParam);
+    .all(dayParam, dayParam, semesterParam, semesterParam);
   const list = [];
   for (const r of rows) {
     const staff = await staffForClass(r.id);
@@ -2145,18 +2158,6 @@ async function membersForSectionRaw(listId, sectionId) {
       )
       .all(listId, sectionId)
   ).map((r) => r.id);
-}
-
-async function appSetting(key, fallback) {
-  const row = await db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key);
-  return row ? row.value : fallback;
-}
-
-async function setAppSetting(key, value) {
-  await db.prepare(
-    `INSERT INTO app_settings (key, value) VALUES (?, ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-  ).run(key, value);
 }
 
 module.exports = {

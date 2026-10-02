@@ -1,4 +1,5 @@
 const db = require('../db');
+const { getActiveKioskSemesterId } = require('./kioskSettings');
 
 // Every task's own permanent 6-digit code, assigned once at creation and
 // never touched again - mirrors utils/members.js's generateMemberCode
@@ -81,16 +82,21 @@ async function refreshBadgesForTeam(teamId) {
 // setup_teams row (see task_list_sections.team_id), so that team's own
 // numbered tasks can print on its card too (item 31 - see
 // tasksForTeam/routes' print handler).
-async function taskListSectionsForDay(day) {
+// A real request: "the kiosk can be changed each semester seamlessly" -
+// scoped to the active Kiosk semester (utils/kioskSettings.js), same as
+// utils/setup.js's own teamsForDay, so a brand new semester's Task List
+// page doesn't still show every past semester's own sections.
+async function taskListSectionsForDay(day, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
   const sections = await db
     .prepare(
       `SELECT ts.*, st.title AS "teamTitle"
        FROM task_list_sections ts
        LEFT JOIN setup_teams st ON st.id = ts.team_id
-       WHERE ts.day = ?
+       WHERE ts.day = ? AND ts.semester_id IS NOT DISTINCT FROM ?
        ORDER BY ts.position, ts.id`
     )
-    .all(day);
+    .all(day, sid);
   const result = [];
   for (const s of sections) result.push({ ...s, items: await itemsForSection(s.id) });
   return result;
@@ -133,15 +139,17 @@ async function getSection(id) {
   return db.prepare('SELECT * FROM task_list_sections WHERE id = ?').get(id);
 }
 
-async function nextSectionPosition(day) {
-  const row = await db.prepare('SELECT MAX(position) AS "maxPos" FROM task_list_sections WHERE day = ?').get(day);
+async function nextSectionPosition(day, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+  const row = await db.prepare('SELECT MAX(position) AS "maxPos" FROM task_list_sections WHERE day = ? AND semester_id IS NOT DISTINCT FROM ?').get(day, sid);
   return (row && row.maxPos != null ? row.maxPos : -1) + 1;
 }
 
-async function createSection(day, title, teamId) {
+async function createSection(day, title, teamId, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
   const info = await db
-    .prepare('INSERT INTO task_list_sections (day, title, team_id, position) VALUES (?, ?, ?, ?)')
-    .run(day, title, teamId || null, await nextSectionPosition(day));
+    .prepare('INSERT INTO task_list_sections (day, title, team_id, position, semester_id) VALUES (?, ?, ?, ?, ?)')
+    .run(day, title, teamId || null, await nextSectionPosition(day, sid), sid);
   return info.lastInsertRowid;
 }
 
@@ -162,8 +170,11 @@ async function deleteSection(id) {
 
 // Drag-free reordering - swaps this section's position with its
 // immediate up/down neighbor (a no-op at either end of the stack).
-async function swapSectionPosition(day, sectionId, direction) {
-  const sections = await db.prepare('SELECT id, position FROM task_list_sections WHERE day = ? ORDER BY position, id').all(day);
+async function swapSectionPosition(day, sectionId, direction, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+  const sections = await db
+    .prepare('SELECT id, position FROM task_list_sections WHERE day = ? AND semester_id IS NOT DISTINCT FROM ? ORDER BY position, id')
+    .all(day, sid);
   const idx = sections.findIndex((s) => s.id === sectionId);
   const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
   if (idx === -1 || swapIdx < 0 || swapIdx >= sections.length) return;
@@ -183,8 +194,9 @@ async function swapSectionPosition(day, sectionId, direction) {
 // same thing. Any id not belonging to this day is ignored, so a stale/
 // tampered request can't move another day's section into this one's
 // position numbering.
-async function reorderSections(day, orderedIds) {
-  const existing = await db.prepare('SELECT id FROM task_list_sections WHERE day = ?').all(day);
+async function reorderSections(day, orderedIds, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+  const existing = await db.prepare('SELECT id FROM task_list_sections WHERE day = ? AND semester_id IS NOT DISTINCT FROM ?').all(day, sid);
   const validIds = new Set(existing.map((s) => s.id));
   let position = 0;
   for (const id of orderedIds) {

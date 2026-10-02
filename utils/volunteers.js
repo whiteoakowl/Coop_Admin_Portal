@@ -2,9 +2,33 @@ const db = require('../db');
 const { formatDateLabel } = require('./dates');
 const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
 const { byLastName } = require('./members');
+const { getActiveKioskSemesterId } = require('./kioskSettings');
 
-async function getListByDay(day) {
-  return db.prepare('SELECT * FROM volunteer_lists WHERE day = ?').get(day);
+// A real request: "the kiosk can be changed each semester seamlessly" -
+// each semester gets its own fully separate Floater List per day (own
+// sections/members/assignments via volunteer_list_id), not one shared
+// Monday/Wednesday list reused forever. semesterId defaults to whatever
+// Settings > Kiosk currently has active (utils/kioskSettings.js) when not
+// given explicitly - every existing call site across this app (the Floater
+// Assignments admin pages, the public Kiosk floater sign-up, the
+// Substitute Board, class-schedule sync) keeps working unchanged and
+// automatically now operates on whichever semester is active, with no
+// need to thread semesterId through every layer in between. null is its
+// own valid bucket (a fresh install with no semesters created yet).
+// Lazily creates the list (with its 4 default Hour sections) the first
+// time a given (day, semesterId) pair is actually needed, same shape db/
+// bootstrapPg.js used to seed eagerly for the old single-list-per-day
+// world - this also makes a deleted list self-heal instead of 404ing.
+async function getListByDay(day, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+  const existing = await db.prepare('SELECT * FROM volunteer_lists WHERE day = ? AND semester_id IS NOT DISTINCT FROM ?').get(day, sid);
+  if (existing) return existing;
+  const info = await db.prepare('INSERT INTO volunteer_lists (day, semester_id) VALUES (?, ?)').run(day, sid);
+  const listId = info.lastInsertRowid;
+  for (let i = 1; i <= 4; i++) {
+    await db.prepare('INSERT INTO volunteer_sections (volunteer_list_id, position, label) VALUES (?, ?, ?)').run(listId, i, `Hour ${i}`);
+  }
+  return db.prepare('SELECT * FROM volunteer_lists WHERE id = ?').get(listId);
 }
 
 // Floater Assignments (volunteer_members) only ever gets a parent added to

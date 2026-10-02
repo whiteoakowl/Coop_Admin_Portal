@@ -1,14 +1,15 @@
 // Real HTTP-level coverage for GET /volunteers/:day - the public, no-login
 // kiosk floater-assignment chart linked from the site's own landing page
 // (views/index.ejs's "Floater Assignments" card) and the full kiosk
-// screen (views/kiosk-home.ejs). Previously had zero test coverage at
-// all, which is exactly how a real crash on this route (deployed to
-// Netlify, a request landing before first-boot seeding had finished -
-// see netlify/functions/app.js's own header comment) went unnoticed:
-// getListByDay(day) returning undefined and the route reading `.id` off
-// it unguarded threw a TypeError instead of a clean response. This
-// mirrors every other getListByDay call site in the codebase, all of
-// which already guard against exactly this.
+// screen (views/kiosk-home.ejs). Originally written after a real crash on
+// this route (deployed to Netlify, a request landing before first-boot
+// seeding had finished) went unnoticed: getListByDay(day) returning
+// undefined and the route reading `.id` off it unguarded threw a
+// TypeError instead of a clean response. A later real request ("the
+// kiosk can be changed each semester seamlessly") made volunteer_lists
+// semester-scoped and getListByDay self-healing (it creates a day's list
+// on demand instead of relying on eager first-boot seeding), which closes
+// that whole race condition rather than just guarding against it.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -120,14 +121,17 @@ test('GET /volunteers/:day', async (t) => {
     assert.doesNotMatch(res.text, /href="\/admin\/members\//, 'the public kiosk board must never link out to the admin site');
   });
 
-  await t.test('a missing volunteer_lists row for an otherwise-valid day 404s instead of crashing', async () => {
-    // Simulates the real startup-race bug this test file exists to lock
-    // in: a request landing before db/bootstrapPg.js's first-boot seeding
-    // has created this day's row. Deleting it directly reproduces the
-    // same "row doesn't exist yet" state without needing to actually race
-    // real boot timing.
+  await t.test('a missing volunteer_lists row for an otherwise-valid day self-heals instead of crashing or 404ing', async () => {
+    // Simulates the real startup-race bug this test file was originally
+    // written to lock in (a request landing before this day's row had
+    // been seeded) without needing to actually race real boot timing.
+    // getListByDay (utils/volunteers.js) now lazily creates the list - for
+    // whatever semester is currently active - the first time it's needed,
+    // so this comes back as a normal, empty chart rather than a 404.
     await db.prepare("DELETE FROM volunteer_lists WHERE day = 'wednesday'").run();
     const res = await request(app).get('/volunteers/wednesday');
-    assert.equal(res.status, 404);
+    assert.equal(res.status, 200);
+    const list = await db.prepare("SELECT id FROM volunteer_lists WHERE day = 'wednesday'").get();
+    assert.ok(list, 'the list should have been recreated');
   });
 });

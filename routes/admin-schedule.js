@@ -52,6 +52,7 @@ const { imageFileFilter, spreadsheetFileFilter } = require('../utils/uploads');
 const { sweepScheduleCardImages } = require('../utils/designImageGC');
 const { createStorageClient, publicUrl } = require('../utils/storage');
 const { saveUpload } = require('../utils/uploadBackend');
+const { getActiveKioskSemesterId, setActiveKioskSemesterId } = require('../utils/kioskSettings');
 
 const uploadScheduleImport = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
@@ -76,7 +77,7 @@ const uploadDesignImage = multer({
 });
 
 const SCHEDULE_TABS = ['monday', 'wednesday', 'members', 'archive', 'settings'];
-const SETTINGS_SUBTABS = ['general', 'semester', 'registration'];
+const SETTINGS_SUBTABS = ['general', 'semester', 'registration', 'kiosk'];
 const ARCHIVE_TYPES = ['class', 'student', 'parent'];
 const MEMBER_TYPE_FILTERS = ['student', 'parent'];
 const PAGE_SIZE = 25;
@@ -187,6 +188,10 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       semesters: await listSemesters(),
       missingSemesterCount: await countClassesMissingSemester(),
       classSettings: await classGlobalSettings(),
+      // Settings > Kiosk - a real request: "the kiosk page and all of its
+      // features are linked to [this semester]... this way the kiosk can
+      // be changed each semester seamlessly." See utils/kioskSettings.js.
+      activeKioskSemesterId: await getActiveKioskSemesterId(),
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -392,6 +397,22 @@ router.post('/schedule/class-settings', requireFullAdmin, async (req, res) => {
     autoCreditOnAdminRemoval: req.body.autoCreditOnAdminRemoval === '1',
   });
   res.redirect('/admin/schedule?tab=settings&settingsTab=general&notice=' + encodeURIComponent('Class settings saved.'));
+});
+
+// --- Classes > Settings: Kiosk - a real request: "Add a tab in co-op
+// admin portal settings called kiosk. There will be a drop down picker
+// for choosing a semester that the kiosk page and all of its features
+// are linked too. The floater list for that semester, the setup/cleanup,
+// check in, check out... This way the kiosk can be changed each semester
+// seamlessly." See utils/kioskSettings.js for how Floater/Setup-Cleanup/
+// Check-In/Check-Out all resolve this same setting.
+router.post('/schedule/kiosk-semester', requireFullAdmin, async (req, res) => {
+  const semesterId = parseInt(req.body.semesterId, 10);
+  if (!semesterId) {
+    return res.redirect('/admin/schedule?tab=settings&settingsTab=kiosk&error=' + encodeURIComponent('Choose a semester first.'));
+  }
+  await setActiveKioskSemesterId(semesterId);
+  res.redirect('/admin/schedule?tab=settings&settingsTab=kiosk&notice=' + encodeURIComponent('Kiosk semester updated.'));
 });
 
 // --- Member Schedules: bulk import ---

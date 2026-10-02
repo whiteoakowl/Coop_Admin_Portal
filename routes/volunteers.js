@@ -24,14 +24,11 @@ router.get('/volunteers/:day', async (req, res) => {
   const day = req.params.day;
   if (!isValidDay(day)) return res.status(404).render('404', { title: 'Not Found' });
 
+  // getListByDay now creates this day's list (for whatever semester is
+  // currently active - utils/kioskSettings.js) on demand if it doesn't
+  // exist yet, so this can no longer actually come back empty - kept as a
+  // defensive guard rather than assuming that holds forever.
   const list = await getListByDay(day);
-  // A volunteer_lists row for every valid day is always seeded at first
-  // boot (see db/bootstrapPg.js) and should never actually be missing -
-  // this is a defensive guard against a genuine startup race rather than
-  // a scenario expected in normal operation: this is a public, no-login
-  // route, so it's the most exposed to a request landing before that
-  // seeding has finished (see netlify/functions/app.js's own comment on
-  // why every invocation now awaits app.ready first to close that race).
   if (!list) return res.status(404).render('404', { title: 'Not Found' });
   const date = closestUpcomingDate(await datesForList(list.id));
   // A real bug report: this used to be built from dailyAssignmentCards

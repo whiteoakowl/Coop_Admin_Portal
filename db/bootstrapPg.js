@@ -33,15 +33,12 @@ async function seedIfMissing(db) {
     console.log(`Seeded default Class Check-In PIN "${pin}". Change it under Settings after first login.`);
   }
 
-  for (const day of ['monday', 'wednesday']) {
-    const existing = await db.prepare('SELECT id FROM volunteer_lists WHERE day = ?').get(day);
-    if (existing) continue;
-    const info = await db.prepare('INSERT INTO volunteer_lists (day) VALUES (?)').run(day);
-    const listId = info.lastInsertRowid;
-    for (let i = 1; i <= 4; i++) {
-      await db.prepare('INSERT INTO volunteer_sections (volunteer_list_id, position, label) VALUES (?, ?, ?)').run(listId, i, `Hour ${i}`);
-    }
-  }
+  // volunteer_lists is no longer seeded eagerly here - a real request
+  // ("the kiosk can be changed each semester seamlessly") made it
+  // semester-scoped (one Monday/Wednesday Floater List per semester, not
+  // one forever), so utils/volunteers.js's own getListByDay now creates a
+  // day's list (plus its 4 default Hour sections) lazily, the first time
+  // it's actually needed for whatever semester is active.
 
   for (const day of ['monday', 'wednesday']) {
     const existing = await db.prepare('SELECT id FROM class_schedule_hours WHERE day = ?').get(day);

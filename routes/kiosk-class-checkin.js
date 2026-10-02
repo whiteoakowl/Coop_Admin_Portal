@@ -24,6 +24,7 @@ const db = require('../db');
 const { todayISO, formatDateLong } = require('../utils/dates');
 const { isValidDay, DAY_LABELS } = require('../utils/days');
 const { allClassesList, ensureDayRoster, HOUR_POSITIONS } = require('../utils/classSchedule');
+const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
 const { buildRosterGridData, rosterDates } = require('../utils/rosterGrid');
 const { verifyClassCheckinPin } = require('../utils/classCheckinPin');
 const { findMemberByBarcodeOrName } = require('../utils/memberLookup');
@@ -68,7 +69,7 @@ function requireUnlocked(req, res, next) {
 async function findClassWithLabels(id) {
   const raw = await db.prepare('SELECT day FROM classes WHERE id = ?').get(id);
   if (!raw) return null;
-  return (await allClassesList(raw.day)).find((c) => c.id === id) || null;
+  return (await allClassesList(raw.day, await getActiveKioskSemesterId())).find((c) => c.id === id) || null;
 }
 
 router.get('/', (req, res) => {
@@ -116,7 +117,7 @@ router.get('/classes/:day', requireUnlocked, async (req, res) => {
   const day = req.params.day;
   if (!isValidDay(day)) return res.status(404).render('404', { title: 'Not Found' });
   const hourFilter = HOUR_POSITIONS.includes(parseInt(req.query.hour, 10)) ? parseInt(req.query.hour, 10) : null;
-  let classes = await allClassesList(day);
+  let classes = await allClassesList(day, await getActiveKioskSemesterId());
   if (hourFilter) classes = classes.filter((c) => c.hour_position === hourFilter);
   res.render('kiosk-class-checkin-classes', {
     title: 'Class Check-In',
@@ -224,6 +225,16 @@ async function resolveScan(req, res) {
   const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
   if (!cls || !cls.roster_id) {
     res.json({ ok: false, message: 'Class not found.' });
+    return null;
+  }
+  // A real request: "the kiosk can be changed each semester seamlessly" -
+  // blocks a scan against a class from a semester the Kiosk has since
+  // moved on from (e.g. a browser tab left open from before a semester
+  // switch), the same way the class list/attendance screen already won't
+  // surface it (findClassWithLabels/GET /classes/:day above).
+  const activeSemesterId = await getActiveKioskSemesterId();
+  if (activeSemesterId != null && cls.semester_id !== activeSemesterId) {
+    res.json({ ok: false, message: `${cls.class_name} is not part of the Kiosk's current semester.` });
     return null;
   }
 
