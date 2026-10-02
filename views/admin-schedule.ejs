@@ -231,7 +231,7 @@
             class's own assignment is its own Semester dropdown, now on
             that class's own Details tab. %>
         <h2>Semesters</h2>
-        <%- include('partials/semester-manager', { semesters, missingSemesterCount, backUrl: '/admin/schedule?tab=settings&settingsTab=semester' }) %>
+        <%- include('partials/semester-manager', { semesters, missingSemesterCount, missingSemesterBreakdown, backUrl: '/admin/schedule?tab=settings&settingsTab=semester' }) %>
       <% } else if (settingsTab === 'registration') { %>
 
         <%# A real request: "add registration schedule. Be able to

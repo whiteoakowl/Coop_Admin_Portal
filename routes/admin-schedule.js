@@ -45,11 +45,10 @@ const {
   createSemester,
   renameSemester,
   deleteSemester,
-  countClassesMissingSemester,
-  assignUnassignedClassesToSemester,
   classGlobalSettings,
   saveClassGlobalSettings,
 } = require('../utils/classSchedule');
+const { countMissingSemesterData, totalMissing, assignMissingSemesterData } = require('../utils/semesterAssignment');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
 const { scheduleCardDataForMembers, getScheduleCardTemplate } = require('../utils/scheduleCardData');
@@ -123,6 +122,7 @@ router.get('/schedule', requireAdmin, async (req, res) => {
 
   if (CLASS_DAYS.includes(tab)) {
     const selectedDate = isValidISODate(req.query.date) ? req.query.date : defaultDateFor(tab);
+    const missingSemesterBreakdown = res.locals.isFullAdmin ? await countMissingSemesterData() : null;
     return res.render('admin-schedule', {
       title: 'Schedules',
       tab,
@@ -146,7 +146,8 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       // of which previously existed on this tab (only the Settings tab
       // had the semester list before).
       semesters: await listSemesters(),
-      missingSemesterCount: res.locals.isFullAdmin ? await countClassesMissingSemester() : 0,
+      missingSemesterBreakdown,
+      missingSemesterCount: missingSemesterBreakdown ? totalMissing(missingSemesterBreakdown) : 0,
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -192,6 +193,7 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   if (tab === 'settings') {
     const settingsTab = SETTINGS_SUBTABS.includes(req.query.settingsTab) ? req.query.settingsTab : 'general';
     const windowRows = await listWindows();
+    const missingSemesterBreakdown = await countMissingSemesterData();
     return res.render('admin-schedule', {
       title: 'Co-op Class Settings',
       tab,
@@ -202,7 +204,8 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       roles: await db.prepare('SELECT key, label FROM roles ORDER BY label').all(),
       sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
       semesters: await listSemesters(),
-      missingSemesterCount: await countClassesMissingSemester(),
+      missingSemesterBreakdown,
+      missingSemesterCount: totalMissing(missingSemesterBreakdown),
       classSettings: await classGlobalSettings(),
       // Settings > Kiosk - a real request: "the kiosk page and all of its
       // features are linked to [this semester]... this way the kiosk can
@@ -385,11 +388,15 @@ router.post('/schedule/semesters/:id/delete', requireFullAdmin, async (req, res)
   res.redirect(back + sep + 'notice=' + encodeURIComponent('Semester removed.'));
 });
 
-// A real bug report: "there are currently many people signed up for fall
-// 2026 classes. They aren't showing on this orientation list" - classes
-// created before a semester existed (or before createClass's own new
-// semester-id default) are stuck with semester_id NULL. One-click fix:
-// tag every still-unassigned class with a chosen semester.
+// A real request: "create a fall 2026 semester and connect all classes,
+// floater assignments, setup cleanup, attendance, logs, everything on
+// co-op admin portal. I don't want to loose any current data." One-click
+// fix: tag every still-unassigned Classes/Floater Assignments/Setup-
+// Cleanup/Day Settings record with a chosen semester at once (see
+// utils/semesterAssignment.js's own header comment for exactly what is
+// and isn't touched, and why - nothing is ever deleted or moved, only
+// tagged, and a day that already has a real entry under the target
+// semester is safely skipped rather than overwritten).
 router.post('/schedule/semesters/assign-missing', requireFullAdmin, async (req, res) => {
   const back = semesterSettingsBack(req);
   const sep = back.includes('?') ? '&' : '?';
@@ -397,8 +404,25 @@ router.post('/schedule/semesters/assign-missing', requireFullAdmin, async (req, 
   if (!semesterId) {
     return res.redirect(back + sep + 'error=' + encodeURIComponent('Choose a semester first.'));
   }
-  const count = await assignUnassignedClassesToSemester(semesterId);
-  res.redirect(back + sep + 'notice=' + encodeURIComponent(count === 0 ? 'No classes were missing a semester.' : `Assigned ${count} class${count === 1 ? '' : 'es'} with no semester.`));
+  const { before, skippedTotal } = await assignMissingSemesterData(semesterId);
+  // Also makes this the Kiosk's active semester (Settings > Kiosk) - the
+  // Floater Assignments/Setup-Cleanup admin pages and the live Kiosk both
+  // resolve "which semester" from that setting, not from "whichever
+  // semester a list most recently got tagged with". Without this, the
+  // very next visit to those pages (still pointed at whatever semester -
+  // or no semester - was active before) would silently start a brand new,
+  // empty list instead of showing the data this action just connected.
+  await setActiveKioskSemesterId(semesterId);
+  const parts = [];
+  if (before.classes) parts.push(`${before.classes} class${before.classes === 1 ? '' : 'es'}`);
+  if (before.volunteerLists) parts.push(`${before.volunteerLists} Floater List${before.volunteerLists === 1 ? '' : 's'}`);
+  if (before.setupTeams) parts.push(`${before.setupTeams} Setup/Cleanup Team${before.setupTeams === 1 ? '' : 's'}`);
+  if (before.taskListSections) parts.push(`${before.taskListSections} Task List${before.taskListSections === 1 ? '' : 's'}`);
+  if (before.classSchedules) parts.push(`${before.classSchedules} Day Settings record${before.classSchedules === 1 ? '' : 's'}`);
+  let notice = parts.length === 0 ? 'Nothing was missing a semester.' : `Connected ${parts.join(', ')} to this semester.`;
+  notice += ' This is now the Kiosk’s active semester too.';
+  if (skippedTotal > 0) notice += ` ${skippedTotal} item${skippedTotal === 1 ? '' : 's'} already had a conflicting entry under this semester and were left untouched.`;
+  res.redirect(back + sep + 'notice=' + encodeURIComponent(notice));
 });
 
 // --- Classes > Settings: Day Settings (class_schedules) - a real

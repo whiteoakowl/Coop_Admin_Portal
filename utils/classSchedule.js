@@ -753,23 +753,6 @@ async function renameSemester(id, title) {
   await db.prepare('UPDATE semesters SET title = ? WHERE id = ?').run(trimmed, id);
 }
 
-// A real bug report: "there are currently many people signed up for fall
-// 2026 classes. They aren't showing on this orientation list" - classes
-// created before createClass's own new semester-id default (above) are
-// already sitting in the database with semester_id NULL, and nothing
-// short of opening each one's Details tab by hand would ever fix that.
-// One-click bulk remediation: tag every still-unassigned class with a
-// chosen semester in one go.
-async function countClassesMissingSemester() {
-  const row = await db.prepare('SELECT COUNT(*) AS c FROM classes WHERE semester_id IS NULL').get();
-  return Number(row.c);
-}
-
-async function assignUnassignedClassesToSemester(semesterId) {
-  const info = await db.prepare('UPDATE classes SET semester_id = ? WHERE semester_id IS NULL').run(semesterId);
-  return info.changes || 0;
-}
-
 // Separate from updateClassSettings above since the value here is a
 // nullable semester id, not a boolean - '' from the dropdown's own "No
 // Semester" option means clear it.
@@ -2274,8 +2257,6 @@ module.exports = {
   renameSemester,
   deleteSemester,
   setClassSemester,
-  countClassesMissingSemester,
-  assignUnassignedClassesToSemester,
   CLASS_DAYS,
   CLASS_DAY_LABELS_FULL,
   CLASS_DAY_WEEKDAY_FULL,

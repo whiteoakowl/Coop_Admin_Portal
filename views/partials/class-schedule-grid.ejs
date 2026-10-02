@@ -550,7 +550,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 
 <dialog id="semester-manager-dialog-<%= day %>" class="member-picker-dialog">
   <h3>Add/Edit Semester</h3>
-  <%- include('semester-manager', { semesters, missingSemesterCount, backUrl: gridBasePath }) %>
+  <%- include('semester-manager', { semesters, missingSemesterCount, missingSemesterBreakdown, backUrl: gridBasePath }) %>
   <div class="member-form-full">
     <button type="button" class="btn-secondary" onclick="document.getElementById('semester-manager-dialog-<%= day %>').close()">Close</button>
   </div>

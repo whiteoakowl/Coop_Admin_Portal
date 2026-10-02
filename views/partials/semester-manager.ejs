@@ -1,10 +1,21 @@
 <%
-// locals: semesters, missingSemesterCount, backUrl (optional - where each
-// form's own POST redirects back to; defaults to the Settings tab). Used
-// both by the Settings tab (its original home) and the new "Add/Edit
-// Semester" dialog on the Monday/Wednesday Classes page itself (a real
-// request: "on class page add a button that says add/edit semester").
+// locals: semesters, missingSemesterCount, missingSemesterBreakdown
+// (optional - the per-category counts behind missingSemesterCount; falls
+// back to just showing the total if not passed), backUrl (optional -
+// where each form's own POST redirects back to; defaults to the Settings
+// tab). Used both by the Settings tab (its original home) and the new
+// "Add/Edit Semester" dialog on the Monday/Wednesday Classes page itself
+// (a real request: "on class page add a button that says add/edit
+// semester").
 const semesterBackUrl = typeof backUrl !== 'undefined' && backUrl ? backUrl : '/admin/schedule?tab=settings';
+const breakdown = typeof missingSemesterBreakdown !== 'undefined' ? missingSemesterBreakdown : null;
+const BREAKDOWN_LABELS = {
+  classes: ['class', 'classes'],
+  volunteerLists: ['Floater List', 'Floater Lists'],
+  setupTeams: ['Setup/Cleanup Team', 'Setup/Cleanup Teams'],
+  taskListSections: ['Task List', 'Task Lists'],
+  classSchedules: ['Day Settings record', 'Day Settings records'],
+};
 %>
 <section class="portal-dashboard-card portal-dashboard-card-wide">
   <h2>Add a Semester</h2>
@@ -19,15 +30,29 @@ const semesterBackUrl = typeof backUrl !== 'undefined' && backUrl ? backUrl : '/
   </form>
 </section>
 
-<%# A real bug report: "there are currently many people signed up for
-    fall 2026 classes. They aren't showing on this orientation list" -
-    classes created before a semester existed (or before a semester was
-    picked up by default) are stuck with no semester at all. One-click
-    fix instead of opening each class's own Details tab by hand. %>
+<%# A real request: "create a fall 2026 semester and connect all classes,
+    floater assignments, setup cleanup, attendance, logs, everything on
+    co-op admin portal. I don't want to loose any current data." Classes,
+    Floater Assignments, Setup/Cleanup, and Day Settings records all sit
+    with no semester until tagged - this is the one-click sweep that tags
+    everything still untagged at once (see utils/semesterAssignment.js's
+    own header comment for exactly what this does and doesn't touch -
+    nothing is ever deleted or moved, only tagged). Attendance/checkouts/
+    admin logs aren't listed here - they're plain dated event records with
+    no semester concept of their own to assign. %>
 <% if (missingSemesterCount > 0) { %>
   <section class="portal-dashboard-card portal-dashboard-card-wide">
-    <h2>Classes With No Semester</h2>
-    <p class="hint"><%= missingSemesterCount %> class<%= missingSemesterCount === 1 ? '' : 'es' %> <%= missingSemesterCount === 1 ? 'has' : 'have' %> no semester assigned, so <%= missingSemesterCount === 1 ? 'it' : 'they' %> won't show up on Orientation (or any other semester-filtered page) while a specific semester is selected. Assign <%= missingSemesterCount === 1 ? 'it' : 'them all' %> at once:</p>
+    <h2>Data Missing a Semester</h2>
+    <% if (breakdown) { %>
+      <ul class="hint">
+        <% Object.keys(BREAKDOWN_LABELS).forEach(function(key) { %>
+          <% if (breakdown[key] > 0) { %>
+            <li><%= breakdown[key] %> <%= BREAKDOWN_LABELS[key][breakdown[key] === 1 ? 0 : 1] %> with no semester assigned</li>
+          <% } %>
+        <% }); %>
+      </ul>
+    <% } %>
+    <p class="hint">None of this will show up on Orientation (or any other semester-filtered page) while a specific semester is selected. Connect it all to one semester at once:</p>
     <form method="POST" action="/admin/schedule/semesters/assign-missing" class="member-form-grid">
       <input type="hidden" name="back" value="<%= semesterBackUrl %>" />
       <label class="member-form-full">Assign To
@@ -39,7 +64,7 @@ const semesterBackUrl = typeof backUrl !== 'undefined' && backUrl ? backUrl : '/
         </select>
       </label>
       <div class="member-form-full">
-        <button type="submit" class="primary-btn">Assign</button>
+        <button type="submit" class="primary-btn">Connect Everything</button>
       </div>
     </form>
   </section>

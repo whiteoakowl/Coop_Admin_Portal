@@ -9,9 +9,26 @@
 // entry), left as a single unstacked string for the named early-childhood
 // levels (which already read fine on their own, and "Kindergarten"/"Grade"
 // stacked wouldn't make sense).
+// Every other test file in this repo sets DB_PATH and awaits the db
+// module's own .ready before running assertions - this file never did
+// either, despite requiring utils/nameTagData.js (which requires ../db at
+// module load). gradeLevelLabel itself never touches the db, so this went
+// unnoticed for a long time, but the unawaited db.ready boot chain (169
+// migrations + a dozen backfills) left the process unable to exit once
+// its 4 synchronous assertions finished in under a millisecond - `node
+// --test` hung indefinitely rather than failing outright, which is what
+// surfaced this while regression-testing an unrelated feature.
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const os = require('os');
+const path = require('path');
+
+process.env.DB_PATH = path.join(os.tmpdir(), `name-tag-grade-level-label-test-db-${process.pid}.db`);
+
+const db = require('../db');
 const { gradeLevelLabel } = require('../utils/nameTagData');
+
+test.before(() => db.ready);
 
 test('gradeLevelLabel returns ["<ordinal>", "Grade"] for an ordinal grade, ready to stack', () => {
   assert.deepEqual(gradeLevelLabel('1st'), ['1st', 'Grade']);

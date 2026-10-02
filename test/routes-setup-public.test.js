@@ -35,7 +35,11 @@ test.after(() => {
 
 test('GET /setup/:day', async (t) => {
   await t.test('an invalid day 404s', async () => {
-    const res = await request(app).get('/setup/tuesday');
+    // Not "tuesday" - the 7-day expansion (utils/classDays.js's
+    // isValidClassDay) made every real weekday valid everywhere,
+    // Setup/Cleanup included, so a real day name is no longer a usable
+    // "invalid" example here.
+    const res = await request(app).get('/setup/notaday');
     assert.equal(res.status, 404);
   });
 
