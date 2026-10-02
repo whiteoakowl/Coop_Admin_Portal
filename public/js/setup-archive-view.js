@@ -6,13 +6,15 @@
   const dialog = document.getElementById('setup-archive-view-dialog');
   if (!dialog || !window.loadFragmentIntoDialog) return;
 
-  const day = document.querySelector('main[data-day]')?.dataset.day;
+  const main = document.querySelector('main[data-day]');
+  const day = main?.dataset.day;
+  const semesterId = main?.dataset.semesterId;
   if (!day) return;
 
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-view-setup-archive-date]');
     if (!btn) return;
     const date = btn.getAttribute('data-view-setup-archive-date');
-    window.loadFragmentIntoDialog(dialog, `/admin/setup/${day}/archive/${date}/view-fragment`).catch(() => {});
+    window.loadFragmentIntoDialog(dialog, `/admin/setup/${day}/archive/${date}/view-fragment?semesterId=${encodeURIComponent(semesterId || '')}`).catch(() => {});
   });
 })();

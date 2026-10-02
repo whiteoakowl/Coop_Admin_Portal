@@ -6,7 +6,7 @@
 </head>
 <body class="admin-page setup-assignments-print-page">
   <%- include('partials/admin-nav') %>
-  <main id="main-content" tabindex="-1" class="admin-main" data-day="<%= day %>">
+  <main id="main-content" tabindex="-1" class="admin-main" data-day="<%= day %>" data-semester-id="<%= semesterId %>">
     <%# A real request: "make sure it prints one team per page" - this
         page's own top-level .print-header (display:none outside print,
         so removing it changes nothing on screen) used to be the only
@@ -19,29 +19,25 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <%- include('partials/setup-tabs', { day, activeSetupTab: 'assignments' }) %>
+    <%- include('partials/setup-tabs', { day, activeSetupTab: 'assignments', semesterId }) %>
 
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">
         <div class="roster-toolbar-left">
-          <div class="day-toggle">
-            <% activeDays.forEach(function(d) { %>
-              <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/admin/setup/<%= d %>/assignments"><%= dayLabels[d] %></a>
-            <% }); %>
-          </div>
+          <%- include('partials/schedule-combo-picker', { combos, basePrefix: '/admin/setup', pathSuffix: '/assignments', selectedComboId }) %>
         </div>
         <div class="roster-btn-row roster-btn-row-fit-text">
           <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
-          <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/assignments/export.csv<%= selectedDate ? '?date=' + selectedDate : '' %>">Export</a>
+          <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/assignments/export.csv?semesterId=<%= semesterId %><%= selectedDate ? '&date=' + selectedDate : '' %>">Export</a>
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
-          <a class="roster-action-btn" href="/admin/setup/<%= day %>/archive">Archive</a>
+          <a class="roster-action-btn" href="/admin/setup/<%= day %>/archive?semesterId=<%= semesterId %>">Archive</a>
         </div>
       </div>
 
       <div class="roster-toolbar no-print">
         <div class="category-filter" style="margin: 0;">
           <label for="assignments-date-select">Choose Date</label>
-          <select id="assignments-date-select" onchange="window.fullscreenNavigate('/admin/setup/<%= day %>/assignments' + (this.value ? '?date=' + this.value : ''))">
+          <select id="assignments-date-select" onchange="window.fullscreenNavigate('/admin/setup/<%= day %>/assignments?semesterId=<%= semesterId %>' + (this.value ? '&date=' + this.value : ''))">
             <% if (upcomingDates.length === 0) { %><option value="">No upcoming dates</option><% } %>
             <% upcomingDates.forEach(function(d) { %>
               <option value="<%= d.date %>" <%= selectedDate === d.date ? 'selected' : '' %>><%= d.label %></option>
@@ -53,11 +49,11 @@
       <% if (dates.length === 0) { %>
         <p class="roster-empty">Add session dates above first.</p>
       <% } else if (!selectedDate) { %>
-        <p class="roster-empty">No upcoming session dates - add one above, or see past dates on the <a href="/admin/setup/<%= day %>/archive">Archive</a> tab.</p>
+        <p class="roster-empty">No upcoming session dates - add one above, or see past dates on the <a href="/admin/setup/<%= day %>/archive?semesterId=<%= semesterId %>">Archive</a> tab.</p>
       <% } else { %>
         <div id="setup-assign-status" class="alert alert-error no-print" hidden></div>
         <div id="setup-assignment-cards-container" data-selected-date="<%= selectedDate %>">
-          <%- include('partials/setup-assignment-cards', { cards, day, dayLabel, selectedDate, editable: true }) %>
+          <%- include('partials/setup-assignment-cards', { cards, day, dayLabel, selectedDate, editable: true, semesterId }) %>
         </div>
       <% } %>
     </div>
@@ -66,10 +62,10 @@
       <h3>Edit Session Dates</h3>
       <div class="roster-scroll">
         <div id="setup-dates-list">
-          <%- include('setup-dates-fragment', { day, dates }) %>
+          <%- include('setup-dates-fragment', { day, dates, semesterId }) %>
         </div>
       </div>
-      <form method="POST" action="/admin/setup/<%= day %>/dates/add" class="volunteer-date-add-form">
+      <form method="POST" action="/admin/setup/<%= day %>/dates/add?semesterId=<%= semesterId %>" class="volunteer-date-add-form">
         <input type="date" name="dates" onchange="if (this.value) this.form.requestSubmit();" />
       </form>
       <div class="notes-dialog-actions">

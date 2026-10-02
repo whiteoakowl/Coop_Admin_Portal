@@ -8,7 +8,9 @@ const {
   requireClassDay,
   listActiveClassDays,
   parseClassDayValue,
+  listScheduleCombos,
 } = require('../utils/classSchedule');
+const { comboSemesterId, qsSemester, appendSemester, findComboId } = require('../utils/scheduleComboLinks');
 const { isValidISODate, formatDateLabel } = require('../utils/dates');
 const {
   teamsForDay,
@@ -41,6 +43,15 @@ const { activeParentAndAdminOptions } = require('../utils/members');
 const { spreadsheetFileFilter } = require('../utils/uploads');
 const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
 
+// Pages here (unlike Floater Assignments' own manage page) never fetch a
+// single authoritative row of their own to read an effective .semester_id
+// back off - teamsWithMembers/taskListSectionsForDay/etc. all return
+// arrays. Resolves the exact same way those functions' own semesterId
+// default does, so every page's combo picker preselects correctly.
+async function resolveSemesterId(semesterId) {
+  return semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+}
+
 const uploadTasks = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
 // Lands on Assignments first, same as Floater Assignments' own /volunteers
@@ -56,6 +67,8 @@ router.get('/setup', requireAdmin, async (req, res) => {
 
 router.get('/setup/:day/manage', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const combos = await listScheduleCombos();
+  const resolvedSemesterId = await resolveSemesterId(comboSemesterId(req));
 
   res.render('admin-setup', {
     title: `${DAY_LABELS[day]} Setup/Cleanup Teams`,
@@ -63,7 +76,10 @@ router.get('/setup/:day/manage', requireAdmin, requireClassDay, async (req, res)
     dayLabel: DAY_LABELS[day],
     activeDays: await listActiveClassDays(),
     dayLabels: DAY_LABELS,
-    teams: await teamsWithMembers(day),
+    combos,
+    selectedComboId: findComboId(combos, day, resolvedSemesterId),
+    semesterId: qsSemester(resolvedSemesterId),
+    teams: await teamsWithMembers(day, resolvedSemesterId),
     // availableParents: the Add Member dialog's member picker. Used to be
     // parent-only by design, but a broader follow-up request widened
     // that: "admins should still be included in lists of members/parents
@@ -103,12 +119,13 @@ router.get('/setup/:day/teams/print', requireAdmin, requireClassDay, async (req,
     title: `${DAY_LABELS[day]} Setup/Cleanup Teams`,
     day,
     dayLabel: DAY_LABELS[day],
-    teams: await teamsWithMembers(day),
+    teams: await teamsWithMembers(day, await resolveSemesterId(comboSemesterId(req))),
   });
 });
 
 router.post('/setup/:day/teams', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   const title = (req.body.title || '').trim();
   const description = (req.body.description || '').trim();
   const leaderId = parseInt(req.body.leaderId, 10) || null;
@@ -121,22 +138,28 @@ router.post('/setup/:day/teams', requireAdmin, requireClassDay, async (req, res)
   // 'checkout' (today's original behavior) for anything else submitted.
   const taskScanTiming = req.body.taskScanTiming === 'checkin' ? 'checkin' : 'checkout';
   if (!title) {
-    return res.redirect(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'));
+    return res.redirect(appendSemester(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'), semesterId));
   }
+  // A new team is tagged to whichever combo the admin is actually
+  // viewing, not necessarily Settings > Kiosk's own active semester -
+  // the two can differ now that this picker is its own per-page view
+  // choice (a real decision: picking a semester here never touches the
+  // Kiosk's site-wide setting).
   await db
     .prepare('INSERT INTO setup_teams (day, title, description, leader_id, meeting_time, meeting_location, task_scan_timing, semester_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(day, title, description || null, leaderId, meetingTime || null, meetingLocation || null, taskScanTiming, await getActiveKioskSemesterId());
-  res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`Team "${title}" created.`));
+    .run(day, title, description || null, leaderId, meetingTime || null, meetingLocation || null, taskScanTiming, await resolveSemesterId(semesterId));
+  res.redirect(appendSemester(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`Team "${title}" created.`), semesterId));
 });
 
 // Leader dropdown auto-submits on change, same pattern as a Floater
 // Teams rank select - no separate "edit" step.
 router.post('/setup/:day/teams/:teamId/leader', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   const teamId = parseInt(req.params.teamId, 10);
   const leaderId = parseInt(req.body.leaderId, 10) || null;
   await setTeamLeader(teamId, leaderId);
-  res.redirect(`/admin/setup/${day}/manage`);
+  res.redirect(appendSemester(`/admin/setup/${day}/manage`, semesterId));
 });
 
 // Team cards are view-only until Edit is clicked - title/description/
@@ -144,6 +167,7 @@ router.post('/setup/:day/teams/:teamId/leader', requireAdmin, requireClassDay, a
 // replacing the old inline-editable card.
 router.post('/setup/:day/teams/:teamId/edit', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   const teamId = parseInt(req.params.teamId, 10);
   const title = (req.body.title || '').trim();
   const description = (req.body.description || '').trim();
@@ -152,7 +176,7 @@ router.post('/setup/:day/teams/:teamId/edit', requireAdmin, requireClassDay, asy
   const meetingLocation = (req.body.meetingLocation || '').trim();
   const taskScanTiming = req.body.taskScanTiming === 'checkin' ? 'checkin' : 'checkout';
   if (!title) {
-    return res.redirect(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'));
+    return res.redirect(appendSemester(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'), semesterId));
   }
   await updateTeam(teamId, { title, description, leaderId, meetingTime, meetingLocation, taskScanTiming });
 
@@ -160,20 +184,22 @@ router.post('/setup/:day/teams/:teamId/edit', requireAdmin, requireClassDay, asy
   // straight to /remove-member/:memberId below via fetch - see "A real
   // request" comment there), not something that rides along with this
   // Save submission.
-  res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`"${title}" updated.`));
+  res.redirect(appendSemester(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`"${title}" updated.`), semesterId));
 });
 
 router.post('/setup/:day/teams/:teamId/delete', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   const teamId = parseInt(req.params.teamId, 10);
   await db.prepare('DELETE FROM setup_teams WHERE id = ? AND day = ?').run(teamId, day);
-  res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent('Team deleted.'));
+  res.redirect(appendSemester(`/admin/setup/${day}/manage?notice=` + encodeURIComponent('Team deleted.'), semesterId));
 });
 
 // Single "+ Add Member" popup (toolbar, not per-card) - member + team
 // dropdowns, so adding someone doesn't require opening a specific card.
 router.post('/setup/:day/teams/add-member', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   const teamId = parseInt(req.body.teamId, 10);
   const memberId = parseInt(req.body.memberId, 10);
   if (teamId && memberId) {
@@ -181,7 +207,7 @@ router.post('/setup/:day/teams/add-member', requireAdmin, requireClassDay, async
       .prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?) ON CONFLICT (team_id, member_id) DO NOTHING')
       .run(teamId, memberId);
   }
-  res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent('Member added.'));
+  res.redirect(appendSemester(`/admin/setup/${day}/manage?notice=` + encodeURIComponent('Member added.'), semesterId));
 });
 
 // A real request: "if you click the trash button the member name should
@@ -194,17 +220,18 @@ router.post('/setup/:day/teams/add-member', requireAdmin, requireClassDay, async
 // (non-fetch) request still gets the original redirect for safety.
 router.post('/setup/:day/teams/:teamId/remove-member/:memberId', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   const teamId = parseInt(req.params.teamId, 10);
   const memberId = parseInt(req.params.memberId, 10);
   const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
   await db.prepare('DELETE FROM setup_team_members WHERE team_id = ? AND member_id = ?').run(teamId, memberId);
   if (wantsJson) return res.json({ ok: true });
-  res.redirect(`/admin/setup/${day}/manage`);
+  res.redirect(appendSemester(`/admin/setup/${day}/manage`, semesterId));
 });
 
 router.get('/setup/:day/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const teams = await teamsWithMembers(day);
+  const teams = await teamsWithMembers(day, await resolveSemesterId(comboSemesterId(req)));
 
   const lines = [toCsvRow(['Team', 'Description', 'Member'])];
   for (const t of teams) {
@@ -227,7 +254,9 @@ router.get('/setup/:day/export.csv', requireAdmin, requireClassDay, async (req, 
 
 router.get('/setup/:day/assignments', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const dates = await datesForDay(day);
+  const semesterId = await resolveSemesterId(comboSemesterId(req));
+  const combos = await listScheduleCombos();
+  const dates = await datesForDay(day, semesterId);
   const { upcoming } = splitDatesByToday(dates);
   const selectedDate = upcoming.includes(req.query.date) ? req.query.date : upcoming[0] || null;
 
@@ -237,10 +266,13 @@ router.get('/setup/:day/assignments', requireAdmin, requireClassDay, async (req,
     dayLabel: DAY_LABELS[day],
     activeDays: await listActiveClassDays(),
     dayLabels: DAY_LABELS,
+    combos,
+    selectedComboId: findComboId(combos, day, semesterId),
+    semesterId: qsSemester(semesterId),
     dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
     upcomingDates: upcoming.map((d) => ({ date: d, label: formatDateLabel(d) })),
     selectedDate,
-    cards: selectedDate ? await assignmentCardsForDate(day, selectedDate) : [],
+    cards: selectedDate ? await assignmentCardsForDate(day, selectedDate, semesterId) : [],
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -260,25 +292,27 @@ function isFetch(req) {
   return req.get('X-Requested-With') === 'fetch';
 }
 
-async function renderDatesFragment(req, res, day) {
-  const dates = (await datesForDay(day)).map((d) => ({ date: d, label: formatDateLabel(d) }));
-  res.render('setup-dates-fragment', { day, dates });
+async function renderDatesFragment(req, res, day, semesterId) {
+  const dates = (await datesForDay(day, semesterId)).map((d) => ({ date: d, label: formatDateLabel(d) }));
+  res.render('setup-dates-fragment', { day, dates, semesterId: qsSemester(semesterId === undefined ? null : semesterId) });
 }
 
 router.post('/setup/:day/dates/add', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))];
-  await addSetupDates(day, dates);
-  if (isFetch(req)) return renderDatesFragment(req, res, day);
-  res.redirect(`/admin/setup/${day}/assignments?notice=` + encodeURIComponent(`Added ${dates.length} date(s).`));
+  await addSetupDates(day, dates, semesterId);
+  if (isFetch(req)) return renderDatesFragment(req, res, day, semesterId);
+  res.redirect(appendSemester(`/admin/setup/${day}/assignments?notice=` + encodeURIComponent(`Added ${dates.length} date(s).`), semesterId));
 });
 
 router.post('/setup/:day/dates/:date/remove', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   const date = req.params.date;
-  await removeSetupDate(day, date);
-  if (isFetch(req)) return renderDatesFragment(req, res, day);
-  res.redirect(`/admin/setup/${day}/assignments?notice=` + encodeURIComponent(`Removed ${formatDateLabel(date)}.`));
+  await removeSetupDate(day, date, semesterId);
+  if (isFetch(req)) return renderDatesFragment(req, res, day, semesterId);
+  res.redirect(appendSemester(`/admin/setup/${day}/assignments?notice=` + encodeURIComponent(`Removed ${formatDateLabel(date)}.`), semesterId));
 });
 
 // A real request: Setup/Cleanup should "look and work like Floater
@@ -306,17 +340,18 @@ router.post('/setup/:day/dates/:date/remove', requireAdmin, requireClassDay, asy
 // redirect.
 router.post('/setup/:day/assignments/:memberId/task', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   const memberId = parseInt(req.params.memberId, 10);
   const date = req.body.date;
   const slot = req.body.slot === '2' ? 2 : 1;
   const taskItemId = parseInt(req.body.taskItemId, 10) || null;
-  const back = `/admin/setup/${day}/assignments` + (date ? `?date=${encodeURIComponent(date)}` : '');
+  const back = appendSemester(`/admin/setup/${day}/assignments` + (date ? `?date=${encodeURIComponent(date)}` : ''), semesterId);
   if (date && isValidISODate(date)) {
     try {
-      await setTaskAssignment(day, memberId, date, slot, taskItemId);
+      await setTaskAssignment(day, memberId, date, slot, taskItemId, semesterId);
     } catch (e) {
       if (isFetch(req)) return res.status(400).json({ ok: false, error: e.message });
-      return res.redirect(back + (date ? '&' : '?') + 'error=' + encodeURIComponent(e.message));
+      return res.redirect(back + (back.includes('?') ? '&' : '?') + 'error=' + encodeURIComponent(e.message));
     }
   }
   if (isFetch(req)) return res.json({ ok: true });
@@ -331,17 +366,18 @@ router.post('/setup/:day/assignments/:memberId/task', requireAdmin, requireClass
 // Floater Chart.
 router.get('/setup/:day/assignments/fragment', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const dates = await datesForDay(day);
+  const semesterId = comboSemesterId(req);
+  const dates = await datesForDay(day, semesterId);
   const { upcoming } = splitDatesByToday(dates);
   const selectedDate = upcoming.includes(req.query.date) ? req.query.date : upcoming[0] || null;
-  const cards = selectedDate ? await assignmentCardsForDate(day, selectedDate) : [];
-  res.render('setup-assignment-live-fragment', { day, dayLabel: DAY_LABELS[day], selectedDate, cards });
+  const cards = selectedDate ? await assignmentCardsForDate(day, selectedDate, semesterId) : [];
+  res.render('setup-assignment-live-fragment', { day, dayLabel: DAY_LABELS[day], selectedDate, cards, semesterId: qsSemester(semesterId === undefined ? null : semesterId) });
 });
 
 router.get('/setup/:day/assignments/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const date = req.query.date;
-  const cards = date && isValidISODate(date) ? await assignmentCardsForDate(day, date) : [];
+  const cards = date && isValidISODate(date) ? await assignmentCardsForDate(day, date, comboSemesterId(req)) : [];
 
   const lines = [toCsvRow(['Team', 'Member', 'Suggested Task 1', 'Suggested Task 2'])];
   cards.forEach((t) => {
@@ -363,7 +399,9 @@ router.get('/setup/:day/assignments/export.csv', requireAdmin, requireClassDay, 
 
 router.get('/setup/:day/archive', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const dates = await datesForDay(day);
+  const semesterId = await resolveSemesterId(comboSemesterId(req));
+  const combos = await listScheduleCombos();
+  const dates = await datesForDay(day, semesterId);
   const { past } = splitDatesByToday(dates);
   const pastSorted = [...past].sort().reverse();
   const dateFilter = pastSorted.includes(req.query.date) ? req.query.date : null;
@@ -374,6 +412,9 @@ router.get('/setup/:day/archive', requireAdmin, requireClassDay, async (req, res
     dayLabel: DAY_LABELS[day],
     activeDays: await listActiveClassDays(),
     dayLabels: DAY_LABELS,
+    combos,
+    selectedComboId: findComboId(combos, day, semesterId),
+    semesterId: qsSemester(semesterId),
     dateOptions: pastSorted.map((d) => ({ date: d, label: formatDateLabel(d) })),
     dateFilter,
     rows: (dateFilter ? [dateFilter] : pastSorted).map((d) => ({ date: d, label: formatDateLabel(d) })),
@@ -383,7 +424,8 @@ router.get('/setup/:day/archive', requireAdmin, requireClassDay, async (req, res
 router.get('/setup/:day/archive/:date/view-fragment', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
-  const dates = await datesForDay(day);
+  const semesterId = comboSemesterId(req);
+  const dates = await datesForDay(day, semesterId);
   if (!dates.includes(date)) return res.status(404).send('Not found');
 
   res.render('setup-assignment-cards-fragment', {
@@ -391,17 +433,19 @@ router.get('/setup/:day/archive/:date/view-fragment', requireAdmin, requireClass
     dayLabel: DAY_LABELS[day],
     date,
     dateLabel: formatDateLabel(date),
-    cards: await assignmentCardsForDate(day, date),
+    semesterId: qsSemester(semesterId === undefined ? null : semesterId),
+    cards: await assignmentCardsForDate(day, date, semesterId),
   });
 });
 
 router.get('/setup/:day/archive/:date/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
-  const dates = await datesForDay(day);
+  const semesterId = comboSemesterId(req);
+  const dates = await datesForDay(day, semesterId);
   if (!dates.includes(date)) return res.status(404).send('Not found');
 
-  const cards = await assignmentCardsForDate(day, date);
+  const cards = await assignmentCardsForDate(day, date, semesterId);
   const lines = [toCsvRow(['Team', 'Member', 'Suggested Task 1', 'Suggested Task 2'])];
   cards.forEach((t) => {
     if (t.members.length === 0) {
@@ -416,7 +460,8 @@ router.get('/setup/:day/archive/:date/export.csv', requireAdmin, requireClassDay
 router.get('/setup/:day/archive/:date/print', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
-  const dates = await datesForDay(day);
+  const semesterId = comboSemesterId(req);
+  const dates = await datesForDay(day, semesterId);
   if (!dates.includes(date)) return res.status(404).send('Not found');
 
   res.render('admin-setup-archive-print', {
@@ -425,7 +470,7 @@ router.get('/setup/:day/archive/:date/print', requireAdmin, requireClassDay, asy
     dayLabel: DAY_LABELS[day],
     date,
     dateLabel: formatDateLabel(date),
-    cards: await assignmentCardsForDate(day, date),
+    cards: await assignmentCardsForDate(day, date, semesterId),
   });
 });
 
@@ -434,14 +479,19 @@ router.get('/setup/:day/archive/:date/print', requireAdmin, requireClassDay, asy
 
 router.get('/setup/:day/tasks', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = await resolveSemesterId(comboSemesterId(req));
+  const combos = await listScheduleCombos();
   res.render('admin-setup-tasks', {
     title: `${DAY_LABELS[day]} Task List`,
     day,
     dayLabel: DAY_LABELS[day],
     activeDays: await listActiveClassDays(),
     dayLabels: DAY_LABELS,
-    sections: await taskListSectionsForDay(day),
-    teams: await teamsForDay(day),
+    combos,
+    selectedComboId: findComboId(combos, day, semesterId),
+    semesterId: qsSemester(semesterId),
+    sections: await taskListSectionsForDay(day, semesterId),
+    teams: await teamsForDay(day, semesterId),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -449,27 +499,30 @@ router.get('/setup/:day/tasks', requireAdmin, requireClassDay, async (req, res) 
 
 router.post('/setup/:day/tasks/new', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   const title = (req.body.title || '').trim();
   const teamId = parseInt(req.body.teamId, 10) || null;
   if (!title) {
-    return res.redirect(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('List title is required.'));
+    return res.redirect(appendSemester(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('List title is required.'), semesterId));
   }
-  await createSection(day, title, teamId);
-  res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent(`"${title}" created.`));
+  await createSection(day, title, teamId, semesterId);
+  res.redirect(appendSemester(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent(`"${title}" created.`), semesterId));
 });
 
 router.post('/setup/:day/tasks/:sectionId/delete', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   await deleteSection(parseInt(req.params.sectionId, 10));
-  res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent('List deleted.'));
+  res.redirect(appendSemester(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent('List deleted.'), semesterId));
 });
 
 router.post('/setup/:day/tasks/:sectionId/move', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   const sectionId = parseInt(req.params.sectionId, 10);
   const direction = req.body.direction === 'up' ? 'up' : 'down';
   await swapSectionPosition(day, sectionId, direction);
-  res.redirect(`/admin/setup/${day}/tasks`);
+  res.redirect(appendSemester(`/admin/setup/${day}/tasks`, semesterId));
 });
 
 // Drag-and-drop reordering of the whole list stack - called via fetch
@@ -488,30 +541,33 @@ router.post('/setup/:day/tasks/reorder', requireAdmin, requireClassDay, async (r
 // which list dropdown, same pattern as Teams' "+ Add Member" popup.
 router.post('/setup/:day/tasks/add-item', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   const sectionId = parseInt(req.body.sectionId, 10);
   const description = (req.body.description || '').trim();
   if (!sectionId || !description) {
-    return res.redirect(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('Choose a list and enter a task.'));
+    return res.redirect(appendSemester(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('Choose a list and enter a task.'), semesterId));
   }
   const section = await getSection(sectionId);
-  if (!section || section.day !== day) return res.redirect(`/admin/setup/${day}/tasks`);
+  if (!section || section.day !== day) return res.redirect(appendSemester(`/admin/setup/${day}/tasks`, semesterId));
   await addItem(sectionId, description);
-  res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent('Task added.'));
+  res.redirect(appendSemester(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent('Task added.'), semesterId));
 });
 
 router.post('/setup/:day/tasks/:sectionId/items/:itemId/delete', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   await deleteItem(parseInt(req.params.itemId, 10));
-  res.redirect(`/admin/setup/${day}/tasks`);
+  res.redirect(appendSemester(`/admin/setup/${day}/tasks`, semesterId));
 });
 
 router.post('/setup/:day/tasks/:sectionId/items/:itemId/move', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   const sectionId = parseInt(req.params.sectionId, 10);
   const itemId = parseInt(req.params.itemId, 10);
   const direction = req.body.direction === 'up' ? 'up' : 'down';
   await swapItemPosition(sectionId, itemId, direction);
-  res.redirect(`/admin/setup/${day}/tasks`);
+  res.redirect(appendSemester(`/admin/setup/${day}/tasks`, semesterId));
 });
 
 router.post('/setup/:day/tasks/:sectionId/items/reorder', requireAdmin, requireClassDay, async (req, res) => {
@@ -531,6 +587,7 @@ router.post('/setup/:day/tasks/:sectionId/items/reorder', requireAdmin, requireC
 // actions elsewhere, not part of this.
 router.post('/setup/:day/tasks/save', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   for (const key of Object.keys(req.body)) {
     const sectionMatch = /^sectionTitle_(\d+)$/.exec(key);
     if (sectionMatch) {
@@ -549,7 +606,7 @@ router.post('/setup/:day/tasks/save', requireAdmin, requireClassDay, async (req,
       if (description) await updateItem(id, description);
     }
   }
-  res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent('Task list updated.'));
+  res.redirect(appendSemester(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent('Task list updated.'), semesterId));
 });
 
 router.get('/setup/:day/tasks/import-template.xlsx', requireAdmin, requireClassDay, (req, res) => {
@@ -577,14 +634,15 @@ router.get('/setup/:day/tasks/import-template.xlsx', requireAdmin, requireClassD
 // every numbered row in that same list, in file order.
 router.post('/setup/:day/tasks/import', requireAdmin, requireClassDay, uploadTasks.single('file'), async (req, res) => {
   const day = req.params.day;
+  const semesterId = comboSemesterId(req);
   if (!req.file) {
-    return res.redirect(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('Please choose a file to import.'));
+    return res.redirect(appendSemester(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('Please choose a file to import.'), semesterId));
   }
   let rawRows;
   try {
     rawRows = await readRowsFromFile(req.file.buffer);
   } catch (err) {
-    return res.redirect(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
+    return res.redirect(appendSemester(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'), semesterId));
   }
 
   const rows = rawRows
@@ -621,12 +679,12 @@ router.post('/setup/:day/tasks/import', requireAdmin, requireClassDay, uploadTas
   let added = 0;
   for (const [rowDay, dayGroups] of grouped) {
     const sectionIdByTitle = new Map();
-    (await taskListSectionsForDay(rowDay)).forEach((s) => sectionIdByTitle.set(s.title.toLowerCase(), s.id));
+    (await taskListSectionsForDay(rowDay, semesterId)).forEach((s) => sectionIdByTitle.set(s.title.toLowerCase(), s.id));
     for (const [listKey, group] of dayGroups) {
       group.rows.sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity));
       let sectionId = sectionIdByTitle.get(listKey);
       if (!sectionId) {
-        sectionId = await createSection(rowDay, group.listTitle, null);
+        sectionId = await createSection(rowDay, group.listTitle, null, semesterId);
         sectionIdByTitle.set(listKey, sectionId);
       }
       for (const r of group.rows) {
@@ -636,12 +694,12 @@ router.post('/setup/:day/tasks/import', requireAdmin, requireClassDay, uploadTas
     }
   }
 
-  res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent(`Imported ${added} task(s).`));
+  res.redirect(appendSemester(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent(`Imported ${added} task(s).`), semesterId));
 });
 
 router.get('/setup/:day/tasks/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const sections = await taskListSectionsForDay(day);
+  const sections = await taskListSectionsForDay(day, await resolveSemesterId(comboSemesterId(req)));
   const lines = [toCsvRow(['List', 'Number', 'Task'])];
   sections.forEach((s) => {
     if (s.items.length === 0) {
@@ -659,7 +717,7 @@ router.get('/setup/:day/tasks/print', requireAdmin, requireClassDay, async (req,
     title: `${DAY_LABELS[day]} Task List`,
     day,
     dayLabel: DAY_LABELS[day],
-    sections: await taskListSectionsForDay(day),
+    sections: await taskListSectionsForDay(day, await resolveSemesterId(comboSemesterId(req))),
   });
 });
 

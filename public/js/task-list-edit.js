@@ -17,6 +17,7 @@
   const stack = document.querySelector('[data-task-list-form]');
   if (!stack) return;
   const day = stack.getAttribute('data-task-list-day');
+  const semesterId = document.getElementById('main-content')?.dataset.semesterId || '';
 
   function setEditing(card, editing) {
     card.querySelectorAll('[data-task-list-input]').forEach((el) => { el.readOnly = !editing; });
@@ -50,7 +51,7 @@
     card.querySelectorAll('[name^="itemDesc_"]').forEach((input) => { params.set(input.name, input.value); });
 
     try {
-      const res = await fetch(`/admin/setup/${day}/tasks/save`, {
+      const res = await fetch(`/admin/setup/${day}/tasks/save?semesterId=${encodeURIComponent(semesterId)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',

@@ -1,11 +1,11 @@
 <%# Fragment (no <html>/<head>/<body>) - fetched by public/js/setup-archive-view.js
     and injected into the Archive list page's shared #setup-archive-view-dialog.
     Mirrors views/volunteer-archive-view-fragment.ejs. Locals: day, dayLabel,
-    date, dateLabel, cards. %>
+    date, dateLabel, cards, semesterId. %>
 <div class="member-view-close-row volunteer-archive-actions-row">
   <div class="volunteer-archive-actions">
-    <a class="roster-action-btn file-action-btn condensed-btn" href="/admin/setup/<%= day %>/archive/<%= date %>/export.csv">Export</a>
-    <a class="roster-action-btn print-action-btn condensed-btn" href="/admin/setup/<%= day %>/archive/<%= date %>/print" target="_blank">Print</a>
+    <a class="roster-action-btn file-action-btn condensed-btn" href="/admin/setup/<%= day %>/archive/<%= date %>/export.csv?semesterId=<%= semesterId %>">Export</a>
+    <a class="roster-action-btn print-action-btn condensed-btn" href="/admin/setup/<%= day %>/archive/<%= date %>/print?semesterId=<%= semesterId %>" target="_blank">Print</a>
   </div>
   <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
 </div>

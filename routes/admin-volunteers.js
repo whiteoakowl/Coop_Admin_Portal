@@ -46,6 +46,7 @@ const {
   groupedTemporaryJobsForDayDate,
 } = require('../utils/substitutes');
 const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
+const { comboSemesterId, qsSemester, appendSemester, findComboId } = require('../utils/scheduleComboLinks');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
@@ -68,52 +69,6 @@ function dialogParam(req) {
   return EDIT_DIALOGS.includes(req.query.dialog) ? req.query.dialog : null;
 }
 
-// A real request: "I need to be able to switch between semester views on
-// floaters, setup cleanup, attendance, classes etc." - the new semester+
-// day combo picker's own selection, read back off ?semesterId= so every
-// route on this page (not just the GET page view - every POST action
-// too) stays scoped to the exact semester being viewed, never silently
-// falling back to whatever Settings > Kiosk has active. undefined (the
-// param isn't present at all) means "use the normal default" - every
-// Floater util function's own existing fallback to the active Kiosk
-// semester, unchanged for any link/bookmark that predates this picker.
-// 'none' (the picker's own value for an untagged combo) means "no
-// semester," explicitly distinct from "not specified."
-function comboSemesterId(req) {
-  const v = req.query.semesterId;
-  if (v === undefined) return undefined;
-  if (v === '' || v === 'none') return null;
-  const n = parseInt(v, 10);
-  return Number.isNaN(n) ? undefined : n;
-}
-// The inverse of comboSemesterId, for building a redirect/link's own
-// ?semesterId= value: undefined stays undefined (manageUrl's own
-// params-object filtering already drops it, so there's nothing to carry
-// forward), an explicit "no semester" becomes the picker's own 'none'.
-function qsSemester(semesterId) {
-  return semesterId === null ? 'none' : semesterId;
-}
-// Appends the current combo selection to a redirect/link URL so the next
-// page load (after a POST action, or a sub-tab link like Manage -> Teams)
-// stays on the same semester+day combo instead of resetting to whatever
-// the normal default would resolve to. No-ops when semesterId is
-// undefined (the admin never picked an explicit combo, so there's nothing
-// to carry forward) - manageUrl's own `params` object handles this same
-// job for the main manage page's own redirects, which already thread
-// arbitrary query params through.
-function appendSemester(url, semesterId) {
-  if (semesterId === undefined) return url;
-  const sep = url.includes('?') ? '&' : '?';
-  return `${url}${sep}semesterId=${qsSemester(semesterId)}`;
-}
-// The exact class_schedules row (if any) a day+resolved-semesterId pair
-// corresponds to - the combo picker preselects by this id rather than by
-// day/semesterId separately, so there's no risk of two combos somehow
-// looking selected at once.
-function findComboId(combos, day, semesterId) {
-  const match = combos.find((c) => c.day === day && c.semesterId === (semesterId ?? null));
-  return match ? match.id : null;
-}
 // A page like Risk that never calls getListByDay itself (it has no
 // volunteer_lists row of its own to read an authoritative .semester_id
 // back off, the way the picker preselects on every other Floater page)

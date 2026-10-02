@@ -5,7 +5,7 @@
 </head>
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
-  <main id="main-content" tabindex="-1" class="admin-main" data-day="<%= day %>">
+  <main id="main-content" tabindex="-1" class="admin-main" data-day="<%= day %>" data-semester-id="<%= semesterId %>">
     <div class="print-header">
       <img src="/img/logo.png" alt="" />
       <div>
@@ -16,18 +16,14 @@
 
     <h1>Setup/Cleanup</h1>
 
-    <%- include('partials/setup-tabs', { day, activeSetupTab: 'archive' }) %>
+    <%- include('partials/setup-tabs', { day, activeSetupTab: 'archive', semesterId }) %>
 
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">
-        <div class="day-toggle">
-          <% activeDays.forEach(function(d) { %>
-            <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/admin/setup/<%= d %>/archive"><%= dayLabels[d] %></a>
-          <% }); %>
-        </div>
+        <%- include('partials/schedule-combo-picker', { combos, basePrefix: '/admin/setup', pathSuffix: '/archive', selectedComboId }) %>
         <div class="category-filter" style="margin: 0;">
           <label for="setup-archive-date-select">Choose Date</label>
-          <select id="setup-archive-date-select" onchange="window.fullscreenNavigate('/admin/setup/<%= day %>/archive' + (this.value ? '?date=' + this.value : ''))">
+          <select id="setup-archive-date-select" onchange="window.fullscreenNavigate('/admin/setup/<%= day %>/archive?semesterId=<%= semesterId %>' + (this.value ? '&date=' + this.value : ''))">
             <option value="">All dates</option>
             <% dateOptions.forEach(function(d) { %>
               <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>

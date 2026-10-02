@@ -46,7 +46,7 @@ test('Setup/Cleanup Teams: Print button links to a dedicated preview page instea
 
   const manage = await request(app).get('/admin/setup/monday/manage').set('Cookie', cookie);
   assert.equal(manage.status, 200);
-  assert.match(manage.text, /href="\/admin\/setup\/monday\/teams\/print"[^>]*target="_blank"/, 'Print button should link to the preview page, not call window.print() on itself');
+  assert.match(manage.text, /href="\/admin\/setup\/monday\/teams\/print\?semesterId=[^"]*"[^>]*target="_blank"/, 'Print button should link to the preview page, not call window.print() on itself');
   assert.doesNotMatch(manage.text, /print-action-btn" onclick="window\.print\(\)"/, 'the old direct-to-print-dialog button should be gone');
 
   const preview = await request(app).get('/admin/setup/monday/teams/print').set('Cookie', cookie);

@@ -10,7 +10,7 @@
 </head>
 <body class="admin-page setup-teams-print-page">
   <%- include('partials/admin-nav') %>
-  <main id="main-content" tabindex="-1" class="admin-main">
+  <main id="main-content" tabindex="-1" class="admin-main" data-day="<%= day %>" data-semester-id="<%= semesterId %>">
     <div class="print-header">
       <img src="/img/logo.png" alt="" />
       <div>
@@ -24,26 +24,22 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <%- include('partials/setup-tabs', { day, activeSetupTab: 'teams' }) %>
+    <%- include('partials/setup-tabs', { day, activeSetupTab: 'teams', semesterId }) %>
 
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">
-        <div class="day-toggle">
-          <% activeDays.forEach(function(d) { %>
-            <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/admin/setup/<%= d %>/manage"><%= dayLabels[d] %></a>
-          <% }); %>
-        </div>
+        <%- include('partials/schedule-combo-picker', { combos, basePrefix: '/admin/setup', pathSuffix: '/manage', selectedComboId }) %>
         <div class="roster-btn-row roster-btn-row-fit-text">
           <button type="button" class="roster-action-btn" onclick="document.getElementById('new-team-dialog').showModal()">+ Create New Team</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
-          <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/export.csv">Export</a>
+          <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/export.csv?semesterId=<%= semesterId %>">Export</a>
           <%# A real bug report: "floater team and setup cleanup teams
               should have a print preview before going to print." Lands on
               a dedicated read-only preview page (admin-setup-teams-print.ejs)
               with its own Print button, instead of jumping straight to the
               OS print dialog off this live edit page. %>
-          <a class="roster-action-btn print-action-btn" href="/admin/setup/<%= day %>/teams/print" target="_blank">Print</a>
-          <a class="roster-action-btn" href="/admin/setup/<%= day %>/archive">Archive</a>
+          <a class="roster-action-btn print-action-btn" href="/admin/setup/<%= day %>/teams/print?semesterId=<%= semesterId %>" target="_blank">Print</a>
+          <a class="roster-action-btn" href="/admin/setup/<%= day %>/archive?semesterId=<%= semesterId %>">Archive</a>
         </div>
       </div>
 
@@ -98,12 +94,12 @@
                 <button type="button" class="icon-btn" data-edit-toggle-cancel hidden aria-label="Cancel editing <%= t.title %>" title="Cancel">
                   <svg class="icon"><use href="#icon-x-circle"/></svg>
                 </button>
-                <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/delete" class="inline-block-form" data-edit-toggle-reveal hidden data-confirm="Delete team &quot;<%= t.title %>&quot;? This cannot be undone.">
+                <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/delete?semesterId=<%= semesterId %>" class="inline-block-form" data-edit-toggle-reveal hidden data-confirm="Delete team &quot;<%= t.title %>&quot;? This cannot be undone.">
                   <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= t.title %>" title="Delete Team"><svg class="icon"><use href="#icon-trash"/></svg></button>
                 </form>
               </div>
               <span class="team-info-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
-              <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/edit" id="team-edit-form-<%= t.id %>" class="team-info-edit-form">
+              <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/edit?semesterId=<%= semesterId %>" id="team-edit-form-<%= t.id %>" class="team-info-edit-form">
                 <input type="text" name="title" class="team-info-title team-info-title-input" value="<%= t.title %>" required disabled />
                 <input type="text" name="description" class="team-info-desc-input" value="<%= t.description || '' %>" placeholder="Short description (optional)" disabled />
                 <%# A real report: "on the setup/cleanup team cards its
@@ -222,7 +218,7 @@
                         remove.js) and removes the row the moment the
                         server confirms it, with a confirm prompt first
                         since there's no more Cancel-before-Save undo. %>
-                    <button type="button" class="icon-btn" data-edit-toggle-reveal hidden data-member-instant-remove-btn data-member-remove-url="/admin/setup/<%= day %>/teams/<%= t.id %>/remove-member/<%= m.id %>" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    <button type="button" class="icon-btn" data-edit-toggle-reveal hidden data-member-instant-remove-btn data-member-remove-url="/admin/setup/<%= day %>/teams/<%= t.id %>/remove-member/<%= m.id %>?semesterId=<%= semesterId %>" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
                   </div>
                 <% }); %>
               </div>
@@ -244,7 +240,7 @@
     </div>
 
     <dialog id="new-team-dialog" class="member-picker-dialog">
-      <form method="POST" action="/admin/setup/<%= day %>/teams">
+      <form method="POST" action="/admin/setup/<%= day %>/teams?semesterId=<%= semesterId %>">
         <h3>Create New Team</h3>
         <input type="text" name="title" placeholder="Team title (e.g. Chairs &amp; Tables)" required />
         <input type="text" name="description" placeholder="Short description (optional)" />
@@ -272,7 +268,7 @@
     </dialog>
 
     <dialog id="add-member-dialog" class="member-picker-dialog">
-      <form method="POST" action="/admin/setup/<%= day %>/teams/add-member">
+      <form method="POST" action="/admin/setup/<%= day %>/teams/add-member?semesterId=<%= semesterId %>">
         <h3>Add Member to a Team</h3>
         <% if (teams.length === 0) { %>
           <p class="hint">Create a team above first.</p>

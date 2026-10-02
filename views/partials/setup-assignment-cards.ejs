@@ -150,7 +150,7 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
                         <span class="floater-card-unassigned">No suggestion</span>
                       <% } %>
                     <% } else if (slot.taskItemId) { %>
-                      <form method="POST" class="floater-assign-form" action="/admin/setup/<%= day %>/assignments/<%= m.id %>/task">
+                      <form method="POST" class="floater-assign-form" action="/admin/setup/<%= day %>/assignments/<%= m.id %>/task?semesterId=<%= typeof semesterId !== 'undefined' ? semesterId : '' %>">
                         <input type="hidden" name="date" value="<%= selectedDate %>" />
                         <input type="hidden" name="slot" value="<%= slot.num %>" />
                         <input type="hidden" name="taskItemId" value="" />
@@ -180,7 +180,7 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
                       </select>
                       <% if (slot.num === 1 && team.taskOptions.length === 0) { %><p class="hint">No task list linked to this team yet.</p><% } %>
                     <% } else { %>
-                      <form method="POST" class="floater-assign-form" action="/admin/setup/<%= day %>/assignments/<%= m.id %>/task">
+                      <form method="POST" class="floater-assign-form" action="/admin/setup/<%= day %>/assignments/<%= m.id %>/task?semesterId=<%= typeof semesterId !== 'undefined' ? semesterId : '' %>">
                         <input type="hidden" name="date" value="<%= selectedDate %>" />
                         <input type="hidden" name="slot" value="<%= slot.num %>" />
                         <select name="taskItemId">

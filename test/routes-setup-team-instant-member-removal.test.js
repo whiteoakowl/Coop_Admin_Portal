@@ -54,7 +54,7 @@ test('Setup/Cleanup Teams card markup: the trash icon posts straight to its own 
   const res = await request(app).get('/admin/setup/monday/manage').set('Cookie', cookie);
   assert.match(
     res.text,
-    new RegExp(`data-edit-toggle-reveal hidden data-member-instant-remove-btn data-member-remove-url="/admin/setup/monday/teams/${teamId}/remove-member/${memberId}"`)
+    new RegExp(`data-edit-toggle-reveal hidden data-member-instant-remove-btn data-member-remove-url="/admin/setup/monday/teams/${teamId}/remove-member/${memberId}\\?semesterId=`)
   );
   assert.doesNotMatch(res.text, /name="removeMemberIds"/, 'the old stage-until-Save checkbox should be gone from this card');
   assert.match(res.text, /<script src="\/js\/team-member-instant-remove\.js"><\/script>/);

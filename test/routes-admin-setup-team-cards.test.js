@@ -177,7 +177,7 @@ test('Setup/Cleanup team card: leader on its own row, meeting time/location shar
   // the literal substring "team-edit-form-<id>"", which also appears
   // earlier in the card as the corner Save button's own form="..."
   // attribute, well before this form's real content).
-  const cardMatch = new RegExp(`<form method="POST" action="[^"]*teams/${withMeta.lastInsertRowid}/edit" id="team-edit-form-${withMeta.lastInsertRowid}"[\\s\\S]*?</form>`).exec(res.text);
+  const cardMatch = new RegExp(`<form method="POST" action="[^"]*teams/${withMeta.lastInsertRowid}/edit[^"]*" id="team-edit-form-${withMeta.lastInsertRowid}"[\\s\\S]*?</form>`).exec(res.text);
   assert.ok(cardMatch, 'expected to find this team\'s own edit form');
   const cardHtml = cardMatch[0];
   // There are exactly two .team-info-meta-row wrappers now (leader's own

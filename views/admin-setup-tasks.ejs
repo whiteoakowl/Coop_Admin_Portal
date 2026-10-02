@@ -5,7 +5,7 @@
 </head>
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
-  <main id="main-content" tabindex="-1" class="admin-main">
+  <main id="main-content" tabindex="-1" class="admin-main" data-day="<%= day %>" data-semester-id="<%= semesterId %>">
     <div class="print-header">
       <img src="/img/logo.png" alt="" />
       <div>
@@ -19,21 +19,17 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <%- include('partials/setup-tabs', { day, activeSetupTab: 'tasks' }) %>
+    <%- include('partials/setup-tabs', { day, activeSetupTab: 'tasks', semesterId }) %>
 
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">
-        <div class="day-toggle">
-          <% activeDays.forEach(function(d) { %>
-            <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/admin/setup/<%= d %>/tasks"><%= dayLabels[d] %></a>
-          <% }); %>
-        </div>
+        <%- include('partials/schedule-combo-picker', { combos, basePrefix: '/admin/setup', pathSuffix: '/tasks', selectedComboId }) %>
         <div class="roster-btn-row roster-btn-row-fit-text">
           <button type="button" class="roster-action-btn" onclick="document.getElementById('new-list-dialog').showModal()">+ Add New List</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('new-task-dialog').showModal()">+ Add New Task</button>
           <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('task-import-dialog').showModal()">Import</button>
-          <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/tasks/export.csv">Export</a>
-          <a class="roster-action-btn print-action-btn" href="/admin/setup/<%= day %>/tasks/print" target="_blank">Print</a>
+          <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/tasks/export.csv?semesterId=<%= semesterId %>">Export</a>
+          <a class="roster-action-btn print-action-btn" href="/admin/setup/<%= day %>/tasks/print?semesterId=<%= semesterId %>" target="_blank">Print</a>
         </div>
       </div>
 
@@ -58,7 +54,7 @@
                     sectionTitle_/itemDesc_ keys it's given). %>
                 <button type="button" class="icon-btn" data-task-list-edit-btn aria-label="Edit list &quot;<%= s.title %>&quot;" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
                 <button type="button" class="icon-btn" data-task-list-save-btn hidden aria-label="Save list &quot;<%= s.title %>&quot;" title="Save"><svg class="icon"><use href="#icon-check"/></svg></button>
-                <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/delete" class="inline-block-form" data-task-list-edit-only hidden data-confirm="Delete list &quot;<%= s.title %>&quot;? This cannot be undone.">
+                <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/delete?semesterId=<%= semesterId %>" class="inline-block-form" data-task-list-edit-only hidden data-confirm="Delete list &quot;<%= s.title %>&quot;? This cannot be undone.">
                   <button type="submit" class="icon-btn" aria-label="Delete list" title="Delete List"><svg class="icon"><use href="#icon-trash"/></svg></button>
                 </form>
               </div>
@@ -91,7 +87,7 @@
                       <td class="task-list-num-col"><%= item.number %></td>
                       <td><input type="text" name="itemDesc_<%= item.id %>" value="<%= item.description %>" class="task-list-desc-input" data-task-list-input readonly /></td>
                       <td class="no-print actions-cell">
-                        <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/items/<%= item.id %>/delete" class="inline-block-form" data-confirm="Delete this task?">
+                        <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/items/<%= item.id %>/delete?semesterId=<%= semesterId %>" class="inline-block-form" data-confirm="Delete this task?">
                           <button type="submit" class="icon-btn" aria-label="Delete task" title="Delete Task"><svg class="icon"><use href="#icon-trash"/></svg></button>
                         </form>
                       </td>
@@ -106,7 +102,7 @@
     </div>
 
     <dialog id="new-list-dialog" class="member-picker-dialog">
-      <form method="POST" action="/admin/setup/<%= day %>/tasks/new">
+      <form method="POST" action="/admin/setup/<%= day %>/tasks/new?semesterId=<%= semesterId %>">
         <h3>Add New List</h3>
         <input type="text" name="title" placeholder="List title (e.g. Chairs & Tables)" required />
         <label>Link to a Team (optional)
@@ -123,7 +119,7 @@
     </dialog>
 
     <dialog id="new-task-dialog" class="member-picker-dialog">
-      <form method="POST" action="/admin/setup/<%= day %>/tasks/add-item">
+      <form method="POST" action="/admin/setup/<%= day %>/tasks/add-item?semesterId=<%= semesterId %>">
         <h3>Add New Task</h3>
         <% if (sections.length === 0) { %>
           <p class="hint">Create a list above first.</p>
@@ -146,7 +142,7 @@
     </dialog>
 
     <dialog id="task-import-dialog" class="member-picker-dialog">
-      <form method="POST" action="/admin/setup/<%= day %>/tasks/import" enctype="multipart/form-data">
+      <form method="POST" action="/admin/setup/<%= day %>/tasks/import?semesterId=<%= semesterId %>" enctype="multipart/form-data">
         <h3>Import Tasks</h3>
         <a class="btn-secondary import-sample-link" href="/admin/setup/<%= day %>/tasks/import-template.xlsx">Download Sample File</a>
         <input type="file" name="file" accept=".csv,.txt,.xlsx" required />

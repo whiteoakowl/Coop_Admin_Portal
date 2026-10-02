@@ -381,7 +381,7 @@ test('Setup/Cleanup Teams page gained an Archive button and the shared 4-tab bar
   const { cookie } = await loginAsAdmin();
   const res = await request(app).get('/admin/setup/monday/manage').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /href="\/admin\/setup\/monday\/archive">Archive</);
+  assert.match(res.text, /href="\/admin\/setup\/monday\/archive\?semesterId=[^"]*">Archive</);
   assert.match(res.text, /Setup\/Cleanup Assignments/);
   assert.match(res.text, /Setup\/Cleanup Teams/);
   assert.match(res.text, /Task List/);
