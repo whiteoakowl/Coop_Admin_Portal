@@ -62,13 +62,24 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
             filtering both Grid and List views by whichever semester a
             class is tagged with. %>
         <% if (typeof semesters !== 'undefined' && semesters.length > 0) { %>
+          <%
+          // A real request: "I need to be able to switch between semester
+          // views on... classes." The new Semester/Day combo picker above
+          // the grid (admin-schedule.ejs) navigates here with its own
+          // ?semesterId= already set - pre-selects this filter to match
+          // (public/js/class-schedule-filters.js applies it once on load
+          // too, see that file's own comment) so the combo picker and this
+          // older, narrower per-grid filter never show two different
+          // answers to "which semester am I looking at" at once.
+          var filterSelected = typeof selectedSemesterId !== 'undefined' ? String(selectedSemesterId) : '';
+          %>
           <div class="category-filter">
             <label for="class-schedule-semester-select-<%= day %>">Semester</label>
             <select id="class-schedule-semester-select-<%= day %>" data-class-schedule-semester-filter="<%= day %>">
-              <option value="">All Semesters</option>
-              <option value="none">No Semester</option>
+              <option value="" <%= filterSelected === '' ? 'selected' : '' %>>All Semesters</option>
+              <option value="none" <%= filterSelected === 'none' ? 'selected' : '' %>>No Semester</option>
               <% semesters.forEach(function(s) { %>
-                <option value="<%= s.id %>"><%= s.title %></option>
+                <option value="<%= s.id %>" <%= filterSelected === String(s.id) ? 'selected' : '' %>><%= s.title %></option>
               <% }); %>
             </select>
           </div>

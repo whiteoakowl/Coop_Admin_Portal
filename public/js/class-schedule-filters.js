@@ -71,6 +71,20 @@
     applyFilters(day);
   });
 
+  // A real request: "I need to be able to switch between semester views
+  // on... classes." The new Semester/Day combo picker (routes/admin-
+  // schedule.js, views/admin-schedule.ejs) navigates here with
+  // ?semesterId= already set, which the Semester filter's own <select>
+  // (views/partials/class-schedule-grid.ejs) pre-selects server-side -
+  // this filter has only ever RUN on its own change event though, so
+  // without this, the dropdown would show the right semester selected
+  // but every class would still be visible until the admin touched some
+  // other filter first. Runs once for whichever day's filter panel is
+  // actually on the page.
+  document.querySelectorAll('[data-class-schedule-semester-filter]').forEach((select) => {
+    applyFilters(select.getAttribute('data-class-schedule-semester-filter'));
+  });
+
   // Close the Filter dropdown on an outside click, same "click anywhere
   // else closes it" affordance every other popup in this app already has.
   document.addEventListener('click', function (e) {

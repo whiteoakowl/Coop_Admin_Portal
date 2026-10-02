@@ -21,16 +21,17 @@
 
     <div class="view-tab-panel">
       <% if (typeof activeDays !== 'undefined') { %>
-        <%# A real request: "Full 7 day expansion so multiple semesters
-            can be created and managed... now day settings." This toggle
-            used to be a hardcoded Monday/Wednesday pair - it's now every
-            day activated on Settings > Day Settings, in calendar order. %>
-        <div class="day-toggle no-print schedule-day-toggle">
-          <% activeDays.forEach(function(d) { %>
-            <a class="day-toggle-option<%= tab === d ? ' active' : '' %>" href="/admin/schedule?tab=<%= d %>"><%= classDayLabels[d] %></a>
-          <% }); %>
-        </div>
-        <%- include('partials/class-schedule-grid', { day, dayLabel, activeDays, classDayLabels, error, notice, selectedDate, hours, roomGrid, rooms, gradeLevels, ageOptions, colorPalette, availableStaff, sections, absentIds, basePath: `/admin/schedule?tab=${tab}`, readOnly: !isFullAdmin }) %>
+        <%# A real request: "I need to be able to switch between semester
+            views on... classes. Drop down on all these pages should be
+            fall 2026 - Monday, fall 2026 Wednesday." Replaces the plain
+            Monday/Wednesday day-toggle (itself a real request: "Full 7
+            day expansion... now day settings" - every day activated on
+            Settings > Day Settings, in calendar order) with the same
+            semester+day combo picker Floater Assignments/Setup-Cleanup
+            use, in its ?tab= query-param flavor (see partials/schedule-
+            combo-picker.ejs's own dayQueryUrl local). %>
+        <%- include('partials/schedule-combo-picker', { combos, selectedComboId, dayQueryUrl: '/admin/schedule?tab=' }) %>
+        <%- include('partials/class-schedule-grid', { day, dayLabel, activeDays, classDayLabels, error, notice, selectedDate, hours, roomGrid, rooms, gradeLevels, ageOptions, colorPalette, availableStaff, sections, absentIds, selectedSemesterId, basePath: `/admin/schedule?tab=${tab}&semesterId=${selectedSemesterId}`, readOnly: !isFullAdmin }) %>
       <% } else if (tab === 'archive') { %>
         <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
         <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

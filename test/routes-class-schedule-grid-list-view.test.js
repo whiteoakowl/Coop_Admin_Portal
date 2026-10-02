@@ -49,10 +49,13 @@ test('the list view lists every class alphabetically, and the day pill/hour drop
   const res = await request(app).get('/admin/schedule?tab=monday').set('Cookie', cookie);
   assert.equal(res.status, 200);
 
-  // Monday/Wednesday pill toggle still there.
-  assert.match(res.text, /schedule-day-toggle/);
-  assert.match(res.text, />Monday<\/a>/);
-  assert.match(res.text, />Wednesday<\/a>/);
+  // The plain Monday/Wednesday day-toggle pill is now the semester+day
+  // combo picker (a real request: "I need to be able to switch between
+  // semester views on... classes. Drop down on all these pages should be
+  // fall 2026 - Monday, fall 2026 Wednesday").
+  assert.match(res.text, /schedule-combo-picker/);
+  assert.match(res.text, />Monday<\/option>/);
+  assert.match(res.text, />Wednesday<\/option>/);
 
   // The Grid/List view toggle buttons and the Hour filter dropdown.
   assert.match(res.text, /data-class-schedule-view-btn="grid"/);

@@ -14,19 +14,27 @@
 // public Kiosk screens are deliberately unaffected by what an admin
 // happens to be looking at here).
 //
-// Locals: combos (listScheduleCombos() output), basePrefix (e.g.
-// "/admin/volunteers"), pathSuffix (e.g. "/manage"), selectedComboId
-// (the exact class_schedules.id currently being viewed - matching by id
+// Locals: combos (listScheduleCombos() output), selectedComboId (the
+// exact class_schedules.id currently being viewed - matching by id
 // rather than by day/semesterId separately means two combos that somehow
 // share a day+semester pair, which shouldn't happen, still can't both
-// look selected).
+// look selected), plus ONE of two URL shapes depending on the page:
+//   - Floater/Setup-Cleanup's own /:day/ path style: basePrefix (e.g.
+//     "/admin/volunteers") + pathSuffix (e.g. "/manage"), giving
+//     "/admin/volunteers/monday/manage?semesterId=5".
+//   - Classes' own ?tab=<day> query style: dayQueryUrl (e.g.
+//     "/admin/schedule?tab=") - the day is appended directly after it,
+//     giving "/admin/schedule?tab=monday&semesterId=5".
 function comboHref(combo) {
-  return basePrefix + '/' + combo.day + pathSuffix + '?semesterId=' + (combo.semesterId == null ? 'none' : combo.semesterId);
+  var semesterQS = combo.semesterId == null ? 'none' : combo.semesterId;
+  if (typeof dayQueryUrl !== 'undefined') return dayQueryUrl + combo.day + '&semesterId=' + semesterQS;
+  return basePrefix + '/' + combo.day + pathSuffix + '?semesterId=' + semesterQS;
 }
+var pickerId = 'schedule-combo-picker-' + (typeof dayQueryUrl !== 'undefined' ? 'tab' : pathSuffix.replace(/\//g, ''));
 %>
 <div class="category-filter schedule-combo-picker-wrap">
-  <label for="schedule-combo-picker-<%= pathSuffix.replace(/\//g, '') %>">Semester / Day</label>
-  <select id="schedule-combo-picker-<%= pathSuffix.replace(/\//g, '') %>" class="schedule-combo-picker" onchange="window.fullscreenNavigate(this.value)">
+  <label for="<%= pickerId %>">Semester / Day</label>
+  <select id="<%= pickerId %>" class="schedule-combo-picker" onchange="window.fullscreenNavigate(this.value)">
     <% combos.forEach(function(combo) { %>
       <option value="<%= comboHref(combo) %>" <%= combo.id === selectedComboId ? 'selected' : '' %>><%= combo.label %></option>
     <% }); %>

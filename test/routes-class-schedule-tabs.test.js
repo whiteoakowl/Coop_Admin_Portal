@@ -49,7 +49,10 @@ async function loginAsAdmin() {
 function assertHasTabsAndToggle(html) {
   assert.match(html, /Class Schedules<\/a>/, 'the Class/Member Schedules tab bar should be present');
   assert.match(html, /Member Schedules<\/a>/);
-  assert.match(html, /class="day-toggle no-print schedule-day-toggle"/, 'the Monday/Wednesday pill toggle should be present');
+  // The plain Monday/Wednesday pill toggle is now the semester+day combo
+  // picker (a real request: "I need to be able to switch between
+  // semester views on... classes").
+  assert.match(html, /class="schedule-combo-picker"/, 'the semester+day combo picker should be present');
 }
 
 test('the bare /admin/class-schedule/:day route redirects to the real tabbed page', async (t) => {

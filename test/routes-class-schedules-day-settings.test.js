@@ -80,7 +80,10 @@ test('Adding a Tuesday day schedule makes it a real Classes grid tab, with Add C
 
   const gridPage = await request(app).get('/admin/schedule?tab=tuesday').set('Cookie', admin.cookie);
   assert.equal(gridPage.status, 200);
-  assert.match(gridPage.text, />Tuesday<\/a>/, 'Tuesday should be a real tab now, alongside Monday/Wednesday');
+  // The plain day-toggle pill is now the semester+day combo picker (a
+  // real request: "I need to be able to switch between semester views
+  // on... classes").
+  assert.match(gridPage.text, />Tuesday<\/option>/, 'Tuesday should be a real tab now, alongside Monday/Wednesday');
   assert.match(gridPage.text, />Monday<\/a>/);
   assert.match(gridPage.text, />Wednesday<\/a>/);
 

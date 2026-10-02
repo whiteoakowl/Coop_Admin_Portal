@@ -47,7 +47,9 @@ const {
   deleteSemester,
   classGlobalSettings,
   saveClassGlobalSettings,
+  listScheduleCombos,
 } = require('../utils/classSchedule');
+const { comboSemesterId, qsSemester, findComboId } = require('../utils/scheduleComboLinks');
 const { countMissingSemesterData, totalMissing, assignMissingSemesterData } = require('../utils/semesterAssignment');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
@@ -87,6 +89,24 @@ const ARCHIVE_TYPES = ['class', 'student', 'parent'];
 const MEMBER_TYPE_FILTERS = ['student', 'parent'];
 const PAGE_SIZE = 25;
 
+// A real request: "I need to be able to switch between semester views
+// on... classes." The Classes grid itself still loads every class for
+// the day regardless of semester and filters client-side (the Filter
+// popup's own Semester dropdown, public/js/class-schedule-filters.js) -
+// not yet converted to a real per-semester query, unlike Floater
+// Assignments/Setup-Cleanup's own full per-combo data swap. The new
+// Semester/Day combo picker above the grid still gives the same "Fall
+// 2026 - Monday" navigation everywhere else has, by pre-selecting that
+// same Filter dropdown to match (see class-schedule-grid.ejs's own
+// comment) rather than re-querying. resolveSemesterId mirrors routes/
+// admin-setup.js's own helper, for pages here (Settings' own Day
+// Settings/General tabs, Risk-equivalent spots) that need the combo
+// picker's effective semester without a single authoritative row of
+// their own to read it back off.
+async function resolveSemesterId(semesterId) {
+  return semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+}
+
 router.get('/schedule', requireAdmin, async (req, res) => {
   // A real request: "merge Parent + Student Schedules tabs into 'Member
   // Schedules' with filter popup" - the two separate top-level tabs are
@@ -123,6 +143,8 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   if (CLASS_DAYS.includes(tab)) {
     const selectedDate = isValidISODate(req.query.date) ? req.query.date : defaultDateFor(tab);
     const missingSemesterBreakdown = res.locals.isFullAdmin ? await countMissingSemesterData() : null;
+    const combos = await listScheduleCombos();
+    const resolvedSemesterId = await resolveSemesterId(comboSemesterId(req));
     return res.render('admin-schedule', {
       title: 'Schedules',
       tab,
@@ -131,6 +153,9 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       dayLabel: CLASS_DAY_LABELS[tab],
       activeDays,
       classDayLabels: CLASS_DAY_LABELS,
+      combos,
+      selectedComboId: findComboId(combos, tab, resolvedSemesterId),
+      selectedSemesterId: qsSemester(resolvedSemesterId),
       hours: await hoursForDay(tab),
       roomGrid: await roomGridForDay(tab),
       rooms: await roomsForDay(tab),
