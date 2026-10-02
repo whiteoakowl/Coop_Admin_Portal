@@ -39,7 +39,23 @@
       { href: '/admin/volunteers', icon: 'users', label: 'Floater Assignments' },
       { href: '/admin/setup', icon: 'broom', label: 'Setup/Cleanup' },
       { href: '/admin/schedule', icon: 'clock', match: '/admin/class-schedule', label: 'Classes', subpages: [
-        { href: '/admin/schedule?tab=monday', label: 'Class Schedules' },
+        // A real bug report: "co-op main menu, classes page should have
+        // blue bubble dropdown menu next to title for subpages" - public/
+        // js/page-tabs.js's own findCurrentSectionDialog only matches a
+        // subpage link whose own href EXACTLY mirrors the current URL -
+        // either the same query params, or (its fallback) a BARE href
+        // with no query string at all matched against a bare current URL.
+        // GET /admin/schedule with no ?tab= at all renders the Monday
+        // tab directly (routes/admin-schedule.js's own `tab = ... :
+        // 'monday'` default), without ever redirecting the address bar
+        // to ?tab=monday - so with every single subpage link here
+        // carrying its own ?tab=, NONE of them could ever match that bare
+        // URL, and the title's own Menu dropdown silently never appeared.
+        // A bare href on the one subpage that actually IS this route's
+        // own default (matching Shop's/Communication's own identical
+        // "first entry has no query string" convention, both already
+        // working) fixes it without touching the route itself.
+        { href: '/admin/schedule', label: 'Class Schedules' },
         ...(isFullAdmin ? [
           { href: '/admin/schedule?tab=members', label: 'Member Schedules' },
           { href: '/admin/schedule?tab=archive', label: 'Archive' },
@@ -47,7 +63,11 @@
         ] : []),
       ] },
       { href: '/admin/logs', icon: 'clipboard-list', label: 'Logs', subpages: [
-        { href: '/admin/logs?tab=absence', label: 'Absence/Late Log' },
+        // Same bug/fix as Classes' own identical comment above - GET
+        // /admin/logs with no ?tab= renders the Absence/Late tab
+        // directly (routes/admin-logs.js's own `tab = ... : 'absence'`
+        // default) without ever redirecting to ?tab=absence.
+        { href: '/admin/logs', label: 'Absence/Late Log' },
         { href: '/admin/logs?tab=checkinout', label: 'Co-op Check-In/Out Log' },
         { href: '/admin/logs?tab=classcheckinout', label: 'Class Check-In/Out Log' },
         { href: '/admin/logs?tab=nametag', label: 'Name Tag Requests' },
@@ -63,7 +83,11 @@
       // Admin's own Members nav (portal-nav.ejs) still has its Archive tab.
       { href: '/admin/members', icon: 'user-check', label: 'Members' },
       { href: '/admin/library', icon: 'book', label: 'Library', subpages: [
-        { href: '/admin/library?tab=checkin', label: 'Check In' },
+        // Same bug/fix as Classes' own identical comment above - GET
+        // /admin/library with no ?tab= renders the Check In tab directly
+        // (routes/admin-library.js's own `tab = ... : 'checkin'` default)
+        // without ever redirecting to ?tab=checkin.
+        { href: '/admin/library', label: 'Check In' },
         { href: '/admin/library?tab=checkout', label: 'Check Out' },
         { href: '/admin/library?tab=members', label: 'Library Log' },
         { href: '/admin/library?tab=titles', label: 'Catalog' },

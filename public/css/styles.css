@@ -423,7 +423,14 @@ textarea:focus-visible,
 }
 .home-staff-login:hover { color: var(--brand-dark); }
 
-.documents-grid { justify-content: flex-start; }
+/* A real bug report: "add documents button overlaps the documents." -
+   .grid-box-header (the Documents h1 + Add/Edit Documents button row)
+   has no bottom margin of its own - each page using it is expected to
+   space its OWN next element (different pages put a table, a form, a
+   grid below it), but this page's own .documents-grid never did, so the
+   button sat flush against the very top of the first document card
+   right below it. */
+.documents-grid { justify-content: flex-start; margin-top: 1.5rem; }
 
 /* A real request (Parent Portal Documents, mobile): "document card/
    buttons should be centered on the screen and smaller." .documents-grid
@@ -7083,7 +7090,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-schedule-room-grid tr.room-row-dragging { opacity: 0.55; background: var(--brand-soft); }
 .class-schedule-room-grid .class-card { max-width: none; margin-bottom: 0.4rem; }
 .class-schedule-room-grid .class-card:last-child { margin-bottom: 0; }
+/* A real bug report (Playground Attendance list): "Wednesday is too
+   close to everything. It should have some space between rows" -
+   margin-bottom only meant a section's heading sat flush against
+   whatever the PREVIOUS section's own last row left behind (here,
+   Monday's own list of hours, with no bottom margin of its own) -
+   "Wednesday" the heading and "Monday"'s last row touched directly. A
+   :not(:first-child) guard keeps a container's own FIRST heading
+   (Admin Dashboard's own Alert Log sections, Logs' own per-hour
+   Substitutes board - both reuse this same class) flush with the
+   container's own top padding instead of double-spacing it. */
 .class-schedule-hour-label { margin: 0 0 0.6rem; font-size: 1.1rem; color: var(--brand-dark); }
+.class-schedule-hour-label:not(:first-child) { margin-top: 1.5rem; }
 .class-card-row { display: flex; flex-wrap: wrap; gap: 1rem; }
 .class-card {
   flex: 1 1 220px;

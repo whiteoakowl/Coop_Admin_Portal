@@ -49,6 +49,24 @@ test('the Playground tab appears in the Attendance tab bar and lists all 8 (day,
   }
 });
 
+// A real bug report: "playground attendance page title should be
+// playground attendance" - the page's own <h1> fell through to the plain
+// "Attendance" every other multi-day view (Class Rosters, Archive) uses,
+// not naming Playground specifically.
+test('the Playground list page\'s own title says "Playground Attendance", not just "Attendance"', async () => {
+  const cookie = await loginAsAdmin();
+  const res = await request(app).get('/admin/rosters?tab=playground').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /<h1>Playground Attendance<\/h1>/);
+});
+
+test('a specific Playground hour\'s log page keeps the same "Playground Attendance" title', async () => {
+  const cookie = await loginAsAdmin();
+  const res = await request(app).get('/admin/rosters?tab=playground-monday-1').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /<h1>Playground Attendance<\/h1>/);
+});
+
 test('a specific playground hour shows a Session Date dropdown and today\'s log', async () => {
   const cookie = await loginAsAdmin();
   const today = todayISO();

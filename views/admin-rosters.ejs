@@ -19,9 +19,13 @@
         attendance page it should say wednesday attendance." Only the
         day-scoped grid view (Parent/Student/class tabs, all of which
         carry a real `day`) has a single day to name this way - the
-        Classes list, Playground list, and Attendance Archive views span
-        both days at once, so they keep the plain "Attendance" title. %>
-    <h1><%= view === 'grid' ? `${dayLabel} Attendance` : 'Attendance' %></h1>
+        Classes list and Attendance Archive views span both days at once,
+        so they keep the plain "Attendance" title. A later real request:
+        "playground attendance page title should be playground
+        attendance" - playgroundList/playgroundLog both span both days
+        too (same reasoning), but are their own distinct page, not just
+        "Attendance" generically. %>
+    <h1><%= view === 'grid' ? `${dayLabel} Attendance` : (view === 'playgroundList' || view === 'playgroundLog') ? 'Playground Attendance' : 'Attendance' %></h1>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

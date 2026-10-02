@@ -117,7 +117,7 @@ test('Mobile orange bar: every subpages-bearing item gets its own popup trigger 
     { slug: 'resource-links', tabCount: 2 },
     { slug: 'business-directory', tabCount: 3 },
     { slug: 'classifieds', tabCount: 3 },
-    { slug: 'shop', tabCount: 4 },
+    { slug: 'shop', tabCount: 5 },
     { slug: 'babysitters', tabCount: 3 },
   ];
   sections.forEach(({ slug, tabCount }) => {
