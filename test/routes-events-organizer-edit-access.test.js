@@ -127,7 +127,7 @@ test('an organizer-parent can open the builder, sees Parent Portal nav, no Cance
   const financePage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', organizer.cookie);
   assert.equal(financePage.status, 200);
   assert.match(financePage.text, /name="accountingCategoryId" disabled/);
-  assert.match(financePage.text, /name="paymentInstructionsTitle"[^>]*disabled/);
+  assert.match(financePage.text, /name="paymentInstructionsText"[^>]*disabled/);
   assert.doesNotMatch(financePage.text, />Save Finance</);
 });
 
@@ -157,10 +157,10 @@ test('an organizer-parent can save Details (title) but is rejected saving Financ
     .post(`/main-admin/events/${eventId}/finance`)
     .set('Cookie', organizer.cookie)
     .type('form')
-    .send({ paymentInstructionsTitle: 'Hacked', _csrf: organizerCsrf });
+    .send({ paymentInstructionsText: 'Hacked', _csrf: organizerCsrf });
   assert.equal(saveFinance.status, 403);
-  const eventAfter = await db.prepare('SELECT payment_instructions_title FROM events WHERE id = ?').get(eventId);
-  assert.notEqual(eventAfter.payment_instructions_title, 'Hacked');
+  const eventAfter = await db.prepare('SELECT payment_instructions_text FROM events WHERE id = ?').get(eventId);
+  assert.notEqual(eventAfter.payment_instructions_text, 'Hacked');
 });
 
 test('an organizer-parent is rejected publishing, cancelling, or deleting the event', async () => {

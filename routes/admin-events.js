@@ -715,16 +715,15 @@ router.post('/:id', async (req, res) => {
 // Event Details into their own Finance tab. Same "spread the existing row,
 // override just this tab's own fields" guarantee as every other builder
 // tab's save.
-// A real bug report: "the only things under finance are accounting
-// category, payment title and payment instructions. Ticket pricing is
-// gone." An earlier real request ("accounting category drop is all
-// that is now needed above ticket types") dropped Price/Charged Per
-// from this form on the assumption Ticket Types fully replaced them -
-// they don't: utils/events.js's own chargeForConfirmedRegistration
-// still falls back to event.price_cents/price_per whenever a
-// registrant doesn't pick a specific Ticket Type, which is every
-// registrant for an event with no ticket types added at all. Restored
-// here, saved alongside everything else this tab already owns.
+// A real request: "Price, charged per person, and payment title are not
+// needed. All pricing will happen with adding ticket pricing, even if it
+// is only one ticket." Neither priceCents/pricePer nor
+// paymentInstructionsTitle are overridden here any more - the form no
+// longer submits them at all, and eventDataFromRow's own spread above
+// already preserves whatever an event's existing values happen to be
+// (same "retired but not reset" treatment as any other column a form
+// stops touching), so an older event that already had one isn't silently
+// wiped out either.
 router.post('/:id/finance', async (req, res) => {
   const id = req.params.id;
   const event = await events.getEvent(id);
@@ -732,9 +731,6 @@ router.post('/:id/finance', async (req, res) => {
   await events.updateEvent(id, {
     ...eventDataFromRow(event),
     accountingCategoryId: req.body.accountingCategoryId ? parseInt(req.body.accountingCategoryId, 10) : null,
-    priceCents: req.body.priceDollars ? Math.round(parseFloat(req.body.priceDollars) * 100) : null,
-    pricePer: req.body.pricePer === 'family' ? 'family' : 'person',
-    paymentInstructionsTitle: (req.body.paymentInstructionsTitle || '').trim(),
     paymentInstructionsText: (req.body.paymentInstructionsText || '').trim(),
   });
   res.redirect(`/main-admin/events/${id}/builder?tab=finance&notice=` + encodeURIComponent('Finance saved.'));

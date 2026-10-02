@@ -186,21 +186,17 @@ test('Events builder: Finance tab saves Accounting Category without touching Det
 
   const financePage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
   assert.equal(financePage.status, 200);
-  // A real bug report ("the only things under finance are accounting
-  // category, payment title and payment instructions. Ticket pricing is
-  // gone") restored the flat Price/Charged Per fields to this form -
-  // utils/events.js's own chargeForConfirmedRegistration still falls back
-  // to them whenever a registrant doesn't pick a specific Ticket Type, so
-  // removing them (an earlier real request's doing) left no way to price
-  // an event with no ticket types at all. See test/routes-main-admin-
-  // events-finance-tickets-accounting.test.js for full save/persist
-  // coverage of these two fields - this just confirms they're on the
-  // actual Finance form, not just the separate Add Ticket Type dialog
-  // further down the page (which has its own same-named fields).
+  // A real request: "Price, charged per person, and payment title are not
+  // needed. All pricing will happen with adding ticket pricing, even if
+  // it is only one ticket." The flat Price/Charged Per fields are gone
+  // from the Finance form itself for good (the separate Add Ticket Type
+  // dialog further down the page still has its own same-named fields) -
+  // see test/routes-main-admin-events-finance-tickets-accounting.test.js
+  // for the full Finance-tab-contents coverage.
   const financeFormMatch = /<form method="POST" action="\/main-admin\/events\/\d+\/finance"[^>]*>([\s\S]*?)<\/form>/.exec(financePage.text);
   assert.ok(financeFormMatch, 'the Finance form should exist');
-  assert.match(financeFormMatch[1], /name="priceDollars"/);
-  assert.match(financeFormMatch[1], /name="pricePer"/);
+  assert.doesNotMatch(financeFormMatch[1], /name="priceDollars"/);
+  assert.doesNotMatch(financeFormMatch[1], /name="pricePer"/);
   assert.match(financeFormMatch[1], /name="accountingCategoryId"/);
 
   await request(app)

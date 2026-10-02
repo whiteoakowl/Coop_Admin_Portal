@@ -333,38 +333,27 @@
               <% }); %>
             </select>
           </label>
-          <%# A real bug report: "the only things under finance are
-              accounting category, payment title and payment instructions.
-              Ticket pricing is gone." These two fields (event.price_cents/
-              price_per) were dropped from this form by an earlier real
-              request ("accounting category drop is all that is now needed
-              above ticket types") on the assumption Ticket Types fully
-              replaced them - but utils/events.js's own
-              chargeForConfirmedRegistration still charges THIS price
-              whenever a registrant doesn't pick a specific Ticket Type
-              (the common case for an event with no ticket types added at
-              all, e.g. one simple flat-price event) - it was never
-              actually retired, just made invisible/un-editable here. Set
-              during event creation (the wizard's own Tickets step) and
-              otherwise stuck forever with no way to see or change it. %>
-          <label>Price ($) <span class="hint">(blank = free; charged when a registrant doesn't pick a specific Ticket Type below)</span>
-            <input type="number" name="priceDollars" min="0" step="0.01" placeholder="e.g. 10.00" value="<%= event.price_cents != null ? (event.price_cents / 100).toFixed(2) : '' %>" <%= financeDisabled %> />
-          </label>
-          <label>Charged per
-            <select name="pricePer" <%= financeDisabled %>>
-              <option value="person" <%= event.price_per !== 'family' ? 'selected' : '' %>>Person</option>
-              <option value="family" <%= event.price_per === 'family' ? 'selected' : '' %>>Family</option>
-            </select>
-          </label>
+          <%# A real request: "Price, charged per person, and payment title
+              are not needed. All pricing will happen with adding ticket
+              pricing, even if it is only one ticket." Reverses an earlier
+              fix that restored these two fields (event.price_cents/
+              price_per) after a bug report that they'd gone missing -
+              confirmed here as deliberate: every event's pricing now goes
+              through at least one Ticket Type below, even a single one,
+              rather than a flat price on the event itself. The columns/
+              charge-fallback logic in utils/events.js are left alone (an
+              event with zero ticket types still has no way to collect a
+              price - exactly the point), only the now-unwanted form
+              fields are gone. %>
           <%# A real request: "adding a the title payment instructions
               with a text field below it. This will appear when members
               are choosing their tickets." Same title+free-text shape as
               the existing membership-application payment info - shown to
               a registrant on the event's own public page next to its
-              Price/Ticket Types, not a real checkout. %>
-          <label class="member-form-full">Payment Instructions Title
-            <input type="text" name="paymentInstructionsTitle" value="<%= event.payment_instructions_title || '' %>" placeholder="e.g. How to Pay" <%= financeDisabled %> />
-          </label>
+              Price/Ticket Types, not a real checkout. A later real
+              request ("...and payment title [is not needed]") dropped
+              just the Title half - the free-text field alone still shows
+              on the public page with no heading above it. %>
           <label class="member-form-full">Payment Instructions
             <textarea name="paymentInstructionsText" rows="3" placeholder="e.g. Pay by cash, check, or Venmo @coopname at drop-off." <%= financeDisabled %>><%= event.payment_instructions_text || '' %></textarea>
           </label>

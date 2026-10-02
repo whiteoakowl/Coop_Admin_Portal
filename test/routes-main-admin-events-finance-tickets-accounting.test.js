@@ -3,15 +3,16 @@
 // different price and title bar next to it. Add a drop down menu for
 // choosing accounting category." A later real request: "add ticket
 // types, price, title and permissions person or family... accounting
-// category drop is all that is now needed above ticket types" briefly
-// dropped the Finance tab's own flat Price/Charged Per fields entirely -
-// a real bug report ("the only things under finance are accounting
-// category, payment title and payment instructions. Ticket pricing is
-// gone") caught that utils/events.js's own chargeForConfirmedRegistration
-// still falls back to event.price_cents/price_per whenever a registrant
-// doesn't pick a specific Ticket Type (the only pricing mechanism at all
-// for an event with no ticket types added), so they're restored here,
-// alongside Ticket Types rather than instead of them.
+// category drop is all that is now needed above ticket types" dropped
+// the Finance tab's own flat Price/Charged Per fields - a bug report
+// that they'd gone missing briefly restored them (utils/events.js's own
+// chargeForConfirmedRegistration does still fall back to event.
+// price_cents/price_per whenever a registrant doesn't pick a specific
+// Ticket Type), but a further real request made the original removal
+// final and deliberate: "Price, charged per person, and payment title
+// are not needed. All pricing will happen with adding ticket pricing,
+// even if it is only one ticket." Accounting Category plus Ticket Types
+// is the whole Finance tab now.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -60,7 +61,7 @@ async function createEvent(admin, overrides = {}) {
   return Number(/\/main-admin\/events\/(\d+)\/builder/.exec(res.headers.location)[1]);
 }
 
-test('Finance tab: Accounting Category plus a flat Price/Charged Per (the base price charged when no Ticket Type is picked), and it saves/persists', async () => {
+test('Finance tab: only Accounting Category above Ticket Types - no flat Price/Charged Per fields, no Payment Instructions Title', async () => {
   const admin = await loginAsMainAdmin();
   const eventId = await createEvent(admin);
 
@@ -71,39 +72,38 @@ test('Finance tab: Accounting Category plus a flat Price/Charged Per (the base p
   const financeFormMatch = /<form method="POST" action="\/main-admin\/events\/\d+\/finance"[^>]*>([\s\S]*?)<\/form>/.exec(financePage.text);
   assert.ok(financeFormMatch, 'the Finance form should exist');
   assert.match(financeFormMatch[1], /Accounting Category/);
-  assert.match(financeFormMatch[1], /name="priceDollars"/, 'the base Price field should be on the Finance form');
-  assert.match(financeFormMatch[1], /name="pricePer"/, 'the base Charged Per dropdown should be on the Finance form');
-
-  const csrf = extractCsrf(financePage.text);
-  await request(app)
-    .post(`/main-admin/events/${eventId}/finance`)
-    .set('Cookie', admin.cookie)
-    .type('form')
-    .send({ priceDollars: '15.00', pricePer: 'family', _csrf: csrf });
-
-  const event = await db.prepare('SELECT price_cents, price_per FROM events WHERE id = ?').get(eventId);
-  assert.equal(event.price_cents, 1500);
-  assert.equal(event.price_per, 'family');
-
-  const afterSave = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
-  assert.match(afterSave.text, /name="priceDollars"[^>]*value="15\.00"/);
-  assert.match(afterSave.text, /<option value="family" selected>Family<\/option>/);
+  assert.doesNotMatch(financeFormMatch[1], /name="priceDollars"/, 'the flat Price field should be gone');
+  assert.doesNotMatch(financeFormMatch[1], /name="pricePer"/, 'the flat Charged Per dropdown should be gone');
+  assert.doesNotMatch(financeFormMatch[1], /name="paymentInstructionsTitle"/, 'the Payment Instructions Title field should be gone');
+  assert.match(financeFormMatch[1], /name="paymentInstructionsText"/, 'Payment Instructions (the free-text field) stays');
 });
 
-test('Finance tab: leaving the base Price field blank clears it (free/unset), not a crash', async () => {
+// A real bug report earlier caught that removing these fields' UI was
+// silently charging registrants a price nobody could see or change -
+// the fix back then was to preserve (not reset) whatever value was
+// already in the column whenever a form stops submitting a field, the
+// same "retired but not dropped" treatment as any other column. Confirms
+// that guarantee still holds now that the fields are gone for good: an
+// event that already has a flat price set (e.g. from old data, or the
+// still-unchanged creation wizard) keeps it across an unrelated Finance
+// save instead of getting silently wiped to null.
+test('Finance tab save never touches an existing flat price - it has no form field to read one from any more', async () => {
   const admin = await loginAsMainAdmin();
   const eventId = await createEvent(admin);
+  await db.prepare('UPDATE events SET price_cents = ?, price_per = ? WHERE id = ?').run(1200, 'family', eventId);
+
   const page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
   const csrf = extractCsrf(page.text);
-
   await request(app)
     .post(`/main-admin/events/${eventId}/finance`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ priceDollars: '', _csrf: csrf });
+    .send({ paymentInstructionsText: 'Pay at the door.', _csrf: csrf });
 
-  const event = await db.prepare('SELECT price_cents FROM events WHERE id = ?').get(eventId);
-  assert.equal(event.price_cents, null);
+  const event = await db.prepare('SELECT price_cents, price_per, payment_instructions_text FROM events WHERE id = ?').get(eventId);
+  assert.equal(event.price_cents, 1200, 'an untouched column must survive a save of the fields that still exist');
+  assert.equal(event.price_per, 'family');
+  assert.equal(event.payment_instructions_text, 'Pay at the door.');
 });
 
 test('Accounting Categories: manage from the Accounting tab (not Events Settings), pick one on the Finance tab, and it persists', async () => {
@@ -368,12 +368,17 @@ async function createParentAccountForPaymentInstructions() {
   return { cookie: loginRes.headers['set-cookie'] };
 }
 
-test('Payment Instructions: Finance tab has a title+text field, saves, and shows on the public event page', async () => {
+// A real request: "Price, charged per person, and payment title are not
+// needed" dropped the Title half of this field - the free-text field
+// alone still saves and shows on the public page (events-detail.ejs
+// conditions on title/text independently, so dropping one doesn't break
+// the other).
+test('Payment Instructions: Finance tab has a text field (no Title), saves, and shows on the public event page', async () => {
   const admin = await loginAsMainAdmin();
   const eventId = await createEvent(admin);
 
   const financePage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
-  assert.match(financePage.text, /name="paymentInstructionsTitle"/);
+  assert.doesNotMatch(financePage.text, /name="paymentInstructionsTitle"/);
   assert.match(financePage.text, /name="paymentInstructionsText"/);
 
   const csrf = extractCsrf(financePage.text);
@@ -381,14 +386,12 @@ test('Payment Instructions: Finance tab has a title+text field, saves, and shows
     .post(`/main-admin/events/${eventId}/finance`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ paymentInstructionsTitle: 'How to Pay', paymentInstructionsText: 'Pay by cash, check, or Venmo @coopname at drop-off.', _csrf: csrf });
+    .send({ paymentInstructionsText: 'Pay by cash, check, or Venmo @coopname at drop-off.', _csrf: csrf });
 
-  const event = await db.prepare('SELECT payment_instructions_title, payment_instructions_text FROM events WHERE id = ?').get(eventId);
-  assert.equal(event.payment_instructions_title, 'How to Pay');
+  const event = await db.prepare('SELECT payment_instructions_text FROM events WHERE id = ?').get(eventId);
   assert.equal(event.payment_instructions_text, 'Pay by cash, check, or Venmo @coopname at drop-off.');
 
   const afterSavePage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
-  assert.match(afterSavePage.text, /value="How to Pay"/);
   assert.match(afterSavePage.text, /Pay by cash, check, or Venmo @coopname at drop-off\./);
 
   await request(app)
@@ -400,7 +403,6 @@ test('Payment Instructions: Finance tab has a title+text field, saves, and shows
   const parent = await createParentAccountForPaymentInstructions();
   const detailPage = await request(app).get(`/events/${eventId}`).set('Cookie', parent.cookie);
   assert.equal(detailPage.status, 200);
-  assert.match(detailPage.text, /How to Pay/);
   assert.match(detailPage.text, /Pay by cash, check, or Venmo @coopname at drop-off\./);
 });
 
