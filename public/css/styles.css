@@ -1775,6 +1775,22 @@ body.public-page .roster-empty {
     background: var(--accent);
     box-shadow: 0 2px 10px rgba(0,0,0,0.12);
     padding: 0.7rem 1.25rem;
+    /* A real bug report: "communication page, mobile, orange menu bar at
+       the bottom disappears when scrolling" - .admin-mobile-tabs (the
+       bottom bar) already carries this exact same hardening for the
+       identical "iOS Safari drops a persistently-positioned element from
+       its own compositing layer mid-scroll" bug (see its own comment,
+       first reported on Chat); this sticky TOP bar never got the same
+       treatment. A page with enough on-screen, dynamically-sized content
+       to genuinely need scrolling - Communication's own rich-text
+       announcement editor is exactly that - is also exactly the
+       condition this bug only ever shows up under, so hardening only the
+       bottom bar still left the page with one persistently-positioned
+       element (this one) that could still trigger it. */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   }
   .admin-mobile-topbar-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
   .admin-nav-right-mobile { background: rgba(28, 37, 48, 0.08); border-radius: 10px; padding: 0.25rem; }
