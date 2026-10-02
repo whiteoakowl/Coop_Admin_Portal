@@ -715,13 +715,16 @@ router.post('/:id', async (req, res) => {
 // Event Details into their own Finance tab. Same "spread the existing row,
 // override just this tab's own fields" guarantee as every other builder
 // tab's save.
-// A real request: "accounting category drop is all that is now needed
-// above ticket types" - the flat Price/Charged Per fields that used to
-// sit above Ticket Types are gone from this form; each ticket type now
-// carries its own price and person/family basis instead (see the ticket-
-// types route below). event.price_cents/price_per stay in the schema
-// unused rather than dropped, same "retired but not removed column"
-// pattern as e.g. events.language.
+// A real bug report: "the only things under finance are accounting
+// category, payment title and payment instructions. Ticket pricing is
+// gone." An earlier real request ("accounting category drop is all
+// that is now needed above ticket types") dropped Price/Charged Per
+// from this form on the assumption Ticket Types fully replaced them -
+// they don't: utils/events.js's own chargeForConfirmedRegistration
+// still falls back to event.price_cents/price_per whenever a
+// registrant doesn't pick a specific Ticket Type, which is every
+// registrant for an event with no ticket types added at all. Restored
+// here, saved alongside everything else this tab already owns.
 router.post('/:id/finance', async (req, res) => {
   const id = req.params.id;
   const event = await events.getEvent(id);
@@ -729,6 +732,8 @@ router.post('/:id/finance', async (req, res) => {
   await events.updateEvent(id, {
     ...eventDataFromRow(event),
     accountingCategoryId: req.body.accountingCategoryId ? parseInt(req.body.accountingCategoryId, 10) : null,
+    priceCents: req.body.priceDollars ? Math.round(parseFloat(req.body.priceDollars) * 100) : null,
+    pricePer: req.body.pricePer === 'family' ? 'family' : 'person',
     paymentInstructionsTitle: (req.body.paymentInstructionsTitle || '').trim(),
     paymentInstructionsText: (req.body.paymentInstructionsText || '').trim(),
   });

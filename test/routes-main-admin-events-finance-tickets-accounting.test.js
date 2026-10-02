@@ -1,14 +1,17 @@
 // A real request: "event settings, finance, if charging per person there
 // should be an option for adding several types of tickets with a
 // different price and title bar next to it. Add a drop down menu for
-// choosing accounting category." Admin-side only for now (a scoping
-// question confirmed this) - registration doesn't yet let a registrant
-// pick one and be charged accordingly. A later real request: "add ticket
+// choosing accounting category." A later real request: "add ticket
 // types, price, title and permissions person or family... accounting
-// category drop is all that is now needed above ticket types" - each
-// ticket type now carries its own person/family basis, and the Finance
-// tab's own flat Price/Charged Per fields are gone (Accounting Category
-// is the only thing left above the Ticket Types list).
+// category drop is all that is now needed above ticket types" briefly
+// dropped the Finance tab's own flat Price/Charged Per fields entirely -
+// a real bug report ("the only things under finance are accounting
+// category, payment title and payment instructions. Ticket pricing is
+// gone") caught that utils/events.js's own chargeForConfirmedRegistration
+// still falls back to event.price_cents/price_per whenever a registrant
+// doesn't pick a specific Ticket Type (the only pricing mechanism at all
+// for an event with no ticket types added), so they're restored here,
+// alongside Ticket Types rather than instead of them.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -57,9 +60,10 @@ async function createEvent(admin, overrides = {}) {
   return Number(/\/main-admin\/events\/(\d+)\/builder/.exec(res.headers.location)[1]);
 }
 
-test('Finance tab: only an Accounting Category dropdown, no flat Price/Charged Per fields', async () => {
+test('Finance tab: Accounting Category plus a flat Price/Charged Per (the base price charged when no Ticket Type is picked), and it saves/persists', async () => {
   const admin = await loginAsMainAdmin();
   const eventId = await createEvent(admin);
+
   const financePage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
   // Isolate the actual Finance form (not the separate Add Ticket Type
   // dialog further down the page, which has its own priceDollars/
@@ -67,8 +71,39 @@ test('Finance tab: only an Accounting Category dropdown, no flat Price/Charged P
   const financeFormMatch = /<form method="POST" action="\/main-admin\/events\/\d+\/finance"[^>]*>([\s\S]*?)<\/form>/.exec(financePage.text);
   assert.ok(financeFormMatch, 'the Finance form should exist');
   assert.match(financeFormMatch[1], /Accounting Category/);
-  assert.doesNotMatch(financeFormMatch[1], /name="priceDollars"/, 'the top-of-Finance flat Price field should be gone');
-  assert.doesNotMatch(financeFormMatch[1], /name="pricePer"/, 'the top-of-Finance Charged Per dropdown should be gone');
+  assert.match(financeFormMatch[1], /name="priceDollars"/, 'the base Price field should be on the Finance form');
+  assert.match(financeFormMatch[1], /name="pricePer"/, 'the base Charged Per dropdown should be on the Finance form');
+
+  const csrf = extractCsrf(financePage.text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/finance`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ priceDollars: '15.00', pricePer: 'family', _csrf: csrf });
+
+  const event = await db.prepare('SELECT price_cents, price_per FROM events WHERE id = ?').get(eventId);
+  assert.equal(event.price_cents, 1500);
+  assert.equal(event.price_per, 'family');
+
+  const afterSave = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  assert.match(afterSave.text, /name="priceDollars"[^>]*value="15\.00"/);
+  assert.match(afterSave.text, /<option value="family" selected>Family<\/option>/);
+});
+
+test('Finance tab: leaving the base Price field blank clears it (free/unset), not a crash', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  const page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  const csrf = extractCsrf(page.text);
+
+  await request(app)
+    .post(`/main-admin/events/${eventId}/finance`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ priceDollars: '', _csrf: csrf });
+
+  const event = await db.prepare('SELECT price_cents FROM events WHERE id = ?').get(eventId);
+  assert.equal(event.price_cents, null);
 });
 
 test('Accounting Categories: manage from the Accounting tab (not Events Settings), pick one on the Finance tab, and it persists', async () => {
