@@ -5864,9 +5864,41 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .floater-chart-table th:nth-child(1) { width: 30%; }
   .floater-chart-table th:nth-child(2) { width: 16%; }
   .floater-chart-table th:nth-child(3) { width: 54%; }
-  .setup-assignment-table th:nth-child(1), .setup-assignment-table td:nth-child(1) { width: 28%; }
-  .setup-assignment-table th:nth-child(2), .setup-assignment-table td:nth-child(2),
-  .setup-assignment-table th:nth-child(3), .setup-assignment-table td:nth-child(3) { width: 36%; }
+
+  /* A real bug report: "setup/cleanup team assignments... the dropdown
+     choices for picking a task. You can't see anything in the dropdown.
+     You should at least be able to see the task number." Member/Task 1/
+     Task 2 staying a real 3-column table on a phone (unlike Floater's
+     own chart, converted to stacked flex rows above for this exact
+     reason) squeezed each task's dropdown+button into roughly a third of
+     the card's width, on top of font-size/padding already shrunk as far
+     as this table's own rules below take it - there was nothing left to
+     shrink that would make the "#N - description" text readable, only
+     ever-smaller illegible text. Reusing the Floater Chart's own working
+     fix: stack Member, Task 1, and Task 2 as their own full-width lines
+     instead, so each dropdown gets the WHOLE card to itself the same way
+     Floater's own Position/Room/Floater row does. */
+  .setup-assignment-table, .setup-assignment-table tbody { display: block; width: 100%; }
+  .setup-assignment-table thead { display: none; }
+  .setup-assignment-table tr {
+    display: flex;
+    flex-direction: column;
+    row-gap: 0.3rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .setup-assignment-table tbody tr:last-child { border-bottom: none; }
+  .setup-assignment-table td { display: block; width: auto; padding: 0; border: none; }
+  /* The desktop-width 36%/32%/32% column split (.setup-assignment-table
+     td:nth-child(N), further up) outranks the plain .setup-assignment-
+     table td rule just above on specificity alone (an extra pseudo-class)
+     - without repeating those same :nth-child selectors here, each stacked
+     "row" above stayed stuck at its old desktop fraction of the row's
+     width instead of actually going full-width, squeezing the dropdown
+     down to a sliver no wider than "#..." regardless of the stacking fix. */
+  .setup-assignment-table td:nth-child(1),
+  .setup-assignment-table td:nth-child(2),
+  .setup-assignment-table td:nth-child(3) { width: auto; }
 
   .floater-assign-form { flex-direction: column; align-items: stretch; gap: 0.3rem; }
   .floater-assign-form select,
@@ -5885,13 +5917,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      line below them instead of squeezing into a third column. */
   .floater-chart-table, .floater-chart-table tbody { display: block; width: 100%; }
   .floater-chart-table thead { display: none; }
+  /* A real bug report: "each line for a floater everything on the left
+     is touching the border - there should be some space to balance
+     between features and edges." This row switched from a table cell
+     (which got its own horizontal padding from .floater-card-table td)
+     to a flex row via display:flex above - but copied only the table
+     row's vertical padding (0.5rem 0), leaving the row's actual content
+     flush against the card's own left/right edge with nothing to
+     balance it. 0.75rem matches .floater-card-header's own horizontal
+     inset just above it, so the row content lines up with the card's
+     header instead of sitting narrower than it. */
   .floater-chart-table tr {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
     column-gap: 0.4rem;
     row-gap: 0.3rem;
-    padding: 0.5rem 0;
+    padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--border);
   }
   .floater-chart-table tbody tr:last-child { border-bottom: none; }
@@ -5939,12 +5981,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
   /* Setup/Cleanup Assignments' own version of the row-not-column fix
      above (a real request: "the assign button should be next to each
-     assignment dropdown") - this table never switched to flex rows the
-     way Floater's own chart did (it stays a plain 3-column table at
-     every width, see .setup-assignment-table), so its Task 1/Task 2
-     cells are even narrower than the Floater Chart's dedicated column
-     and need the same select-shrink/ellipsis treatment just to fit a
-     dropdown and a button on one line at all. */
+     assignment dropdown") - now that .setup-assignment-table also stacks
+     to full-width rows (just above), each Task cell gets the same room
+     Floater's own dedicated column does; this still shrinks the select
+     relative to its Assign/Unassign button so both sit on one line
+     within that full-width row, with ellipsis as a safety net for an
+     unusually long task description rather than the illegibly-narrow
+     squeeze a real 3-column table forced before. */
   .setup-assignment-table .floater-assign-form { flex-direction: row; align-items: center; }
   .setup-assignment-table .floater-assign-form select,
   .setup-assignment-table .setup-task-static {

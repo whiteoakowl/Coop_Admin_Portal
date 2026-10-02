@@ -203,6 +203,7 @@
 <%- include('session-timeout-dialog') %>
 <%- include('confirm-dialog') %>
 
+<script src="/js/fullscreen-navigate-shim.js"></script>
 <script src="/js/admin-nav.js"></script>
 <%# defer, unlike this file's other scripts - both read window.CSRF_TOKEN,
     which partials/head.ejs's csrf.js sets. csrf.js is itself deferred (it
