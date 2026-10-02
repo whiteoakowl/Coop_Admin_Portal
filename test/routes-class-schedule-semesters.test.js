@@ -83,24 +83,40 @@ test("Each class's own Details tab gets a Semester dropdown, pre-selected to its
     .send({ title: 'Spring 2027', _csrf: admin.csrfToken });
   const semester = await db.prepare('SELECT * FROM semesters WHERE title = ?').get('Spring 2027');
 
+  // A real bug report ("there are currently many people signed up for
+  // fall 2026 classes. They aren't showing on this orientation list")
+  // means a brand new class no longer starts with NO semester - it
+  // defaults to whichever semester is currently the most-recently-
+  // created one (see createClass's own comment in utils/classSchedule.js) -
+  // Spring 2027 here, since it's the only one that exists yet.
   const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'Semester Dropdown Class' });
+  const clsOnCreate = await getClass(classId);
+  assert.equal(clsOnCreate.semester_id, semester.id, 'a brand new class should default to the current semester, not none');
 
   const page = await request(app).get(`/admin/class-schedule/classes/${classId}/manage`).set('Cookie', admin.cookie);
   assert.match(page.text, /<select name="semesterId">/);
   assert.match(page.text, /<option value="">No Semester<\/option>/);
-  assert.match(page.text, new RegExp(`<option value="${semester.id}" >Spring 2027</option>`));
+  assert.match(page.text, new RegExp(`<option value="${semester.id}" selected>Spring 2027</option>`));
+
+  // Explicitly choosing a DIFFERENT semester still works as before.
+  await request(app)
+    .post('/admin/schedule/semesters')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Fall 2027', _csrf: admin.csrfToken });
+  const laterSemester = await db.prepare('SELECT * FROM semesters WHERE title = ?').get('Fall 2027');
 
   await request(app)
     .post(`/admin/class-schedule/classes/${classId}`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ className: 'Semester Dropdown Class', hourPosition: '1', semesterId: String(semester.id), _csrf: admin.csrfToken });
+    .send({ className: 'Semester Dropdown Class', hourPosition: '1', semesterId: String(laterSemester.id), _csrf: admin.csrfToken });
 
   const cls = await getClass(classId);
-  assert.equal(cls.semester_id, semester.id);
+  assert.equal(cls.semester_id, laterSemester.id);
 
   const afterAssign = await request(app).get(`/admin/class-schedule/classes/${classId}/manage`).set('Cookie', admin.cookie);
-  assert.match(afterAssign.text, new RegExp(`<option value="${semester.id}" selected>Spring 2027</option>`));
+  assert.match(afterAssign.text, new RegExp(`<option value="${laterSemester.id}" selected>Fall 2027</option>`));
 
   // Clearing it back to "No Semester" (empty value) should null it out.
   await request(app)

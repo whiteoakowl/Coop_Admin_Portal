@@ -60,6 +60,7 @@
 //     assertions. See each function's own comment for specifics.
 const db = require('../db');
 const { byLastName, lastNameOf, teacherMemberIds } = require('./members');
+const { applyTrainingCompletion } = require('./orientation');
 
 const LESSON_TYPES = ['video', 'text', 'quiz'];
 const TRAINING_STATUSES = ['draft', 'published', 'archived'];
@@ -921,6 +922,15 @@ async function maybeFinalizeAttempt(attemptId) {
       )
       .run(status, score, bestScore, passed ? 1 : 0, assignment.id);
   });
+
+  // A real request: "Orientation settings should be linking a training
+  // already created under training to each selection. This [way] when a
+  // member completes a training it will automatically register as
+  // complete in the correct column next to the member." Only on the
+  // actual pass transition (not the alreadyDone early-return above) -
+  // applyTrainingCompletion itself is a harmless no-op when nothing links
+  // to this training, so there's no cost to always calling it here.
+  if (passed) await applyTrainingCompletion(assignment.training_id, assignment.member_id);
 
   return { finalized: true, score, passed };
 }

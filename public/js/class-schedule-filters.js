@@ -27,6 +27,16 @@
     return fullValue === 'full' ? isFull : !isFull;
   }
 
+  // A real request: "add semester choice dropdown settings to... all
+  // classes." 'none' (the "No Semester" option) matches a class whose own
+  // data-class-semester-id is also 'none' (see the EJS: semester_id == null
+  // is rendered as the literal string "none", same sentinel the select's
+  // own option value uses).
+  function matchesSemester(el, semesterValue) {
+    if (!semesterValue) return true;
+    return el.getAttribute('data-class-semester-id') === semesterValue;
+  }
+
   function selectValue(day, attr) {
     const select = document.querySelector('[' + attr + '="' + day + '"]');
     return select ? select.value : '';
@@ -36,11 +46,12 @@
     const gradeValue = selectValue(day, 'data-class-schedule-grade-filter');
     const fullValue = selectValue(day, 'data-class-schedule-full-filter');
     const hourValue = selectValue(day, 'data-class-schedule-hour-filter');
+    const semesterValue = selectValue(day, 'data-class-schedule-semester-filter');
 
     const gridPanel = document.querySelector('[data-class-schedule-view="grid"][data-class-schedule-day="' + day + '"]');
     if (gridPanel) {
       gridPanel.querySelectorAll('[data-class-grade-list]').forEach((card) => {
-        card.style.display = matchesGrade(card, gradeValue) && matchesFull(card, fullValue) ? '' : 'none';
+        card.style.display = matchesGrade(card, gradeValue) && matchesFull(card, fullValue) && matchesSemester(card, semesterValue) ? '' : 'none';
       });
     }
 
@@ -48,15 +59,15 @@
     if (listPanel) {
       listPanel.querySelectorAll('tr[data-class-schedule-hour]').forEach((row) => {
         const hourOk = !hourValue || row.getAttribute('data-class-schedule-hour') === hourValue;
-        row.hidden = !(hourOk && matchesGrade(row, gradeValue) && matchesFull(row, fullValue));
+        row.hidden = !(hourOk && matchesGrade(row, gradeValue) && matchesFull(row, fullValue) && matchesSemester(row, semesterValue));
       });
     }
   }
 
   document.addEventListener('change', function (e) {
-    const select = e.target.closest('[data-class-schedule-hour-filter], [data-class-schedule-grade-filter], [data-class-schedule-full-filter]');
+    const select = e.target.closest('[data-class-schedule-hour-filter], [data-class-schedule-grade-filter], [data-class-schedule-full-filter], [data-class-schedule-semester-filter]');
     if (!select) return;
-    const day = select.getAttribute('data-class-schedule-hour-filter') || select.getAttribute('data-class-schedule-grade-filter') || select.getAttribute('data-class-schedule-full-filter');
+    const day = select.getAttribute('data-class-schedule-hour-filter') || select.getAttribute('data-class-schedule-grade-filter') || select.getAttribute('data-class-schedule-full-filter') || select.getAttribute('data-class-schedule-semester-filter');
     applyFilters(day);
   });
 

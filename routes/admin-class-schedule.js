@@ -55,6 +55,7 @@ const {
   createClass,
   colorForClassName,
   updateClass,
+  bulkUpdateClasses,
   setClassImage,
   classImageUrl,
   CLASS_IMAGES_BUCKET,
@@ -772,6 +773,46 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single(
     return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not save class: ${err.message}`));
   }
   res.redirect(`/admin/class-schedule/${cls.day}?notice=` + encodeURIComponent(`"${className}" updated.`));
+});
+
+// A real request: "Add bulk edit button on classes, class schedules...
+// One form popsup showing title, room number, class start time and end
+// time, open and close class check boxes, description, class start date,
+// class end date, class semester selection." Every key is left OUT of
+// `patch` entirely (not just blank) unless the admin actually filled
+// that field in on the dialog - see bulkUpdateClasses's own comment for
+// why that distinction matters (a blank field must never clobber every
+// selected class's existing value).
+router.post('/class-schedule/:day/bulk-edit', requireFullAdmin, async (req, res) => {
+  const day = isValidDay(req.params.day) ? req.params.day : 'monday';
+  const ids = (req.body.classIds || '')
+    .split(',')
+    .map((v) => parseInt(v, 10))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    return res.redirect(`/admin/schedule?tab=${day}&error=` + encodeURIComponent('No classes were selected.'));
+  }
+
+  const patch = {};
+  if ((req.body.className || '').trim()) patch.className = req.body.className.trim();
+  if ((req.body.room || '').trim()) patch.room = req.body.room.trim();
+  if ((req.body.startTime || '').trim()) patch.startTime = req.body.startTime.trim();
+  if ((req.body.endTime || '').trim()) patch.endTime = req.body.endTime.trim();
+  if ((req.body.startDate || '').trim()) patch.startDate = req.body.startDate.trim();
+  if ((req.body.endDate || '').trim()) patch.endDate = req.body.endDate.trim();
+  if ((req.body.description || '').trim()) patch.description = sanitizePostBody(req.body.description);
+  // Two independent checkboxes (a real request: "open and close class
+  // check boxes," not one toggle) - the client already makes them
+  // mutually exclusive, but an Open+Close tie here just means neither
+  // wins, which is the same as "don't change" (patch.registrationOpen
+  // stays unset).
+  if (req.body.openClass === '1' && req.body.closeClass !== '1') patch.registrationOpen = true;
+  if (req.body.closeClass === '1' && req.body.openClass !== '1') patch.registrationOpen = false;
+  if (req.body.semesterId === 'none') patch.semesterId = null;
+  else if (req.body.semesterId) patch.semesterId = parseInt(req.body.semesterId, 10);
+
+  const updated = await bulkUpdateClasses(ids, patch);
+  res.redirect(`/admin/schedule?tab=${day}&notice=` + encodeURIComponent(`Updated ${updated} class${updated === 1 ? '' : 'es'}.`));
 });
 
 // A real request: "# of students, # of teachers, # of class assistants

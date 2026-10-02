@@ -58,6 +58,21 @@
               <% }); %>
             </select>
           </div>
+          <%# A real request: "add semester choice dropdown settings to...
+              Monday/Wednesday attendance" - filters the Classes tab's own
+              list the same way Day/Hour already do. %>
+          <% if (semesters.length > 0) { %>
+            <div class="category-filter" style="margin: 0;">
+              <label for="class-roster-semester-select">Semester</label>
+              <select id="class-roster-semester-select" onchange="window.fullscreenNavigate('/admin/rosters?tab=classes' + (document.getElementById('class-roster-day-select').value ? '&day=' + document.getElementById('class-roster-day-select').value : '') + (document.getElementById('class-roster-hour-select').value ? '&hour=' + document.getElementById('class-roster-hour-select').value : '') + (this.value ? '&semesterId=' + this.value : ''))">
+                <option value="" <%= !semesterFilter ? 'selected' : '' %>>All Semesters</option>
+                <option value="none" <%= semesterFilter === 'none' ? 'selected' : '' %>>No Semester</option>
+                <% semesters.forEach(function(s) { %>
+                  <option value="<%= s.id %>" <%= semesterFilter === String(s.id) ? 'selected' : '' %>><%= s.title %></option>
+                <% }); %>
+              </select>
+            </div>
+          <% } %>
         </div>
         <% if (classes.length === 0) { %>
           <p class="roster-empty">No classes yet &mdash; add one on the <a href="/admin/schedule">Schedules</a> page.</p>

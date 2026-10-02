@@ -56,6 +56,23 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
             <option value="open">Open Only</option>
           </select>
         </div>
+        <%# A real request: "add semester choice dropdown settings to...
+            all classes" - same client-side filter shape as Grade/Hour/
+            Full right above (public/js/class-schedule-filters.js),
+            filtering both Grid and List views by whichever semester a
+            class is tagged with. %>
+        <% if (typeof semesters !== 'undefined' && semesters.length > 0) { %>
+          <div class="category-filter">
+            <label for="class-schedule-semester-select-<%= day %>">Semester</label>
+            <select id="class-schedule-semester-select-<%= day %>" data-class-schedule-semester-filter="<%= day %>">
+              <option value="">All Semesters</option>
+              <option value="none">No Semester</option>
+              <% semesters.forEach(function(s) { %>
+                <option value="<%= s.id %>"><%= s.title %></option>
+              <% }); %>
+            </select>
+          </div>
+        <% } %>
       </div>
     </details>
     <%# Grid view already lays every hour out as its own column, so this
@@ -90,6 +107,15 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
         </label>
         <button type="submit" form="class-archive-form-<%= day %>" class="roster-action-btn">Archive Selected</button>
       </div>
+      <%# Bulk Edit's own Select All lives in List view instead of Grid -
+          the checkboxes themselves only exist on the list rows (see
+          below), so there's nothing to select while Grid is showing. %>
+      <div class="class-schedule-archive-controls" id="class-schedule-bulk-edit-controls-<%= day %>" data-bulk-edit-controls="class-bulk-edit-form-<%= day %>" hidden>
+        <label class="checkbox-option class-schedule-select-all">
+          <input type="checkbox" data-select-all-for="class-bulk-edit-form-<%= day %>" />
+          Select All
+        </label>
+      </div>
     <% } %>
   </div>
   <div class="roster-btn-row">
@@ -98,6 +124,12 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
       <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-schedule-dialog-<%= day %>').showModal()">Edit</button>
       <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog-<%= day %>').showModal()">Import</button>
       <button type="button" class="roster-action-btn" data-archive-toggle="class-archive-form-<%= day %>" aria-pressed="false">Archive</button>
+      <%# A real request: "on class page add a button that says add/edit
+          semester" - same Add/rename/delete semester list the Settings
+          tab already has (partials/semester-manager.ejs), reachable
+          right from the day grid instead of only buried in Settings. %>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('semester-manager-dialog-<%= day %>').showModal()">Add/Edit Semester</button>
+      <button type="button" class="roster-action-btn" data-bulk-edit-toggle="class-bulk-edit-form-<%= day %>" data-bulk-edit-dialog="bulk-edit-dialog-<%= day %>" aria-pressed="false">Bulk Edit</button>
     <% } %>
     <a class="roster-action-btn print-action-btn" href="/admin/class-schedule/<%= day %>/print" target="_blank">Print</a>
   </div>
@@ -113,6 +145,11 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
     data-confirm-icon="icon-save"
     data-confirm-safe="1"
   ></form>
+  <%# Never submitted itself - just an id for the List view's own
+      checkboxes to carry a form="..." attribute, the same trick
+      class-schedule-bulk-edit.js's own query selectors key off of. The
+      actual POST happens from the Bulk Edit dialog's own form below. %>
+  <form id="class-bulk-edit-form-<%= day %>" onsubmit="return false;"></form>
 <% } %>
 
 <% if (!gridReadOnly) { %>
@@ -394,6 +431,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
                     style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 42%, white);"
                     data-class-grade-list="<%= (cls.age_group || '').split(',').map(function(g) { return g.trim(); }).filter(Boolean).join(',') %>"
                     data-class-full="<%= (cls.capacity != null && cls.students.length >= cls.capacity) ? '1' : '0' %>"
+                    data-class-semester-id="<%= cls.semester_id != null ? cls.semester_id : 'none' %>"
                     <% if (!gridReadOnly) { %>
                       data-view-class="<%= cls.id %>" role="button" tabindex="0" aria-label="View/edit <%= cls.class_name %>"
                     <% } %>
@@ -452,6 +490,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
   <table class="roster-table class-schedule-list-table">
     <thead>
       <tr>
+        <% if (!gridReadOnly) { %><th class="no-print"></th><% } %>
         <th>Class</th>
         <th>Hour</th>
         <th>Room</th>
@@ -462,14 +501,26 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
     </thead>
     <tbody>
       <% if (allClasses.length === 0) { %>
-        <tr><td colspan="6" class="roster-empty">No classes yet.</td></tr>
+        <tr><td colspan="<%= gridReadOnly ? 6 : 7 %>" class="roster-empty">No classes yet.</td></tr>
       <% } %>
       <% allClasses.forEach(function(cls) { %>
         <tr
           data-class-schedule-hour="<%= cls.hour_position %>"
           data-class-grade-list="<%= (cls.age_group || '').split(',').map(function(g) { return g.trim(); }).filter(Boolean).join(',') %>"
           data-class-full="<%= (cls.capacity != null && cls.students.length >= cls.capacity) ? '1' : '0' %>"
+          data-class-semester-id="<%= cls.semester_id != null ? cls.semester_id : 'none' %>"
         >
+          <%# Bulk Edit's own per-row checkbox - a real request: "when you
+              click bulk edit it will show a check mark on the left next
+              to each [class] in list view." Hidden until the Bulk Edit
+              toggle reveals it, same pattern the Grid view's own Archive
+              checkbox already uses (public/js/class-schedule-bulk-
+              edit.js). %>
+          <% if (!gridReadOnly) { %>
+            <td class="no-print">
+              <input type="checkbox" name="classIds" value="<%= cls.id %>" form="class-bulk-edit-form-<%= day %>" aria-label="Select <%= cls.class_name %> for bulk edit" hidden />
+            </td>
+          <% } %>
           <td class="class-schedule-list-name-col">
             <span class="class-schedule-list-swatch" style="background: <%= cls.color %>;"></span>
             <%= cls.class_name %>
@@ -495,6 +546,69 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 <script src="/js/class-schedule-view.js"></script>
 <script src="/js/allergy-log-popup.js"></script>
 <script src="/js/room-row-reorder.js"></script>
+
+<dialog id="semester-manager-dialog-<%= day %>" class="member-picker-dialog">
+  <h3>Add/Edit Semester</h3>
+  <%- include('semester-manager', { semesters, missingSemesterCount, backUrl: gridBasePath }) %>
+  <div class="member-form-full">
+    <button type="button" class="btn-secondary" onclick="document.getElementById('semester-manager-dialog-<%= day %>').close()">Close</button>
+  </div>
+</dialog>
+
+<%# A real request: "One form popsup showing title, room number, class
+    start time and end time, open and close class check boxes,
+    description, class start date, class end date, class semester
+    selection." Every field defaults to blank/unchecked, and the route
+    (POST /admin/class-schedule/<day>/bulk-edit) only touches a class's
+    own column when the admin actually filled that field in - leaving a
+    field blank means "don't change this" rather than clobbering every
+    selected class's existing value with an empty one. %>
+<dialog id="bulk-edit-dialog-<%= day %>" class="class-form-dialog">
+  <form method="POST" action="/admin/class-schedule/<%= day %>/bulk-edit" class="member-form-grid">
+    <input type="hidden" name="classIds" data-bulk-edit-ids value="" />
+    <h3>Bulk Edit <span data-bulk-edit-count>0</span> Selected Class(es)</h3>
+    <p class="hint">Leave a field blank (or "Don't change") to leave that field as-is on every selected class.</p>
+    <label class="member-form-full">Title
+      <input type="text" name="className" placeholder="Don't change" />
+    </label>
+    <label>Room Number
+      <input type="text" name="room" placeholder="Don't change" />
+    </label>
+    <label>Semester
+      <select name="semesterId">
+        <option value="">Don't change</option>
+        <option value="none">No Semester</option>
+        <% semesters.forEach(function(s) { %>
+          <option value="<%= s.id %>"><%= s.title %></option>
+        <% }); %>
+      </select>
+    </label>
+    <label>Class Start Time
+      <input type="time" name="startTime" />
+    </label>
+    <label>Class End Time
+      <input type="time" name="endTime" />
+    </label>
+    <label>Class Start Date
+      <input type="date" name="startDate" />
+    </label>
+    <label>Class End Date
+      <input type="date" name="endDate" />
+    </label>
+    <div class="member-form-full">
+      <label class="checkbox-option"><input type="checkbox" name="openClass" value="1" /> Open Class</label>
+      <label class="checkbox-option"><input type="checkbox" name="closeClass" value="1" /> Close Class</label>
+    </div>
+    <label class="member-form-full">Description
+      <textarea name="description" rows="3" placeholder="Don't change"></textarea>
+    </label>
+    <div class="member-form-full roster-btn-row">
+      <button type="submit" class="primary-btn">Save Changes</button>
+      <button type="button" class="btn-secondary" onclick="document.getElementById('bulk-edit-dialog-<%= day %>').close()">Cancel</button>
+    </div>
+  </form>
+</dialog>
+<script src="/js/class-schedule-bulk-edit.js"></script>
 <% } %>
 <%# archive-select-toggle.js is loaded once, unconditionally, by the page
     that includes this partial (views/admin-schedule.ejs) - every tab on

@@ -14,6 +14,7 @@ const {
   syncDayMemberRosters,
   classRosterIdsForDay,
   HOUR_POSITIONS,
+  listSemesters,
 } = require('../utils/classSchedule');
 const { defaultDay, DAYS, DAY_LABELS, isValidDay, requireDay } = require('../utils/days');
 const { absenceFormSubmissionsForRoster } = require('../utils/alerts');
@@ -255,6 +256,11 @@ router.get('/rosters', requireAdmin, async (req, res) => {
   if (requestedTab === 'classes') {
     const dayFilter = ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '';
     const hourFilter = HOUR_POSITIONS.includes(parseInt(req.query.hour, 10)) ? parseInt(req.query.hour, 10) : null;
+    // A real request: "add semester choice dropdown settings to...
+    // Monday/Wednesday attendance" - same optional filter the Classes
+    // page itself offers, applied here the same way Hour already is
+    // (allClassesList has no semester concept of its own either).
+    const semesterFilter = req.query.semesterId || '';
     let classes = await allClassesList(dayFilter || null);
     // Filtered here rather than in allClassesList() itself (its two other
     // callers - buildDaySnapshot and clearDayRosterData's own roster-id
@@ -264,6 +270,8 @@ router.get('/rosters', requireAdmin, async (req, res) => {
     // between Monday's and Wednesday's own "Hour 1", while this filter
     // needs to mean the same hour regardless of which day(s) are shown.
     if (hourFilter) classes = classes.filter((c) => c.hour_position === hourFilter);
+    if (semesterFilter === 'none') classes = classes.filter((c) => c.semester_id == null);
+    else if (semesterFilter) classes = classes.filter((c) => String(c.semester_id) === semesterFilter);
     return res.render('admin-rosters', {
       title: 'Attendance',
       tab: 'classes',
@@ -272,6 +280,8 @@ router.get('/rosters', requireAdmin, async (req, res) => {
       classes,
       dayFilter,
       hourFilter,
+      semesterFilter,
+      semesters: await listSemesters(),
       hourPositions: HOUR_POSITIONS,
       error: req.query.error || null,
       notice: req.query.notice || null,

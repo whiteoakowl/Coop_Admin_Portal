@@ -37,7 +37,10 @@ const {
   listClassArchives,
   listSemesters,
   createSemester,
+  renameSemester,
   deleteSemester,
+  countClassesMissingSemester,
+  assignUnassignedClassesToSemester,
   classGlobalSettings,
   saveClassGlobalSettings,
 } = require('../utils/classSchedule');
@@ -120,6 +123,12 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
       selectedDate,
       absentIds: await absentMemberIdsForDate(selectedDate),
+      // Needed for the Bulk Edit dialog's own semester dropdown and the
+      // "Add/Edit Semester" dialog (both new - a real request), neither
+      // of which previously existed on this tab (only the Settings tab
+      // had the semester list before).
+      semesters: await listSemesters(),
+      missingSemesterCount: res.locals.isFullAdmin ? await countClassesMissingSemester() : 0,
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -166,6 +175,7 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       roles: await db.prepare('SELECT key, label FROM roles ORDER BY label').all(),
       sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
       semesters: await listSemesters(),
+      missingSemesterCount: await countClassesMissingSemester(),
       classSettings: await classGlobalSettings(),
       error: req.query.error || null,
       notice: req.query.notice || null,
@@ -293,19 +303,63 @@ router.post('/schedule/registration-windows/:id/delete', requireFullAdmin, async
 // settings. Add a place to create and add new semester titles." Just a
 // title list; each class's own semester assignment is its own dropdown
 // on that class's own Details tab (views/admin-class-schedule-manage.ejs).
+// A later request put an "Add/Edit Semester" button directly on the
+// Monday/Wednesday Classes page too (views/partials/class-schedule-grid.
+// ejs's own dialog) - every route here honors an optional ?back= so that
+// dialog's own forms land the admin back on the day grid they opened it
+// from instead of always bouncing to the Settings tab.
+function semesterSettingsBack(req) {
+  const back = req.body.back || req.query.back;
+  return back && back.startsWith('/admin/schedule') ? back : '/admin/schedule?tab=settings';
+}
+
 router.post('/schedule/semesters', requireFullAdmin, async (req, res) => {
-  const back = '/admin/schedule?tab=settings';
+  const back = semesterSettingsBack(req);
+  const sep = back.includes('?') ? '&' : '?';
   try {
     await createSemester(req.body.title);
   } catch (err) {
-    return res.redirect(back + '&error=' + encodeURIComponent(err.message));
+    return res.redirect(back + sep + 'error=' + encodeURIComponent(err.message));
   }
-  res.redirect(back + '&notice=' + encodeURIComponent('Semester added.'));
+  res.redirect(back + sep + 'notice=' + encodeURIComponent('Semester added.'));
+});
+
+// A real request: "add button for orientation settings to link training"
+// and "on class page add a button that says add/edit semester" both
+// assumed an existing semester could be renamed, not just added/deleted -
+// the "Edit" half of "Add/Edit Semester" this button is named for.
+router.post('/schedule/semesters/:id/rename', requireFullAdmin, async (req, res) => {
+  const back = semesterSettingsBack(req);
+  const sep = back.includes('?') ? '&' : '?';
+  try {
+    await renameSemester(req.params.id, req.body.title);
+  } catch (err) {
+    return res.redirect(back + sep + 'error=' + encodeURIComponent(err.message));
+  }
+  res.redirect(back + sep + 'notice=' + encodeURIComponent('Semester renamed.'));
 });
 
 router.post('/schedule/semesters/:id/delete', requireFullAdmin, async (req, res) => {
+  const back = semesterSettingsBack(req);
+  const sep = back.includes('?') ? '&' : '?';
   await deleteSemester(req.params.id);
-  res.redirect('/admin/schedule?tab=settings&notice=' + encodeURIComponent('Semester removed.'));
+  res.redirect(back + sep + 'notice=' + encodeURIComponent('Semester removed.'));
+});
+
+// A real bug report: "there are currently many people signed up for fall
+// 2026 classes. They aren't showing on this orientation list" - classes
+// created before a semester existed (or before createClass's own new
+// semester-id default) are stuck with semester_id NULL. One-click fix:
+// tag every still-unassigned class with a chosen semester.
+router.post('/schedule/semesters/assign-missing', requireFullAdmin, async (req, res) => {
+  const back = semesterSettingsBack(req);
+  const sep = back.includes('?') ? '&' : '?';
+  const semesterId = parseInt(req.body.semesterId, 10);
+  if (!semesterId) {
+    return res.redirect(back + sep + 'error=' + encodeURIComponent('Choose a semester first.'));
+  }
+  const count = await assignUnassignedClassesToSemester(semesterId);
+  res.redirect(back + sep + 'notice=' + encodeURIComponent(count === 0 ? 'No classes were missing a semester.' : `Assigned ${count} class${count === 1 ? '' : 'es'} with no semester.`));
 });
 
 // A real request rebuilt Co-op Class Settings entirely: "Remove [the

@@ -485,13 +485,33 @@ async function renameRoom(day, oldName, newName) {
 // EXISTING values for those 6 fields (since its own form no longer
 // submits them) rather than letting them silently reset to defaults just
 // because a name/room/description edit doesn't carry them anymore.
+// A real bug report: "there are currently many people signed up for fall
+// 2026 classes. They aren't showing on this orientation list." A new
+// class left semester_id unset (NULL) by default - the Add Class dialog
+// has no semester field of its own (that's only on a class's own Details
+// tab, after creation) - and Orientation's own semester filter
+// (utils/orientation.js's orientationRows) matches a semester_id exactly,
+// so a NULL-semester class's enrolled students never show under a
+// specific semester's filtered view even though they show fine under "All
+// Semesters." Defaulting every new class to whichever semester is
+// currently most-recently-created - the same fallback every other
+// semester-aware view already uses (see orientation.js's own
+// defaultSemesterId) - means a newly created Fall 2026 class is tagged
+// Fall 2026 automatically as long as that semester already exists, with
+// no extra step for the admin to remember.
+async function currentDefaultSemesterId() {
+  const row = await db.prepare('SELECT id FROM semesters ORDER BY id DESC LIMIT 1').get();
+  return row ? row.id : null;
+}
+
 async function createClass(fields) {
+  const semesterId = fields.semesterId !== undefined ? (fields.semesterId || null) : await currentDefaultSemesterId();
   const info = await db
     .prepare(
       `INSERT INTO classes (day, hour_position, class_name, room, age_group, numeric_ages, color, start_time, end_time, start_date, end_date, capacity, registration_open, description, supply_list,
          allow_parent_register, allow_teacher_register, allow_student_register, teacher_slots, assistant_slots, min_capacity, allow_cancel, auto_refund_on_cancel, price_cents, price_per, lock_by_grade, lock_by_age,
-         allow_parent_complete_lessons, allow_parent_chat)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         allow_parent_complete_lessons, allow_parent_chat, semester_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.day,
@@ -522,7 +542,8 @@ async function createClass(fields) {
       fields.lockByGrade === false ? 0 : 1,
       fields.lockByAge === false ? 0 : 1,
       fields.allowParentCompleteLessons ? 1 : 0,
-      fields.allowParentChat ? 1 : 0
+      fields.allowParentChat ? 1 : 0,
+      semesterId
     );
   const id = info.lastInsertRowid;
   await ensureClassRoster(id);
@@ -577,6 +598,60 @@ async function updateClass(id, fields) {
   // it) and the new one.
   await syncDayMemberRosters(fields.day);
   if (before && before.day && before.day !== fields.day) await syncDayMemberRosters(before.day);
+}
+
+// A real request: "Add bulk edit button on classes... One form popsup
+// showing title, room number, class start time and end time, open and
+// close class check boxes, description, class start date, class end
+// date, class semester selection." `patch` only carries the handful of
+// keys the admin actually filled in on that one shared form (undefined,
+// not blank, for everything else) - reusing updateClass's own full-row
+// UPDATE means every OTHER column has to be resupplied with the class's
+// own current value rather than silently resetting to a default, which
+// is exactly what this does: load each selected class, overlay just the
+// patched keys on top of its current values, and save that merged row.
+async function bulkUpdateClasses(ids, patch) {
+  let updated = 0;
+  for (const id of ids) {
+    const cls = await getClass(id);
+    if (!cls) continue;
+    await updateClass(id, {
+      day: cls.day,
+      hourPosition: cls.hour_position,
+      className: patch.className !== undefined ? patch.className : cls.class_name,
+      room: patch.room !== undefined ? patch.room : cls.room,
+      ageGroup: cls.age_group,
+      numericAges: cls.numeric_ages,
+      color: cls.color,
+      startTime: patch.startTime !== undefined ? patch.startTime : cls.start_time,
+      endTime: patch.endTime !== undefined ? patch.endTime : cls.end_time,
+      startDate: patch.startDate !== undefined ? patch.startDate : cls.start_date,
+      endDate: patch.endDate !== undefined ? patch.endDate : cls.end_date,
+      capacity: cls.capacity,
+      registrationOpen: patch.registrationOpen !== undefined ? patch.registrationOpen : !!cls.registration_open,
+      description: patch.description !== undefined ? patch.description : cls.description,
+      supplyList: cls.supply_list,
+      allowParentRegister: !!cls.allow_parent_register,
+      allowTeacherRegister: !!cls.allow_teacher_register,
+      allowStudentRegister: !!cls.allow_student_register,
+      teacherSlots: cls.teacher_slots,
+      assistantSlots: cls.assistant_slots,
+      minCapacity: cls.min_capacity,
+      allowCancel: !!cls.allow_cancel,
+      autoRefundOnCancel: !!cls.auto_refund_on_cancel,
+      priceCents: cls.price_cents,
+      pricePer: cls.price_per,
+      lockByGrade: !!cls.lock_by_grade,
+      lockByAge: !!cls.lock_by_age,
+      allowParentCompleteLessons: !!cls.allow_parent_complete_lessons,
+      allowParentChat: !!cls.allow_parent_chat,
+    });
+    if (patch.semesterId !== undefined) {
+      await setClassSemester(id, patch.semesterId);
+    }
+    updated++;
+  }
+  return updated;
 }
 
 // A real request: "sql editor copy paste should be for event photo,
@@ -660,6 +735,29 @@ async function createSemester(title) {
 
 async function deleteSemester(id) {
   await db.prepare('DELETE FROM semesters WHERE id = ?').run(id);
+}
+
+async function renameSemester(id, title) {
+  const trimmed = (title || '').trim();
+  if (!trimmed) throw new Error('A semester title is required.');
+  await db.prepare('UPDATE semesters SET title = ? WHERE id = ?').run(trimmed, id);
+}
+
+// A real bug report: "there are currently many people signed up for fall
+// 2026 classes. They aren't showing on this orientation list" - classes
+// created before createClass's own new semester-id default (above) are
+// already sitting in the database with semester_id NULL, and nothing
+// short of opening each one's Details tab by hand would ever fix that.
+// One-click bulk remediation: tag every still-unassigned class with a
+// chosen semester in one go.
+async function countClassesMissingSemester() {
+  const row = await db.prepare('SELECT COUNT(*) AS c FROM classes WHERE semester_id IS NULL').get();
+  return Number(row.c);
+}
+
+async function assignUnassignedClassesToSemester(semesterId) {
+  const info = await db.prepare('UPDATE classes SET semester_id = ? WHERE semester_id IS NULL').run(semesterId);
+  return info.changes || 0;
 }
 
 // Separate from updateClassSettings above since the value here is a
@@ -2086,6 +2184,7 @@ module.exports = {
   createClass,
   colorForClassName,
   updateClass,
+  bulkUpdateClasses,
   setClassImage,
   classImageUrl,
   CLASS_IMAGES_BUCKET,
@@ -2093,8 +2192,11 @@ module.exports = {
   saveClassGlobalSettings,
   listSemesters,
   createSemester,
+  renameSemester,
   deleteSemester,
   setClassSemester,
+  countClassesMissingSemester,
+  assignUnassignedClassesToSemester,
   updateClassSlots,
   deleteClass,
   archiveClasses,

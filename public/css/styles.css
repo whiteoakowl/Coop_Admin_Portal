@@ -3168,6 +3168,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .roster-name-col { text-align: left !important; position: sticky; left: 0; background: var(--surface); font-weight: 600; }
 .roster-table thead .roster-name-col { background: var(--brand-soft); }
 
+/* The "Add/Edit Semester" list's own rename row (partials/semester-
+   manager.ejs) - a text input + Save button sitting inline inside a
+   table cell, same small-gap-inline-flex shape as every other compact
+   form-in-a-cell in this app. */
+.semester-rename-form { display: flex; align-items: center; gap: 0.4rem; }
+.semester-rename-form input[type="text"] { flex: 1 1 auto; min-width: 8rem; }
+
 /* Event Attendance roster - a real request: "roster will show primary
    member name sub categories students and other guests in that family."
    Each family's own first row (the primary member, or first alphabetical

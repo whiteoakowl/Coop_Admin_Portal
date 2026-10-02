@@ -161,14 +161,62 @@ async function orientationLinks() {
   return byField;
 }
 
-async function setOrientationLink(field, url) {
+// A real request: "Orientation settings should be linking a training
+// already created under training to each selection... when a member
+// completes a training it will automatically register as complete in
+// the correct column next to the member." `trainingId` is a separate,
+// independent column from `link_url` on the same row (see migration
+// 20261023010000_orientation_training_link.sql) - a column can have
+// either, both, or neither, so the row is only deleted once BOTH are
+// empty rather than whenever the plain URL field alone is cleared.
+async function setOrientationLink(field, url, trainingId) {
   if (!FIELDS.includes(field)) throw new Error(`Unknown orientation field: ${field}`);
-  const trimmed = (url || '').trim();
-  if (!trimmed) {
+  const trimmedUrl = (url || '').trim() || null;
+  const tId = trainingId || null;
+  if (!trimmedUrl && !tId) {
     await db.prepare('DELETE FROM orientation_settings WHERE field = ?').run(field);
     return;
   }
-  await db.prepare('INSERT INTO orientation_settings (field, link_url) VALUES (?, ?) ON CONFLICT (field) DO UPDATE SET link_url = ?').run(field, trimmed, trimmed);
+  await db
+    .prepare(
+      `INSERT INTO orientation_settings (field, link_url, training_id) VALUES (?, ?, ?)
+       ON CONFLICT (field) DO UPDATE SET link_url = ?, training_id = ?`
+    )
+    .run(field, trimmedUrl, tId, trimmedUrl, tId);
 }
 
-module.exports = { FIELDS, orientationRows, setOrientationField, defaultSemesterId, orientationLinks, setOrientationLink };
+async function orientationTrainingLinks() {
+  const rows = await db.prepare('SELECT field, training_id FROM orientation_settings WHERE training_id IS NOT NULL').all();
+  const byField = {};
+  rows.forEach((r) => {
+    byField[r.field] = r.training_id;
+  });
+  return byField;
+}
+
+// Called from utils/training.js's own maybeFinalizeAttempt right after a
+// training attempt is finalized as passed - looks up every orientation
+// column linked to this training and marks it complete for that member.
+// Training completions aren't semester-scoped the way class enrollment
+// is, so "whichever semester Orientation itself currently defaults to"
+// (the same most-recently-created-semester fallback every other
+// semester-aware view already uses) is the closest sensible target.
+async function applyTrainingCompletion(trainingId, memberId) {
+  const rows = await db.prepare('SELECT field FROM orientation_settings WHERE training_id = ?').all(trainingId);
+  if (rows.length === 0) return;
+  const semesterId = await defaultSemesterId();
+  for (const row of rows) {
+    await setOrientationField(memberId, semesterId, row.field, true);
+  }
+}
+
+module.exports = {
+  FIELDS,
+  orientationRows,
+  setOrientationField,
+  defaultSemesterId,
+  orientationLinks,
+  setOrientationLink,
+  orientationTrainingLinks,
+  applyTrainingCompletion,
+};

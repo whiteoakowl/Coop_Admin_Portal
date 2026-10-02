@@ -15,26 +15,40 @@
         to it (a training video, an external check-in event, etc.)
         instead of being a plain label. %>
     <p class="hint">Attach a link to each orientation column - a training video, a sign-up page, or a check-in event. Leave a field blank to remove its link.</p>
+    <%# A later real request: "Orientation settings should be linking a
+        training already created under training to each selection. This
+        [way] when a member completes a training it will automatically
+        register as complete in the correct column next to the member." A
+        second, independent choice per column - the plain URL above is
+        just a clickable header link; THIS is what actually auto-checks
+        the column (utils/orientation.js's own applyTrainingCompletion,
+        called from utils/training.js whenever a training is finalized as
+        passed). %>
+    <p class="hint">Separately, link an actual Training from the Training module to a column so that completing it there automatically checks that column for that member.</p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <form method="POST" action="/admin/orientation/settings" class="member-form-grid">
-      <label class="member-form-full">Parent Orientation Link
-        <input type="url" name="video" placeholder="https://..." value="<%= links.video || '' %>" />
-      </label>
-      <label class="member-form-full">Orientation Meet Up Link
-        <input type="url" name="meetup" placeholder="https://..." value="<%= links.meetup || '' %>" />
-      </label>
-      <label class="member-form-full">Teacher Orientation Link
-        <input type="url" name="teacherTraining" placeholder="https://..." value="<%= links.teacherTraining || '' %>" />
-      </label>
-      <label class="member-form-full">Tour Link
-        <input type="url" name="tour" placeholder="https://..." value="<%= links.tour || '' %>" />
-      </label>
-      <label class="member-form-full">Open House Link
-        <input type="url" name="openHouse" placeholder="https://..." value="<%= links.openHouse || '' %>" />
-      </label>
+      <% [
+        ['video', 'Parent Orientation'],
+        ['meetup', 'Orientation Meet Up'],
+        ['teacherTraining', 'Teacher Orientation'],
+        ['tour', 'Tour'],
+        ['openHouse', 'Open House'],
+      ].forEach(function(pair) { var field = pair[0], label = pair[1]; %>
+        <label class="member-form-full"><%= label %> Link
+          <input type="url" name="<%= field %>" placeholder="https://..." value="<%= links[field] || '' %>" />
+        </label>
+        <label class="member-form-full"><%= label %> - Linked Training
+          <select name="<%= field %>TrainingId">
+            <option value="">No linked training</option>
+            <% trainings.forEach(function(t) { %>
+              <option value="<%= t.id %>" <%= trainingLinks[field] === t.id ? 'selected' : '' %>><%= t.title %></option>
+            <% }); %>
+          </select>
+        </label>
+      <% }); %>
       <div class="member-form-full">
         <button type="submit" class="primary-btn">Save Orientation Settings</button>
       </div>

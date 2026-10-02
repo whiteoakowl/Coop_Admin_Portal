@@ -15,7 +15,7 @@ const express = require('express');
 const router = express.Router();
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const db = require('../db');
-const { FIELDS, orientationRows, setOrientationField, defaultSemesterId, orientationLinks, setOrientationLink } = require('../utils/orientation');
+const { FIELDS, orientationRows, setOrientationField, defaultSemesterId, orientationLinks, setOrientationLink, orientationTrainingLinks } = require('../utils/orientation');
 
 // Shared by every page in this router - `?semesterId=` if given, else the
 // most recently created semester, else null (the fallback "every class
@@ -63,12 +63,18 @@ router.post('/orientation/:memberId/toggle', requireFullAdmin, async (req, res) 
 // link out to the actual training video or check-in event.
 router.get('/orientation/settings', requireFullAdmin, async (req, res) => {
   const links = await orientationLinks();
-  res.render('admin-orientation-settings', { title: 'Orientation Settings', links, notice: req.query.notice || null, error: req.query.error || null });
+  const trainingLinks = await orientationTrainingLinks();
+  // Draft/archived trainings can still be linked (an admin may set this
+  // up before publishing, or keep it after archiving a training that's
+  // done its job) - every training is offered, not just published ones.
+  const trainings = await db.prepare('SELECT id, title FROM trainings ORDER BY title').all();
+  res.render('admin-orientation-settings', { title: 'Orientation Settings', links, trainingLinks, trainings, notice: req.query.notice || null, error: req.query.error || null });
 });
 
 router.post('/orientation/settings', requireFullAdmin, async (req, res) => {
   for (const field of FIELDS) {
-    await setOrientationLink(field, req.body[field]);
+    const trainingId = req.body[field + 'TrainingId'] ? parseInt(req.body[field + 'TrainingId'], 10) : null;
+    await setOrientationLink(field, req.body[field], trainingId);
   }
   res.redirect('/admin/orientation/settings?notice=' + encodeURIComponent('Orientation settings saved.'));
 });

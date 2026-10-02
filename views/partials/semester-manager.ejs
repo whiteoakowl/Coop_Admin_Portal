@@ -1,0 +1,79 @@
+<%
+// locals: semesters, missingSemesterCount, backUrl (optional - where each
+// form's own POST redirects back to; defaults to the Settings tab). Used
+// both by the Settings tab (its original home) and the new "Add/Edit
+// Semester" dialog on the Monday/Wednesday Classes page itself (a real
+// request: "on class page add a button that says add/edit semester").
+const semesterBackUrl = typeof backUrl !== 'undefined' && backUrl ? backUrl : '/admin/schedule?tab=settings';
+%>
+<section class="portal-dashboard-card portal-dashboard-card-wide">
+  <h2>Add a Semester</h2>
+  <form method="POST" action="/admin/schedule/semesters" class="member-form-grid">
+    <input type="hidden" name="back" value="<%= semesterBackUrl %>" />
+    <label class="member-form-full">Title
+      <input type="text" name="title" placeholder="e.g. Fall 2026" required />
+    </label>
+    <div class="member-form-full">
+      <button type="submit" class="primary-btn">Add Semester</button>
+    </div>
+  </form>
+</section>
+
+<%# A real bug report: "there are currently many people signed up for
+    fall 2026 classes. They aren't showing on this orientation list" -
+    classes created before a semester existed (or before a semester was
+    picked up by default) are stuck with no semester at all. One-click
+    fix instead of opening each class's own Details tab by hand. %>
+<% if (missingSemesterCount > 0) { %>
+  <section class="portal-dashboard-card portal-dashboard-card-wide">
+    <h2>Classes With No Semester</h2>
+    <p class="hint"><%= missingSemesterCount %> class<%= missingSemesterCount === 1 ? '' : 'es' %> <%= missingSemesterCount === 1 ? 'has' : 'have' %> no semester assigned, so <%= missingSemesterCount === 1 ? 'it' : 'they' %> won't show up on Orientation (or any other semester-filtered page) while a specific semester is selected. Assign <%= missingSemesterCount === 1 ? 'it' : 'them all' %> at once:</p>
+    <form method="POST" action="/admin/schedule/semesters/assign-missing" class="member-form-grid">
+      <input type="hidden" name="back" value="<%= semesterBackUrl %>" />
+      <label class="member-form-full">Assign To
+        <select name="semesterId" required>
+          <option value="">Choose a semester...</option>
+          <% semesters.forEach(function(s) { %>
+            <option value="<%= s.id %>"><%= s.title %></option>
+          <% }); %>
+        </select>
+      </label>
+      <div class="member-form-full">
+        <button type="submit" class="primary-btn">Assign</button>
+      </div>
+    </form>
+  </section>
+<% } %>
+
+<section class="portal-dashboard-section">
+  <% if (semesters.length === 0) { %>
+    <p class="roster-empty">No semesters yet.</p>
+  <% } else { %>
+    <div class="roster-scroll">
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr><th>Title</th><th></th></tr>
+        </thead>
+        <tbody>
+          <% semesters.forEach(function(s) { %>
+            <tr>
+              <td class="roster-name-col">
+                <form method="POST" action="/admin/schedule/semesters/<%= s.id %>/rename" class="semester-rename-form">
+                  <input type="hidden" name="back" value="<%= semesterBackUrl %>" />
+                  <input type="text" name="title" value="<%= s.title %>" aria-label="Rename <%= s.title %>" required />
+                  <button type="submit" class="roster-action-btn">Save</button>
+                </form>
+              </td>
+              <td>
+                <form method="POST" action="/admin/schedule/semesters/<%= s.id %>/delete" data-confirm="Delete the &quot;<%= s.title %>&quot; semester? Classes assigned to it will show No Semester.">
+                  <input type="hidden" name="back" value="<%= semesterBackUrl %>" />
+                  <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>

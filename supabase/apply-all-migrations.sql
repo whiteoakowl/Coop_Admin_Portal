@@ -4075,7 +4075,6 @@ create table if not exists event_organizers (
 );
 create index if not exists idx_event_organizers_event on event_organizers(event_id);
 
-
 -- ===== 20261020010000_event_settings_split_auto_approve.sql =====
 -- A real request: "Main admin, events, settings, under allow families to
 -- submit events calendar events? It should just say yes or no.
@@ -4093,7 +4092,6 @@ update event_settings set auto_approve_family_submissions = 1, family_submit_eve
 alter table event_settings drop constraint if exists event_settings_family_submit_events_check;
 alter table event_settings add constraint event_settings_family_submit_events_check check (family_submit_events in ('yes', 'no'));
 
-
 -- ===== 20261020020000_forum_chat_room.sql =====
 -- A real request: "main admin, chat tab, add chat room where people can
 -- talk to each other in a live continuous feed." A chat room is a
@@ -4106,7 +4104,6 @@ alter table event_settings add constraint event_settings_family_submit_events_ch
 alter table forum_categories add column if not exists is_chat_room integer not null default 0;
 alter table forum_categories add column if not exists room_thread_id integer references forum_threads(id) on delete set null;
 
-
 -- ===== 20261021010000_signup_volunteer_list_open.sql =====
 -- A real request: "volunteer lists, click on a list and add... enable
 -- button when you click it members can signup on the list. Enable button
@@ -4118,7 +4115,6 @@ alter table forum_categories add column if not exists room_thread_id integer ref
 -- lists.js), never the GET view.
 alter table volunteer_signup_lists add column if not exists is_open integer not null default 1;
 alter table sign_up_lists add column if not exists is_open integer not null default 1;
-
 
 -- ===== 20261021020000_event_volunteer_donation_food_requirement_scope.sql =====
 -- A real request: "On volunteer, donations and food signup pages there
@@ -4134,7 +4130,6 @@ alter table sign_up_lists add column if not exists is_open integer not null defa
 alter table events add column if not exists volunteer_requirement_scope text not null default 'family' check (volunteer_requirement_scope in ('attendee', 'family'));
 alter table events add column if not exists donation_requirement_scope text not null default 'family' check (donation_requirement_scope in ('attendee', 'family'));
 alter table events add column if not exists food_requirement_scope text not null default 'family' check (food_requirement_scope in ('attendee', 'family'));
-
 
 -- ===== 20261022010000_store_settings.sql =====
 -- Main Admin > Shop > Settings - "add a subpage called settings. This is
@@ -4163,3 +4158,19 @@ create table if not exists store_settings (
   updated_at text not null default now_text()
 );
 insert into store_settings (id) values (1) on conflict (id) do nothing;
+
+-- ===== 20261023010000_orientation_training_link.sql =====
+-- A real request: "Orientation settings should be linking a training
+-- already created under training to each selection. This was when a
+-- member completes a training it will automatically register as
+-- complete in the correct column next to the member." The existing
+-- orientation_settings table (see 20261012010000_orientation_semesters.
+-- sql) already lets each column's header link out to a plain URL - this
+-- is a separate, deeper mechanism: an actual trainings.id reference per
+-- column, read by utils/training.js's own maybeFinalizeAttempt to
+-- auto-call setOrientationField whenever a member passes that training.
+-- link_url now needs to be nullable too, since a column can have a
+-- linked training with no header URL at all.
+alter table orientation_settings alter column link_url drop not null;
+alter table orientation_settings add column if not exists training_id integer references trainings(id) on delete set null;
+
