@@ -21,10 +21,8 @@ const db = require('../db');
 const events = require('../utils/events');
 const { activeParentOptionsWithEmail } = require('../utils/members');
 const {
-  listSignUpLists,
   getSignUpList,
   updateSignUpList,
-  listVolunteerLists,
   getVolunteerList,
   updateVolunteerList,
   signUpListsForEvent,
@@ -495,13 +493,6 @@ router.get('/new', async (req, res) => {
   // routes/main-admin-name-tags.js already compute per-request for a
   // shareable link, shown as static text in front of the slug input.
   const origin = `${req.protocol}://${req.get('host')}`;
-  // A real request: "drop down with title, add a volunteer list.
-  // Dropdown with title add a signup list" - only lists not already tied
-  // to a different event are offered, since attaching one here means
-  // giving it this brand-new event's id (utils/committeesAndSignupLists.js's
-  // own event_id column, already nullable/optional everywhere else it's
-  // used).
-  const [allSignUpLists, allVolunteerLists] = await Promise.all([listSignUpLists(), listVolunteerLists()]);
   res.render('admin-events-new', {
     title: 'Create New Event',
     origin,
@@ -510,8 +501,6 @@ router.get('/new', async (req, res) => {
     sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
     gradeOptions: events.GRADE_OPTIONS,
     eventTypes: events.EVENT_TYPES,
-    availableSignUpLists: allSignUpLists.filter((l) => !l.event_id),
-    availableVolunteerLists: allVolunteerLists.filter((l) => !l.event_id),
     error: req.query.error || null,
   });
 });

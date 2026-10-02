@@ -27,33 +27,18 @@
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <%
-    // A real request originally set this up as Details/Tickets/
-    // Permissions. A later real request ("Price, charged per person...
-    // are not needed. All pricing will happen with adding ticket
-    // pricing, even if it is only one ticket") retired the flat-price
-    // Tickets step entirely - a real Ticket Type needs the event to
-    // already exist (it's its own row, FK'd to the event id), so that
-    // happens after creation, on the Finance tab, same as it already
-    // does for an existing event. Step definitions drive both the circle
-    // strip and the button-label logic below, so a step added here shows
-    // up as a circle automatically.
-    var wizardSteps = [
-      { n: 1, label: 'Details' },
-      { n: 2, label: 'Permissions' },
-    ];
-    %>
-    <div class="event-wizard-steps" data-wizard-steps>
-      <% wizardSteps.forEach(function(s, i) { %>
-        <button type="button" class="event-wizard-step<%= i === 0 ? ' active' : '' %>" data-step-tab="<%= s.n %>">
-          <span class="event-wizard-step-circle"><%= s.n %></span>
-          <span class="event-wizard-step-label"><%= s.label %></span>
-        </button>
-      <% }); %>
-    </div>
-
+    <%# A real request chain: originally a 3-step Details/Tickets/
+        Permissions wizard, then Tickets was retired (a real Ticket Type
+        needs the event to already exist - that happens after creation,
+        on the Finance tab), then finally: "no permissions page when
+        creating the event. Access to permissions for an event will come
+        after creation of the event. So event creation will now just be
+        one page." Permissions (Grade Restriction/Who Can Register/
+        Sections) is folded into this same page below instead of its own
+        step - no more step circles/Back-Continue navigation needed for
+        just one page. %>
     <form id="event-wizard-form" method="POST" action="/main-admin/events" enctype="multipart/form-data">
-      <div class="manage-section event-wizard-panel" data-step-panel="1">
+      <div class="manage-section">
         <h2>Event Details</h2>
         <div class="member-form-grid">
           <label class="member-form-full">Event Title <span class="required-star">*</span>
@@ -97,19 +82,31 @@
         </div>
 
         <h3 class="event-wizard-subheading">Date &amp; Time</h3>
+        <%# A real request: "dates and times options should be separated.
+            Date should be a calendar picker, time should be a clock
+            picker" - the exact same partials/date-range-picker.ejs
+            (calendar date input + time-of-day <select>, recombined
+            client-side by public/js/event-date-time-picker.js into the
+            same startsAt/endsAt/registrationOpensAt/registrationClosesAt
+            "YYYY-MM-DDTHH:MM" hidden value this form always submitted)
+            the per-event builder's own Details/Settings tabs already use -
+            see that partial's own header comment. %>
         <div class="member-form-grid">
-          <label>Starts <span class="required-star">*</span>
-            <input type="datetime-local" name="startsAt" required />
-          </label>
-          <label>Ends
-            <input type="datetime-local" name="endsAt" />
-          </label>
-          <label>Registration Opens
-            <input type="datetime-local" name="registrationOpensAt" />
-          </label>
-          <label>Registration Closes
-            <input type="datetime-local" name="registrationClosesAt" />
-          </label>
+          <%- include('partials/date-range-picker', {
+            startGroup: 'starts', endGroup: 'ends',
+            startDateLabel: 'Start Date', endDateLabel: 'End Date',
+            startTimeLabel: 'Start Time', endTimeLabel: 'End Time',
+            startDate: '', startTime: '', endDate: '', endTime: '',
+            startFieldName: 'startsAt', endFieldName: 'endsAt',
+            startRequired: true,
+          }) %>
+          <%- include('partials/date-range-picker', {
+            startGroup: 'regOpens', endGroup: 'regCloses',
+            startDateLabel: 'Registration Opens Date', endDateLabel: 'Registration Closes Date',
+            startTimeLabel: 'Registration Opens Time', endTimeLabel: 'Registration Closes Time',
+            startDate: '', startTime: '', endDate: '', endTime: '',
+            startFieldName: 'registrationOpensAt', endFieldName: 'registrationClosesAt',
+          }) %>
         </div>
 
         <h3 class="event-wizard-subheading">Location &amp; Capacity</h3>
@@ -145,32 +142,14 @@
           </label>
         </div>
 
-        <%
-        // A real request: "drop down with title, add a volunteer list.
-        // Dropdown with title add a signup list" - picks one already-
-        // existing, not-yet-attached list of each kind to give this
-        // event's own id once it's created (routes/main-admin-volunteers.js
-        // is still where a brand new list itself gets built).
-        %>
-        <h3 class="event-wizard-subheading">Volunteers &amp; Sign-Ups</h3>
-        <div class="member-form-grid">
-          <label>Add a Volunteer List
-            <select name="volunteerListId">
-              <option value="">None</option>
-              <% availableVolunteerLists.forEach(function(l) { %>
-                <option value="<%= l.id %>"><%= l.title %></option>
-              <% }); %>
-            </select>
-          </label>
-          <label>Add a Signup List
-            <select name="signupListId">
-              <option value="">None</option>
-              <% availableSignUpLists.forEach(function(l) { %>
-                <option value="<%= l.id %>"><%= l.title %></option>
-              <% }); %>
-            </select>
-          </label>
-        </div>
+        <%# A real request: "remove volunteer signups from page 1. That
+            feature is only available under its own tab after initially
+            creating the event." The "Add a Volunteer List / Add a Signup
+            List" dropdowns that used to live here are gone - the
+            per-event builder's own Volunteers/Resources tab is where
+            volunteer roles (and, for a pre-existing standalone list,
+            whatever a future admin-facing attach flow looks like) are
+            managed from now on, same as every other section. %>
 
         <h3 class="event-wizard-subheading">Event Image</h3>
         <label class="member-form-full">Choose an Image <span class="hint">(optional)</span>
@@ -184,16 +163,15 @@
           </div>
         </div>
 
-        <div class="event-wizard-footer">
-          <a class="btn-secondary" href="/main-admin/events">Cancel</a>
-          <div class="event-wizard-footer-right">
-            <button type="button" class="primary-btn" data-next-step>Save &amp; Continue</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="manage-section event-wizard-panel" data-step-panel="2" hidden>
-        <h2>Permissions</h2>
+        <%# A real request: "no permissions page when creating the event.
+            Access to permissions for an event will come after creation of
+            the event." Folded directly onto this one page instead of its
+            own step - every field here already has the exact same
+            sensible defaults (allow adults/kids, no grade or section
+            restriction) when a raw create POST doesn't send them at all,
+            same as this page now never does; the per-event builder's own
+            Settings tab is where they're ever changed again. %>
+        <h3 class="event-wizard-subheading">Permissions</h3>
         <div class="member-form-full">
           <span class="roster-checkbox-label">Grade Restriction <span class="hint">(leave all unchecked to allow every grade)</span></span>
           <%- include('partials/multi-select-checkbox', {
@@ -239,15 +217,21 @@
             checkbox trio that used to sit here - Volunteers/Donations
             still default to on and Food to off either way
             (routes/admin-events.js's own registrationFieldsFromBody reads
-            them as unset, not unchecked, when the wizard never submits
+            them as unset, not unchecked, when this page never submits
             these fields at all), and every section's own on/off switch,
             plus its actual items (volunteer roles, donation items, food
             items, ticket types), are all one stop on the full builder
             this draft opens into next. %>
         <p class="hint">Creating the draft below takes you to this event's full editor, where Settings, Finance (including Ticket Types), Attendance, and Volunteers/Donations/Food/Extra Fields are all ready to fill in - and where you can publish it when it's ready.</p>
 
+        <%# A real request: "Save/continue and cancel buttons should be the
+            same height and font size" - both are now plain siblings in
+            the same row (no more Back button to tell apart from Cancel),
+            and public/css/styles.css's own .event-wizard-footer-right
+            rule gives .btn-secondary the same box model as .primary-btn
+            right here so neither reads as the "smaller" option. %>
         <div class="event-wizard-footer">
-          <button type="button" class="btn-secondary" data-prev-step>&larr; Back</button>
+          <a class="btn-secondary" href="/main-admin/events">Cancel</a>
           <div class="event-wizard-footer-right">
             <button type="submit" name="status" value="draft" class="primary-btn">Create Draft</button>
           </div>
@@ -259,5 +243,6 @@
   <script src="/js/tag-input.js"></script>
   <script src="/js/event-wizard.js"></script>
   <script src="/js/multi-select-checkbox.js"></script>
+  <script src="/js/event-date-time-picker.js"></script>
 </body>
 </html>

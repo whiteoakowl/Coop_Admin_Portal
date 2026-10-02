@@ -10069,7 +10069,20 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 }
 
 .event-wizard-panel h2 { margin-top: 0; }
-.event-wizard-subheading { margin: 1.5rem 0 0.75rem; font-size: 1rem; }
+/* A real request: "Help distinguish between sections on this detail page
+   with section titles or lines between the sections, maybe both" - this
+   page went from two separate steps (Details, Permissions) down to one
+   long page, so a plain top border (the same divider language
+   .event-wizard-footer's own border-top already uses) on every one of
+   these subheadings reads as a clean section break, not just a change in
+   font size. */
+.event-wizard-subheading {
+  margin: 1.5rem 0 0.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 1rem;
+}
+.event-wizard-subheading:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
 .event-wizard-media-note { display: flex; align-items: center; gap: 0.4rem; margin-top: 1.25rem; }
 .event-wizard-media-note .icon { width: 1rem; height: 1rem; flex-shrink: 0; }
 .event-wizard-footer {
@@ -10083,9 +10096,32 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 }
 .event-wizard-footer-right { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 /* Same margin-top reset as .event-wizard-header-actions above, for this
-   step's own Back/Create Draft row. */
+   row's own Create Draft button. */
 .event-wizard-footer-right .primary-btn { margin-top: 0; }
 .event-wizard-footer-right button { white-space: nowrap; }
+/* A real request: "Save/continue and cancel buttons should be the same
+   height and font size." Cancel is a plain .btn-secondary, which
+   normally uses the smaller --control-padding-compact/
+   --control-font-size-compact sizing (dialog Close buttons, etc.) -
+   bumped up here to match .primary-btn's own box model exactly so the
+   two read as equally-weighted choices instead of Cancel looking like
+   an afterthought next to Create Draft. Both also get the same explicit
+   line-height - .btn-secondary's own default (1.3) and .primary-btn's
+   (unset, so whatever the browser's normal line-height happens to be)
+   otherwise still rendered a few pixels apart in total height even once
+   padding/font-size matched exactly. */
+.event-wizard-footer .btn-secondary,
+.event-wizard-footer .primary-btn {
+  padding: 0.85rem 1.5rem;
+  font-size: 1rem;
+  line-height: 1.2;
+  /* .btn-secondary's own border-color always matches its own
+     background (invisible either way), but .primary-btn has none at
+     all - without a matching 1px transparent border here, .primary-btn
+     would still render 2px shorter than .btn-secondary overall despite
+     every other box-model property above now matching exactly. */
+  border: 1px solid transparent;
+}
 .required-star { color: var(--red); font-weight: 700; }
 
 /* Tags field (Create New Event, Additional step) - type-and-Enter chip

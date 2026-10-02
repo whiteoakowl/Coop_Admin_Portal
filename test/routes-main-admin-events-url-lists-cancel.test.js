@@ -2,7 +2,12 @@
 // - "event slug should say event url. It should show the web address
 //   then finish with the text box to add the custom ending" (creation)
 // - "drop down with title, add a volunteer list. Dropdown with title
-//   add a signup list" (creation)
+//   add a signup list" (creation) - a later real request ("remove
+//   volunteer signups from page 1. That feature is only available under
+//   its own tab after initially creating the event") removed the
+//   dropdowns themselves from the Create Event page, but the underlying
+//   attach-an-existing-list-by-id capability this test also covers still
+//   works the same way via a direct POST.
 // - "location (legacy text - prefer the dropdown below). Should say
 //   location details" (edit)
 // - "cancel event button should leave the event on the calendar but the
@@ -72,7 +77,7 @@ test('New Event wizard: Event URL shows the site origin ahead of the slug input,
   assert.match(page.text, /name="slug"/);
 });
 
-test('New Event wizard: Add a Volunteer List / Add a Signup List dropdowns list only unattached lists, and picking one attaches it on create', async () => {
+test('New Event page: no Add a Volunteer List / Add a Signup List dropdowns any more - a direct POST with those ids still attaches the lists', async () => {
   const admin = await loginAsMainAdmin();
 
   const vlRes = await request(app)
@@ -90,10 +95,10 @@ test('New Event wizard: Add a Volunteer List / Add a Signup List dropdowns list 
   const signupListId = Number(/\/signup-lists\/(\d+)/.exec(slRes.headers.location)[1]);
 
   const page = await request(app).get('/main-admin/events/new').set('Cookie', admin.cookie);
-  assert.match(page.text, /Add a Volunteer List/);
-  assert.match(page.text, new RegExp(`<option value="${volunteerListId}">Setup Crew List</option>`));
-  assert.match(page.text, /Add a Signup List/);
-  assert.match(page.text, new RegExp(`<option value="${signupListId}">Potluck Sign-Up</option>`));
+  assert.doesNotMatch(page.text, /Add a Volunteer List/);
+  assert.doesNotMatch(page.text, /Add a Signup List/);
+  assert.doesNotMatch(page.text, /Setup Crew List/);
+  assert.doesNotMatch(page.text, /Potluck Sign-Up/);
 
   const eventId = await createEvent(admin, { volunteerListId: String(volunteerListId), signupListId: String(signupListId) });
 
@@ -101,12 +106,6 @@ test('New Event wizard: Add a Volunteer List / Add a Signup List dropdowns list 
   assert.equal(attachedVl.event_id, eventId);
   const attachedSl = await db.prepare('SELECT event_id FROM sign_up_lists WHERE id = ?').get(signupListId);
   assert.equal(attachedSl.event_id, eventId);
-
-  // Already attached to an event now, so it should no longer be offered
-  // as "unattached" on a second event's own creation page.
-  const secondNewPage = await request(app).get('/main-admin/events/new').set('Cookie', admin.cookie);
-  assert.doesNotMatch(secondNewPage.text, /Setup Crew List/);
-  assert.doesNotMatch(secondNewPage.text, /Potluck Sign-Up/);
 });
 
 test('Event edit: "Location (legacy text...)" label now reads "Location Details"', async () => {
