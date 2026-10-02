@@ -10068,21 +10068,23 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
   .event-wizard-step-label { display: none; }
 }
 
-.event-wizard-panel h2 { margin-top: 0; }
-/* A real request: "Help distinguish between sections on this detail page
-   with section titles or lines between the sections, maybe both" - this
-   page went from two separate steps (Details, Permissions) down to one
-   long page, so a plain top border (the same divider language
+/* A real request: "Show better definition with lines for the different
+   sections" - a plain top border (the same divider language
    .event-wizard-footer's own border-top already uses) on every one of
    these subheadings reads as a clean section break, not just a change in
-   font size. */
+   font size. Deliberately NOT skipped on the first one any more - a
+   real bug report ("there should be space between date and description
+   box") traced to an earlier :first-of-type reset here that assumed the
+   first subheading always sits directly under this page's own <h2>, but
+   Event Description (a whole rich-text editor's worth of content) now
+   comes between them, so it needs its own margin/padding/border exactly
+   like every other section here. */
 .event-wizard-subheading {
   margin: 1.5rem 0 0.75rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--border);
   font-size: 1rem;
 }
-.event-wizard-subheading:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
 .event-wizard-media-note { display: flex; align-items: center; gap: 0.4rem; margin-top: 1.25rem; }
 .event-wizard-media-note .icon { width: 1rem; height: 1rem; flex-shrink: 0; }
 .event-wizard-footer {

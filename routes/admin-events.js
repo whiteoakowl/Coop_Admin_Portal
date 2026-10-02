@@ -498,8 +498,6 @@ router.get('/new', async (req, res) => {
     origin,
     categories: await events.listCategories(),
     locations: await events.listLocations(),
-    sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
-    gradeOptions: events.GRADE_OPTIONS,
     eventTypes: events.EVENT_TYPES,
     error: req.query.error || null,
   });

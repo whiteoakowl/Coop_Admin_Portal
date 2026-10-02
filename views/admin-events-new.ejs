@@ -30,13 +30,14 @@
     <%# A real request chain: originally a 3-step Details/Tickets/
         Permissions wizard, then Tickets was retired (a real Ticket Type
         needs the event to already exist - that happens after creation,
-        on the Finance tab), then finally: "no permissions page when
-        creating the event. Access to permissions for an event will come
-        after creation of the event. So event creation will now just be
-        one page." Permissions (Grade Restriction/Who Can Register/
-        Sections) is folded into this same page below instead of its own
-        step - no more step circles/Back-Continue navigation needed for
-        just one page. %>
+        on the Finance tab), then: "no permissions page when creating the
+        event... event creation will now just be one page," finally
+        sharpened to "Who can register and permissions should not be on
+        event creation at all. Only after event creation when editing the
+        event details you can then edit those items and see those
+        features" - Permissions (Grade Restriction/Who Can Register/
+        Sections) isn't on this page in any form any more; the per-event
+        builder's own Settings tab is the only place it's ever set. %>
     <form id="event-wizard-form" method="POST" action="/main-admin/events" enctype="multipart/form-data">
       <div class="manage-section">
         <h2>Event Details</h2>
@@ -73,12 +74,20 @@
               <span class="class-form-char-count">0/150</span>
             </div>
           </div>
-          <div class="member-form-full" data-forum-editor>
-            <label>Event Description <span class="required-star">*</span></label>
-            <%- include('partials/forum-editor-toolbar') %>
-            <div class="forum-editable" data-forum-editable contenteditable="true"></div>
-            <input type="hidden" name="description" data-forum-body-input required />
-          </div>
+        </div>
+
+        <%# A real request: "Description box title should be the same size
+            as other section titles" - promoted from a plain <label> (a
+            contenteditable rich-text box isn't a real form control a
+            <label> can associate with anyway) to the same
+            .event-wizard-subheading every other section here already
+            uses, as its own section rather than buried inside the Event
+            Details grid above it. %>
+        <h3 class="event-wizard-subheading">Event Description <span class="required-star">*</span></h3>
+        <div class="member-form-full" data-forum-editor>
+          <%- include('partials/forum-editor-toolbar') %>
+          <div class="forum-editable" data-forum-editable contenteditable="true"></div>
+          <input type="hidden" name="description" data-forum-body-input required />
         </div>
 
         <h3 class="event-wizard-subheading">Date &amp; Time</h3>
@@ -163,66 +172,21 @@
           </div>
         </div>
 
-        <%# A real request: "no permissions page when creating the event.
-            Access to permissions for an event will come after creation of
-            the event." Folded directly onto this one page instead of its
-            own step - every field here already has the exact same
-            sensible defaults (allow adults/kids, no grade or section
-            restriction) when a raw create POST doesn't send them at all,
-            same as this page now never does; the per-event builder's own
-            Settings tab is where they're ever changed again. %>
-        <h3 class="event-wizard-subheading">Permissions</h3>
-        <div class="member-form-full">
-          <span class="roster-checkbox-label">Grade Restriction <span class="hint">(leave all unchecked to allow every grade)</span></span>
-          <%- include('partials/multi-select-checkbox', {
-            name: 'ageGroup',
-            options: gradeOptions.map(function(g) { return { value: g, label: g }; }),
-            selected: [],
-            placeholder: 'All grades',
-          }) %>
-        </div>
-
-        <%
-        // A real request: "guests can register should only be a check box
-        // under who can register with parent and student options."
-        %>
-        <h3 class="event-wizard-subheading">Who Can Register</h3>
-        <div class="class-form-row">
-          <div class="class-form-field">
-            <input type="hidden" name="allowAdultRegister" value="off" />
-            <label class="grade-pill"><input type="checkbox" name="allowAdultRegister" value="1" checked /> Parents/adults can register</label>
-          </div>
-          <div class="class-form-field">
-            <input type="hidden" name="allowChildRegister" value="off" />
-            <label class="grade-pill"><input type="checkbox" name="allowChildRegister" value="1" checked /> Kids can register</label>
-          </div>
-          <div class="class-form-field">
-            <label class="grade-pill"><input type="checkbox" name="allowGuestRegister" value="1" /> Guests can register</label>
-          </div>
-        </div>
-
-        <% if (sections.length) { %>
-          <h3 class="event-wizard-subheading">Sections <span class="hint">(leave all unchecked to allow every section - restricts BOTH viewing and registering)</span></h3>
-          <div class="grade-pill-grid">
-            <% sections.forEach(function(s) { %>
-              <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" /> <%= s.name %></label>
-            <% }); %>
-          </div>
-        <% } %>
-
-        <%# A real request: "Don't ask for volunteer, food, extra fields or
-            donations during initial event creation... Then you can go in
-            and use the full editing features and add donations,
-            volunteers, extra fields and food." Removed the Event Sections
-            checkbox trio that used to sit here - Volunteers/Donations
-            still default to on and Food to off either way
-            (routes/admin-events.js's own registrationFieldsFromBody reads
-            them as unset, not unchecked, when this page never submits
-            these fields at all), and every section's own on/off switch,
-            plus its actual items (volunteer roles, donation items, food
-            items, ticket types), are all one stop on the full builder
-            this draft opens into next. %>
-        <p class="hint">Creating the draft below takes you to this event's full editor, where Settings, Finance (including Ticket Types), Attendance, and Volunteers/Donations/Food/Extra Fields are all ready to fill in - and where you can publish it when it's ready.</p>
+        <%# A real request: "Who can register and permissions should not be
+            on event creation at all. Only after event creation when
+            editing the event details you can then edit those items and
+            see those features." No Grade Restriction/Who Can
+            Register/Sections fields anywhere on this page - every one of
+            them already has the exact same sensible default (allow
+            adults/kids, no grade or section restriction) when a raw
+            create POST doesn't send them at all, same as this page now
+            never does. Same reasoning already applied to Volunteers/
+            Donations/Food/Extra Fields (a real request: "Don't ask for
+            volunteer, food, extra fields or donations during initial
+            event creation... Then you can go in and use the full editing
+            features") - the per-event builder's own Settings/Finance/
+            Volunteers tabs are the only place any of this is ever set. %>
+        <p class="hint">Creating the draft below takes you to this event's full editor, where Settings (including Permissions and Who Can Register), Finance (including Ticket Types), Attendance, and Volunteers/Donations/Food/Extra Fields are all ready to fill in - and where you can publish it when it's ready.</p>
 
         <%# A real request: "Save/continue and cancel buttons should be the
             same height and font size" - both are now plain siblings in
@@ -242,7 +206,6 @@
   <script src="/js/forum-editor.js"></script>
   <script src="/js/tag-input.js"></script>
   <script src="/js/event-wizard.js"></script>
-  <script src="/js/multi-select-checkbox.js"></script>
   <script src="/js/event-date-time-picker.js"></script>
 </body>
 </html>

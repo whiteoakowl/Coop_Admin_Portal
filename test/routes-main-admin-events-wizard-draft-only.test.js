@@ -4,11 +4,13 @@
 // charged per person, and payment title are not needed. All pricing will
 // happen with adding ticket pricing, even if it is only one ticket" (a
 // real Ticket Type needs the event to already exist, so the old flat-
-// price Tickets step is gone along with Publish), and "no permissions
-// page when creating the event... event creation will now just be one
-// page" (the old Permissions step's own fields - Grade Restriction, Who
-// Can Register, Sections - are folded directly onto this one page
-// instead, with the same built-in defaults applying either way).
+// price Tickets step is gone along with Publish), and "Who can register
+// and permissions should not be on event creation at all. Only after
+// event creation when editing the event details you can then edit those
+// items and see those features" (Grade Restriction/Who Can Register/
+// Sections aren't on this page in any form - not even folded into the
+// single page an earlier, looser reading of "one page" had tried - the
+// same built-in defaults apply either way).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -46,7 +48,7 @@ async function loginAsMainAdmin() {
   return { cookie, csrfToken: extractCsrf(page.text) };
 }
 
-test('Create Event page: no Publish button, no step circles/Tickets step, and Permissions is folded directly onto the one page', async () => {
+test('Create Event page: no Publish button, no step circles/Tickets step, and no Permissions fields anywhere', async () => {
   const admin = await loginAsMainAdmin();
   const res = await request(app).get('/main-admin/events/new').set('Cookie', admin.cookie);
   assert.equal(res.status, 200);
@@ -66,12 +68,42 @@ test('Create Event page: no Publish button, no step circles/Tickets step, and Pe
   assert.doesNotMatch(res.text, /name="priceDollars"/);
   assert.doesNotMatch(res.text, /name="pricePer"/);
 
-  // Permissions content lives directly on this page now, not its own step.
-  assert.match(res.text, /Grade Restriction/);
-  assert.match(res.text, /Who Can Register/);
-  assert.match(res.text, /name="allowAdultRegister" value="1" checked/);
-  assert.match(res.text, /name="allowChildRegister" value="1" checked/);
-  assert.match(res.text, /name="allowGuestRegister" value="1"(?! checked)/);
+  // A real request: "Who can register and permissions should not be on
+  // event creation at all." Not even folded into the page - gone
+  // entirely (the page's own closing hint paragraph still legitimately
+  // mentions "Who Can Register" by name as a pointer to where it now
+  // lives, so that phrase itself isn't part of this check).
+  assert.doesNotMatch(res.text, /Grade Restriction/);
+  assert.doesNotMatch(res.text, /name="allowAdultRegister"/);
+  assert.doesNotMatch(res.text, /name="allowChildRegister"/);
+  assert.doesNotMatch(res.text, /name="allowGuestRegister"/);
+  assert.doesNotMatch(res.text, /name="sectionIds"/);
+});
+
+test('Create Event: a raw create POST with no Permissions fields at all (the only way this page ever submits now) keeps the same built-in defaults as always', async () => {
+  const admin = await loginAsMainAdmin();
+  const res = await request(app)
+    .post('/main-admin/events')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'No Permissions Fields Event', startsAt: '2027-09-01T18:00', _csrf: admin.csrfToken });
+  const eventId = Number(/\/main-admin\/events\/(\d+)\/builder/.exec(res.headers.location)[1]);
+  const event = await db.prepare('SELECT allow_adult_register, allow_child_register, allow_guest_register, age_group FROM events WHERE id = ?').get(eventId);
+  assert.equal(event.allow_adult_register, 1);
+  assert.equal(event.allow_child_register, 1);
+  assert.equal(event.allow_guest_register, 0);
+  assert.equal(event.age_group, null);
+
+  const sectionRows = await db.prepare('SELECT * FROM event_sections WHERE event_id = ?').all(eventId);
+  assert.equal(sectionRows.length, 0, 'no sections should be locked without any sectionIds submitted');
+
+  // Confirms the per-event builder's own Settings tab is still where all
+  // of this is reachable afterward (its own section labels: "Grade
+  // Level" for the age-group restriction, "Registration Settings" for
+  // who-can-register).
+  const settingsTab = await request(app).get(`/main-admin/events/${eventId}/builder?tab=settings`).set('Cookie', admin.cookie);
+  assert.match(settingsTab.text, /Grade Level/);
+  assert.match(settingsTab.text, /Include parents in the list of possible registrants/);
 });
 
 test('Create Event page: Cancel and Create Draft are sized the same (same padding/font-size), and date/time fields are separate calendar + clock pickers', async () => {
