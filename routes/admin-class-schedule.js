@@ -857,16 +857,46 @@ router.post('/class-schedule/archive/delete-all', requireFullAdmin, async (req, 
 // no way for the admin to tell what happened or for it to get reported
 // back accurately. Wrapping each in try/catch surfaces the real
 // underlying message via the existing error-banner redirect instead.
+// A real request: "when deleting someone from the class roster the page
+// should not refresh. It should stay on the roster and the name should
+// disappear. If you add someone... the page should not refresh. The
+// person should appear on the list." Both routes below now also answer
+// an Accept: application/json request (same convention as the roster/add
+// route above) with no redirect - public/js/class-roster-ajax.js drives
+// them from the Student Roster section of admin-class-schedule-manage.ejs
+// via fetch(), updating the list in place; a plain (non-fetch) form
+// submission, if JS is unavailable, still gets the original redirect.
+// Adding renders each newly-enrolled student's own roster row server-side
+// (partials/roster-student-row, the exact same partial/markup the full
+// page itself uses) and sends the HTML back, rather than duplicating that
+// partial's own enriched fields/markup in client JS.
+function renderPartial(app, view, locals) {
+  return new Promise((resolve, reject) => {
+    app.render(view, locals, (err, html) => (err ? reject(err) : resolve(html)));
+  });
+}
+
 router.post('/class-schedule/classes/:id/enrollment/add', requireFullAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const cls = await getClass(id);
   if (!cls) return res.status(404).send('Not found');
+  const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
   const addIds = [].concat(req.body.studentIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
   const existingIds = cls.students.map((s) => s.id);
+  const newIds = addIds.filter((sid) => !existingIds.includes(sid));
   try {
     await setEnrollment(id, [...new Set([...existingIds, ...addIds])]);
   } catch (err) {
+    if (wantsJson) return res.status(500).json({ ok: false, error: err.message });
     return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
+  }
+  if (wantsJson) {
+    const updatedClass = await getClass(id);
+    const newStudents = await enrichRosterStudents(updatedClass.students.filter((s) => newIds.includes(s.id)));
+    const rowsHtml = await Promise.all(
+      newStudents.map((s) => renderPartial(req.app, 'partials/roster-student-row', { s, classId: id, removeAction: `/admin/class-schedule/classes/${id}/enrollment/${s.id}/remove` }))
+    );
+    return res.json({ ok: true, rowsHtml: rowsHtml.join(''), addedIds: newStudents.map((s) => s.id) });
   }
   res.redirect(`/admin/class-schedule/${cls.day}`);
 });
@@ -875,6 +905,7 @@ router.post('/class-schedule/classes/:id/enrollment/:studentId/remove', requireF
   const id = parseInt(req.params.id, 10);
   const cls = await getClass(id);
   if (!cls) return res.status(404).send('Not found');
+  const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
   const studentId = parseInt(req.params.studentId, 10);
   try {
     await setEnrollment(id, cls.students.map((s) => s.id).filter((sid) => sid !== studentId));
@@ -886,8 +917,10 @@ router.post('/class-schedule/classes/:id/enrollment/:studentId/remove', requireF
     // setEnrollment alone never touched.
     await adminRemoveStudentFromClass(id, studentId, null);
   } catch (err) {
+    if (wantsJson) return res.status(500).json({ ok: false, error: err.message });
     return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
   }
+  if (wantsJson) return res.json({ ok: true });
   res.redirect(`/admin/class-schedule/${cls.day}`);
 });
 

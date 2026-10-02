@@ -246,13 +246,11 @@
 
         <div class="manage-section">
           <div class="grid-box-header">
-            <h2>Student Roster (<%= enrolledStudents.length %>)</h2>
+            <h2>Student Roster (<span id="student-roster-count"><%= enrolledStudents.length %></span>)</h2>
             <button type="button" class="btn-secondary no-print" onclick="document.getElementById('add-students-dialog').showModal()">+ Add Students</button>
           </div>
-          <div class="roster-log-list">
-            <% if (enrolledStudents.length === 0) { %>
-              <p class="roster-log-empty">No students enrolled yet.</p>
-            <% } %>
+          <div class="roster-log-list" id="student-roster-list">
+            <p class="roster-log-empty" id="student-roster-empty" <% if (enrolledStudents.length > 0) { %>hidden<% } %>>No students enrolled yet.</p>
             <% enrolledStudents.forEach(function(s) { %>
               <%- include('partials/roster-student-row', { s: s, classId: cls.id, removeAction: '/admin/class-schedule/classes/' + cls.id + '/enrollment/' + s.id + '/remove' }) %>
             <% }); %>
@@ -371,26 +369,26 @@
       </div>
     <% } %>
 
+    <%# A real request: "If you add someone to a class roster the page
+        should not refresh. The person should appear on the list." Kept
+        as a real <form> (id="add-students-form") so it still works with
+        no JS at all, just plain-submitted instead of fetch()-intercepted
+        - public/js/class-roster-ajax.js below. %>
     <dialog id="add-students-dialog" class="member-picker-dialog">
-      <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/enrollment/add">
+      <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/enrollment/add" id="add-students-form">
         <h3>Add Students</h3>
-        <% if (availableStudents.length === 0) { %>
-          <p class="hint">Every active student is already enrolled.</p>
-        <% } else { %>
-          <div class="member-picker-list">
-            <% availableStudents.forEach(function(s) { %>
-              <label class="member-picker-row">
-                <input type="checkbox" name="studentIds" value="<%= s.id %>" />
-                <span><%= s.name %></span>
-              </label>
-            <% }); %>
-          </div>
-        <% } %>
+        <p class="hint" id="add-students-empty-hint" <% if (availableStudents.length > 0) { %>hidden<% } %>>Every active student is already enrolled.</p>
+        <div class="member-picker-list" id="add-students-list">
+          <% availableStudents.forEach(function(s) { %>
+            <label class="member-picker-row" data-student-id="<%= s.id %>">
+              <input type="checkbox" name="studentIds" value="<%= s.id %>" />
+              <span><%= s.name %></span>
+            </label>
+          <% }); %>
+        </div>
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <% if (availableStudents.length > 0) { %>
-            <button type="submit" class="primary-btn">Add Selected</button>
-          <% } %>
+          <button type="submit" class="primary-btn" id="add-students-submit" <% if (availableStudents.length === 0) { %>hidden<% } %>>Add Selected</button>
         </div>
       </form>
     </dialog>

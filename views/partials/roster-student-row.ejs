@@ -63,8 +63,16 @@
     <% } else { %>
       <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No parent email on file"><svg class="icon"><use href="#icon-mail"/></svg></span>
     <% } %>
-    <form method="POST" action="<%= removeAction %>" class="inline-block-form" data-confirm="Remove <%= s.name %> from this class?">
-      <button type="submit" class="icon-btn" aria-label="Remove <%= s.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
-    </form>
+    <%# A real request: "when deleting someone from the class roster the
+        page should not refresh. It should stay on the roster and the
+        name should disappear." A plain button (not a <form data-
+        confirm>) so public/js/class-roster-ajax.js can drive it via
+        fetch() instead of a full-page form submit - window.confirmAction
+        is the same sitewide "are you sure?" popup every data-confirm
+        form uses, just the Promise-returning flavor meant for a button
+        like this. Still a <button>, so roster-student-profile.js's own
+        "a, form, button" click exclusion keeps this from also opening
+        the mobile profile popup. %>
+    <button type="button" class="icon-btn js-roster-student-remove" data-remove-endpoint="<%= removeAction %>" data-student-name="<%= s.name %>" aria-label="Remove <%= s.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
   </div>
 </div>
