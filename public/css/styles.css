@@ -3117,15 +3117,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   color: var(--orange);
 }
 
-/* A real request: "creating an event save draft button should be the
-   same size as publish event button" - event creation's own Save Draft
-   sits directly beside .primary-btn's own Publish Event, so the two
-   should read as equally-weighted choices rather than one looking like
-   an afterthought next to the other. Same box model as .primary-btn,
-   keeping .btn-secondary's own solid color scheme (still the
-   lower-emphasis of the two actions, just not a smaller target). */
-.btn-secondary-lg { padding: 0.85rem 1.5rem; font-size: 1rem; }
-
 /* A real request: "event slug should say event url. It should show the
    web address then finish with the text box to add the custom ending" -
    the base URL reads as plain static text right in front of the input,
@@ -10017,15 +10008,9 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .event-wizard-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
 .event-wizard-header h1 { margin: 0 0 0.2rem; }
 .event-wizard-header-actions { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
-/* A real bug report: "create event save draft button should be the same
-   size as publish event button." .primary-btn's own margin-top:1.5rem
-   (meant for a button sitting alone at the end of a form) pushed Publish
-   Event down out of vertical alignment with Save Draft in this
-   horizontal button pair, and without an explicit white-space, "Save
-   Draft"'s own borderline-tight content width wrapped onto two lines
-   while "Publish Event" (needing more width, so never that tight)
-   stayed on one - taller and narrower than its neighbor instead of a
-   matched pair. */
+/* .primary-btn's own margin-top:1.5rem (meant for a button sitting alone
+   at the end of a form) doesn't belong on this header's own Create Draft
+   button, which sits inline next to the title instead. */
 .event-wizard-header-actions .primary-btn { margin-top: 0; }
 .event-wizard-header-actions button { white-space: nowrap; }
 
@@ -10097,9 +10082,8 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
   border-top: 1px solid var(--border);
 }
 .event-wizard-footer-right { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-/* Same Save Draft/Publish Event size-mismatch bug as .event-wizard-
-   header-actions above, just this step's own bottom copy of the same
-   button pair. */
+/* Same margin-top reset as .event-wizard-header-actions above, for this
+   step's own Back/Create Draft row. */
 .event-wizard-footer-right .primary-btn { margin-top: 0; }
 .event-wizard-footer-right button { white-space: nowrap; }
 .required-star { color: var(--red); font-weight: 700; }

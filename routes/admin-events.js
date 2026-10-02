@@ -528,11 +528,14 @@ router.post('/', uploadEventImage('/main-admin/events/new'), async (req, res) =>
   if (!title || !startsAt) {
     return res.redirect('/main-admin/events/new?error=' + encodeURIComponent('Title and start date/time are required.'));
   }
-  // The wizard's Save Draft / Publish Event buttons are two submits of
-  // the same form, distinguished only by which button's name="status"
-  // value made it into the body (the pre-wizard "+ New Event" popup no
-  // longer exists, so status is always one of these two now).
-  const status = req.body.status === 'published' ? 'published' : 'draft';
+  // A real request: "After creating an event you can click create draft
+  // only, no immediate publishing. Then you can go in and use the full
+  // editing features." Always 'draft' now regardless of what's submitted -
+  // the wizard itself only has the one Create Draft button any more, and
+  // this closes off the direct route too. Publishing only ever happens
+  // from the per-event builder's own toolbar afterward (POST /:id/status
+  // below), once there's a real draft to review first.
+  const status = 'draft';
   const id = await events.createEvent(
     {
       title,
@@ -569,7 +572,7 @@ router.post('/', uploadEventImage('/main-admin/events/new'), async (req, res) =>
       return res.redirect(`/main-admin/events/${id}/builder?error=` + encodeURIComponent(`Event saved, but the image upload failed: ${err.message}`));
     }
   }
-  res.redirect(`/main-admin/events/${id}/builder?notice=` + encodeURIComponent(status === 'published' ? 'Event published.' : 'Draft saved.'));
+  res.redirect(`/main-admin/events/${id}/builder?notice=` + encodeURIComponent('Draft saved.'));
 });
 
 // --- CSV export/import (item 5) - registered before the /:id param

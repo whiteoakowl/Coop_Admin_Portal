@@ -1,11 +1,10 @@
-// Create New Event wizard (views/admin-events-new.ejs) - a real request
-// to match a reference mockup's 5-step Details/Date & Time/Location/
-// Tickets/Additional flow. Every step's fields live in the SAME <form>
-// the whole time (this app has no client framework, and Save Draft/
-// Publish Event both need every field regardless of which step is
-// showing) - this script only ever toggles which .event-wizard-panel is
-// visible and which .event-wizard-step circle reads as active/completed,
-// it never removes anything from the DOM or the form's own submission.
+// Create New Event wizard (views/admin-events-new.ejs). Every step's
+// fields live in the SAME <form> the whole time (this app has no client
+// framework, and Create Draft needs every field regardless of which step
+// is showing) - this script only ever toggles which .event-wizard-panel
+// is visible and which .event-wizard-step circle reads as active/
+// completed, it never removes anything from the DOM or the form's own
+// submission.
 (function () {
   const stepsBar = document.querySelector('[data-wizard-steps]');
   if (!stepsBar) return;

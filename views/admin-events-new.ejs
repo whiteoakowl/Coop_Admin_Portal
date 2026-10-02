@@ -14,28 +14,33 @@
         <h1>Create New Event</h1>
         <p class="hint">Fill in the details below to create your event.</p>
       </div>
+      <%# A real request: "After creating an event you can click create
+          draft only, no immediate publishing. Then you can go in and use
+          the full editing features." Publish now only happens from the
+          per-event builder's own toolbar (routes/admin-events.js's
+          already-existing POST /:id/status), once there's a real event to
+          review first. %>
       <div class="event-wizard-header-actions">
-        <button type="submit" form="event-wizard-form" name="status" value="draft" class="btn-secondary btn-secondary-lg">Save Draft</button>
-        <button type="submit" form="event-wizard-form" name="status" value="published" class="primary-btn">Publish Event</button>
+        <button type="submit" form="event-wizard-form" name="status" value="draft" class="primary-btn">Create Draft</button>
       </div>
     </div>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <%
-    // A real request: "events creation, page one should also have dates
-    // and times for event, dates and times for opening and closing the
-    // event, and location, capacity totals dropdown choosing family or
-    // person capacity, organized by, event image upload. 2rd page should
-    // be ticket pricing. 3th page should be all of the permissions." -
-    // down from the previous 5-step Details/Date & Time/Location/
-    // Tickets/Additional flow to these 3. Step definitions drive both the
-    // circle strip and the button-label logic below, so a step added
-    // here shows up as a circle automatically.
+    // A real request originally set this up as Details/Tickets/
+    // Permissions. A later real request ("Price, charged per person...
+    // are not needed. All pricing will happen with adding ticket
+    // pricing, even if it is only one ticket") retired the flat-price
+    // Tickets step entirely - a real Ticket Type needs the event to
+    // already exist (it's its own row, FK'd to the event id), so that
+    // happens after creation, on the Finance tab, same as it already
+    // does for an existing event. Step definitions drive both the circle
+    // strip and the button-label logic below, so a step added here shows
+    // up as a circle automatically.
     var wizardSteps = [
       { n: 1, label: 'Details' },
-      { n: 2, label: 'Tickets' },
-      { n: 3, label: 'Permissions' },
+      { n: 2, label: 'Permissions' },
     ];
     %>
     <div class="event-wizard-steps" data-wizard-steps>
@@ -188,28 +193,6 @@
       </div>
 
       <div class="manage-section event-wizard-panel" data-step-panel="2" hidden>
-        <h2>Tickets</h2>
-        <div class="member-form-grid">
-          <label>Price ($) <span class="hint">(blank = free)</span>
-            <input type="number" name="priceDollars" min="0" step="0.01" placeholder="e.g. 10.00" />
-          </label>
-          <label>Charged per
-            <select name="pricePer">
-              <option value="person">Person</option>
-              <option value="family">Family</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="event-wizard-footer">
-          <button type="button" class="btn-secondary" data-prev-step>&larr; Back</button>
-          <div class="event-wizard-footer-right">
-            <button type="button" class="primary-btn" data-next-step>Save &amp; Continue</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="manage-section event-wizard-panel" data-step-panel="3" hidden>
         <h2>Permissions</h2>
         <div class="member-form-full">
           <span class="roster-checkbox-label">Grade Restriction <span class="hint">(leave all unchecked to allow every grade)</span></span>
@@ -249,39 +232,24 @@
           </div>
         <% } %>
 
-        <%# A real request: "where are the rest of the pages? settings,
-            food, volunteers, etc." Volunteers/Donations are already ON
-            by default for a brand-new event (routes/admin-events.js's
-            own registrationFieldsFromBody), so their tabs already show
-            up after saving without needing anything checked here - only
-            Food defaults off. These three checkboxes are just each
-            section's on/off switch (an existing event column each,
-            volunteers_enabled/donations_enabled/food_enabled); adding
-            actual volunteer roles, donation items, or food items - like
-            the rest of Settings/Finance/Attendance - needs a real event
-            id to attach them to, so that part of each tab only opens up
-            once this event is saved below. %>
-        <h3 class="event-wizard-subheading">Event Sections</h3>
-        <div class="class-form-row">
-          <div class="class-form-field">
-            <input type="hidden" name="volunteersEnabled" value="0" />
-            <label class="grade-pill"><input type="checkbox" name="volunteersEnabled" value="1" checked /> Volunteers</label>
-          </div>
-          <div class="class-form-field">
-            <input type="hidden" name="donationsEnabled" value="0" />
-            <label class="grade-pill"><input type="checkbox" name="donationsEnabled" value="1" checked /> Donations</label>
-          </div>
-          <div class="class-form-field">
-            <label class="grade-pill"><input type="checkbox" name="foodEnabled" value="1" /> Food</label>
-          </div>
-        </div>
-        <p class="hint">Saving below (Draft or Published) takes you to this event's full editor, where Settings, Finance, Attendance, and each enabled section's own items (food, donations, volunteer roles) are ready to fill in.</p>
+        <%# A real request: "Don't ask for volunteer, food, extra fields or
+            donations during initial event creation... Then you can go in
+            and use the full editing features and add donations,
+            volunteers, extra fields and food." Removed the Event Sections
+            checkbox trio that used to sit here - Volunteers/Donations
+            still default to on and Food to off either way
+            (routes/admin-events.js's own registrationFieldsFromBody reads
+            them as unset, not unchecked, when the wizard never submits
+            these fields at all), and every section's own on/off switch,
+            plus its actual items (volunteer roles, donation items, food
+            items, ticket types), are all one stop on the full builder
+            this draft opens into next. %>
+        <p class="hint">Creating the draft below takes you to this event's full editor, where Settings, Finance (including Ticket Types), Attendance, and Volunteers/Donations/Food/Extra Fields are all ready to fill in - and where you can publish it when it's ready.</p>
 
         <div class="event-wizard-footer">
           <button type="button" class="btn-secondary" data-prev-step>&larr; Back</button>
           <div class="event-wizard-footer-right">
-            <button type="submit" name="status" value="draft" class="btn-secondary btn-secondary-lg">Save Draft</button>
-            <button type="submit" name="status" value="published" class="primary-btn">Publish Event</button>
+            <button type="submit" name="status" value="draft" class="primary-btn">Create Draft</button>
           </div>
         </div>
       </div>

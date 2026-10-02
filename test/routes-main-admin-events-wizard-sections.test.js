@@ -1,13 +1,16 @@
 // Coverage for a real request: "create a new event it shows 1. details,
 // 2. tickets 3. permissions. where are the rest of the pages? settings,
 // food, volunteers, etc." The Create Event wizard's own Permissions step
-// (views/admin-events-new.ejs) gained an "Event Sections" checkbox trio
-// (Volunteers/Donations/Food, each an existing plain event column) so an
-// admin can see and control these sections before ever reaching the
-// per-event builder that has them as full tabs - see
-// routes/admin-events.js's own registrationFieldsFromBody comment for why
-// the actual items (food/donation/volunteer entries) still only become
-// addable once the event has a real id, right after saving.
+// briefly gained an "Event Sections" checkbox trio (Volunteers/Donations/
+// Food) so an admin could see and control these sections before ever
+// reaching the per-event builder. A later real request ("Don't ask for
+// volunteer, food, extra fields or donations during initial event
+// creation... Then you can go in and use the full editing features")
+// removed that checkbox trio from the wizard again - these tests now
+// cover that the wizard page no longer shows it, and that
+// registrationFieldsFromBody's own defaults (Volunteers/Donations on,
+// Food off) still apply when the wizard submits none of these fields at
+// all, same as a raw caller always could.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -45,38 +48,17 @@ async function loginAsMainAdmin() {
   return { cookie, csrfToken: extractCsrf(page.text) };
 }
 
-test('Create Event wizard has an Event Sections checkbox trio (Volunteers/Donations/Food)', async () => {
+test('Create Event wizard no longer asks about Volunteers/Donations/Food/Extra Fields at all', async () => {
   const admin = await loginAsMainAdmin();
   const res = await request(app).get('/main-admin/events/new').set('Cookie', admin.cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /Event Sections/);
-  assert.match(res.text, /name="volunteersEnabled" value="1" checked/);
-  assert.match(res.text, /name="donationsEnabled" value="1" checked/);
-  assert.match(res.text, /name="foodEnabled" value="1"(?! checked)/);
+  assert.doesNotMatch(res.text, /Event Sections/);
+  assert.doesNotMatch(res.text, /name="volunteersEnabled"/);
+  assert.doesNotMatch(res.text, /name="donationsEnabled"/);
+  assert.doesNotMatch(res.text, /name="foodEnabled"/);
 });
 
-test('submitting the wizard untouched (both the hidden fallback and the checked box fire) keeps Volunteers/Donations on and Food off', async () => {
-  const admin = await loginAsMainAdmin();
-  // Mirrors an untouched real browser submit: the hidden "0" fallback and
-  // the checked checkbox share a name, so BOTH values are sent for
-  // volunteersEnabled/donationsEnabled - Food has no such pair since it
-  // starts unchecked.
-  const body =
-    `title=${encodeURIComponent('Default Sections Event')}&startsAt=${encodeURIComponent('2027-09-01T18:00')}` +
-    `&volunteersEnabled=0&volunteersEnabled=1&donationsEnabled=0&donationsEnabled=1&_csrf=${encodeURIComponent(admin.csrfToken)}`;
-  const res = await request(app)
-    .post('/main-admin/events')
-    .set('Cookie', admin.cookie)
-    .set('Content-Type', 'application/x-www-form-urlencoded')
-    .send(body);
-  const eventId = Number(/\/main-admin\/events\/(\d+)\/builder/.exec(res.headers.location)[1]);
-  const row = await db.prepare('SELECT volunteers_enabled, donations_enabled, food_enabled FROM events WHERE id = ?').get(eventId);
-  assert.equal(row.volunteers_enabled, 1);
-  assert.equal(row.donations_enabled, 1);
-  assert.equal(row.food_enabled, 0);
-});
-
-test('unchecking Volunteers/Donations and checking Food in the wizard saves exactly that', async () => {
+test('a direct POST with explicit Event Sections values (e.g. an older client, or a script) still saves exactly what it sends - the route itself still honors them even though the wizard no longer offers them', async () => {
   const admin = await loginAsMainAdmin();
   const res = await request(app)
     .post('/main-admin/events')
@@ -92,9 +74,9 @@ test('unchecking Volunteers/Donations and checking Food in the wizard saves exac
     });
   const eventId = Number(/\/main-admin\/events\/(\d+)\/builder/.exec(res.headers.location)[1]);
   const row = await db.prepare('SELECT volunteers_enabled, donations_enabled, food_enabled FROM events WHERE id = ?').get(eventId);
-  assert.equal(row.volunteers_enabled, 0, 'unchecking Volunteers in the wizard should turn it off');
-  assert.equal(row.donations_enabled, 0, 'unchecking Donations in the wizard should turn it off');
-  assert.equal(row.food_enabled, 1, 'checking Food in the wizard should turn it on');
+  assert.equal(row.volunteers_enabled, 0);
+  assert.equal(row.donations_enabled, 0);
+  assert.equal(row.food_enabled, 1);
 
   // A later real request folded Donations/Food/Extra Fields into the
   // Volunteers tab (renamed "Resources/Fields") as a pill toggle, so
@@ -102,10 +84,10 @@ test('unchecking Volunteers/Donations and checking Food in the wizard saves exac
   // ?tab=volunteers&section=food.
   const builderPage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=volunteers&section=food`).set('Cookie', admin.cookie);
   assert.match(builderPage.text, />Food</, 'the Food pill should appear under the Resources/Fields tab');
-  assert.match(builderPage.text, /<input type="checkbox" name="enabled" value="1" checked/, 'Food should be enabled per the wizard checkbox');
+  assert.match(builderPage.text, /<input type="checkbox" name="enabled" value="1" checked/, 'Food should be enabled per the submitted value');
 });
 
-test('a plain create with no Event Sections fields at all (a raw caller bypassing the wizard form) keeps the old Volunteers/Donations-on-by-default behavior', async () => {
+test('creating an event through the real wizard (no Event Sections fields sent) keeps Volunteers/Donations on and Food off by default', async () => {
   const admin = await loginAsMainAdmin();
   const res = await request(app)
     .post('/main-admin/events')
