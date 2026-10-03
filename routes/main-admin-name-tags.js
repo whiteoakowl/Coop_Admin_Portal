@@ -92,7 +92,7 @@ const TABS = ['design', 'print', 'requests'];
 const BADGE_TYPE_LABELS = { setupCleanup: 'Setup/Cleanup', custom: 'Custom' };
 
 const REQUEST_TYPE_LABELS = { new_tag: 'New Name Tag', lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
-const NAME_TAG_DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday', both: 'Both' };
+const NAME_TAG_DAY_LABELS = { ...CLASS_DAY_LABELS_FULL, both: 'Both' };
 
 const DESIGN_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'name-tags');
 const NAME_TAG_IMAGES_BUCKET = 'name-tag-images';

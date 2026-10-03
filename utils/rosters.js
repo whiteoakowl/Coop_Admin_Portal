@@ -1,6 +1,7 @@
 const db = require('../db');
 const { weekdayOf } = require('./dates');
-const { ensureDayRoster, addManualRosterMember } = require('./classSchedule');
+const { ensureDayRoster, addManualRosterMember, listActiveClassDays } = require('./classSchedule');
+const { CLASS_DAY_WEEKDAY_FULL } = require('./classDays');
 
 // Display labels for attendance.reason_category, shared by the admin
 // Absence/Late log (admin-members.js, admin-rosters.js) and anywhere else
@@ -26,13 +27,18 @@ async function getMemberRostersForDate(memberId, dateISO) {
 // added to the roster for that day." Shared by routes/kiosk.js's own
 // /checkin/scan and routes/checkout.js's own /checkout/scan - each calls
 // this once, only when getMemberRostersForDate already came back empty,
-// then re-queries. Only meaningful on an actual meeting day (Monday/
-// Wednesday) - there's no day-level roster to add anyone to otherwise.
+// then re-queries. Only meaningful on an actual meeting day (one of the
+// days activated in Day Settings) - there's no day-level roster to add
+// anyone to otherwise. A real bug found auditing for leftover 2-day-only
+// code: this used to hardcode today's weekday against just Monday(1)/
+// Wednesday(3), so a newly-activated 3rd+ day's own check-in/checkout
+// never auto-added an unscheduled member to that day's roster at all.
 // Idempotent (ensureDayRoster/addManualRosterMember/the roster_dates
 // insert below are all already-exists-safe).
 async function ensureMemberOnTodayRoster(member, today) {
   const dow = weekdayOf(today);
-  const day = dow === 1 ? 'monday' : dow === 3 ? 'wednesday' : null;
+  const activeDays = await listActiveClassDays();
+  const day = activeDays.find((d) => CLASS_DAY_WEEKDAY_FULL[d] === dow) || null;
   if (!day) return;
   // Admins share the Parent day-roster (member_type IN ('parent',
   // 'admin') is how the rest of this app already treats the two - see

@@ -25,7 +25,8 @@ const {
   teacherMemberIds,
   assistantMemberIds,
 } = require('../utils/members');
-const { GRADE_LEVELS, CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
+const { GRADE_LEVELS, CLASS_DAY_LABELS_FULL, listActiveClassDays } = require('../utils/classSchedule');
+const { isValidClassDay } = require('../utils/classDays');
 const { allSetupTeams } = require('../utils/setup');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
@@ -102,7 +103,7 @@ function groupAttendanceByRoster(history) {
 router.get('/members', async (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   const familyFilter = parseInt(req.query.family, 10) || null;
-  const dayFilter = ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '';
+  const dayFilter = isValidClassDay(req.query.day) ? req.query.day : '';
   // A real request: "dropdown member search should include teachers and
   // class assistants" - teacher/assistant are class_staff roles, not a
   // member_type, so this is its own filter dimension alongside Type/Day/
@@ -185,6 +186,8 @@ router.get('/members', async (req, res) => {
     familyFilter,
     dayFilter,
     roleFilter,
+    activeDays: await listActiveClassDays(),
+    dayLabels: CLASS_DAY_LABELS_FULL,
     q: req.query.q || '',
     families: await allFamilies(),
     error: req.query.error || null,

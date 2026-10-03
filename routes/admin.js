@@ -7,7 +7,8 @@ const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { todayISO, formatDateLabel, formatShortDateLabel, weekdayOf, isValidISODate } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { todaysSessionDays, absenceFormSubmissionsForRoster } = require('../utils/alerts');
-const { ensureDayRoster, classesAtRiskForDay, classesNeedingStaffForDay, CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
+const { ensureDayRoster, classesAtRiskForDay, classesNeedingStaffForDay, CLASS_DAY_LABELS_FULL, listActiveClassDays } = require('../utils/classSchedule');
+const { CLASS_DAY_WEEKDAY_FULL } = require('../utils/classDays');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
 const { setClassCheckinPin, verifyClassCheckinPin } = require('../utils/classCheckinPin');
 const fullscreenPinLimiter = require('../utils/classCheckinPinRateLimit');
@@ -93,7 +94,12 @@ async function todayStatsForType(memberType, today) {
   const types = [].concat(memberType);
   const placeholders = types.map(() => '?').join(',');
   const dow = weekdayOf(today);
-  const day = dow === 1 ? 'monday' : dow === 3 ? 'wednesday' : null;
+  // A real bug found auditing for leftover 2-day-only code: this used to
+  // compare dow against just Monday(1)/Wednesday(3), so "Today's
+  // Attendance" always showed 0 expected members on a newly-activated
+  // 3rd+ day, even with a real roster for it.
+  const activeDays = await listActiveClassDays();
+  const day = activeDays.find((d) => CLASS_DAY_WEEKDAY_FULL[d] === dow) || null;
   // All 5 queries below are independent of each other (none reads a
   // result the others produce), so running them concurrently instead of
   // one at a time cuts this function's own latency roughly 5x - real
@@ -284,23 +290,32 @@ router.get('/', requireAdmin, async (req, res) => {
   // additional sequential round trip is real added latency, not
   // effectively free the way it is against a local synchronous SQLite
   // connection.
+  const activeDays = await listActiveClassDays();
   const [previousDate, dayCounts, alertResult] = await Promise.all([
     previousSessionDate(today),
-    Promise.all([
-      dayScheduleCount('student', 'monday'),
-      dayScheduleCount('parent', 'monday'),
-      dayFamilyCount('monday'),
-      dayScheduleCount('student', 'wednesday'),
-      dayScheduleCount('parent', 'wednesday'),
-      dayFamilyCount('wednesday'),
-    ]),
+    Promise.all(
+      activeDays.map((day) => Promise.all([dayScheduleCount('student', day), dayScheduleCount('parent', day), dayFamilyCount(day)]))
+    ),
     alertDay
       ? ensureDayRoster(alertDay, 'parent').then((parentRosterId) =>
           Promise.all([absenceFormSubmissionsForRoster(parentRosterId, today), classesAtRiskForDay(alertDay, today), classesNeedingStaffForDay(alertDay, today)])
         )
       : Promise.resolve([{ absences: [], lates: [] }, [], []]),
   ]);
-  const [mondayStudentCount, mondayParentCount, mondayFamilyCount, wednesdayStudentCount, wednesdayParentCount, wednesdayFamilyCount] = dayCounts;
+  // A real bug found auditing for leftover 2-day-only code: this card
+  // used to hardcode exactly Monday/Wednesday's own student/parent/
+  // family counts, so a newly-activated 3rd+ day's numbers never showed
+  // on the Dashboard homepage at all. Cycles the same orange/blue header
+  // colors the original 2-column design used, for however many active
+  // days there now are.
+  const memberCountsByDay = activeDays.map((day, i) => ({
+    day,
+    label: CLASS_DAY_LABELS_FULL[day],
+    colorClass: i % 2 === 0 ? 'orange' : 'blue',
+    studentCount: dayCounts[i][0],
+    parentCount: dayCounts[i][1],
+    familyCount: dayCounts[i][2],
+  }));
   const [absenceAlerts, classesAtRisk, classesNeedingStaff] = alertResult;
 
   // student/parent stats both only depend on today/previousDate (already
@@ -313,12 +328,7 @@ router.get('/', requireAdmin, async (req, res) => {
     selectedDate: today,
     selectedDateLabel: formatShortDateLabel(today),
     todayIso: todayISO(),
-    mondayStudentCount,
-    mondayParentCount,
-    mondayFamilyCount,
-    wednesdayStudentCount,
-    wednesdayParentCount,
-    wednesdayFamilyCount,
+    memberCountsByDay,
     studentStats,
     parentStats,
     alertDayLabel: alertDay ? CLASS_DAY_LABELS_FULL[alertDay] : null,

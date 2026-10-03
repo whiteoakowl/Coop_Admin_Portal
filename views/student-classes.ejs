@@ -18,8 +18,9 @@
     <% } else { %>
       <div class="day-toggle no-print classes-day-filter" role="tablist">
         <button type="button" class="day-toggle-option active" data-filter="all">All</button>
-        <button type="button" class="day-toggle-option" data-filter="monday">Monday</button>
-        <button type="button" class="day-toggle-option" data-filter="wednesday">Wednesday</button>
+        <% classDays.forEach(function(d) { %>
+          <button type="button" class="day-toggle-option" data-filter="<%= d %>"><%= dayLabels[d] %></button>
+        <% }); %>
       </div>
       <div class="classes-grid">
         <% classes.forEach(function(c) { %>

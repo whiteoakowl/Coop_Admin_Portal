@@ -29,7 +29,7 @@ const app = require('../server');
 const db = require('../db');
 const adminRouter = require('../routes/admin');
 const { todayISO, weekdayOf } = require('../utils/dates');
-const { ensureDayMemberRosters } = require('../utils/classSchedule');
+const { ensureDayMemberRosters, createClassSchedule, setEnrollment, createClass } = require('../utils/classSchedule');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -91,6 +91,27 @@ test('todayStatsForType "of Y" denominator', async (t) => {
 
     const totalAfter = (await adminRouter.todayStatsForType('student', today)).total;
     assert.equal(totalAfter, totalBefore + 1, "a student scheduled on today's roster should count toward today's denominator");
+  });
+
+  // A real bug found auditing for leftover 2-day-only code: this used to
+  // compare dow against a literal Monday(1)/Wednesday(3) check, so the
+  // denominator was always 0 on a newly-activated 3rd+ day even with a
+  // real roster for it - fixed to resolve the day via listActiveClassDays()
+  // instead. 2026-06-02 is a real Tuesday.
+  await t.test('a student scheduled on Tuesday\'s roster counts toward Tuesday\'s own denominator, once Tuesday is activated', async () => {
+    const tuesday = '2026-06-02';
+    await createClassSchedule({ title: 'Dashboard Total Tuesday', dayOfWeek: 'tuesday' });
+    const classId = await createClass({ day: 'tuesday', hourPosition: 1, className: 'Dashboard Total Tuesday Class' });
+
+    const totalBefore = (await adminRouter.todayStatsForType('student', tuesday)).total;
+
+    const { lastInsertRowid: memberId } = await db
+      .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Tuesday Total Dashboard Kid', 'tuesday-total-dashboard-kid', 'student')")
+      .run();
+    await setEnrollment(classId, [memberId]);
+
+    const totalAfter = (await adminRouter.todayStatsForType('student', tuesday)).total;
+    assert.equal(totalAfter, totalBefore + 1, "a student scheduled on Tuesday's roster should count toward Tuesday's own denominator, not stay stuck at 0");
   });
 });
 

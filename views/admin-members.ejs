@@ -69,8 +69,9 @@
           <option value="<%= memberHref({ type: 'student', family: '', day: '', role: '' }) %>" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
           <option value="<%= memberHref({ type: 'admin', family: '', day: '', role: '' }) %>" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
           <optgroup label="Roster Day">
-            <option value="<%= memberHref({ type: '', family: '', day: 'monday', role: '' }) %>" <%= dayFilter === 'monday' ? 'selected' : '' %>>Monday</option>
-            <option value="<%= memberHref({ type: '', family: '', day: 'wednesday', role: '' }) %>" <%= dayFilter === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+            <% activeDays.forEach(function(d) { %>
+              <option value="<%= memberHref({ type: '', family: '', day: d, role: '' }) %>" <%= dayFilter === d ? 'selected' : '' %>><%= dayLabels[d] %></option>
+            <% }); %>
           </optgroup>
           <optgroup label="Role">
             <option value="<%= memberHref({ type: '', family: '', day: '', role: 'teacher' }) %>" <%= roleFilter === 'teacher' ? 'selected' : '' %>>Teacher</option>

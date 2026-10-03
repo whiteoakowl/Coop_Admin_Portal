@@ -23,6 +23,7 @@ process.env.SESSION_SECRET = 'test-secret-not-for-real-use';
 const app = require('../server');
 const db = require('../db');
 const { ensureMemberOnTodayRoster } = require('../utils/rosters');
+const { createClassSchedule } = require('../utils/classSchedule');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -79,6 +80,21 @@ test('ensureMemberOnTodayRoster', async (t) => {
     await ensureMemberOnTodayRoster(member(memberId, 'student'), '2026-06-02');
     assert.equal(await onDayRoster(memberId, 'monday'), undefined);
     assert.equal(await onDayRoster(memberId, 'wednesday'), undefined);
+  });
+
+  // A real bug found auditing for leftover 2-day-only code: this used to
+  // compare today's weekday against a literal Monday(1)/Wednesday(3)
+  // check, so a newly-activated 3rd+ day's own check-in/checkout never
+  // auto-added an unscheduled member to that day's roster at all - this
+  // exact same date (2026-06-02, a Tuesday) is a no-op above when Tuesday
+  // isn't activated, and a real add once it is.
+  await t.test('adds a student to Tuesday\'s own Student roster once Tuesday is activated in Day Settings', async () => {
+    await createClassSchedule({ title: 'Tuesday Enrichment', dayOfWeek: 'tuesday' });
+    const { lastInsertRowid: memberId } = await db
+      .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Roster Fallback Tuesday Student', 'roster-fallback-tuesday-student', 'student')")
+      .run();
+    await ensureMemberOnTodayRoster(member(memberId, 'student'), '2026-06-02');
+    assert.ok(await onDayRoster(memberId, 'tuesday'), 'expected the student on Tuesday\'s Student roster');
   });
 
   await t.test('is idempotent - calling it twice for the same member/date does not error or duplicate', async () => {

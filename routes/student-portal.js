@@ -182,9 +182,19 @@ router.get('/classes', async (req, res) => {
   const windowOpen = await isRegistrationOpenForAccount(req.portalRoles);
   const nextWindow = windowOpen ? null : await nextWindowForAccount(req.portalRoles);
 
+  // The day-filter toggle (public/js/classes-day-filter.js) used to hardcode
+  // just Monday/Wednesday buttons, so a Tuesday (or any 3rd+ day) class had
+  // no way to filter down to it - only "All" would show it. Built from
+  // whichever days this student's own classes actually fall on, sorted
+  // calendar-order, same as the Member Schedules Archive tab's own
+  // archiveDays.
+  const classDays = [...new Set(classes.map((c) => c.day))].sort((a, b) => CLASS_DAY_ORDER[a] - CLASS_DAY_ORDER[b]);
+
   res.render('student-classes', {
     title: 'Class Schedule',
     classes,
+    classDays,
+    dayLabels: CLASS_DAY_LABELS_FULL,
     openClasses,
     eligibleClassIds,
     waitlistPositionByClassId,

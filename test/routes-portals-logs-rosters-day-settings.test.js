@@ -161,6 +161,23 @@ test('Student Portal Transcript shows "Tuesday", not a hardcoded Monday/Wednesda
   assert.match(transcript.text.slice(rowStart, rowEnd), />Tuesday<\/td>/);
 });
 
+test('Student Portal "My Classes" day-filter toggle offers a Tuesday button, not just All/Monday/Wednesday', async () => {
+  const admin = await loginAsAdmin();
+  await activateTuesday(admin);
+  const student = await createStudentAccount('Portal Day Filter Student');
+  const classId = await classSchedule.createClass({ day: 'tuesday', hourPosition: 1, className: 'Tuesday Filter Class' });
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId, student.memberId);
+
+  const page = await request(app).get('/student/classes').set('Cookie', student.cookie);
+  assert.equal(page.status, 200);
+  assert.match(
+    page.text,
+    /<button type="button" class="day-toggle-option" data-filter="tuesday">Tuesday<\/button>/,
+    'the day-filter toggle used to hardcode just All/Monday/Wednesday buttons, so a Tuesday class had no way to filter down to it'
+  );
+  assert.match(page.text, /<div class="class-card" data-day="tuesday">/);
+});
+
 test('portal-profile Schedules tab shows "Tuesday" for a family member\'s Tuesday class', async () => {
   const admin = await loginAsAdmin();
   await activateTuesday(admin);
@@ -228,4 +245,40 @@ test("a Tuesday Attendance roster's ACTUALLY-SCANNED Setup/Cleanup task shows up
     /Tuesday Snack Team-#1/,
     'the batch arrival/departure + cleanup-task lookup used to gate on a literal monday/wednesday check and silently skip any 3rd+ day'
   );
+});
+
+test('the Dashboard "Co-op Member Counts" card shows a Tuesday column with its own counts, not just Monday/Wednesday', async () => {
+  const admin = await loginAsAdmin();
+  await activateTuesday(admin);
+  const classId = await classSchedule.createClass({ day: 'tuesday', hourPosition: 1, className: 'Dashboard Tuesday Class' });
+  const { lastInsertRowid: studentId } = await db
+    .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Dashboard Tuesday Student', 'dashboard-tuesday-student', 'student')")
+    .run();
+  await classSchedule.setEnrollment(classId, [studentId]);
+
+  const dashboard = await request(app).get('/admin').set('Cookie', admin.cookie);
+  assert.equal(dashboard.status, 200);
+  assert.match(
+    dashboard.text,
+    /family-student-day-header family-student-day-header-(orange|blue)">[\s\S]*?Tuesday/,
+    'the Co-op Member Counts card used to hardcode exactly Monday+Wednesday columns, so a 3rd+ day never showed up at all'
+  );
+});
+
+test('the Members page Day filter offers and correctly filters by Tuesday', async () => {
+  const admin = await loginAsAdmin();
+  await activateTuesday(admin);
+  const classId = await classSchedule.createClass({ day: 'tuesday', hourPosition: 1, className: 'Members Day Filter Tuesday Class' });
+  const { lastInsertRowid: studentId } = await db
+    .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Members Day Filter Tuesday Student', 'members-day-filter-tuesday-student', 'student')")
+    .run();
+  await classSchedule.setEnrollment(classId, [studentId]);
+
+  const page = await request(app).get('/admin/members?day=tuesday').set('Cookie', admin.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /Members Day Filter Tuesday Student/);
+  assert.match(page.text, /<option value="[^"]*day=tuesday[^"]*"[^>]* selected>Tuesday<\/option>/);
+
+  const mondayFiltered = await request(app).get('/admin/members?day=monday').set('Cookie', admin.cookie);
+  assert.doesNotMatch(mondayFiltered.text, /Members Day Filter Tuesday Student/, 'a Tuesday-only member must not show under the Monday filter');
 });

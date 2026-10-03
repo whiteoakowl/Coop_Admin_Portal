@@ -36,48 +36,29 @@
         </form>
       </div>
       <div class="family-student-counts-columns">
-        <div class="family-student-counts-column">
-          <div class="family-student-day-header family-student-day-header-orange">
-            <span class="family-student-day-header-icon"><svg class="icon"><use href="#icon-calendar-check"/></svg></span>
-            Monday
+        <% memberCountsByDay.forEach(function(d) { %>
+          <div class="family-student-counts-column">
+            <div class="family-student-day-header family-student-day-header-<%= d.colorClass %>">
+              <span class="family-student-day-header-icon"><svg class="icon"><use href="#icon-calendar-check"/></svg></span>
+              <%= d.label %>
+            </div>
+            <div class="family-student-row">
+              <span class="family-student-row-icon family-student-row-icon-<%= d.colorClass %>"><svg class="icon"><use href="#icon-users"/></svg></span>
+              <span class="family-student-row-label">Parents</span>
+              <span class="family-student-row-value"><%= d.parentCount %></span>
+            </div>
+            <div class="family-student-row">
+              <span class="family-student-row-icon family-student-row-icon-<%= d.colorClass %>"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
+              <span class="family-student-row-label">Students</span>
+              <span class="family-student-row-value"><%= d.studentCount %></span>
+            </div>
+            <div class="family-student-row">
+              <span class="family-student-row-icon family-student-row-icon-<%= d.colorClass %>"><svg class="icon"><use href="#icon-home"/></svg></span>
+              <span class="family-student-row-label">Families</span>
+              <span class="family-student-row-value"><%= d.familyCount %></span>
+            </div>
           </div>
-          <div class="family-student-row">
-            <span class="family-student-row-icon family-student-row-icon-orange"><svg class="icon"><use href="#icon-users"/></svg></span>
-            <span class="family-student-row-label">Parents</span>
-            <span class="family-student-row-value"><%= mondayParentCount %></span>
-          </div>
-          <div class="family-student-row">
-            <span class="family-student-row-icon family-student-row-icon-orange"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
-            <span class="family-student-row-label">Students</span>
-            <span class="family-student-row-value"><%= mondayStudentCount %></span>
-          </div>
-          <div class="family-student-row">
-            <span class="family-student-row-icon family-student-row-icon-orange"><svg class="icon"><use href="#icon-home"/></svg></span>
-            <span class="family-student-row-label">Families</span>
-            <span class="family-student-row-value"><%= mondayFamilyCount %></span>
-          </div>
-        </div>
-        <div class="family-student-counts-column">
-          <div class="family-student-day-header family-student-day-header-blue">
-            <span class="family-student-day-header-icon"><svg class="icon"><use href="#icon-calendar-check"/></svg></span>
-            Wednesday
-          </div>
-          <div class="family-student-row">
-            <span class="family-student-row-icon family-student-row-icon-blue"><svg class="icon"><use href="#icon-users"/></svg></span>
-            <span class="family-student-row-label">Parents</span>
-            <span class="family-student-row-value"><%= wednesdayParentCount %></span>
-          </div>
-          <div class="family-student-row">
-            <span class="family-student-row-icon family-student-row-icon-blue"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
-            <span class="family-student-row-label">Students</span>
-            <span class="family-student-row-value"><%= wednesdayStudentCount %></span>
-          </div>
-          <div class="family-student-row">
-            <span class="family-student-row-icon family-student-row-icon-blue"><svg class="icon"><use href="#icon-home"/></svg></span>
-            <span class="family-student-row-label">Families</span>
-            <span class="family-student-row-value"><%= wednesdayFamilyCount %></span>
-          </div>
-        </div>
+        <% }); %>
       </div>
     </div>
 
