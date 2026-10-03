@@ -5,18 +5,17 @@ const requireAdmin = require('../middleware/requireAdmin');
 const { formatDateLabel, formatTime, formatDateAndTime, todayISO, weekdayOf } = require('../utils/dates');
 const { REASON_LABELS } = require('../utils/rosters');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
-const { DAY_LABELS, isValidDay, defaultDay } = require('../utils/days');
-const { classesAtRiskForDay, CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
+const { classesAtRiskForDay, CLASS_DAY_LABELS_FULL, listActiveClassDays } = require('../utils/classSchedule');
+const { isValidClassDay, CLASS_DAY_WEEKDAY_FULL } = require('../utils/classDays');
 const { substituteBoard } = require('../utils/substitutes');
 const { membersWithMedicalNotes, lastNameOf } = require('../utils/members');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 const LOG_TABS = ['absence', 'checkinout', 'classcheckinout', 'nametag', 'classrisk', 'substitutes', 'allergies'];
 
-const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
 function todayIfSessionDay(day) {
   const today = todayISO();
-  return weekdayOf(today) === DAY_WEEKDAY[day] ? today : null;
+  return weekdayOf(today) === CLASS_DAY_WEEKDAY_FULL[day] ? today : null;
 }
 
 // Every Absence/Late form submission, newest first - one row per actual
@@ -243,13 +242,16 @@ router.get('/logs', requireAdmin, async (req, res) => {
   }
 
   if (tab === 'classrisk') {
-    const day = isValidDay(req.query.day) ? req.query.day : defaultDay();
+    const activeDays = await listActiveClassDays();
+    const day = isValidClassDay(req.query.day) ? req.query.day : (activeDays[0] || 'monday');
     const alertDate = todayIfSessionDay(day);
     return res.render('admin-logs', {
       title: 'Class Cancellation Risk',
       tab,
       day,
-      dayLabel: DAY_LABELS[day],
+      activeDays,
+      dayLabels: CLASS_DAY_LABELS_FULL,
+      dayLabel: CLASS_DAY_LABELS_FULL[day],
       alertDateLabel: alertDate ? formatDateLabel(alertDate) : null,
       classesAtRisk: await classesAtRiskForDay(day, alertDate),
       error: req.query.error || null,
@@ -258,7 +260,8 @@ router.get('/logs', requireAdmin, async (req, res) => {
   }
 
   if (tab === 'substitutes') {
-    const day = isValidDay(req.query.day) ? req.query.day : defaultDay();
+    const activeDays = await listActiveClassDays();
+    const day = isValidClassDay(req.query.day) ? req.query.day : (activeDays[0] || 'monday');
     const dateFilter = req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : todayIfSessionDay(day) || '';
     // A real request: "the substitutes needed list under logs should only
     // show teacher and assistant positions that need a floater, not
@@ -275,7 +278,9 @@ router.get('/logs', requireAdmin, async (req, res) => {
       title: 'Substitutes Needed',
       tab,
       day,
-      dayLabel: DAY_LABELS[day],
+      activeDays,
+      dayLabels: CLASS_DAY_LABELS_FULL,
+      dayLabel: CLASS_DAY_LABELS_FULL[day],
       dateFilter,
       board,
       error: req.query.error || null,

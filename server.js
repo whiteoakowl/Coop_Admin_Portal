@@ -48,17 +48,21 @@ process.on('unhandledRejection', (reason) => {
 
 const db = require('./db'); // constructs the db handle; db.ready resolves once schema + first-boot seeding are done (see db/index.js)
 
-// The Monday/Wednesday Parent/Student rosters are normally created lazily
-// the first time a class enrolls/staffs someone that day - ensure all 4
-// always exist up front so they're visible on Attendance immediately, even
-// before any classes are set up. syncDayMemberRosters then backfills both
-// days' roster membership AND member_schedules (the derived Schedule Card
-// / profile Class Schedule data) from current enrollment/staffing, so
-// existing classes are reflected everywhere on every boot, not just after
-// their next edit.
-const { ensureDayRoster, syncDayMemberRosters } = require('./utils/classSchedule');
+// Each active day's Parent/Student rosters are normally created lazily
+// the first time a class enrolls/staffs someone that day - ensure they
+// all exist up front so they're visible on Attendance immediately, even
+// before any classes are set up. syncDayMemberRosters then backfills
+// every active day's roster membership AND member_schedules (the derived
+// Schedule Card / profile Class Schedule data) from current enrollment/
+// staffing, so existing classes are reflected everywhere on every boot,
+// not just after their next edit. A real bug found auditing for leftover
+// 2-day-only code: this used to hardcode ['monday', 'wednesday'], so a
+// newly-activated 3rd+ day never got this boot-time backfill - only
+// Monday/Wednesday's own roster membership/member_schedules stayed in
+// sync across a restart without someone manually clicking Resync.
+const { ensureDayRoster, syncDayMemberRosters, listActiveClassDays } = require('./utils/classSchedule');
 async function bootRosters() {
-  for (const day of ['monday', 'wednesday']) {
+  for (const day of await listActiveClassDays()) {
     for (const role of ['parent', 'student']) await ensureDayRoster(day, role);
     await syncDayMemberRosters(day);
   }

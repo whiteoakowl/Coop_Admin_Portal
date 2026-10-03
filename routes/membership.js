@@ -19,7 +19,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { GRADE_LEVELS } = require('../utils/classSchedule');
+const { GRADE_LEVELS, CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
 const { isValidISODate } = require('../utils/dates');
 const { allFamilies } = require('../utils/members');
 const { resolveFamilyId, createParentMember, createChildMember, uploadIntakePhotos, parseArrayField } = require('../utils/memberIntake');
@@ -39,6 +39,7 @@ router.get('/membership', requireFullAdmin, async (req, res) => {
     isAdmin: true,
     families: await allFamilies(),
     setupTeams: await allSetupTeams(),
+    dayLabels: CLASS_DAY_LABELS_FULL,
     gradeLevels: GRADE_LEVELS,
     parentFields: await membershipFormFields.listFields('parent'),
     childFields: await membershipFormFields.listFields('child'),

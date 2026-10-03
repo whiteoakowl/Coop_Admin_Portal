@@ -90,7 +90,7 @@
               <tr>
                 <td><%= row.memberName %></td>
                 <td><%= row.role %></td>
-                <td><%= row.day === 'monday' ? 'Monday' : 'Wednesday' %></td>
+                <td><%= dayLabels[row.day] || row.day %></td>
                 <td><%= row.start_time || '' %><% if (row.end_time) { %>&ndash;<%= row.end_time %><% } %></td>
                 <td><%= row.class_name %></td>
                 <td><%= row.room || '' %></td>

@@ -121,7 +121,7 @@
                   <select name="parents[<%= i %>][cleanupTeamId]">
                     <option value="">None</option>
                     <% setupTeams.forEach(function(t) { %>
-                      <option value="<%= t.id %>"><%= t.day === 'monday' ? 'Monday' : 'Wednesday' %> &ndash; <%= t.title %></option>
+                      <option value="<%= t.id %>"><%= dayLabels[t.day] || t.day %> &ndash; <%= t.title %></option>
                     <% }); %>
                   </select>
                 </div>

@@ -24,8 +24,9 @@
 
     <div class="filter-row no-print">
       <div class="day-toggle schedule-day-toggle">
-        <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/parent/classes?day=monday">Monday</a>
-        <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/parent/classes?day=wednesday">Wednesday</a>
+        <% activeDays.forEach(function (d) { %>
+          <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/parent/classes?day=<%= d %>"><%= dayLabels[d] %></a>
+        <% }); %>
       </div>
       <%# A real request: "Parents can filter classes by grade level and
           by their own students, drop down menu. If filtering by their

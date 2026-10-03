@@ -1,5 +1,5 @@
 const db = require('../db');
-const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
+const { DAYS } = require('./days');
 const { appSetting, setAppSetting } = require('./appSettings');
 const {
   CLASS_DAYS,
@@ -2265,10 +2265,6 @@ async function membersForSectionRaw(listId, sectionId) {
 }
 
 module.exports = {
-  DAYS,
-  DAY_LABELS,
-  isValidDay,
-  defaultDay,
   HOUR_POSITIONS,
   UNASSIGNED_ROOM,
   COLOR_PALETTE,

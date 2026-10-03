@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const requireAdmin = require('../middleware/requireAdmin');
-const { requireDay } = require('../utils/days');
+const { requireClassDay } = require('../utils/classDays');
 const { isValidISODate } = require('../utils/dates');
 const { HOUR_POSITIONS } = require('../utils/classSchedule');
 const {
@@ -22,7 +22,7 @@ const {
 // Substitutes is no longer its own tab - it's folded into the Floater
 // Assignments manage page (routes/admin-volunteers.js). Keep this as a
 // redirect so any old bookmarks/links still land somewhere useful.
-router.get('/volunteers/:day/substitutes', requireAdmin, requireDay, (req, res) => {
+router.get('/volunteers/:day/substitutes', requireAdmin, requireClassDay, (req, res) => {
   const day = req.params.day;
   const qs = req.query.date ? `?date=${encodeURIComponent(req.query.date)}` : '';
   res.redirect(`/admin/volunteers/${day}/manage${qs}`);
@@ -37,7 +37,7 @@ function subUrl(day, params) {
   return `/admin/volunteers/${day}/manage` + (qs ? `?${qs}` : '');
 }
 
-router.post('/volunteers/:day/substitutes/permanent-jobs/new', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/substitutes/permanent-jobs/new', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   // permanent_jobs itself has no semester concept (day-scoped only, same
   // for every semester) - this is purely so the redirect lands back on
@@ -69,7 +69,7 @@ router.post('/volunteers/:day/substitutes/permanent-jobs/new', requireAdmin, req
 // groupedPermanentJobsForDay) for an existing position, or the literal
 // string 'new' for the blank row, matching savePositionGroup's own
 // keyId-is-null-means-new contract.
-router.post('/volunteers/:day/substitutes/permanent-jobs/save-groups', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/substitutes/permanent-jobs/save-groups', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const semesterId = req.query.semesterId;
   const groups = req.body.groups && typeof req.body.groups === 'object' ? req.body.groups : {};
@@ -96,7 +96,7 @@ router.post('/volunteers/:day/substitutes/permanent-jobs/save-groups', requireAd
 // mechanism the Save button's own save-groups route above already uses)
 // so the dialog pops right back open with the position gone instead of
 // leaving the admin back at the closed manage page.
-router.post('/volunteers/:day/substitutes/permanent-jobs/group/:keyId/delete', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/substitutes/permanent-jobs/group/:keyId/delete', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const semesterId = req.query.semesterId;
   const keyId = parseInt(req.params.keyId, 10);
@@ -112,7 +112,7 @@ router.post('/volunteers/:day/substitutes/permanent-jobs/group/:keyId/delete', r
 // missing/invalid date can't be saved against (there'd be nothing to
 // scope the new rows to), so it's rejected up front instead of silently
 // creating a recurring job by accident.
-router.post('/volunteers/:day/substitutes/temporary-jobs/save-groups', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/substitutes/temporary-jobs/save-groups', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const semesterId = req.query.semesterId;
   const date = req.body.date;
@@ -133,7 +133,7 @@ router.post('/volunteers/:day/substitutes/temporary-jobs/save-groups', requireAd
   res.redirect(subUrl(day, { date, notice: 'Temporary positions saved.', semesterId }));
 });
 
-router.post('/volunteers/:day/substitutes/temporary-jobs/group/:keyId/delete', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/substitutes/temporary-jobs/group/:keyId/delete', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const semesterId = req.query.semesterId;
   const date = req.body.date;
@@ -142,7 +142,7 @@ router.post('/volunteers/:day/substitutes/temporary-jobs/group/:keyId/delete', r
   res.redirect(subUrl(day, { date, dialog: 'temp-job', notice: title ? `Deleted "${title}".` : 'Position not found.', semesterId }));
 });
 
-router.post('/volunteers/:day/substitutes/permanent-jobs/:id/edit', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/substitutes/permanent-jobs/:id/edit', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const semesterId = req.query.semesterId;
   const id = parseInt(req.params.id, 10);
@@ -155,7 +155,7 @@ router.post('/volunteers/:day/substitutes/permanent-jobs/:id/edit', requireAdmin
   res.redirect(subUrl(day, { date: req.body.date, semesterId }));
 });
 
-router.post('/volunteers/:day/substitutes/permanent-jobs/:id/floaters', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/substitutes/permanent-jobs/:id/floaters', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const semesterId = req.query.semesterId;
   const id = parseInt(req.params.id, 10);
@@ -164,7 +164,7 @@ router.post('/volunteers/:day/substitutes/permanent-jobs/:id/floaters', requireA
   res.redirect(subUrl(day, { date: req.body.date, semesterId }));
 });
 
-router.post('/volunteers/:day/substitutes/permanent-jobs/:id/delete', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/substitutes/permanent-jobs/:id/delete', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const semesterId = req.query.semesterId;
   const id = parseInt(req.params.id, 10);
@@ -201,7 +201,7 @@ function isFetch(req) {
   return req.get('X-Requested-With') === 'fetch';
 }
 
-router.post('/volunteers/:day/substitutes/assign', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/substitutes/assign', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const semesterId = req.query.semesterId;
   const date = req.body.date;
@@ -221,7 +221,7 @@ router.post('/volunteers/:day/substitutes/assign', requireAdmin, requireDay, asy
   res.redirect(subUrl(day, { date, semesterId }));
 });
 
-router.post('/volunteers/:day/substitutes/unassign', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/substitutes/unassign', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const semesterId = req.query.semesterId;
   const date = req.body.date;
@@ -235,7 +235,7 @@ router.post('/volunteers/:day/substitutes/unassign', requireAdmin, requireDay, a
 // Confirms the automated sub system's own pick as-is - a one-click
 // approve, distinct from /assign (which is also used to override with a
 // different person entirely).
-router.post('/volunteers/:day/substitutes/approve', requireAdmin, requireDay, async (req, res) => {
+router.post('/volunteers/:day/substitutes/approve', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const semesterId = req.query.semesterId;
   const date = req.body.date;

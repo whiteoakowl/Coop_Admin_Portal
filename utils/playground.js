@@ -9,7 +9,7 @@
 // checkouts row for that roster+date, since anybody can walk up and check
 // in with no enrollment step at all (see playgroundLogForDate below).
 const db = require('../db');
-const { DAY_LABELS, hoursForDay } = require('./classSchedule');
+const { CLASS_DAY_LABELS_FULL, hoursForDay } = require('./classSchedule');
 const { byLastName } = require('./members');
 const { formatTime } = require('./dates');
 
@@ -36,7 +36,7 @@ async function ensurePlaygroundRoster(day, hourPosition) {
   const label = await playgroundHourLabel(day, hourPosition);
   const info = await db
     .prepare('INSERT INTO rosters (name, category, schedule_day) VALUES (?, ?, ?)')
-    .run(`Playground - ${DAY_LABELS[day]} ${label}`, 'Playground', day);
+    .run(`Playground - ${CLASS_DAY_LABELS_FULL[day]} ${label}`, 'Playground', day);
   const rosterId = info.lastInsertRowid;
   await db
     .prepare(

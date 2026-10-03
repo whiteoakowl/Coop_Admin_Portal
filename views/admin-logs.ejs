@@ -251,8 +251,9 @@
       <% } else if (tab === 'classrisk') { %>
         <div class="roster-toolbar no-print">
           <div class="day-toggle">
-            <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/admin/logs?tab=classrisk&day=monday">Monday</a>
-            <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/logs?tab=classrisk&day=wednesday">Wednesday</a>
+            <% activeDays.forEach(function (d) { %>
+              <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/admin/logs?tab=classrisk&day=<%= d %>"><%= dayLabels[d] %></a>
+            <% }); %>
           </div>
           <div class="roster-btn-row">
             <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
@@ -268,8 +269,9 @@
                   separately-interpolated "&date=..." piece - so EJS's
                   auto-escaping applies uniformly across the full query
                   string instead of only to the dynamic part. %>
-              <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="<%= '/admin/logs?tab=substitutes&day=monday' + (dateFilter ? '&date=' + dateFilter : '') %>">Monday</a>
-              <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="<%= '/admin/logs?tab=substitutes&day=wednesday' + (dateFilter ? '&date=' + dateFilter : '') %>">Wednesday</a>
+              <% activeDays.forEach(function (d) { %>
+                <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="<%= '/admin/logs?tab=substitutes&day=' + d + (dateFilter ? '&date=' + dateFilter : '') %>"><%= dayLabels[d] %></a>
+              <% }); %>
             </div>
             <div class="category-filter">
               <label for="sub-log-date">For Date</label>

@@ -9,6 +9,7 @@ const { findAccountByEmail, verifyPassword, hashPassword, memberForAccount, fami
 const { generateMemberCode } = require('../utils/members');
 const { createFailureRateLimiter } = require('../utils/loginRateLimit');
 const { GRADE_OPTIONS } = require('../utils/membership');
+const { CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
 const { isValidISODate } = require('../utils/dates');
 const membershipHandbook = require('../utils/membershipHandbook');
 const membershipFormFields = require('../utils/membershipFormFields');
@@ -372,6 +373,7 @@ async function renderProfile(req, res, error, notice, activeTab) {
     schedule,
     signups,
     gradeOptions: GRADE_OPTIONS,
+    dayLabels: CLASS_DAY_LABELS_FULL,
     error,
     notice,
   });

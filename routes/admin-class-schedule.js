@@ -35,13 +35,13 @@ const { spreadsheetFileFilter, imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = require('../utils/storage');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const {
-  DAY_LABELS,
+  CLASS_DAY_LABELS_FULL,
   HOUR_POSITIONS,
   COLOR_PALETTE,
   GRADE_LEVELS,
   AGE_OPTIONS,
   ageGroupList,
-  defaultDay,
+  listActiveClassDays,
   hoursForDay,
   saveHourLabels,
   syncMemberSchedulesForDay,
@@ -189,7 +189,10 @@ async function saveClassSections(classId, body) {
   }
 }
 
-router.get('/class-schedule', requireAdmin, (req, res) => res.redirect(`/admin/class-schedule/${defaultDay()}`));
+router.get('/class-schedule', requireAdmin, async (req, res) => {
+  const activeDays = await listActiveClassDays();
+  res.redirect(`/admin/class-schedule/${activeDays[0] || 'monday'}`);
+});
 
 // Registered before the /:day route below - otherwise Express's param
 // route would swallow this exact-path request too (":day" matches any
@@ -415,7 +418,7 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, r
     title: `Manage - ${cls.class_name}`,
     cls,
     activeTab,
-    dayLabel: DAY_LABELS[cls.day],
+    dayLabel: CLASS_DAY_LABELS_FULL[cls.day],
     hours: await hoursForDay(cls.day),
     gradeLevels: GRADE_LEVELS,
     ageOptions: AGE_OPTIONS,
@@ -863,7 +866,7 @@ router.get('/class-schedule/archive/export.csv', requireFullAdmin, async (req, r
     toCsvRow(['Day', 'Class Name', 'Room', 'Grade', 'Start Time', 'End Time', 'Teachers', 'Assistants', 'Students', 'Description', 'Archived At']),
     ...archives.map((a) =>
       toCsvRow([
-        DAY_LABELS[a.day] || a.day,
+        CLASS_DAY_LABELS_FULL[a.day] || a.day,
         a.class_name,
         a.room || '',
         a.age_group || '',
@@ -1071,7 +1074,7 @@ router.get('/class-schedule/classes/:id/roster/print', requireFullAdmin, async (
   res.render('class-schedule-roster-print', {
     title: `${cls.class_name} Roster`,
     cls: { ...cls, students: cls.students.map((s) => ({ ...s, age: ageFromBirthday(s.birthday) })) },
-    dayLabel: DAY_LABELS[cls.day],
+    dayLabel: CLASS_DAY_LABELS_FULL[cls.day],
   });
 });
 
@@ -1342,8 +1345,8 @@ router.get('/class-schedule/:day/export.csv', requireAdmin, requireClassDay, asy
 router.get('/class-schedule/:day/print', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   res.render('admin-class-schedule-print', {
-    title: `${DAY_LABELS[day]} Schedule`,
-    dayLabel: DAY_LABELS[day],
+    title: `${CLASS_DAY_LABELS_FULL[day]} Schedule`,
+    dayLabel: CLASS_DAY_LABELS_FULL[day],
     // Room-by-hour grid (same shape the on-screen grid uses) - not the
     // hour-only gridForDay - so the printout keeps room number as its own
     // grid column instead of just a line of text inside each card.

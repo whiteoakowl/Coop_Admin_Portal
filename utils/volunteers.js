@@ -1,6 +1,5 @@
 const db = require('../db');
 const { formatDateLabel } = require('./dates');
-const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
 const { byLastName } = require('./members');
 const { getActiveKioskSemesterId } = require('./kioskSettings');
 const { isValidClassDay } = require('./classDays');
@@ -258,10 +257,6 @@ async function buildListGrid(listId, dateFilter) {
 }
 
 module.exports = {
-  DAYS,
-  DAY_LABELS,
-  isValidDay,
-  defaultDay,
   clearVolunteerMembershipIfNotParent,
   RANKS,
   RANK_LABELS,

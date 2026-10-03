@@ -16,7 +16,8 @@ const fs = require('fs');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
-const { allClassesList, attendanceHistoryForRoster } = require('../utils/classSchedule');
+const { allClassesList, attendanceHistoryForRoster, CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
+const { CLASS_DAY_ORDER } = require('../utils/classDays');
 const { formatFriendlyTimestamp, formatTimestamp, todayISO } = require('../utils/dates');
 const {
   assignmentsForStudent,
@@ -212,10 +213,17 @@ router.get('/classes/dashboard', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const classes = await classesForStudent(member);
   const byHourPosition = (a, b) => a.hour_position - b.hour_position;
+  const byDay = {};
+  classes.forEach((c) => {
+    (byDay[c.day] = byDay[c.day] || []).push(c);
+  });
+  const days = Object.keys(byDay).sort((a, b) => CLASS_DAY_ORDER[a] - CLASS_DAY_ORDER[b]);
+  days.forEach((d) => byDay[d].sort(byHourPosition));
   res.render('student-class-dashboard', {
     title: 'Classroom Dashboard',
-    mondayClasses: classes.filter((c) => c.day === 'monday').sort(byHourPosition),
-    wednesdayClasses: classes.filter((c) => c.day === 'wednesday').sort(byHourPosition),
+    days,
+    dayLabels: CLASS_DAY_LABELS_FULL,
+    byDay,
   });
 });
 
@@ -338,7 +346,7 @@ router.get('/assignments', async (req, res) => {
 router.get('/transcript', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const { current, history } = member ? await transcriptForStudent(member.id) : { current: [], history: [] };
-  res.render('student-transcript', { title: 'Transcript', member, current, history });
+  res.render('student-transcript', { title: 'Transcript', member, current, history, dayLabels: CLASS_DAY_LABELS_FULL });
 });
 
 router.get('/diploma', async (req, res) => {

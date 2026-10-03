@@ -24,13 +24,13 @@
 // class_enrollments, not something progress itself is keyed by).
 const db = require('../db');
 const { primaryParentsFor } = require('./scheduleCardData');
+const { CLASS_DAY_LABELS_FULL } = require('./classDays');
 
 // A real request: "add a column for open house" - same shape as the 4
 // original circle columns (openHouse -> open_house_complete/
 // open_house_completed_at, see the orientation_open_house migration).
 const FIELDS = ['video', 'meetup', 'teacherTraining', 'tour', 'openHouse'];
 const COLUMN_PREFIX = { video: 'video', meetup: 'meetup', teacherTraining: 'teacher_training', tour: 'tour', openHouse: 'open_house' };
-const DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday' };
 
 // The most recently created semester - the default view when no
 // ?semesterId is given, so the page always opens on a concrete semester
@@ -89,7 +89,7 @@ async function orientationRows(semesterId) {
     .all(semesterId || null, semesterId || null);
   const progressByMember = new Map(progressRows.map((r) => [r.member_id, r]));
 
-  const dayLabelFor = (days) => days.sort().map((d) => DAY_LABELS[d]).join(', ');
+  const dayLabelFor = (days) => days.sort().map((d) => CLASS_DAY_LABELS_FULL[d]).join(', ');
 
   return parents
     .map((entry) => {

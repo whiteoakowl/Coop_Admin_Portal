@@ -20,13 +20,14 @@ const {
   getClass,
   formatGradeRange,
   classImageUrl,
-  DAY_LABELS,
-  isValidDay,
-  defaultDay,
+  CLASS_DAY_LABELS_FULL,
+  isValidClassDay,
+  listActiveClassDays,
   allClassesList,
   attendanceHistoryForRoster,
   GRADE_LEVELS,
 } = require('../utils/classSchedule');
+const { CLASS_DAY_ORDER } = require('../utils/classDays');
 const { getHandbookHtml } = require('../utils/membershipHandbook');
 const { getTemplate, badgeDataForMembers } = require('../utils/nameTagData');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
@@ -214,7 +215,7 @@ router.get('/', async (req, res) => {
 // caller can always just tack `error=`/`notice=` straight on, regardless
 // of whether a `day` param made it in.
 function classesBackUrl(day) {
-  return isValidDay(day) ? `/parent/classes?day=${day}&` : '/parent/classes?';
+  return isValidClassDay(day) ? `/parent/classes?day=${day}&` : '/parent/classes?';
 }
 
 // The room x hour grid, day-tabbed exactly like Co-op Admin's own Class
@@ -230,7 +231,8 @@ function classesBackUrl(day) {
 // straight through Co-op Admin's own roster tools) - only the fragment
 // dialog's own register controls actually gate on it.
 router.get('/classes', async (req, res) => {
-  const day = isValidDay(req.query.day) ? req.query.day : defaultDay();
+  const activeDays = await listActiveClassDays();
+  const day = activeDays.includes(req.query.day) ? req.query.day : (activeDays[0] || 'monday');
   const children = await childrenForAccount(req.portalAccount);
   const childIds = children.map((c) => c.id);
 
@@ -251,7 +253,8 @@ router.get('/classes', async (req, res) => {
   res.render('parent-classes', {
     title: 'Class Registration',
     day,
-    dayLabel: DAY_LABELS[day],
+    activeDays,
+    dayLabels: CLASS_DAY_LABELS_FULL,
     hours: await hoursForDay(day),
     roomGrid: await roomGridForDay(day),
     hasChildren: children.length > 0,
@@ -335,6 +338,7 @@ router.get('/classes/:id/fragment', async (req, res) => {
     cls,
     classImageUrl: classImageUrl(cls.image_key),
     day: req.query.day || cls.day,
+    dayLabels: CLASS_DAY_LABELS_FULL,
     gradeLabel: formatGradeRange(cls.age_group),
     teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
     assistantNames: staff.filter((s) => s.role === 'assistant').map((s) => s.name),
@@ -499,8 +503,17 @@ router.get('/classes/dashboard', async (req, res) => {
   // Wednesday and in time order" - allClassesList's own default order is
   // alphabetical by class name (used elsewhere for a plain lookup list),
   // so each day's own cards are re-sorted by hour_position (the class's
-  // actual time slot) here instead.
+  // actual time slot) here instead. Grouped by whichever days this
+  // person's own classes actually fall on (not just the currently-active
+  // Day Settings days), sorted calendar-order, so a class on a since-
+  // deactivated day doesn't just vanish from someone already enrolled.
   const byHourPosition = (a, b) => a.hour_position - b.hour_position;
+  const byDay = {};
+  classes.forEach((c) => {
+    (byDay[c.day] = byDay[c.day] || []).push(c);
+  });
+  const days = Object.keys(byDay).sort((a, b) => CLASS_DAY_ORDER[a] - CLASS_DAY_ORDER[b]);
+  days.forEach((d) => byDay[d].sort(byHourPosition));
 
   res.render('parent-class-dashboard', {
     title: 'Class Dashboard',
@@ -509,8 +522,9 @@ router.get('/classes/dashboard', async (req, res) => {
     selectedChild,
     selectedParent,
     viewerKind,
-    mondayClasses: classes.filter((c) => c.day === 'monday').sort(byHourPosition),
-    wednesdayClasses: classes.filter((c) => c.day === 'wednesday').sort(byHourPosition),
+    days,
+    dayLabels: CLASS_DAY_LABELS_FULL,
+    byDay,
   });
 });
 

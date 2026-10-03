@@ -46,7 +46,7 @@
         <noscript><button type="submit" class="roster-action-btn">Go</button></noscript>
       </form>
 
-      <% if (mondayClasses.length === 0 && wednesdayClasses.length === 0) { %>
+      <% if (days.length === 0) { %>
         <p class="roster-empty">
           <% if (selectedParent) { %>
             <%= selectedParent.name %> isn't teaching or assisting in any classes yet.
@@ -55,27 +55,14 @@
           <% } %>
         </p>
       <% } else { %>
-        <h2>Monday</h2>
-        <% if (mondayClasses.length === 0) { %>
-          <p class="roster-empty">No Monday classes.</p>
-        <% } else { %>
+        <% days.forEach(function(d) { %>
+          <h2><%= dayLabels[d] %></h2>
           <div class="class-dash-grid">
-            <% mondayClasses.forEach(function(c) { %>
+            <% byDay[d].forEach(function(c) { %>
               <%- include('partials/class-dash-card', { c: c, selectedChild: selectedChild }) %>
             <% }); %>
           </div>
-        <% } %>
-
-        <h2>Wednesday</h2>
-        <% if (wednesdayClasses.length === 0) { %>
-          <p class="roster-empty">No Wednesday classes.</p>
-        <% } else { %>
-          <div class="class-dash-grid">
-            <% wednesdayClasses.forEach(function(c) { %>
-              <%- include('partials/class-dash-card', { c: c, selectedChild: selectedChild }) %>
-            <% }); %>
-          </div>
-        <% } %>
+        <% }); %>
       <% } %>
     <% } %>
   </main>

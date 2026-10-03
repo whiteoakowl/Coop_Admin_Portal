@@ -22,7 +22,7 @@
               <% current.forEach(function(c) { %>
                 <tr>
                   <td class="roster-name-col"><%= c.class_name %></td>
-                  <td><%= c.day === 'monday' ? 'Monday' : 'Wednesday' %></td>
+                  <td><%= dayLabels[c.day] || c.day %></td>
                   <td><%= c.teacher_names || '—' %></td>
                 </tr>
               <% }); %>
@@ -44,7 +44,7 @@
               <% history.forEach(function(h) { %>
                 <tr>
                   <td class="roster-name-col"><%= h.class_name %></td>
-                  <td><%= h.day === 'monday' ? 'Monday' : 'Wednesday' %></td>
+                  <td><%= dayLabels[h.day] || h.day %></td>
                   <td><%= h.teacher_names || '—' %></td>
                   <td><%= h.termEndedLabel %></td>
                 </tr>

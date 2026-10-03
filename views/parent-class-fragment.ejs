@@ -31,7 +31,7 @@
       <div>
         <span class="class-view-info-label">Day &amp; Time</span>
         <strong class="class-view-info-value">
-          <%= cls.day === 'monday' ? 'Monday' : 'Wednesday' %>
+          <%= dayLabels[cls.day] || cls.day %>
           <% if (cls.start_time || cls.end_time) { %><br /><%= cls.start_time || '?' %>&ndash;<%= cls.end_time || '?' %><% } %>
         </strong>
       </div>

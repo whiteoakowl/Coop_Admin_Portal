@@ -336,6 +336,7 @@ router.get('/members/new', async (req, res) => {
     isAdmin: true,
     families: await allFamilies(),
     setupTeams: await allSetupTeams(),
+    dayLabels: CLASS_DAY_LABELS_FULL,
     gradeLevels: GRADE_LEVELS,
     parentFields: await membershipFormFields.listFields('parent'),
     childFields: await membershipFormFields.listFields('child'),

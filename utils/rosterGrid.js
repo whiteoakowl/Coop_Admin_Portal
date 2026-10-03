@@ -10,6 +10,7 @@ const { byLastName } = require('./members');
 const { familyOf } = require('./members');
 const { arrivalDepartureLabels, arrivalDepartureLabelsForMembers } = require('./schedule');
 const { formatTime, formatDateLabel } = require('./dates');
+const { isValidClassDay } = require('./classDays');
 
 // Every roster (each weekday's Parent/Student roster, every class's own
 // roster) lists members alphabetically by last name, not first - see
@@ -68,8 +69,14 @@ async function buildRosterGridData(roster, datesOverride) {
   // per member - see arrivalDepartureLabelsForMembers's own comment for
   // why the per-member version was a severe N+1 at real scale. Falls
   // back to the (slower, but always-correct) per-member function only
-  // for the rare roster whose schedule_day isn't 'monday'/'wednesday'.
-  const isRealDay = roster.schedule_day === 'monday' || roster.schedule_day === 'wednesday';
+  // for the rare roster whose schedule_day isn't one of the 7 real days
+  // (e.g. a stale/malformed row) - a real bug found auditing for leftover
+  // Monday/Wednesday-only checks: this used to compare against literal
+  // 'monday'/'wednesday' only, so it silently fell back to the slow path
+  // AND skipped the cleanup-task lookup below entirely for every
+  // newly-activated 3rd+ day (Tuesday's attendance roster would simply
+  // never show a scanned Setup/Cleanup task number).
+  const isRealDay = isValidClassDay(roster.schedule_day);
   const labelsByMember = isRealDay
     ? await arrivalDepartureLabelsForMembers(members.map((m) => m.id), roster.schedule_day)
     : null;
