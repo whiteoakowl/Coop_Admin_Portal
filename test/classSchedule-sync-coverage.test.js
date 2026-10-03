@@ -55,11 +55,11 @@ test('enrolling/unenrolling a student in a class updates their Schedule Card imm
 
   await setEnrollment(classId, [studentId]);
   let schedule = await getMemberSchedule(studentId);
-  assert.equal(schedule.monday.find((r) => r.class_number === 1).class_name, 'Sync Coverage Class');
+  assert.equal(schedule.byDay.monday.find((r) => r.class_number === 1).class_name, 'Sync Coverage Class');
 
   await setEnrollment(classId, []);
   schedule = await getMemberSchedule(studentId);
-  assert.equal(schedule.monday.find((r) => r.class_number === 1).class_name, '');
+  assert.equal(schedule.byDay.monday.find((r) => r.class_number === 1).class_name, '');
 });
 
 test('adding/removing a parent from a Floater Assignments hour updates their Schedule Card immediately', async () => {
@@ -73,12 +73,12 @@ test('adding/removing a parent from a Floater Assignments hour updates their Sch
   const { syncDayMemberRosters } = require('../utils/classSchedule');
   await syncDayMemberRosters('wednesday');
   let schedule = await getMemberSchedule(parentId);
-  assert.equal(schedule.wednesday.find((r) => r.class_number === 2).class_name, 'Floater');
+  assert.equal(schedule.byDay.wednesday.find((r) => r.class_number === 2).class_name, 'Floater');
 
   await removeMemberFromSection(list.id, parentId, hour2.id);
   await syncDayMemberRosters('wednesday');
   schedule = await getMemberSchedule(parentId);
-  assert.equal(schedule.wednesday.find((r) => r.class_number === 2).class_name, '');
+  assert.equal(schedule.byDay.wednesday.find((r) => r.class_number === 2).class_name, '');
 });
 
 test('adding/removing a parent from a Setup/Cleanup team is reflected on their Name Tag instantly (live query, no cache)', async () => {

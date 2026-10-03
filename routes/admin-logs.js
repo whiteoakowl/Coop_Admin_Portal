@@ -6,7 +6,7 @@ const { formatDateLabel, formatTime, formatDateAndTime, todayISO, weekdayOf } = 
 const { REASON_LABELS } = require('../utils/rosters');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { DAY_LABELS, isValidDay, defaultDay } = require('../utils/days');
-const { classesAtRiskForDay } = require('../utils/classSchedule');
+const { classesAtRiskForDay, CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
 const { substituteBoard } = require('../utils/substitutes');
 const { membersWithMedicalNotes, lastNameOf } = require('../utils/members');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
@@ -161,7 +161,7 @@ async function checkinoutLogDates(kind) {
 }
 
 const REQUEST_TYPE_LABELS = { new_tag: 'New Name Tag', lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
-const NAME_TAG_DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday', both: 'Both' };
+const NAME_TAG_DAY_LABELS = { ...CLASS_DAY_LABELS_FULL, both: 'Both' };
 
 async function nameTagSubmissions(showArchived, dateFilter) {
   let sql = `SELECT n.id AS id, m.name AS "memberName", n.request_type AS "requestType", n.day AS day,

@@ -1,11 +1,11 @@
 const db = require('../db');
-const { DAYS, DAY_LABELS } = require('./days');
 const {
   syncClassRosterMembers,
   syncDayMemberRosters,
   familyAttendanceWindowsForDay,
   liveMemberScheduleRowsForDay,
   minutesToClockLabelLocal,
+  listActiveClassDays,
 } = require('./classSchedule');
 const { byLastName } = require('./members');
 
@@ -20,20 +20,26 @@ function fourRows(rows) {
   return CLASS_NUMBERS.map((n) => byNumber[n] || { class_number: n, time: '', class_name: '', room: '', teacher: '' });
 }
 
-// A single member's Monday + Wednesday schedule, computed live (see
-// liveMemberScheduleRowsForDay's own comment for why - every "member
-// schedule" display surface funnels through this one function or
-// scheduleList below, so fixing it here fixes all of them at once, with
-// no separate "did someone resync" step to go stale). Fine to call once
-// per member for a single lookup (the member profile's Schedule popup, a
-// family's few members); a caller iterating over many members at once
-// should use scheduleList instead, which computes each day's live rows
-// ONCE and reuses them, rather than recomputing the whole day per member.
+// A single member's full schedule, one entry per active day (Day
+// Settings - "Full 7 day expansion..." widened this from a fixed Monday +
+// Wednesday pair), computed live (see liveMemberScheduleRowsForDay's own
+// comment for why - every "member schedule" display surface funnels
+// through this one function or scheduleList below, so fixing it here
+// fixes all of them at once, with no separate "did someone resync" step
+// to go stale). Fine to call once per member for a single lookup (the
+// member profile's Schedule popup, a family's few members); a caller
+// iterating over many members at once should use scheduleList instead,
+// which computes each day's live rows ONCE and reuses them, rather than
+// recomputing the whole day per member. Returns { byDay: { [day]:
+// fourRows }, activeDays, lastUpdated } - byDay rather than schedule, so a
+// caller naming its own result `schedule` (most do) doesn't end up with
+// the confusingly doubled-up schedule.schedule.
 async function getMemberSchedule(memberId) {
-  const [mondayRows, wednesdayRows] = await Promise.all([liveMemberScheduleRowsForDay('monday'), liveMemberScheduleRowsForDay('wednesday')]);
-  const monday = fourRows(Object.values(mondayRows[memberId] || {}));
-  const wednesday = fourRows(Object.values(wednesdayRows[memberId] || {}));
-  return { monday, wednesday, lastUpdated: null };
+  const activeDays = await listActiveClassDays();
+  const rowsByDay = await Promise.all(activeDays.map((d) => liveMemberScheduleRowsForDay(d)));
+  const byDay = {};
+  activeDays.forEach((d, i) => { byDay[d] = fourRows(Object.values(rowsByDay[i][memberId] || {})); });
+  return { byDay, activeDays, lastUpdated: null };
 }
 
 // Batch version of getMemberSchedule for an arbitrary list of member ids -
@@ -46,15 +52,15 @@ async function getMemberSchedule(memberId) {
 // report: printing ~800 cards timed out - the exact same severe N+1 shape
 // routes/admin-schedule.js's own print-cards route was already fixed for
 // (see its own comment), just never applied to cardPairs.js. Returns
-// { [memberId]: { monday, wednesday } }.
+// { [memberId]: { [day]: fourRows } }.
 async function schedulesForMembers(memberIds) {
-  const [mondayRows, wednesdayRows] = await Promise.all([liveMemberScheduleRowsForDay('monday'), liveMemberScheduleRowsForDay('wednesday')]);
+  const activeDays = await listActiveClassDays();
+  const rowsByDay = await Promise.all(activeDays.map((d) => liveMemberScheduleRowsForDay(d)));
   const result = {};
   for (const memberId of memberIds) {
-    result[memberId] = {
-      monday: fourRows(Object.values(mondayRows[memberId] || {})),
-      wednesday: fourRows(Object.values(wednesdayRows[memberId] || {})),
-    };
+    const schedule = {};
+    activeDays.forEach((d, i) => { schedule[d] = fourRows(Object.values(rowsByDay[i][memberId] || {})); });
+    result[memberId] = schedule;
   }
   return result;
 }
@@ -108,13 +114,14 @@ function splitTimeRange(raw) {
 // table only gets rebuilt when enrollment/staffing/floater assignments
 // actually change, so a family whose schedule hasn't been touched since a
 // fix to this computation landed would otherwise keep showing whatever
-// was cached under the old logic. `day` ('monday' or 'wednesday') scopes
-// this to the roster's own day, matching Monday rosters to the Monday
-// schedule and Wednesday rosters to the Wednesday schedule; omit it (or
-// pass anything else) to fall back to both days combined. Returns null
-// for either half if nothing on the schedule resolves to a real time.
+// was cached under the old logic. `day` scopes this to one roster's own
+// day, matching that day's roster to that day's own schedule; omit it (or
+// pass a day that isn't currently active) to fall back to every active
+// day combined. Returns null for either half if nothing on the schedule
+// resolves to a real time.
 async function arrivalDepartureLabels(memberId, day) {
-  const days = day === 'monday' || day === 'wednesday' ? [day] : DAYS;
+  const activeDays = await listActiveClassDays();
+  const days = activeDays.includes(day) ? [day] : activeDays;
   let earliest = null;
   let latest = null;
   for (const d of days) {
@@ -157,9 +164,9 @@ async function arrivalDepartureLabelsForMembers(memberIds, day) {
 }
 
 // 'none' - no classes at all. 'partial' - some classes filled in, but not
-// all 8 (4 Monday + 4 Wednesday) slots. 'complete' - every slot filled.
-function scheduleStatus(monday, wednesday) {
-  const all = [...monday, ...wednesday];
+// every active day's 4 slots. 'complete' - every slot filled.
+function scheduleStatus(scheduleByDay) {
+  const all = Object.values(scheduleByDay).flat();
   const filled = all.filter((r) => !rowIsBlank(r));
   if (filled.length === 0) return 'none';
   if (filled.length === all.length) return 'complete';
@@ -209,23 +216,25 @@ async function scheduleList(filters) {
   // row) once per member, the same severe N+1 shape already fixed once
   // for Arrival/Departure (see arrivalDepartureLabelsForMembers's own
   // comment) - this page can list every active member at once.
-  const [mondayRows, wednesdayRows] = await Promise.all([liveMemberScheduleRowsForDay('monday'), liveMemberScheduleRowsForDay('wednesday')]);
+  const activeDays = await listActiveClassDays();
+  const rowsByDay = await Promise.all(activeDays.map((d) => liveMemberScheduleRowsForDay(d)));
   let rows = members.map((m) => {
-    const monday = fourRows(Object.values(mondayRows[m.id] || {}));
-    const wednesday = fourRows(Object.values(wednesdayRows[m.id] || {}));
-    return { member: m, monday, wednesday, lastUpdated: null, status: scheduleStatus(monday, wednesday) };
+    const byDay = {};
+    activeDays.forEach((d, i) => { byDay[d] = fourRows(Object.values(rowsByDay[i][m.id] || {})); });
+    return { member: m, byDay, activeDays, lastUpdated: null, status: scheduleStatus(byDay) };
   });
 
-  if (filters.day === 'monday') rows = rows.filter((r) => r.monday.some((c) => !rowIsBlank(c)));
-  if (filters.day === 'wednesday') rows = rows.filter((r) => r.wednesday.some((c) => !rowIsBlank(c)));
+  if (activeDays.includes(filters.day)) {
+    rows = rows.filter((r) => r.byDay[filters.day].some((c) => !rowIsBlank(c)));
+  }
   if (filters.teacher) {
-    rows = rows.filter((r) => [...r.monday, ...r.wednesday].some((c) => c.teacher === filters.teacher));
+    rows = rows.filter((r) => Object.values(r.byDay).flat().some((c) => c.teacher === filters.teacher));
   }
   if (filters.room) {
-    rows = rows.filter((r) => [...r.monday, ...r.wednesday].some((c) => c.room === filters.room));
+    rows = rows.filter((r) => Object.values(r.byDay).flat().some((c) => c.room === filters.room));
   }
   if (filters.className) {
-    rows = rows.filter((r) => [...r.monday, ...r.wednesday].some((c) => c.class_name === filters.className));
+    rows = rows.filter((r) => Object.values(r.byDay).flat().some((c) => c.class_name === filters.className));
   }
   if (filters.status) {
     rows = rows.filter((r) => r.status === filters.status);
@@ -278,18 +287,20 @@ async function archiveMemberSchedules(memberIds) {
   const members = await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders})`).all(...memberIds);
   if (members.length === 0) return 0;
 
-  const [mondayRows, wednesdayRows] = await Promise.all([liveMemberScheduleRowsForDay('monday'), liveMemberScheduleRowsForDay('wednesday')]);
+  const activeDays = await listActiveClassDays();
+  const rowsByDay = await Promise.all(activeDays.map((d) => liveMemberScheduleRowsForDay(d)));
 
   const touchedDays = new Set();
   const studentIds = [];
   const parentIds = [];
   const archiveRows = members.map((member) => {
-    const monday = fourRows(Object.values(mondayRows[member.id] || {}));
-    const wednesday = fourRows(Object.values(wednesdayRows[member.id] || {}));
-    if (monday.some((r) => !rowIsBlank(r))) touchedDays.add('monday');
-    if (wednesday.some((r) => !rowIsBlank(r))) touchedDays.add('wednesday');
+    const schedule = {};
+    activeDays.forEach((d, i) => {
+      schedule[d] = fourRows(Object.values(rowsByDay[i][member.id] || {}));
+      if (schedule[d].some((r) => !rowIsBlank(r))) touchedDays.add(d);
+    });
     (member.member_type === 'student' ? studentIds : parentIds).push(member.id);
-    return { member, monday, wednesday };
+    return { member, schedule };
   });
 
   // Every class any archived student is currently enrolled in, gathered
@@ -306,13 +317,18 @@ async function archiveMemberSchedules(memberIds) {
   }
 
   await db.withTransaction(async (tx) => {
-    for (const { member, monday, wednesday } of archiveRows) {
+    for (const { member, schedule } of archiveRows) {
+      const daySchedules = {};
+      for (const d of activeDays) {
+        const summary = summarizeScheduleDay(schedule[d]);
+        if (summary) daySchedules[d] = summary;
+      }
       await tx
         .prepare(
-          `INSERT INTO member_schedule_archives (member_id, member_name, member_type, monday_schedule, wednesday_schedule)
-           VALUES (?, ?, ?, ?, ?)`
+          `INSERT INTO member_schedule_archives (member_id, member_name, member_type, day_schedules_json)
+           VALUES (?, ?, ?, ?)`
         )
-        .run(member.id, member.name, member.member_type, summarizeScheduleDay(monday), summarizeScheduleDay(wednesday));
+        .run(member.id, member.name, member.member_type, JSON.stringify(daySchedules));
     }
     if (studentIds.length) {
       const studentPlaceholders = studentIds.map(() => '?').join(',');
@@ -337,10 +353,35 @@ async function archiveMemberSchedules(memberIds) {
   return members.length;
 }
 
+// Normalizes both archive row shapes into one daySchedules object: a row
+// archived after 20261029010000 carries day_schedules_json directly
+// ({ [day]: summaryText }, any active day at archive time); an older row
+// has none of that - only its own fixed monday_schedule/wednesday_schedule
+// columns - so those are read back into the same shape instead. Callers
+// (the Archive tab's table, its CSV export) only ever deal with
+// daySchedules, never the raw columns, so neither has to know which shape
+// a given archive was actually saved in.
+function normalizeArchiveRow(row) {
+  let daySchedules;
+  if (row.day_schedules_json) {
+    try {
+      daySchedules = JSON.parse(row.day_schedules_json);
+    } catch (err) {
+      daySchedules = {};
+    }
+  } else {
+    daySchedules = {};
+    if (row.monday_schedule) daySchedules.monday = row.monday_schedule;
+    if (row.wednesday_schedule) daySchedules.wednesday = row.wednesday_schedule;
+  }
+  return { ...row, daySchedules };
+}
+
 async function listMemberScheduleArchives(memberType) {
-  return db
+  const rows = await db
     .prepare('SELECT * FROM member_schedule_archives WHERE member_type = ? ORDER BY archived_at DESC, id DESC')
     .all(memberType);
+  return rows.map(normalizeArchiveRow);
 }
 
 async function deleteMemberScheduleArchive(id) {
@@ -353,9 +394,7 @@ async function deleteAllMemberScheduleArchives(memberType) {
 }
 
 module.exports = {
-  DAYS,
   CLASS_NUMBERS,
-  DAY_LABELS,
   STATUS_LABELS,
   getMemberSchedule,
   schedulesForMembers,

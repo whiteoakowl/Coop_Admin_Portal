@@ -134,8 +134,8 @@
           <% familySchedules.forEach(function(fs) { %>
             <div class="schedule-day-columns member-profile-family-schedule">
               <h2 class="member-profile-family-schedule-name"><%= fs.member.name %></h2>
-              <% [['monday', 'Monday', fs.schedule.monday], ['wednesday', 'Wednesday', fs.schedule.wednesday]].forEach(function (entry) { %>
-                <% var dayLabel = entry[1], rows = entry[2]; %>
+              <% fs.schedule.activeDays.forEach(function (d) { %>
+                <% var dayLabel = dayLabels[d], rows = fs.schedule.byDay[d]; %>
                 <div class="form-section">
                   <h3><%= dayLabel %> Schedule</h3>
                   <div class="roster-scroll schedule-table-scroll">
@@ -167,8 +167,8 @@
           <a class="roster-action-btn print-action-btn no-print" href="/admin/schedule/print?familyId=<%= member.family_id %>" target="_blank">Print All Schedules</a>
         <% } else { %>
           <div class="schedule-day-columns">
-            <% [['monday', 'Monday', schedule.monday], ['wednesday', 'Wednesday', schedule.wednesday]].forEach(function (entry) { %>
-              <% var dayLabel = entry[1], rows = entry[2]; %>
+            <% schedule.activeDays.forEach(function (d) { %>
+              <% var dayLabel = dayLabels[d], rows = schedule.byDay[d]; %>
               <div class="form-section">
                 <h2><%= dayLabel %> Schedule</h2>
                 <div class="roster-scroll schedule-table-scroll">

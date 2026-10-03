@@ -6,12 +6,10 @@ const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { isValidISODate, easternInputToUtcText, formatTimestamp, ageFromBirthday } = require('../utils/dates');
+const { isValidISODate, easternInputToUtcText, formatTimestamp, ageFromBirthday, todayISO, weekdayOf } = require('../utils/dates');
 const { listWindows, createWindow, deleteWindow } = require('../utils/registrationWindows');
-const { defaultDateFor, parseDayValue } = require('../utils/days');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const {
-  DAY_LABELS,
   getMemberSchedule,
   schedulesForMembers,
   scheduleList,
@@ -24,6 +22,8 @@ const { byLastName, allFamilies } = require('../utils/members');
 const {
   CLASS_DAYS,
   CLASS_DAY_LABELS_FULL: CLASS_DAY_LABELS,
+  CLASS_DAY_WEEKDAY_FULL,
+  parseClassDayValue,
   listClassSchedules,
   listActiveClassDays,
   createClassSchedule,
@@ -50,6 +50,7 @@ const {
   listScheduleCombos,
 } = require('../utils/classSchedule');
 const { comboSemesterId, qsSemester, findComboId } = require('../utils/scheduleComboLinks');
+const { CLASS_DAY_ORDER } = require('../utils/classDays');
 const { countMissingSemesterData, totalMissing, assignMissingSemesterData } = require('../utils/semesterAssignment');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
@@ -107,6 +108,17 @@ async function resolveSemesterId(semesterId) {
   return semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
 }
 
+// utils/days.js's own defaultDateFor is still Monday/Wednesday-only (see
+// that file's header comment) - this is its exact same "only meaningful
+// when today itself falls on the given day" logic, just keyed off the
+// full 7-day CLASS_DAY_WEEKDAY_FULL instead, so viewing a newly-activated
+// day's (e.g. Tuesday) own grid on an actual Tuesday still defaults the
+// date picker to today instead of silently landing on no date at all.
+function defaultDateForClassDay(day) {
+  const today = todayISO();
+  return weekdayOf(today) === CLASS_DAY_WEEKDAY_FULL[day] ? today : '';
+}
+
 router.get('/schedule', requireAdmin, async (req, res) => {
   // A real request: "merge Parent + Student Schedules tabs into 'Member
   // Schedules' with filter popup" - the two separate top-level tabs are
@@ -141,7 +153,7 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   }
 
   if (CLASS_DAYS.includes(tab)) {
-    const selectedDate = isValidISODate(req.query.date) ? req.query.date : defaultDateFor(tab);
+    const selectedDate = isValidISODate(req.query.date) ? req.query.date : defaultDateForClassDay(tab);
     const missingSemesterBreakdown = res.locals.isFullAdmin ? await countMissingSemesterData() : null;
     const combos = await listScheduleCombos();
     const resolvedSemesterId = await resolveSemesterId(comboSemesterId(req));
@@ -187,12 +199,22 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   if (tab === 'archive') {
     const archiveType = ARCHIVE_TYPES.includes(req.query.type) ? req.query.type : 'class';
     const archives = archiveType === 'class' ? await listClassArchives() : await listMemberScheduleArchives(archiveType);
+    // A member-schedule archive's own daySchedules only ever holds
+    // whichever days were active when IT was archived (see
+    // listMemberScheduleArchives' own comment on the two row shapes this
+    // merges) - the table needs one column per day that shows up across
+    // ANY of them, in calendar order, not just whatever's active today.
+    const archiveDays =
+      archiveType === 'class'
+        ? []
+        : [...new Set(archives.flatMap((a) => Object.keys(a.daySchedules)))].sort((a, b) => CLASS_DAY_ORDER[a] - CLASS_DAY_ORDER[b]);
     return res.render('admin-schedule', {
       title: 'Schedules',
       tab,
       topTab: 'archive',
       archiveType,
       archives,
+      archiveDays,
       dayLabels: CLASS_DAY_LABELS,
       error: req.query.error || null,
       notice: req.query.notice || null,
@@ -289,7 +311,7 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   // scheduleCardDataForMembers' own comment) - this page can list every
   // active member of a type at once.
   const scheduleByMember = {};
-  for (const r of rows) scheduleByMember[r.member.id] = { monday: r.monday, wednesday: r.wednesday };
+  for (const r of rows) scheduleByMember[r.member.id] = { monday: r.byDay.monday, wednesday: r.byDay.wednesday };
   const cardDataByMember = await scheduleCardDataForMembers(
     rows.map((r) => r.member),
     scheduleByMember
@@ -631,7 +653,7 @@ function normalizeScheduleImportRow(row) {
     if (!className) continue;
     slots.push({
       className,
-      day: parseDayValue(get(`Class Days ${i}`)),
+      day: parseClassDayValue(get(`Class Days ${i}`)),
       startTime: get(`Class Start Time ${i}`),
       room: getFirst([`Class Location ${i}`, `Room ${i}`]),
     });
@@ -778,9 +800,10 @@ router.get('/schedule/archive/:type/export.csv', requireFullAdmin, async (req, r
   const type = req.params.type;
   if (!['student', 'parent'].includes(type)) return res.status(404).send('Not found');
   const archives = await listMemberScheduleArchives(type);
+  const archiveDays = [...new Set(archives.flatMap((a) => Object.keys(a.daySchedules)))].sort((a, b) => CLASS_DAY_ORDER[a] - CLASS_DAY_ORDER[b]);
   const lines = [
-    toCsvRow(['Name', 'Monday Schedule', 'Wednesday Schedule', 'Archived At']),
-    ...archives.map((a) => toCsvRow([a.member_name, a.monday_schedule || '', a.wednesday_schedule || '', a.archived_at])),
+    toCsvRow(['Name', ...archiveDays.map((d) => `${CLASS_DAY_LABELS[d]} Schedule`), 'Archived At']),
+    ...archives.map((a) => toCsvRow([a.member_name, ...archiveDays.map((d) => a.daySchedules[d] || ''), a.archived_at])),
   ];
   sendCsv(res, `${type}-schedule-archive.csv`, lines);
 });
@@ -888,13 +911,12 @@ router.get('/schedule/member/:id/manage', requireFullAdmin, async (req, res) => 
   const id = parseInt(req.params.id, 10);
   const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
-  const { monday, wednesday } = await getMemberSchedule(id);
+  const schedule = await getMemberSchedule(id);
   res.render('admin-schedule-manage', {
     title: `Schedule - ${member.name}`,
     member,
-    monday,
-    wednesday,
-    dayLabels: DAY_LABELS,
+    schedule,
+    dayLabels: CLASS_DAY_LABELS,
     // "All Schedules" back-link on the merged Member Schedules tab -
     // carries this member's own type along as the Filter popup's ?type=
     // so the admin lands back on a sensibly-scoped view instead of
@@ -904,9 +926,10 @@ router.get('/schedule/member/:id/manage', requireFullAdmin, async (req, res) => 
 });
 
 router.get('/schedule/export.csv', requireFullAdmin, async (req, res) => {
+  const activeDays = await listActiveClassDays();
   const filters = {
     search: (req.query.search || '').trim(),
-    day: ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '',
+    day: activeDays.includes(req.query.day) ? req.query.day : '',
     grade: req.query.grade || '',
     teacher: req.query.teacher || '',
     room: req.query.room || '',
@@ -918,8 +941,8 @@ router.get('/schedule/export.csv', requireFullAdmin, async (req, res) => {
 
   const lines = [toCsvRow(['Member Name', 'Day', 'Class Number', 'Time', 'Class Name', 'Room', 'Teacher'])];
   rows.forEach((r) => {
-    [['monday', r.monday], ['wednesday', r.wednesday]].forEach(([day, dayRows]) => {
-      dayRows.forEach((c) => {
+    activeDays.forEach((day) => {
+      r.byDay[day].forEach((c) => {
         if (!c.class_name && !c.room && !c.time && !c.teacher) return;
         lines.push(toCsvRow([r.member.name, day, c.class_number, c.time || '', c.class_name || '', c.room || '', c.teacher || '']));
       });
@@ -931,9 +954,10 @@ router.get('/schedule/export.csv', requireFullAdmin, async (req, res) => {
 
 router.get('/schedule/print', requireFullAdmin, async (req, res) => {
   const familyId = req.query.familyId ? parseInt(req.query.familyId, 10) : null;
+  const activeDays = await listActiveClassDays();
   const filters = {
     search: (req.query.search || '').trim(),
-    day: ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '',
+    day: activeDays.includes(req.query.day) ? req.query.day : '',
     grade: req.query.grade || '',
     teacher: req.query.teacher || '',
     room: req.query.room || '',
@@ -969,7 +993,7 @@ router.get('/schedule/print', requireFullAdmin, async (req, res) => {
       return 0;
     });
   }
-  res.render('admin-schedule-print', { title: 'Print Schedules', rows, compact: !!familyId });
+  res.render('admin-schedule-print', { title: 'Print Schedules', rows, activeDays, dayLabels: CLASS_DAY_LABELS, compact: !!familyId });
 });
 
 module.exports = router;

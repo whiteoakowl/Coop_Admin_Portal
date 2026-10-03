@@ -83,10 +83,10 @@ test('getMemberSchedule reflects a brand-new class immediately, with no separate
   // the exact live-bug-report scenario.
   await setEnrollment(classId, [studentId]);
 
-  const { monday } = await getMemberSchedule(studentId);
-  assert.equal(monday[0].time, '9:00 AM - 9:45 AM', 'the full time range should show immediately, with no cache to go stale');
-  assert.equal(monday[0].class_name, 'Live Compute Class');
-  assert.equal(monday[0].room, 'Room Z');
+  const { byDay } = await getMemberSchedule(studentId);
+  assert.equal(byDay.monday[0].time, '9:00 AM - 9:45 AM', 'the full time range should show immediately, with no cache to go stale');
+  assert.equal(byDay.monday[0].class_name, 'Live Compute Class');
+  assert.equal(byDay.monday[0].room, 'Room Z');
 });
 
 test('the visual Schedule Card (NameTagRenderCore.renderBadgeElements, the exact path Members > Cards and both print routes use) shows the full time range, not just the start time', async () => {

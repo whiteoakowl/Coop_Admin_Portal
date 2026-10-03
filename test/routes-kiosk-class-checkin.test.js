@@ -166,7 +166,12 @@ test('Class Check-In day and hour navigation', async (t) => {
   await agent.post('/kiosk/class-checkin/unlock').type('form').send({ pin: '0000' });
 
   await t.test('an invalid day 404s', async () => {
-    const res = await agent.get('/kiosk/class-checkin/classes/tuesday');
+    // "tuesday" used to be the example here, back when this route's own
+    // day gate (utils/days.js's isValidDay) only ever recognized Monday/
+    // Wednesday - it's a real, activatable day now (Day Settings' own
+    // 7-day expansion, utils/classDays.js's isValidClassDay), so a
+    // genuinely nonexistent day name is what actually 404s here now.
+    const res = await agent.get('/kiosk/class-checkin/classes/someday');
     assert.equal(res.status, 404);
   });
 

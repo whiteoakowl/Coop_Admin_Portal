@@ -133,13 +133,13 @@ test('a mixed batch: bulk-batched helpers match their per-member counterparts, k
   assert.equal(badgeBatch[loneStudentId].allergies, '', 'a student with no allergy on file should get an empty string, not a neighbor\'s');
 
   // --- schedulesForMembers vs getMemberSchedule, member by member ---
-  // (schedulesForMembers deliberately omits the unused lastUpdated field
-  // getMemberSchedule still carries - see its own "Returns" comment - so
-  // only monday/wednesday are compared here.)
+  // (schedulesForMembers deliberately returns each member's day-keyed rows
+  // flat, with no activeDays/lastUpdated wrapper - see its own "Returns"
+  // comment - so this compares against getMemberSchedule's own byDay.)
   const scheduleBatch = await schedulesForMembers(allMembers.map((m) => m.id));
   for (const member of allMembers) {
-    const { monday, wednesday } = await getMemberSchedule(member.id);
-    assert.deepEqual(scheduleBatch[member.id], { monday, wednesday }, `schedulesForMembers should match getMemberSchedule for ${member.name}`);
+    const { byDay } = await getMemberSchedule(member.id);
+    assert.deepEqual(scheduleBatch[member.id], byDay, `schedulesForMembers should match getMemberSchedule for ${member.name}`);
   }
   assert.equal(scheduleBatch[studentId].monday[0].class_name, 'Batch Class');
   assert.equal(scheduleBatch[loneStudentId].monday[0].class_name, '', 'a member with no classes should get blank rows, not a neighbor\'s class');

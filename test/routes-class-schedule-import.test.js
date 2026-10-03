@@ -13,9 +13,11 @@
 // "Wed" (not the full word) and had no "Hour" concept at all - its Hour
 // column ended up holding an actual clock time instead of a 1-4 slot
 // number - so every single row got silently skipped. Day now tolerates
-// the abbreviation (utils/days.js's parseDayValue), and Hour is optional:
-// when it's missing or not a valid 1-4 position, the row's Start Time is
-// used to auto-assign one instead (see buildAutoHourPositions).
+// the abbreviation (utils/classDays.js's parseClassDayValue, since the
+// 7-day expansion - every other day name/abbreviation works the same way,
+// not just Mon/Wed), and Hour is optional: when it's missing or not a
+// valid 1-4 position, the row's Start Time is used to auto-assign one
+// instead (see buildAutoHourPositions).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -370,5 +372,46 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
     assert.ok(decodeURIComponent(res.headers.location).includes('Imported 4 class'), 'only 4 slots exist per day');
     assert.ok(decodeURIComponent(res.headers.location).includes('1 row(s) skipped'));
     assert.equal(await db.prepare("SELECT id FROM classes WHERE class_name = 'Overflow E'").get(), undefined);
+  });
+});
+
+// A real bug report, found while generalizing the rest of the app off the
+// old 2-day utils/days.js: this import's own Day column resolution (see
+// the file's own header comment) used utils/days.js's parseDayValue,
+// which only ever recognized "Mon"/"Wed" - a spreadsheet row whose Day
+// column said "Tuesday" (or any day beyond Monday/Wednesday) resolved to
+// null and was silently skipped, with no error at all, even once Day
+// Settings could activate any day of the week.
+test('a row whose Day column names a newly-activated day (Tuesday) is imported, not silently skipped', async (t) => {
+  const { cookie, csrfToken } = await loginAsAdmin();
+  await request(app)
+    .post('/admin/schedule/class-schedules')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ title: 'Tuesday Enrichment', dayOfWeek: 'tuesday', _csrf: csrfToken });
+
+  await t.test('the full word "Tuesday" resolves and imports', async () => {
+    const buffer = buildImportBuffer([['Tuesday', '1', 'Tuesday Import Class', 'Room 1', '', '', '', '', '', '', '', '', '']]);
+    const res = await request(app)
+      .post('/admin/class-schedule/tuesday/import?_csrf=' + encodeURIComponent(csrfToken))
+      .set('Cookie', cookie)
+      .attach('file', buffer, 'tuesday.xlsx');
+    assert.equal(res.status, 302);
+    assert.ok(decodeURIComponent(res.headers.location).includes('Imported 1 class'), decodeURIComponent(res.headers.location));
+    const cls = await db.prepare("SELECT * FROM classes WHERE class_name = 'Tuesday Import Class'").get();
+    assert.ok(cls, 'the Tuesday row should have been imported, not skipped');
+    assert.equal(cls.day, 'tuesday');
+  });
+
+  await t.test('the abbreviation "Tue" resolves too', async () => {
+    const buffer = buildImportBuffer([['Tue', '2', 'Tuesday Abbrev Class', 'Room 2', '', '', '', '', '', '', '', '', '']]);
+    const res = await request(app)
+      .post('/admin/class-schedule/tuesday/import?_csrf=' + encodeURIComponent(csrfToken))
+      .set('Cookie', cookie)
+      .attach('file', buffer, 'tuesday-abbrev.xlsx');
+    assert.equal(res.status, 302);
+    assert.ok(decodeURIComponent(res.headers.location).includes('Imported 1 class'), decodeURIComponent(res.headers.location));
+    const cls = await db.prepare("SELECT * FROM classes WHERE class_name = 'Tuesday Abbrev Class'").get();
+    assert.ok(cls, 'the "Tue" abbreviation should resolve the same as "Tuesday"');
   });
 });

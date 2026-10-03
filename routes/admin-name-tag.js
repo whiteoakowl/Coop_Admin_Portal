@@ -17,15 +17,15 @@ const { createStorageClient, publicUrl } = require('../utils/storage');
 const { saveUpload } = require('../utils/uploadBackend');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { jsonScriptSafe } = require('../utils/json');
-const { DAY_LABELS: BASE_DAY_LABELS } = require('../utils/days');
+const { CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
 const { byLastName } = require('../utils/members');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 const REQUEST_TYPE_LABELS = { new_tag: 'New Name Tag', lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
 // A name tag request can also be filed for "both" days, unlike every other
-// :day-scoped feature - extend the shared Monday/Wednesday labels rather
-// than redefining them.
-const DAY_LABELS = { ...BASE_DAY_LABELS, both: 'Both' };
+// :day-scoped feature - extend the shared day labels rather than
+// redefining them.
+const DAY_LABELS = { ...CLASS_DAY_LABELS_FULL, both: 'Both' };
 
 const DESIGN_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'name-tags');
 const NAME_TAG_IMAGES_BUCKET = 'name-tag-images';

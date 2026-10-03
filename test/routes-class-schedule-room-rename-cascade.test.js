@@ -52,7 +52,7 @@ test('renaming a room via the Edit Hours/Rooms dialog updates the cached Schedul
   await setEnrollment(classId, [studentId]);
 
   const before = await getMemberSchedule(studentId);
-  assert.equal(before.monday.find((r) => r.class_number === 1).room, 'Old Room Name', 'sanity check: the schedule card starts with the pre-rename room');
+  assert.equal(before.byDay.monday.find((r) => r.class_number === 1).room, 'Old Room Name', 'sanity check: the schedule card starts with the pre-rename room');
 
   const res = await request(app)
     .post('/admin/class-schedule/monday/edit')
@@ -70,5 +70,5 @@ test('renaming a room via the Edit Hours/Rooms dialog updates the cached Schedul
   assert.equal(cls.room, 'New Room Name', 'sanity check: the live grid picked up the rename');
 
   const after = await getMemberSchedule(studentId);
-  assert.equal(after.monday.find((r) => r.class_number === 1).room, 'New Room Name', 'the Schedule Card should reflect the renamed room, not the stale cached one');
+  assert.equal(after.byDay.monday.find((r) => r.class_number === 1).room, 'New Room Name', 'the Schedule Card should reflect the renamed room, not the stale cached one');
 });

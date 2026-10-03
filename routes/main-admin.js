@@ -12,7 +12,7 @@ const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const { isValidISODate } = require('../utils/dates');
 const { allDiplomas, issueDiploma, allTranscriptEntries, addTranscriptEntry } = require('../utils/academics');
-const { DAY_LABELS } = require('../utils/days');
+const { CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
 const { GRADE_OPTIONS } = require('../utils/membership');
 const events = require('../utils/events');
 const babysitters = require('../utils/babysitters');
@@ -358,7 +358,7 @@ router.get('/academics', requirePortalPermission('manage_academics'), async (req
     diplomas,
     transcriptEntries,
     students,
-    dayLabels: DAY_LABELS,
+    dayLabels: CLASS_DAY_LABELS_FULL,
     gradeOptions: GRADE_OPTIONS,
     error: req.query.error || null,
     notice: req.query.notice || null,

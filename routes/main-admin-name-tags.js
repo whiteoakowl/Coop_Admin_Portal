@@ -78,8 +78,7 @@ const { buildCardPairs } = require('../utils/cardPairs');
 const { formatDateLabel, formatTimestamp } = require('../utils/dates');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
-const { allClassesList, UNASSIGNED_ROOM, HOUR_POSITIONS } = require('../utils/classSchedule');
-const { DAYS, DAY_LABELS } = require('../utils/days');
+const { allClassesList, UNASSIGNED_ROOM, HOUR_POSITIONS, listActiveClassDays, CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
 const { playgroundHourLabel } = require('../utils/playground');
 const { allItems: allLibraryItems, allLibraryTypes } = require('../utils/library');
 const { schedulesForMembers } = require('../utils/schedule');
@@ -679,7 +678,7 @@ router.post('/print-classcheckin-qr', async (req, res) => {
 router.get('/print-playground-qr', async (req, res) => {
   const origin = `${req.protocol}://${req.get('host')}`;
   const pages = [];
-  for (const day of DAYS) {
+  for (const day of await listActiveClassDays()) {
     const hours = [];
     for (const hour of HOUR_POSITIONS) {
       hours.push({
@@ -687,7 +686,7 @@ router.get('/print-playground-qr', async (req, res) => {
         checkInUrl: `${origin}/kiosk/class-checkin/playground/${day}/${hour}/attendance`,
       });
     }
-    pages.push({ dayLabel: DAY_LABELS[day], hours });
+    pages.push({ dayLabel: CLASS_DAY_LABELS_FULL[day], hours });
   }
 
   res.render('main-admin-playground-qr-print', {

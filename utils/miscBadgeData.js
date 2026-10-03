@@ -5,7 +5,7 @@
 // shape stays untouched.
 const db = require('../db');
 const { DEFAULT_LAYOUTS } = require('./nameTagBadge');
-const { DAY_LABELS } = require('./days');
+const { CLASS_DAY_LABELS_FULL } = require('./classDays');
 
 const MISC_BADGE_TYPES = ['setupCleanup', 'custom'];
 
@@ -82,7 +82,7 @@ function miscBadgeRowData(row, taskNumber) {
     title: row.title || '',
     description: row.description || '',
     barcodeValue: row.barcode || '',
-    day: row.day ? DAY_LABELS[row.day] || row.day : '',
+    day: row.day ? CLASS_DAY_LABELS_FULL[row.day] || row.day : '',
     leaderLabel: row.leader_name ? `Leader: ${row.leader_name}` : '',
     taskNumber: taskNumber != null ? String(taskNumber) : '',
   };

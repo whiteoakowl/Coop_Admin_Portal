@@ -14,8 +14,7 @@ const { buildCardPairs } = require('../utils/cardPairs');
 const { formatDateLabel, formatTimestamp } = require('../utils/dates');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
-const { allClassesList, UNASSIGNED_ROOM, HOUR_POSITIONS } = require('../utils/classSchedule');
-const { DAYS, DAY_LABELS } = require('../utils/days');
+const { allClassesList, UNASSIGNED_ROOM, HOUR_POSITIONS, listActiveClassDays, CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
 const { playgroundHourLabel } = require('../utils/playground');
 const { allItems: allLibraryItems, allLibraryTypes } = require('../utils/library');
 
@@ -340,14 +339,14 @@ router.get('/design/print-playground-qr', async (req, res) => {
   // really only 2 distinct day-level queries worth of data - run them all
   // concurrently instead.
   const pages = await Promise.all(
-    DAYS.map(async (day) => {
+    (await listActiveClassDays()).map(async (day) => {
       const hours = await Promise.all(
         HOUR_POSITIONS.map(async (hour) => ({
           hourLabel: await playgroundHourLabel(day, hour),
           checkInUrl: `${origin}/kiosk/class-checkin/playground/${day}/${hour}/attendance`,
         }))
       );
-      return { dayLabel: DAY_LABELS[day], hours };
+      return { dayLabel: CLASS_DAY_LABELS_FULL[day], hours };
     })
   );
 

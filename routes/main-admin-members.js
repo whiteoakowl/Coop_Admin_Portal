@@ -29,7 +29,7 @@ const multer = require('multer');
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const { formatDateLabel, formatDateNumeric, formatTime, ageFromBirthday, isChildAge, isValidISODate } = require('../utils/dates');
-const { GRADE_LEVELS } = require('../utils/classSchedule');
+const { GRADE_LEVELS, CLASS_DAY_LABELS_FULL, listActiveClassDays } = require('../utils/classSchedule');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE, memberFamilyGroupKey } = require('../utils/pagination');
 const { spreadsheetFileFilter } = require('../utils/uploads');
 const { uploadMemberPhoto, savePhotoFile, deletePhotoFile } = require('../utils/memberPhoto');
@@ -656,7 +656,13 @@ router.post('/new', uploadIntakePhotos('/main-admin/members/new'), async (req, r
 router.get('/schedule-print', async (req, res) => {
   const familyId = req.query.familyId ? parseInt(req.query.familyId, 10) : null;
   const rows = await scheduleList({ memberId: req.query.memberId ? parseInt(req.query.memberId, 10) : null, familyId });
-  res.render('admin-schedule-print', { title: 'Print Schedules', rows, compact: !!familyId });
+  res.render('admin-schedule-print', {
+    title: 'Print Schedules',
+    rows,
+    activeDays: await listActiveClassDays(),
+    dayLabels: CLASS_DAY_LABELS_FULL,
+    compact: !!familyId,
+  });
 });
 
 const PROFILE_TABS = ['profile', 'schedule', 'attendance'];
@@ -696,6 +702,7 @@ router.get('/:id', async (req, res) => {
     familyMembers: [member, ...restOfFamily].sort(byLastName),
     familyRoster,
     schedule: await getMemberSchedule(id),
+    dayLabels: CLASS_DAY_LABELS_FULL,
     scheduleFamilyAll,
     familySchedules: scheduleFamilyAll
       ? await Promise.all(familyRoster.map(async (m) => ({ member: m, schedule: await getMemberSchedule(m.id) })))

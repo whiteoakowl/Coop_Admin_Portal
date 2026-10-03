@@ -80,24 +80,35 @@ function allergyLabel(medicalNotes) {
 // a parent's own card leaves it blank rather than showing some other
 // parent in the family (or, for a single-parent family, nothing at all
 // since familyOf() excludes the card's own owner from the lookup).
-// precomputedSchedule (optional) is a { monday, wednesday } already
-// fetched by the caller (e.g. scheduleList's own already-batched rows) -
-// skips this function's own getMemberSchedule call, which would
+// precomputedSchedule (optional) is a { [day]: fourRows } already fetched
+// by the caller (e.g. schedulesForMembers/scheduleList's own already-
+// batched rows - the exact shape schedulesForMembers returns per member)
+// - skips this function's own getMemberSchedule call, which would
 // otherwise redo a full live schedule computation per member when called
 // in a loop over many members (see getMemberSchedule's own comment). Fine
 // to call once per member for a single lookup; a caller iterating over
 // many members at once (a bulk print) should use
 // scheduleCardDataForMembers instead, which also batches the
 // primaryParentFor lookup below.
+//
+// Deliberately still Monday/Wednesday only, unlike the rest of the 7-day
+// expansion this module's own getMemberSchedule/scheduleList callers went
+// through - a Schedule Card's own template (schedule_card_templates,
+// DEFAULT_LAYOUT) places exactly two fixed fields, mondaySchedule and
+// wednesdaySchedule, on the printable card itself. Supporting an
+// arbitrary active day here would mean the badge DESIGN tool growing a
+// new per-day field type (or a dynamic repeating block) - a real,
+// separate redesign of the badge template schema, not a label/filter
+// swap like everywhere else this expansion touched.
 async function scheduleCardDataForMember(member, precomputedSchedule) {
-  const { monday, wednesday } = precomputedSchedule || (await getMemberSchedule(member.id));
+  const byDay = precomputedSchedule || (await getMemberSchedule(member.id)).byDay;
   const primaryParent = member.member_type === 'student' ? await primaryParentFor(member) : null;
   return {
     name: member.name,
     allergy: allergyLabel(member.medical_notes),
     primaryParentPhone: primaryParent ? `Parent Phone: ${primaryParent.phone || 'Not on file'}` : '',
-    mondaySchedule: toTableRows(monday),
-    wednesdaySchedule: toTableRows(wednesday),
+    mondaySchedule: toTableRows(byDay.monday || []),
+    wednesdaySchedule: toTableRows(byDay.wednesday || []),
   };
 }
 
@@ -112,14 +123,14 @@ async function scheduleCardDataForMembers(members, scheduleByMember) {
   const primaryParentByMember = await primaryParentsFor(members);
   const result = {};
   for (const member of members) {
-    const schedule = scheduleByMember[member.id] || { monday: [], wednesday: [] };
+    const schedule = scheduleByMember[member.id] || {};
     const primaryParent = primaryParentByMember[member.id] || null;
     result[member.id] = {
       name: member.name,
       allergy: allergyLabel(member.medical_notes),
       primaryParentPhone: primaryParent ? `Parent Phone: ${primaryParent.phone || 'Not on file'}` : '',
-      mondaySchedule: toTableRows(schedule.monday),
-      wednesdaySchedule: toTableRows(schedule.wednesday),
+      mondaySchedule: toTableRows(schedule.monday || []),
+      wednesdaySchedule: toTableRows(schedule.wednesday || []),
     };
   }
   return result;

@@ -9,15 +9,13 @@
 const db = require('../db');
 const { byLastName } = require('./members');
 const { REASON_LABELS } = require('./rosters');
-const { DAYS } = require('./days');
+const { CLASS_DAYS, CLASS_DAY_WEEKDAY_FULL } = require('./classDays');
 const { weekdayOf } = require('./dates');
 
-const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
-
 // Only check a day whose weekday actually matches today - "today" isn't a
-// real session for the other day, so there's nothing to alert on yet.
+// real session for the other day(s), so there's nothing to alert on yet.
 function todaysSessionDays(date) {
-  return DAYS.filter((day) => weekdayOf(date) === DAY_WEEKDAY[day]);
+  return CLASS_DAYS.filter((day) => weekdayOf(date) === CLASS_DAY_WEEKDAY_FULL[day]);
 }
 
 // Every PARENT (or admin, who counts as a parent for this - a real

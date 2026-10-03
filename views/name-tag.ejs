@@ -101,15 +101,17 @@
 
       <div class="form-section">
         <h2>Day</h2>
+        <%# A real request: "Full 7 day expansion..." - these radios used
+            to be a hardcoded Monday/Wednesday/Both set; activeDays is
+            every day activated on Settings > Day Settings, Both still
+            covers all of them at once regardless of how many there are. %>
         <div class="radio-group">
-          <label class="radio-option">
-            <input type="radio" name="day" value="monday" <%= formValues.day === 'monday' ? 'checked' : '' %> required />
-            Monday
-          </label>
-          <label class="radio-option">
-            <input type="radio" name="day" value="wednesday" <%= formValues.day === 'wednesday' ? 'checked' : '' %> />
-            Wednesday
-          </label>
+          <% activeDays.forEach(function(d, i) { %>
+            <label class="radio-option">
+              <input type="radio" name="day" value="<%= d %>" <%= formValues.day === d ? 'checked' : '' %> <%= i === 0 ? 'required' : '' %> />
+              <%= dayLabels[d] %>
+            </label>
+          <% }); %>
           <label class="radio-option">
             <input type="radio" name="day" value="both" <%= formValues.day === 'both' ? 'checked' : '' %> />
             Both

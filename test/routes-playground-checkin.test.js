@@ -87,8 +87,13 @@ test('Playground Check-In day/hour navigation is reachable once unlocked', async
   });
 
   await t.test('an invalid day 404s', async () => {
+    // "tuesday" used to be the example here, back when this route's own
+    // day gate (utils/days.js's isValidDay) only ever recognized Monday/
+    // Wednesday - it's a real, activatable day now (Day Settings' own
+    // 7-day expansion, utils/classDays.js's isValidClassDay), so a
+    // genuinely nonexistent day name is what actually 404s here now.
     const agent = await unlockedAgent();
-    const res = await agent.get('/kiosk/class-checkin/playground/tuesday');
+    const res = await agent.get('/kiosk/class-checkin/playground/someday');
     assert.equal(res.status, 404);
   });
 });

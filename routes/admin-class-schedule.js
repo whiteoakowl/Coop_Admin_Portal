@@ -6,7 +6,6 @@ const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { parseDayValue } = require('../utils/days');
 const { ageFromBirthday, formatFriendlyTimestamp, formatDateNumeric, formatDateLabel } = require('../utils/dates');
 const {
   assignmentsForClass,
@@ -74,6 +73,7 @@ const {
   activeMembersForStaff,
   isValidClassDay,
   requireClassDay,
+  parseClassDayValue,
 } = require('../utils/classSchedule');
 const { classSectionIds } = require('../utils/sections');
 
@@ -1226,10 +1226,10 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireClassDay, up
   } catch (err) {
     return res.redirect(`/admin/class-schedule/${day}?error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }
-  // Day tolerates "Mon"/"Wed" abbreviations, not just the full word (see
-  // utils/days.js's parseDayValue) - falls back to whichever day tab
-  // Import was clicked from when the column's blank.
-  rows.forEach((r) => { r.resolvedDay = r.day ? parseDayValue(r.day) : day; });
+  // Day tolerates any day-of-week abbreviation, not just the full word
+  // (see utils/classDays.js's parseClassDayValue) - falls back to
+  // whichever day tab Import was clicked from when the column's blank.
+  rows.forEach((r) => { r.resolvedDay = r.day ? parseClassDayValue(r.day) : day; });
   const autoHourPositions = buildAutoHourPositions(rows);
 
   // Looked up once instead of once per staff name per row - a real import

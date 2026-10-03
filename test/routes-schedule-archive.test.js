@@ -109,7 +109,10 @@ test('POST /admin/schedule/members/archive unenrolls a student', async (t) => {
     const archived = await db.prepare("SELECT * FROM member_schedule_archives WHERE member_name = 'Archive Schedule Kid'").get();
     assert.ok(archived, 'expected a member_schedule_archives row');
     assert.equal(archived.member_type, 'student');
-    assert.match(archived.monday_schedule || '', /Archive Schedule Class/, "the snapshot should mention the class the student was on before being unenrolled");
+    // Day-keyed JSON now, not a fixed monday_schedule column - see
+    // utils/schedule.js's own archiveMemberSchedules/listMemberScheduleArchives.
+    const daySchedules = JSON.parse(archived.day_schedules_json);
+    assert.match(daySchedules.monday || '', /Archive Schedule Class/, "the snapshot should mention the class the student was on before being unenrolled");
   });
 });
 
@@ -139,7 +142,8 @@ test('POST /admin/schedule/members/archive unstaffs a teacher from every class',
     const archived = await db.prepare("SELECT * FROM member_schedule_archives WHERE member_name = 'Archive Parent Teacher'").get();
     assert.ok(archived);
     assert.equal(archived.member_type, 'parent');
-    assert.match(archived.monday_schedule || '', /Parent Archive Class/);
+    const daySchedules = JSON.parse(archived.day_schedules_json);
+    assert.match(daySchedules.monday || '', /Parent Archive Class/);
   });
 });
 

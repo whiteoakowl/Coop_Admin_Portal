@@ -22,8 +22,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { todayISO, formatDateLong } = require('../utils/dates');
-const { isValidDay, DAY_LABELS } = require('../utils/days');
-const { allClassesList, ensureDayRoster, HOUR_POSITIONS, CLASS_DAY_LABELS_FULL, listActiveClassDays } = require('../utils/classSchedule');
+const { allClassesList, ensureDayRoster, HOUR_POSITIONS, CLASS_DAY_LABELS_FULL, isValidClassDay, listActiveClassDays } = require('../utils/classSchedule');
 const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
 const { buildRosterGridData, rosterDates } = require('../utils/rosterGrid');
 const { verifyClassCheckinPin } = require('../utils/classCheckinPin');
@@ -118,14 +117,14 @@ router.get('/classes', requireUnlocked, async (req, res) => {
 // is already fixed by the URL here.
 router.get('/classes/:day', requireUnlocked, async (req, res) => {
   const day = req.params.day;
-  if (!isValidDay(day)) return res.status(404).render('404', { title: 'Not Found' });
+  if (!isValidClassDay(day)) return res.status(404).render('404', { title: 'Not Found' });
   const hourFilter = HOUR_POSITIONS.includes(parseInt(req.query.hour, 10)) ? parseInt(req.query.hour, 10) : null;
   let classes = await allClassesList(day, await getActiveKioskSemesterId());
   if (hourFilter) classes = classes.filter((c) => c.hour_position === hourFilter);
   res.render('kiosk-class-checkin-classes', {
     title: 'Class Check-In',
     day,
-    dayLabel: DAY_LABELS[day],
+    dayLabel: CLASS_DAY_LABELS_FULL[day],
     classes,
     hourFilter,
     hourPositions: HOUR_POSITIONS,
@@ -370,25 +369,26 @@ router.post('/classes/:id/scan/checkout', requireUnlocked, async (req, res) => {
 function requirePlaygroundHour(req, res, next) {
   const day = req.params.day;
   const hour = parseInt(req.params.hour, 10);
-  if (!isValidDay(day) || !HOUR_POSITIONS.includes(hour)) return res.status(404).render('404', { title: 'Not Found' });
+  if (!isValidClassDay(day) || !HOUR_POSITIONS.includes(hour)) return res.status(404).render('404', { title: 'Not Found' });
   req.playgroundDay = day;
   req.playgroundHour = hour;
   next();
 }
 
-router.get('/playground', requireUnlocked, (req, res) => {
-  res.render('kiosk-playground-days', { title: 'Playground Check-In' });
+router.get('/playground', requireUnlocked, async (req, res) => {
+  const days = (await listActiveClassDays()).map((d) => ({ value: d, label: CLASS_DAY_LABELS_FULL[d] }));
+  res.render('kiosk-playground-days', { title: 'Playground Check-In', days });
 });
 
 router.get('/playground/:day', requireUnlocked, async (req, res) => {
   const day = req.params.day;
-  if (!isValidDay(day)) return res.status(404).render('404', { title: 'Not Found' });
+  if (!isValidClassDay(day)) return res.status(404).render('404', { title: 'Not Found' });
   // playgroundHourLabel(day, h) re-runs the SAME "hours for this day" query
   // for every hour position (a real N+1 - only 4 positions today, but each
   // one is a full round trip to Postgres in production) - each call is
   // independent of the others, so run them concurrently instead.
   const hours = await Promise.all(HOUR_POSITIONS.map(async (h) => ({ position: h, label: await playgroundHourLabel(day, h) })));
-  res.render('kiosk-playground-hours', { title: 'Playground Check-In', day, dayLabel: DAY_LABELS[day], hours });
+  res.render('kiosk-playground-hours', { title: 'Playground Check-In', day, dayLabel: CLASS_DAY_LABELS_FULL[day], hours });
 });
 
 // Read-only, today-only log plus the Check In/Check Out buttons - same
@@ -405,7 +405,7 @@ router.get('/playground/:day/:hour/attendance', requireUnlocked, requirePlaygrou
     title: `Playground - ${hourLabel}`,
     day,
     hour,
-    dayLabel: DAY_LABELS[day],
+    dayLabel: CLASS_DAY_LABELS_FULL[day],
     hourLabel,
     dateLabel: formatDateLong(today),
     log: await playgroundLogForDate(rosterId, today),
@@ -449,7 +449,7 @@ async function resolvePlaygroundScan(day, hour, req, res) {
     .prepare('SELECT 1 FROM roster_dates WHERE roster_id = ? AND session_date = ?')
     .get(studentRosterId, today);
   if (!inSessionToday) {
-    res.json({ ok: false, message: `${DAY_LABELS[day]} isn't in session today.` });
+    res.json({ ok: false, message: `${CLASS_DAY_LABELS_FULL[day]} isn't in session today.` });
     return null;
   }
 

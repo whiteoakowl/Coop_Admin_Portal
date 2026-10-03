@@ -6,9 +6,12 @@
     was one getMemberSchedule() query per member, on every page load,
     whether or not anyone ever opened it). %>
 <h3>Class Schedule &mdash; <%= member.name %></h3>
-<% [['Monday', schedule.monday], ['Wednesday', schedule.wednesday]].forEach(function(entry) { %>
-  <% var dayLabel = entry[0], dayRows = entry[1]; %>
-  <h4><%= dayLabel %></h4>
+<%# A real request: "Full 7 day expansion..." - this used to be a fixed
+    Monday/Wednesday pair; schedule.activeDays is every day activated on
+    Settings > Day Settings. %>
+<% schedule.activeDays.forEach(function(d) { %>
+  <% var dayRows = schedule.byDay[d]; %>
+  <h4><%= dayLabels[d] %></h4>
   <table class="roster-table schedule-print-table">
     <thead><tr><th>#</th><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>
     <tbody>

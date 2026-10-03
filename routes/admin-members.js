@@ -25,7 +25,7 @@ const {
   teacherMemberIds,
   assistantMemberIds,
 } = require('../utils/members');
-const { GRADE_LEVELS } = require('../utils/classSchedule');
+const { GRADE_LEVELS, CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
 const { allSetupTeams } = require('../utils/setup');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
@@ -224,7 +224,7 @@ router.get('/members/:id/cards-fragment', async (req, res) => {
 router.get('/members/:id/schedule-fragment', async (req, res) => {
   const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(parseInt(req.params.id, 10));
   if (!member) return res.status(404).send('Not found');
-  res.render('member-schedule-fragment', { member, schedule: await getMemberSchedule(member.id) });
+  res.render('member-schedule-fragment', { member, schedule: await getMemberSchedule(member.id), dayLabels: CLASS_DAY_LABELS_FULL });
 });
 
 // Exports every field a member's profile can hold - the same information
@@ -485,6 +485,7 @@ router.get('/members/:id', async (req, res) => {
     familyRoster,
     rosters: await rostersForMember(id),
     schedule: await getMemberSchedule(id),
+    dayLabels: CLASS_DAY_LABELS_FULL,
     scheduleFamilyAll,
     familySchedules: scheduleFamilyAll
       ? await Promise.all(familyRoster.map(async (m) => ({ member: m, schedule: await getMemberSchedule(m.id) })))

@@ -48,8 +48,8 @@
                     students[.]" %>
                 <h3><%= r.member.name %><% if (r.member.member_type === 'student' && r.member.grade_level) { %> (<%= r.member.grade_level %>)<% } %></h3>
                 <div class="schedule-print-member-days">
-                  <% [['Monday', r.monday], ['Wednesday', r.wednesday]].forEach(function (entry) { %>
-                    <% var label = entry[0], lines = classLines(entry[1]); %>
+                  <% activeDays.forEach(function (d) { %>
+                    <% var label = dayLabels[d], lines = classLines(r.byDay[d]); %>
                     <div>
                       <p class="schedule-print-member-day-label"><%= label %></p>
                       <% if (lines.length === 0) { %>
@@ -73,8 +73,8 @@
         <% rows.forEach(function(r) { %>
           <div class="schedule-print-card">
             <h2><%= r.member.name %></h2>
-            <% [['Monday', r.monday], ['Wednesday', r.wednesday]].forEach(function (entry) { %>
-              <% var label = entry[0], dayRows = entry[1]; %>
+            <% activeDays.forEach(function (d) { %>
+              <% var label = dayLabels[d], dayRows = r.byDay[d]; %>
               <h3><%= label %></h3>
               <table class="roster-table schedule-print-table">
                 <thead><tr><th>#</th><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>

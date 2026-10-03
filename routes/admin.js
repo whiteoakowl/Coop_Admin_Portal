@@ -7,8 +7,7 @@ const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { todayISO, formatDateLabel, formatShortDateLabel, weekdayOf, isValidISODate } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { todaysSessionDays, absenceFormSubmissionsForRoster } = require('../utils/alerts');
-const { ensureDayRoster, classesAtRiskForDay, classesNeedingStaffForDay } = require('../utils/classSchedule');
-const { DAY_LABELS } = require('../utils/days');
+const { ensureDayRoster, classesAtRiskForDay, classesNeedingStaffForDay, CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
 const { setClassCheckinPin, verifyClassCheckinPin } = require('../utils/classCheckinPin');
 const fullscreenPinLimiter = require('../utils/classCheckinPinRateLimit');
@@ -322,7 +321,7 @@ router.get('/', requireAdmin, async (req, res) => {
     wednesdayFamilyCount,
     studentStats,
     parentStats,
-    alertDayLabel: alertDay ? DAY_LABELS[alertDay] : null,
+    alertDayLabel: alertDay ? CLASS_DAY_LABELS_FULL[alertDay] : null,
     absenceAlerts,
     classesAtRisk,
     classesNeedingStaff,

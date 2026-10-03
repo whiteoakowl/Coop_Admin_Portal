@@ -4359,3 +4359,42 @@ alter table playground_rosters add constraint playground_rosters_day_check check
 
 alter table roster_archives drop constraint if exists roster_archives_day_check;
 alter table roster_archives add constraint roster_archives_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));
+
+-- ===== 20261028010000_name_tags_and_class_archive_day_expansion.sql =====
+-- Continuing the 7-day expansion's Phase 3 (Name Tags/Badges), plus a real
+-- gap found while auditing for it: class_schedule_archives (Classes' own
+-- Bulk Edit > Archive feature) was missed by Phase 1 (20261025010000) and
+-- still had a 2-day-only CHECK constraint, so archiving a class scheduled
+-- on a newly-activated day (e.g. Tuesday) would 500. name_tag_requests
+-- (the public Name Tag Form's own "Schedule Change" day picker, and the
+-- admin-added-from-Member-List 'both' default) has the same gap - widened
+-- the same way the three prior day-expansion migrations did.
+alter table name_tag_requests drop constraint if exists name_tag_requests_day_check;
+alter table name_tag_requests add constraint name_tag_requests_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday','both'));
+
+alter table class_schedule_archives drop constraint if exists class_schedule_archives_day_check;
+alter table class_schedule_archives add constraint class_schedule_archives_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));
+
+-- ===== 20261029010000_member_schedules_day_expansion.sql =====
+-- Phase 3 of the 7-day expansion, Member Schedules. Unlike every other
+-- :day-scoped table this expansion touched, member_schedule_archives
+-- wasn't just missing a wider CHECK constraint - it had two fixed
+-- columns, monday_schedule/wednesday_schedule, baked into its own shape
+-- for exactly two days. Rather than rewrite those into a normalized child
+-- table (a much bigger, riskier migration for existing archived data),
+-- this adds one generic column that holds every active day's own summary
+-- as JSON ({"monday": "...", "tuesday": "...", ...}, utils/schedule.js's
+-- archiveMemberSchedules) - monday_schedule/wednesday_schedule stay as
+-- they are, read-only now, so every archive made before this migration
+-- keeps reading back exactly as it always has (see
+-- listMemberScheduleArchives' own comment on how the two shapes are
+-- merged for display).
+alter table member_schedule_archives add column if not exists day_schedules_json text;
+
+-- member_schedules (the write-through cache utils/classSchedule.js's own
+-- syncMemberSchedulesForDay keeps in sync whenever class hours/enrollment/
+-- staffing change - routes/admin-class-schedule.js's Edit Hours among its
+-- callers) had the same 2-day-only CHECK constraint class_schedule_archives
+-- did - editing a newly-activated day's own Class Hours 500'd outright.
+alter table member_schedules drop constraint if exists member_schedules_day_check;
+alter table member_schedules add constraint member_schedules_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));

@@ -118,8 +118,9 @@
                 <thead>
                   <tr>
                     <th>Name</th>
-                    <th>Monday Schedule</th>
-                    <th>Wednesday Schedule</th>
+                    <% archiveDays.forEach(function(d) { %>
+                      <th><%= dayLabels[d] %> Schedule</th>
+                    <% }); %>
                     <th>Archived At</th>
                     <th></th>
                   </tr>
@@ -128,8 +129,9 @@
                   <% archives.forEach(function(a) { %>
                     <tr>
                       <td><%= a.member_name %></td>
-                      <td><%= a.monday_schedule || '—' %></td>
-                      <td><%= a.wednesday_schedule || '—' %></td>
+                      <% archiveDays.forEach(function(d) { %>
+                        <td><%= a.daySchedules[d] || '—' %></td>
+                      <% }); %>
                       <td><%= a.archived_at %></td>
                       <td class="actions-cell">
                         <form method="POST" action="/admin/schedule/archive/<%= a.id %>/delete" class="inline-block-form" data-confirm="Permanently delete this archived schedule (&quot;<%= a.member_name %>&quot;)? This cannot be undone.">
