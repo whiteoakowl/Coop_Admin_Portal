@@ -85,7 +85,7 @@ const uploadDesignImage = multer({
 });
 
 const SPECIAL_SCHEDULE_TABS = ['members', 'archive', 'settings'];
-const SETTINGS_SUBTABS = ['general', 'semester', 'registration', 'kiosk', 'days'];
+const SETTINGS_SUBTABS = ['general', 'semester', 'registration', 'days'];
 const ARCHIVE_TYPES = ['class', 'student', 'parent'];
 const MEMBER_TYPE_FILTERS = ['student', 'parent'];
 const PAGE_SIZE = 25;
@@ -181,8 +181,13 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       // Needed for the Bulk Edit dialog's own semester dropdown and the
       // "Add/Edit Semester" dialog (both new - a real request), neither
       // of which previously existed on this tab (only the Settings tab
-      // had the semester list before).
+      // had the semester list before). classDays/classSchedules let the
+      // dialog's own Add a Schedule day checkboxes and each semester's
+      // "which days does this cover" display work here too, same as
+      // Settings > Day Settings already has.
       semesters: await listSemesters(),
+      classDays: CLASS_DAYS,
+      classSchedules: await listClassSchedules(),
       missingSemesterBreakdown,
       missingSemesterCount: missingSemesterBreakdown ? totalMissing(missingSemesterBreakdown) : 0,
       error: req.query.error || null,
@@ -254,10 +259,6 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       missingSemesterBreakdown,
       missingSemesterCount: totalMissing(missingSemesterBreakdown),
       classSettings: await classGlobalSettings(),
-      // Settings > Kiosk - a real request: "the kiosk page and all of its
-      // features are linked to [this semester]... this way the kiosk can
-      // be changed each semester seamlessly." See utils/kioskSettings.js.
-      activeKioskSemesterId: await getActiveKioskSemesterId(),
       // Settings > Day Settings - a real request: "Full 7 day expansion
       // so multiple semesters can be created and managed... now day
       // settings." classDays is every weekday CLASS_DAY_LABELS can offer
@@ -402,11 +403,25 @@ function semesterSettingsBack(req) {
   return back && back.startsWith('/admin/schedule') ? back : '/admin/schedule?tab=settings&settingsTab=semester';
 }
 
+// days[] is the "Add a Schedule" checkbox group (a real request: "then a
+// section for add a schedule. check boxes to select the days of the week
+// it will be. then the choose semester/day dropdowns on every page will
+// show the new semester separately for each day selected") - creating a
+// semester now also creates one class_schedules row per checked day in
+// the same step, instead of needing a separate trip to Day Settings for
+// each one.
+function checkedClassDays(req) {
+  return [].concat(req.body.days || []).filter((d) => CLASS_DAYS.includes(d));
+}
+
 router.post('/schedule/semesters', requireFullAdmin, async (req, res) => {
   const back = semesterSettingsBack(req);
   const sep = back.includes('?') ? '&' : '?';
   try {
-    await createSemester(req.body.title);
+    const semester = await createSemester(req.body.title);
+    for (const day of checkedClassDays(req)) {
+      await createClassSchedule({ title: `${semester.title} - ${CLASS_DAY_LABELS[day]}`, dayOfWeek: day, semesterId: semester.id });
+    }
   } catch (err) {
     return res.redirect(back + sep + 'error=' + encodeURIComponent(err.message));
   }
@@ -416,16 +431,35 @@ router.post('/schedule/semesters', requireFullAdmin, async (req, res) => {
 // A real request: "add button for orientation settings to link training"
 // and "on class page add a button that says add/edit semester" both
 // assumed an existing semester could be renamed, not just added/deleted -
-// the "Edit" half of "Add/Edit Semester" this button is named for.
-router.post('/schedule/semesters/:id/rename', requireFullAdmin, async (req, res) => {
+// the "Edit" half of "Add/Edit Semester" this button is named for. Now
+// also edits which days the semester covers (clicking a semester's title
+// in the list opens its title + day checkboxes, same shape as Add a
+// Semester) - a newly-checked day creates its own class_schedules row, an
+// unchecked one removes it (this never touches the classes/Floater Lists/
+// Setup Teams actually scheduled for that day+semester - only the Day
+// Settings catalog row that makes that combo selectable in the Semester/
+// Day dropdowns elsewhere).
+router.post('/schedule/semesters/:id/update', requireFullAdmin, async (req, res) => {
   const back = semesterSettingsBack(req);
   const sep = back.includes('?') ? '&' : '?';
+  const semesterId = parseInt(req.params.id, 10);
   try {
-    await renameSemester(req.params.id, req.body.title);
+    await renameSemester(semesterId, req.body.title);
+    const semester = (await listSemesters()).find((s) => s.id === semesterId);
+    const existing = (await listClassSchedules()).filter((cs) => cs.semester_id === semesterId);
+    const days = checkedClassDays(req);
+    for (const day of days) {
+      if (!existing.some((cs) => cs.day_of_week === day)) {
+        await createClassSchedule({ title: `${semester.title} - ${CLASS_DAY_LABELS[day]}`, dayOfWeek: day, semesterId });
+      }
+    }
+    for (const cs of existing) {
+      if (!days.includes(cs.day_of_week)) await deleteClassSchedule(cs.id);
+    }
   } catch (err) {
     return res.redirect(back + sep + 'error=' + encodeURIComponent(err.message));
   }
-  res.redirect(back + sep + 'notice=' + encodeURIComponent('Semester renamed.'));
+  res.redirect(back + sep + 'notice=' + encodeURIComponent('Semester updated.'));
 });
 
 router.post('/schedule/semesters/:id/delete', requireFullAdmin, async (req, res) => {
@@ -532,22 +566,6 @@ router.post('/schedule/class-settings', requireFullAdmin, async (req, res) => {
     autoCreditOnAdminRemoval: req.body.autoCreditOnAdminRemoval === '1',
   });
   res.redirect('/admin/schedule?tab=settings&settingsTab=general&notice=' + encodeURIComponent('Class settings saved.'));
-});
-
-// --- Classes > Settings: Kiosk - a real request: "Add a tab in co-op
-// admin portal settings called kiosk. There will be a drop down picker
-// for choosing a semester that the kiosk page and all of its features
-// are linked too. The floater list for that semester, the setup/cleanup,
-// check in, check out... This way the kiosk can be changed each semester
-// seamlessly." See utils/kioskSettings.js for how Floater/Setup-Cleanup/
-// Check-In/Check-Out all resolve this same setting.
-router.post('/schedule/kiosk-semester', requireFullAdmin, async (req, res) => {
-  const semesterId = parseInt(req.body.semesterId, 10);
-  if (!semesterId) {
-    return res.redirect('/admin/schedule?tab=settings&settingsTab=kiosk&error=' + encodeURIComponent('Choose a semester first.'));
-  }
-  await setActiveKioskSemesterId(semesterId);
-  res.redirect('/admin/schedule?tab=settings&settingsTab=kiosk&notice=' + encodeURIComponent('Kiosk semester updated.'));
 });
 
 // --- Member Schedules: bulk import ---

@@ -2449,6 +2449,16 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 .roster-btn-form-icon { display: flex; flex: none; }
 .icon-btn-danger:hover { border-color: var(--red); color: var(--red); background: rgba(220, 38, 38, 0.08); }
 
+/* Add/Edit Semester's own list (views/partials/semester-manager.ejs) - a
+   real request: "clicking on the semester title you can edit the title
+   and days checked, save." Reset to plain bold text (same weight/color
+   as .roster-card-title-link) rather than looking like a button, since
+   this sits inline in a table cell among other plain text. */
+.semester-title-btn { background: none; border: none; padding: 0; font: inherit; font-weight: 700; color: var(--ink); cursor: pointer; text-align: left; }
+.semester-title-btn:hover, .semester-title-btn:focus-visible { color: var(--brand-dark); text-decoration: underline; }
+.semester-edit-row td { padding-top: 1rem; padding-bottom: 1rem; }
+.semester-edit-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
 .badge-pill {
   display: inline-flex;
   align-items: center;

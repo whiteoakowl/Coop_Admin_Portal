@@ -1,12 +1,14 @@
 <%
 // locals: semesters, missingSemesterCount, missingSemesterBreakdown
 // (optional - the per-category counts behind missingSemesterCount; falls
-// back to just showing the total if not passed), backUrl (optional -
-// where each form's own POST redirects back to; defaults to the Settings
-// tab). Used both by the Settings tab (its original home) and the new
-// "Add/Edit Semester" dialog on the Monday/Wednesday Classes page itself
-// (a real request: "on class page add a button that says add/edit
-// semester").
+// back to just showing the total if not passed), classDays/classDayLabels
+// (every day of the week the "Add a Schedule"/edit checkboxes can offer),
+// classSchedules (every class_schedules row - used here only to work out
+// which days each semester already covers), backUrl (optional - where
+// each form's own POST redirects back to; defaults to the Settings tab).
+// Used both by the Settings tab (its original home) and the "Add/Edit
+// Semester" dialog on each Classes day's own grid (a real request: "on
+// class page add a button that says add/edit semester").
 const semesterBackUrl = typeof backUrl !== 'undefined' && backUrl ? backUrl : '/admin/schedule?tab=settings';
 const breakdown = typeof missingSemesterBreakdown !== 'undefined' ? missingSemesterBreakdown : null;
 const BREAKDOWN_LABELS = {
@@ -16,6 +18,13 @@ const BREAKDOWN_LABELS = {
   taskListSections: ['Task List', 'Task Lists'],
   classSchedules: ['Day Settings record', 'Day Settings records'],
 };
+// classDays is already in calendar order, so filtering it (rather than
+// mapping classSchedules directly) gives each semester's own day list
+// back in calendar order too, not creation order.
+function daysForSemester(semesterId) {
+  const covered = new Set(classSchedules.filter(function (cs) { return cs.semester_id === semesterId; }).map(function (cs) { return cs.day_of_week; }));
+  return classDays.filter(function (d) { return covered.has(d); });
+}
 %>
 <section class="portal-dashboard-card portal-dashboard-card-wide">
   <h2>Add a Semester</h2>
@@ -24,6 +33,17 @@ const BREAKDOWN_LABELS = {
     <label class="member-form-full">Title
       <input type="text" name="title" placeholder="e.g. Fall 2026" required />
     </label>
+    <div class="member-form-full">
+      <span class="checkbox-group-label">Add a Schedule</span>
+      <div class="checkbox-group">
+        <% classDays.forEach(function(d) { %>
+          <label class="checkbox-option">
+            <input type="checkbox" name="days" value="<%= d %>" />
+            <%= classDayLabels[d] %>
+          </label>
+        <% }); %>
+      </div>
+    </div>
     <div class="member-form-full">
       <button type="submit" class="primary-btn">Add Semester</button>
     </div>
@@ -75,24 +95,47 @@ const BREAKDOWN_LABELS = {
     <p class="roster-empty">No semesters yet.</p>
   <% } else { %>
     <div class="roster-scroll">
-      <table class="roster-table members-table condensed-table">
+      <table class="roster-table members-table condensed-table semester-list-table">
         <thead>
-          <tr><th>Title</th><th></th></tr>
+          <tr><th>Title</th><th>Days</th><th></th></tr>
         </thead>
         <tbody>
           <% semesters.forEach(function(s) { %>
+            <% var semesterDays = daysForSemester(s.id); %>
             <tr>
               <td class="roster-name-col">
-                <form method="POST" action="/admin/schedule/semesters/<%= s.id %>/rename" class="semester-rename-form">
+                <button type="button" class="semester-title-btn" data-semester-edit-toggle="semester-edit-<%= s.id %>"><%= s.title %></button>
+              </td>
+              <td class="hint"><%= semesterDays.length ? semesterDays.map(function(d){ return classDayLabels[d]; }).join(', ') : 'No days yet' %></td>
+              <td>
+                <form method="POST" action="/admin/schedule/semesters/<%= s.id %>/delete" data-confirm="Are you sure you want to delete the &quot;<%= s.title %>&quot; semester? This action can&#39;t be reversed. Its Floater Assignments, Setup/Cleanup Teams, Task Lists, and Day Settings schedules will be permanently deleted too - classes assigned to it will just show No Semester.">
                   <input type="hidden" name="back" value="<%= semesterBackUrl %>" />
-                  <input type="text" name="title" value="<%= s.title %>" aria-label="Rename <%= s.title %>" required />
-                  <button type="submit" class="roster-action-btn">Save</button>
+                  <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= s.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                 </form>
               </td>
-              <td>
-                <form method="POST" action="/admin/schedule/semesters/<%= s.id %>/delete" data-confirm="Delete the &quot;<%= s.title %>&quot; semester? Classes assigned to it will show No Semester.">
+            </tr>
+            <tr id="semester-edit-<%= s.id %>" class="semester-edit-row" hidden>
+              <td colspan="3">
+                <form method="POST" action="/admin/schedule/semesters/<%= s.id %>/update" class="member-form-grid">
                   <input type="hidden" name="back" value="<%= semesterBackUrl %>" />
-                  <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                  <label class="member-form-full">Title
+                    <input type="text" name="title" value="<%= s.title %>" aria-label="Rename <%= s.title %>" required />
+                  </label>
+                  <div class="member-form-full">
+                    <span class="checkbox-group-label">Days</span>
+                    <div class="checkbox-group">
+                      <% classDays.forEach(function(d) { %>
+                        <label class="checkbox-option">
+                          <input type="checkbox" name="days" value="<%= d %>" <%= semesterDays.includes(d) ? 'checked' : '' %> />
+                          <%= classDayLabels[d] %>
+                        </label>
+                      <% }); %>
+                    </div>
+                  </div>
+                  <div class="member-form-full semester-edit-actions">
+                    <button type="submit" class="primary-btn">Save</button>
+                    <button type="button" class="btn-secondary" data-semester-edit-cancel="semester-edit-<%= s.id %>">Cancel</button>
+                  </div>
                 </form>
               </td>
             </tr>
@@ -102,3 +145,4 @@ const BREAKDOWN_LABELS = {
     </div>
   <% } %>
 </section>
+<script src="/js/semester-manager.js"></script>

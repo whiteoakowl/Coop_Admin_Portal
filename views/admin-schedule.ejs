@@ -160,7 +160,6 @@
           <a class="view-tab<%= settingsTab === 'general' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=general">General</a>
           <a class="view-tab<%= settingsTab === 'semester' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=semester">Semester</a>
           <a class="view-tab<%= settingsTab === 'registration' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=registration">Registration Schedule</a>
-          <a class="view-tab<%= settingsTab === 'kiosk' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=kiosk">Kiosk</a>
           <a class="view-tab<%= settingsTab === 'days' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=days">Day Settings</a>
         </div>
 
@@ -333,37 +332,6 @@
             </div>
           <% } %>
         </section>
-      <% } else if (settingsTab === 'kiosk') { %>
-
-        <%# A real request: "Add a tab in co-op admin portal settings
-            called kiosk. There will be a drop down picker for choosing a
-            semester that the kiosk page and all of its features are
-            linked too. The floater list for that semester, the setup/
-            cleanup, check in, check out... This way the kiosk can be
-            changed each semester seamlessly." Floater Assignments, Setup/
-            Cleanup, and Class Check-In/Check-Out all resolve this same
-            setting (see utils/kioskSettings.js) and scope their own data
-            to whichever semester is picked here. %>
-        <p class="hint">Choose which semester the Kiosk (Floater List, Setup/Cleanup, Class Check-In, and Check-Out) is currently running. Each semester has its own fully separate Floater List and Setup/Cleanup Teams - switching here switches which semester's data the Kiosk and these admin pages show.</p>
-
-        <section class="portal-dashboard-card portal-dashboard-card-wide">
-          <form method="POST" action="/admin/schedule/kiosk-semester" class="member-form-grid">
-            <label class="member-form-full">Active Kiosk Semester
-              <select name="semesterId" required>
-                <option value="">Choose a semester...</option>
-                <% semesters.forEach(function(s) { %>
-                  <option value="<%= s.id %>" <%= activeKioskSemesterId === s.id ? 'selected' : '' %>><%= s.title %></option>
-                <% }); %>
-              </select>
-            </label>
-            <div class="member-form-full">
-              <button type="submit" class="primary-btn">Save</button>
-            </div>
-          </form>
-        </section>
-        <% if (semesters.length === 0) { %>
-          <p class="roster-empty">No semesters yet - add one on the Semester tab first.</p>
-        <% } %>
       <% } else { %>
 
         <%# A real request: "Full 7 day expansion so multiple semesters

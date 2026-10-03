@@ -20,6 +20,7 @@
       <% if (isFullAdmin) { %>
         <a class="view-tab<%= activeTab === 'account' ? ' active' : '' %>" href="/admin/settings?tab=account">Username/Password</a>
         <a class="view-tab<%= activeTab === 'classcheckin' ? ' active' : '' %>" href="/admin/settings?tab=classcheckin">Class Check-In PIN</a>
+        <a class="view-tab<%= activeTab === 'kiosk' ? ' active' : '' %>" href="/admin/settings?tab=kiosk">Kiosk</a>
       <% } %>
       <a class="view-tab<%= activeTab === 'quicklinks' ? ' active' : '' %>" href="/admin/settings?tab=quicklinks">Quick Links</a>
       <a class="view-tab<%= activeTab === 'install' ? ' active' : '' %>" href="/admin/settings?tab=install">Install App</a>
@@ -59,6 +60,27 @@
 
             <button type="submit" class="primary-btn">Update PIN</button>
           </form>
+        </div>
+      <% } else if (activeTab === 'kiosk') { %>
+        <div class="manage-section">
+          <h2>Kiosk Semester</h2>
+          <p class="hint">Choose which semester the Kiosk (Floater List, Setup/Cleanup, Class Check-In, and Check-Out) is currently running. Each semester has its own fully separate Floater List and Setup/Cleanup Teams - switching here switches which semester's data the Kiosk and these admin pages show.</p>
+          <form method="POST" action="/admin/settings/kiosk-semester" class="member-form-grid">
+            <label class="member-form-full">Active Kiosk Semester
+              <select name="semesterId" required>
+                <option value="">Choose a semester...</option>
+                <% semesters.forEach(function(s) { %>
+                  <option value="<%= s.id %>" <%= activeKioskSemesterId === s.id ? 'selected' : '' %>><%= s.title %></option>
+                <% }); %>
+              </select>
+            </label>
+            <div class="member-form-full">
+              <button type="submit" class="primary-btn">Save</button>
+            </div>
+          </form>
+          <% if (semesters.length === 0) { %>
+            <p class="roster-empty">No semesters yet - add one on the Classes &gt; Settings &gt; Semester tab first.</p>
+          <% } %>
         </div>
       <% } else if (activeTab === 'install') { %>
         <div class="manage-section">

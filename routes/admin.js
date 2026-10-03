@@ -7,7 +7,8 @@ const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { todayISO, formatDateLabel, formatShortDateLabel, weekdayOf, isValidISODate } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { todaysSessionDays, absenceFormSubmissionsForRoster } = require('../utils/alerts');
-const { ensureDayRoster, classesAtRiskForDay, classesNeedingStaffForDay, CLASS_DAY_LABELS_FULL, listActiveClassDays } = require('../utils/classSchedule');
+const { ensureDayRoster, classesAtRiskForDay, classesNeedingStaffForDay, CLASS_DAY_LABELS_FULL, listActiveClassDays, listSemesters } = require('../utils/classSchedule');
+const { getActiveKioskSemesterId, setActiveKioskSemesterId } = require('../utils/kioskSettings');
 const { CLASS_DAY_WEEKDAY_FULL } = require('../utils/classDays');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
 const { setClassCheckinPin, verifyClassCheckinPin } = require('../utils/classCheckinPin');
@@ -361,8 +362,8 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 // It should move to the documents page." - 'documents' is gone from here
 // too; that upload form and management list now live entirely on
 // /admin/documents itself (routes/admin-documents.js).
-const SETTINGS_TABS = ['account', 'classcheckin', 'quicklinks', 'install'];
-const FULL_ADMIN_ONLY_TABS = ['account', 'classcheckin'];
+const SETTINGS_TABS = ['account', 'classcheckin', 'kiosk', 'quicklinks', 'install'];
+const FULL_ADMIN_ONLY_TABS = ['account', 'classcheckin', 'kiosk'];
 
 async function renderSettings(req, res, error, success, activeTab) {
   const isFullAdmin = !!req.session.adminId;
@@ -376,6 +377,13 @@ async function renderSettings(req, res, error, success, activeTab) {
     username: req.session.username,
     isFullAdmin,
     activeTab: tab,
+    // A real request: "Kiosk semester control should be under co-op
+    // admin portal, gear settings icon at the top. Not under class
+    // settings" - moved here from Classes > Settings > Kiosk (routes/
+    // admin-schedule.js used to own this). Only fetched for the tab that
+    // actually needs it, same as every other tab-scoped query here.
+    semesters: tab === 'kiosk' ? await listSemesters() : null,
+    activeKioskSemesterId: tab === 'kiosk' ? await getActiveKioskSemesterId() : null,
     error,
     success,
   });
@@ -383,6 +391,23 @@ async function renderSettings(req, res, error, success, activeTab) {
 
 router.get('/settings', requireAdmin, async (req, res) => {
   await renderSettings(req, res, req.query.error || null, req.query.notice || null, req.query.tab);
+});
+
+// A real request: "Add a tab in co-op admin portal settings called
+// kiosk. There will be a drop down picker for choosing a semester that
+// the kiosk page and all of its features are linked too. The floater
+// list for that semester, the setup/cleanup, check in, check out...
+// This way the kiosk can be changed each semester seamlessly." Floater
+// Assignments, Setup/Cleanup, and Class Check-In/Check-Out all resolve
+// this same setting (see utils/kioskSettings.js) and scope their own
+// data to whichever semester is picked here.
+router.post('/settings/kiosk-semester', requireAdmin, requireFullAdmin, async (req, res) => {
+  const semesterId = parseInt(req.body.semesterId, 10);
+  if (!semesterId) {
+    return res.redirect('/admin/settings?tab=kiosk&error=' + encodeURIComponent('Choose a semester first.'));
+  }
+  await setActiveKioskSemesterId(semesterId);
+  res.redirect('/admin/settings?tab=kiosk&notice=' + encodeURIComponent('Kiosk semester updated.'));
 });
 
 router.post('/settings/username', requireAdmin, requireFullAdmin, async (req, res) => {

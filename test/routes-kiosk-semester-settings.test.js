@@ -54,29 +54,35 @@ async function createSemester(cookie, csrfToken, title) {
   return (await db.prepare('SELECT * FROM semesters WHERE title = ?').get(title)).id;
 }
 
-test('Kiosk settings sub-tab shows a semester dropdown, and saving it updates the active semester', async () => {
+test('Kiosk settings tab (under the gear icon, not Class Settings) shows a semester dropdown, and saving it updates the active semester', async () => {
   const admin = await loginAsAdmin();
   const fall = await createSemester(admin.cookie, admin.csrfToken, 'Fall 2026 Kiosk Test');
   const spring = await createSemester(admin.cookie, admin.csrfToken, 'Spring 2027 Kiosk Test');
 
-  const page = await request(app).get('/admin/schedule?tab=settings&settingsTab=kiosk').set('Cookie', admin.cookie);
+  const page = await request(app).get('/admin/settings?tab=kiosk').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /Active Kiosk Semester/);
   assert.match(page.text, /Fall 2026 Kiosk Test/);
   assert.match(page.text, /Spring 2027 Kiosk Test/);
 
+  // A real request: "Kiosk semester control should be under co-op admin
+  // portal, gear settings icon at the top. Not under class settings" -
+  // the Classes > Settings page no longer has a Kiosk sub-tab at all.
+  const classSettingsPage = await request(app).get('/admin/schedule?tab=settings').set('Cookie', admin.cookie);
+  assert.doesNotMatch(classSettingsPage.text, /settingsTab=kiosk/);
+
   await request(app)
-    .post('/admin/schedule/kiosk-semester')
+    .post('/admin/settings/kiosk-semester')
     .set('Cookie', admin.cookie)
     .type('form')
     .send({ semesterId: String(fall), _csrf: admin.csrfToken });
   assert.equal(await getActiveKioskSemesterId(), fall);
 
-  const afterFall = await request(app).get('/admin/schedule?tab=settings&settingsTab=kiosk').set('Cookie', admin.cookie);
+  const afterFall = await request(app).get('/admin/settings?tab=kiosk').set('Cookie', admin.cookie);
   assert.match(afterFall.text, new RegExp(`<option value="${fall}" selected>`));
 
   await request(app)
-    .post('/admin/schedule/kiosk-semester')
+    .post('/admin/settings/kiosk-semester')
     .set('Cookie', admin.cookie)
     .type('form')
     .send({ semesterId: String(spring), _csrf: admin.csrfToken });
@@ -88,7 +94,7 @@ test('Posting the Kiosk semester form with no semester chosen is rejected with a
   const fall = await createSemester(admin.cookie, admin.csrfToken, 'Fall 2026 Kiosk Guard');
   await setActiveKioskSemesterId(fall);
 
-  const res = await request(app).post('/admin/schedule/kiosk-semester').set('Cookie', admin.cookie).type('form').send({ semesterId: '', _csrf: admin.csrfToken });
+  const res = await request(app).post('/admin/settings/kiosk-semester').set('Cookie', admin.cookie).type('form').send({ semesterId: '', _csrf: admin.csrfToken });
   assert.match(res.headers.location, /error=/);
   assert.equal(await getActiveKioskSemesterId(), fall, 'the previously active semester should be untouched');
 });
