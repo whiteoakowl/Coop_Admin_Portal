@@ -154,12 +154,12 @@
             each one only renders under its own sub-tab, same day-toggle
             pattern this page's own Archive Class/Student/Parent sub-tabs
             already use. %>
-        <div class="day-toggle no-print schedule-day-toggle">
-          <a class="day-toggle-option<%= settingsTab === 'general' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=general">General</a>
-          <a class="day-toggle-option<%= settingsTab === 'semester' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=semester">Semester</a>
-          <a class="day-toggle-option<%= settingsTab === 'registration' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=registration">Registration Schedule</a>
-          <a class="day-toggle-option<%= settingsTab === 'kiosk' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=kiosk">Kiosk</a>
-          <a class="day-toggle-option<%= settingsTab === 'days' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=days">Day Settings</a>
+        <div class="view-tabs no-print">
+          <a class="view-tab<%= settingsTab === 'general' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=general">General</a>
+          <a class="view-tab<%= settingsTab === 'semester' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=semester">Semester</a>
+          <a class="view-tab<%= settingsTab === 'registration' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=registration">Registration Schedule</a>
+          <a class="view-tab<%= settingsTab === 'kiosk' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=kiosk">Kiosk</a>
+          <a class="view-tab<%= settingsTab === 'days' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=days">Day Settings</a>
         </div>
 
       <% if (settingsTab === 'general') { %>
@@ -201,7 +201,6 @@
 
             <label class="checkbox-option class-settings-row"><input type="checkbox" name="defaultLockByAge" value="1" <%= classSettings.defaultLockByAge ? 'checked' : '' %> /> By default, restrict class registration to the age(s) selected per class.</label>
             <label class="checkbox-option class-settings-row"><input type="checkbox" name="defaultLockByGrade" value="1" <%= classSettings.defaultLockByGrade ? 'checked' : '' %> /> By default, restrict class registration to the grade(s) selected per class.</label>
-            <label class="checkbox-option class-settings-row"><input type="checkbox" name="enableParentVolunteerRegistration" value="1" <%= classSettings.enableParentVolunteerRegistration ? 'checked' : '' %> /> Enable Parent/Volunteer Registration for classes.</label>
 
             <div class="class-settings-question">
               <div class="class-settings-question-label">Allow families to cancel class registrations:</div>

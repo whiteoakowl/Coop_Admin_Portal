@@ -11,7 +11,7 @@ const path = require('path');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
-const { allClassesList, removeStaff, classGlobalSettings } = require('../utils/classSchedule');
+const { allClassesList, removeStaff } = require('../utils/classSchedule');
 const { createCharge } = require('../utils/payments');
 const {
   assignmentsForClass,
@@ -146,10 +146,7 @@ router.get('/browse-classes', async (req, res) => {
   const myClasses = await classesForTeacher(member);
   const myClassIds = new Set(myClasses.map((c) => c.id));
 
-  const settings = await classGlobalSettings();
-  const openClasses = settings.enableParentVolunteerRegistration
-    ? (await allClassesList(null)).filter((c) => c.registration_open && !myClassIds.has(c.id))
-    : [];
+  const openClasses = (await allClassesList(null)).filter((c) => c.registration_open && !myClassIds.has(c.id));
   const countsByClass = await staffCountsForClasses(openClasses.map((c) => c.id));
 
   res.render('teacher-browse-classes', {
@@ -170,8 +167,7 @@ router.post('/classes/:id/join', async (req, res) => {
   if (!member) return res.redirect(back + '?error=' + encodeURIComponent('No profile found for your account.'));
 
   const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
-  const settings = await classGlobalSettings();
-  if (!cls || !cls.registration_open || !settings.enableParentVolunteerRegistration) {
+  if (!cls || !cls.registration_open) {
     return res.redirect(back + '?error=' + encodeURIComponent('Self-signup is not open for that class.'));
   }
   // No date/time enforcement existed here at all before Registration

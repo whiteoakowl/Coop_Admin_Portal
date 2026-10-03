@@ -700,7 +700,6 @@ const CLASS_SETTINGS_DEFAULTS = {
   ageRestrictionDay: '31',
   defaultLockByAge: false,
   defaultLockByGrade: true,
-  enableParentVolunteerRegistration: true,
   cancellationPolicy: 'through_end', // 'through_end' | 'before_start' | 'never'
   autoCreditOnParentOrSystemRemoval: true,
   autoCreditOnAdminRemoval: false,

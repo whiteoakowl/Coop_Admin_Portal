@@ -1446,17 +1446,42 @@ body.public-page .roster-empty {
 .absence-required-msg { color: var(--red); font-weight: 600; margin-top: 0.35rem; }
 
 /* A real bug report: Co-op Class Settings (General tab) forced the whole
-   page wider than a phone screen. Second contributor alongside the
-   5-option .schedule-day-toggle row above: the "Consider the student's
-   age on [month] [day] during the academic year..." radio option
-   (views/admin-schedule.ejs) packs a full sentence plus two <select>
-   elements into one .checkbox-option label - every other .checkbox-
-   option in the app is a short one-line "checkbox + label" pair that
-   never needed to wrap, so .checkbox-option's own flex row has always
-   been nowrap by default. Scoped to this one composite control rather
-   than changing .checkbox-option's own default everywhere it's used. */
+   page wider than a phone screen. One contributor: the "Consider the
+   student's age on [month] [day] during the academic year..." radio
+   option (views/admin-schedule.ejs) packs a full sentence plus two
+   <select> elements into one .checkbox-option label - every other
+   .checkbox-option in the app is a short one-line "checkbox + label"
+   pair that never needed to wrap, so .checkbox-option's own flex row has
+   always been nowrap by default. Scoped to this one composite control
+   rather than changing .checkbox-option's own default everywhere it's
+   used. */
 @media (max-width: 640px) {
   .class-settings-question-control .checkbox-option { flex-wrap: wrap; }
+}
+
+/* A real request: "There should be adequate space between each section.
+   Check box and beginning of question should line up on the same row."
+   .class-settings-question/.class-settings-row had no spacing rules of
+   their own at all, so every question in Co-op Class Settings' General
+   tab ran straight into the next with no visual separation. And
+   .checkbox-option's own align-items: center (correct for a short
+   one-line label, which it stays level with) instead centered the
+   checkbox against a label that had wrapped to 2-3 lines on a narrow
+   screen, landing it on a middle line instead of alongside the question's
+   first line - flex-start plus a small top nudge (to match the text's own
+   line-height rather than sitting glued to its very top) fixes that
+   without changing how a one-line label looks. */
+.class-settings-form > .class-settings-question,
+.class-settings-form > .class-settings-row {
+  margin-bottom: 1.5rem;
+}
+.class-settings-form > .class-settings-row:last-child { margin-bottom: 0; }
+.class-settings-question-label { margin-bottom: 0.5rem; font-weight: 700; }
+.class-settings-question-control { display: flex; flex-direction: column; gap: 0.5rem; }
+.class-settings-form .checkbox-option { align-items: flex-start; }
+.class-settings-form .checkbox-option input[type="checkbox"],
+.class-settings-form .checkbox-option input[type="radio"] {
+  margin-top: 0.2rem;
 }
 
 .primary-btn {
@@ -5809,17 +5834,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    and don't need this). */
 .schedule-day-toggle { margin-bottom: 1rem; }
 
-/* A real bug report: Co-op Class Settings' own General/Semester/
-   Registration Schedule/Kiosk/Day Settings sub-tab row (5 options, the
-   most .day-toggle has ever held - the Monday/Wednesday pill this
-   component was built for is only ever 2-3) forced the ENTIRE PAGE wider
-   than a phone screen, since .day-toggle's inline-flex never wraps and
-   had nothing capping its own width - every other pill variant (2-3
-   short day names) happens to fit a phone width without ever needing
-   this. Scrollable instead of wrapped: a multi-row wrap would break the
-   pill's rounded-999px shape, so this keeps it one row and lets that row
-   scroll on its own, same "let this one thing scroll instead of the
-   page" pattern .roster-btn-row-nowrap already uses elsewhere. */
+/* A real bug report: a long .day-toggle row (more options than the
+   Monday/Wednesday pill this component was built for) can force the
+   ENTIRE PAGE wider than a phone screen, since .day-toggle's inline-flex
+   never wraps and had nothing capping its own width. Scrollable instead
+   of wrapped: a multi-row wrap would break the pill's rounded-999px
+   shape, so this keeps it one row and lets that row scroll on its own,
+   same "let this one thing scroll instead of the page" pattern
+   .roster-btn-row-nowrap already uses elsewhere. (Co-op Class Settings'
+   own General/Semester/Registration Schedule/Kiosk/Day Settings sub-tab
+   row - the one that first surfaced this - has since moved to the
+   .view-tabs/.view-tab component instead, which shrinks itself to fit
+   one row via public/js/fit-tabs.js rather than scrolling; this guard
+   stays here for the Archive Class/Student/Parent toggle and any other
+   .day-toggle row long enough to need it.) */
 @media (max-width: 640px) {
   .schedule-day-toggle {
     max-width: 100%;

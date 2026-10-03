@@ -5,11 +5,7 @@
 // student register themselves. Rather than duplicate this whole
 // transaction in both routes/parent-portal.js and routes/student-
 // portal.js, both call these functions - `registrantType` ('parent' or
-// 'student') is who's registering, since only the parent path checks the
-// Co-op Class Settings' own global enableParentVolunteerRegistration
-// switch (teacher/assistant self-signup is a different flow entirely -
-// class_staff, not class_registrations - see routes/teacher-portal.js,
-// which checks the same global switch itself).
+// 'student') is who's registering.
 //
 // A real request rebuilt the old per-class Settings tab: "we can
 // schedule members to register through the timed settings [Registration
@@ -17,10 +13,11 @@
 // allow_student_register/allow_cancel] completely." Registration
 // eligibility is now just: the class's own registration_open (Class
 // Details' own Close Registration checkbox), Registration Schedule's
-// role-scoped windows (isRegistrationOpenForAccount), the global
-// Enable Parent/Volunteer Registration switch for the parent path only,
-// and the Co-op Class Settings' own global Cancellation Policy in place
-// of the old per-class allow_cancel.
+// role-scoped windows (isRegistrationOpenForAccount), and the Co-op
+// Class Settings' own global Cancellation Policy in place of the old
+// per-class allow_cancel. A later request removed the global Enable
+// Parent/Volunteer Registration switch too, for the same reason -
+// Registration Schedule's own role-scoped windows already cover that.
 const db = require('../db');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('./sections');
 const { ageGroupList, classGlobalSettings } = require('./classSchedule');
@@ -71,10 +68,6 @@ async function registerForClass({ classId, studentId, accountId, portalRoles, re
   if (!cls || !cls.registration_open) return { ok: false, error: 'Registration is not open for that class.' };
 
   const settings = await classGlobalSettings();
-  if (registrantType === 'parent' && !settings.enableParentVolunteerRegistration) {
-    return { ok: false, error: 'Parent registration is not enabled right now.' };
-  }
-
   const restriction = await classSectionIds(classId);
   if (!(await isRegistrationOpenForAccount(portalRoles, { day: cls.day, sectionIds: restriction }))) {
     return { ok: false, error: 'Registration is not open for your account yet.' };

@@ -505,7 +505,6 @@ router.post('/schedule/class-settings', requireFullAdmin, async (req, res) => {
     ageRestrictionDay: req.body.ageRestrictionDay,
     defaultLockByAge: req.body.defaultLockByAge === '1',
     defaultLockByGrade: req.body.defaultLockByGrade === '1',
-    enableParentVolunteerRegistration: req.body.enableParentVolunteerRegistration === '1',
     cancellationPolicy: ['through_end', 'before_start', 'never'].includes(req.body.cancellationPolicy) ? req.body.cancellationPolicy : 'through_end',
     autoCreditOnParentOrSystemRemoval: req.body.autoCreditOnParentOrSystemRemoval === '1',
     autoCreditOnAdminRemoval: req.body.autoCreditOnAdminRemoval === '1',
