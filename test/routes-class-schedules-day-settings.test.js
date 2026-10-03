@@ -84,8 +84,8 @@ test('Adding a Tuesday day schedule makes it a real Classes grid tab, with Add C
   // real request: "I need to be able to switch between semester views
   // on... classes").
   assert.match(gridPage.text, />Tuesday<\/option>/, 'Tuesday should be a real tab now, alongside Monday/Wednesday');
-  assert.match(gridPage.text, />Monday<\/a>/);
-  assert.match(gridPage.text, />Wednesday<\/a>/);
+  assert.match(gridPage.text, />Monday<\/option>/);
+  assert.match(gridPage.text, />Wednesday<\/option>/);
 
   // Add Class on the Tuesday tab offers Tuesday (and every other active
   // day) in its own Class Day dropdown.

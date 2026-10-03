@@ -2,7 +2,14 @@
 // always land on parents first." The Attendance nav's own Wednesday
 // subpage link already pointed at ?tab=wednesday-parent (a prior real
 // request); Monday's own link still pointed at ?tab=monday-student,
-// unchanged since then. This makes both days consistent.
+// unchanged since then. This made both days consistent - fixed Monday/
+// Wednesday links were later replaced by one bare "Parent/Student
+// Rosters" link (the 7-day expansion's own Phase 3: Day Settings can now
+// activate any day of the week, not just Monday/Wednesday, so the nav
+// can't hardcode a link per day anymore), which relies on the same
+// behavior a different way: GET /admin/rosters with no ?tab= at all
+// (routes/admin-rosters.js's own defaultDay fallback) still always lands
+// on that day's Parent half, never Student.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -33,10 +40,12 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
-test('Attendance nav: both Monday and Wednesday subpage links land on the Parent roster first', async () => {
+test('Attendance nav: the Parent/Student Rosters subpage link lands on the Parent roster first', async () => {
   const cookie = await loginAsAdmin();
   const page = await request(app).get('/admin').set('Cookie', cookie);
-  assert.match(page.text, /href="\/admin\/rosters\?tab=monday-parent">Monday</);
-  assert.match(page.text, /href="\/admin\/rosters\?tab=wednesday-parent">Wednesday</);
-  assert.doesNotMatch(page.text, /tab=monday-student">Monday</);
+  assert.match(page.text, /href="\/admin\/rosters">Parent\/Student Rosters</);
+
+  const rostersPage = await request(app).get('/admin/rosters').set('Cookie', cookie);
+  assert.match(rostersPage.text, /Parents Attendance/);
+  assert.doesNotMatch(rostersPage.text, /Students Attendance/);
 });

@@ -10,6 +10,10 @@ const {
   isValidClassDay,
   requireClassDay,
 } = require('./classDays');
+// ^ CLASS_DAY_LABELS_FULL also backs ensureDayRoster's own roster naming
+// below (DAY_ROSTER_LABEL used to be a standalone 2-day object here -
+// same Phase 3 generalization as the rest of this file, see
+// routes/admin-rosters.js).
 const { getListByDay, sectionsForList, membersForList, removeMemberFromSection, addMemberToSection, excludedFloaterPairsForList } = require('./volunteers');
 const { byLastName } = require('./members');
 const { amountPaidForCharge, cancelCharge } = require('./payments');
@@ -1390,7 +1394,7 @@ async function allClassesList(day, semesterId) {
     const staff = await staffForClass(r.id);
     list.push({
       ...r,
-      dayLabel: DAY_LABELS[r.day],
+      dayLabel: CLASS_DAY_LABELS_FULL[r.day],
       gradeLabel: formatGradeRange(r.age_group),
       timeLabel: await timeRangeForClass(r),
       teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
@@ -1496,7 +1500,7 @@ async function classRosterIdsForDay(day) {
 // NOTHING makes re-running this (or the normal dates/add route, which
 // keeps them in sync going forward) always safe.
 async function backfillClassRosterDates() {
-  for (const day of DAYS) {
+  for (const day of await listActiveClassDays()) {
     const studentRosterId = await ensureDayRoster(day, 'student');
     const dates = await db.prepare('SELECT session_date FROM roster_dates WHERE roster_id = ?').all(studentRosterId);
     if (dates.length === 0) continue;
@@ -1529,8 +1533,6 @@ async function syncClassRosterMembers(classId) {
   await setRosterMembership(rosterId, memberIds);
 }
 
-const DAY_ROSTER_LABEL = { monday: 'Monday', wednesday: 'Wednesday' };
-
 function dayRosterSettingKey(day, role) {
   return `${day}_${role}_roster_id`;
 }
@@ -1545,7 +1547,7 @@ async function ensureDayRoster(day, role) {
     const existing = await db.prepare('SELECT id FROM rosters WHERE id = ?').get(existingId);
     if (existing) return existing.id;
   }
-  const name = `${DAY_ROSTER_LABEL[day]} ${role === 'parent' ? 'Parents' : 'Students'}`;
+  const name = `${CLASS_DAY_LABELS_FULL[day]} ${role === 'parent' ? 'Parents' : 'Students'}`;
   const info = await db
     .prepare('INSERT INTO rosters (name, category, schedule_day) VALUES (?, ?, ?)')
     .run(name, 'Class Schedule', day);

@@ -22,12 +22,19 @@
 //   - Floater/Setup-Cleanup's own /:day/ path style: basePrefix (e.g.
 //     "/admin/volunteers") + pathSuffix (e.g. "/manage"), giving
 //     "/admin/volunteers/monday/manage?semesterId=5".
-//   - Classes' own ?tab=<day> query style: dayQueryUrl (e.g.
+//   - Classes'/Attendance's own ?tab=<day> query style: dayQueryUrl (e.g.
 //     "/admin/schedule?tab=") - the day is appended directly after it,
-//     giving "/admin/schedule?tab=monday&semesterId=5".
+//     giving "/admin/schedule?tab=monday&semesterId=5". Attendance's own
+//     tab key is "<day>-parent"/"<day>-student" rather than a bare day -
+//     an optional daySuffix local (e.g. "-parent") is appended right
+//     after combo.day, before "&semesterId=", to preserve whichever
+//     Parent/Student half is currently open instead of always landing on
+//     a day's Parent half.
 function comboHref(combo) {
   var semesterQS = combo.semesterId == null ? 'none' : combo.semesterId;
-  if (typeof dayQueryUrl !== 'undefined') return dayQueryUrl + combo.day + '&semesterId=' + semesterQS;
+  if (typeof dayQueryUrl !== 'undefined') {
+    return dayQueryUrl + combo.day + (typeof daySuffix !== 'undefined' ? daySuffix : '') + '&semesterId=' + semesterQS;
+  }
   return basePrefix + '/' + combo.day + pathSuffix + '?semesterId=' + semesterQS;
 }
 var pickerId = 'schedule-combo-picker-' + (typeof dayQueryUrl !== 'undefined' ? 'tab' : pathSuffix.replace(/\//g, ''));

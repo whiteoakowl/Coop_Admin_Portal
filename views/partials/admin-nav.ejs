@@ -19,19 +19,29 @@
     // wired in here for Co-op Admin's own separate nav shell.
     const adminNavLinks = [
       { href: '/admin', icon: 'home', label: 'Home' },
-      // Monday/Wednesday's own Student/Parent roster toggle lives inside
-      // the page itself (?tab=monday-student vs. monday-parent, etc.) -
-      // admin-nav-accordion.js matches the exact ?tab= value, so landing
-      // on the Parent half won't auto-highlight "Monday" here the same
-      // way the page's own tabLabel print header already handles it
-      // (see admin-rosters.ejs); a cosmetic gap in the sidebar's own
-      // active-state only, not a broken link or a broken mobile popup.
+      // Each day's own Student/Parent roster toggle lives inside the page
+      // itself (?tab=<day>-student vs. <day>-parent, etc., plus the
+      // page's own semester+day combo picker for switching days) - none
+      // of that is a query param this bare "Parent/Student Rosters" link
+      // itself carries, so admin-nav-accordion.js's own exact-match pass
+      // never matches it directly; its bare-href fallback (no query
+      // params at all) is what actually highlights it as active for any
+      // day/role combination, same as Classes' own "Class Schedules" link
+      // just below.
       { href: '/admin/rosters', icon: 'calendar-check', label: 'Attendance', subpages: [
-        // A real request: "attendance, Monday, it should always land on
-        // parents first" - matches Wednesday's own link (see below), so
-        // both days now land on their Parent half first.
-        { href: '/admin/rosters?tab=monday-parent', label: 'Monday' },
-        { href: '/admin/rosters?tab=wednesday-parent', label: 'Wednesday' },
+        // A bare href, matching Classes' own "Class Schedules" subpage
+        // link just below - GET /admin/rosters with no ?tab= at all
+        // renders its default day's Parent roster directly (routes/
+        // admin-rosters.js) without ever redirecting the address bar to
+        // one, so a query-string link here could never match it and the
+        // title's own Menu dropdown would silently never appear (same
+        // bug, same fix, as that comment explains in full). A real
+        // request: "attendance, Monday, it should always land on parents
+        // first" - still true, just no longer a fixed Monday/Wednesday
+        // pair of links now that Day Settings can activate any day of
+        // the week - the page's own semester+day combo picker is how an
+        // admin switches days from here now.
+        { href: '/admin/rosters', label: 'Parent/Student Rosters' },
         { href: '/admin/rosters?tab=classes', label: 'Classes' },
         { href: '/admin/rosters?tab=playground', label: 'Playground' },
         { href: '/admin/rosters?tab=archive', label: 'Archive' },

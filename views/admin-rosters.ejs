@@ -44,9 +44,10 @@
                 keeps whatever Day is already chosen, and vice versa
                 (either filter, or both together). %>
             <select id="class-roster-day-select" onchange="window.fullscreenNavigate('/admin/rosters?tab=classes' + (this.value ? '&day=' + this.value : '') + (document.getElementById('class-roster-hour-select').value ? '&hour=' + document.getElementById('class-roster-hour-select').value : ''))">
-              <option value="" <%= !dayFilter ? 'selected' : '' %>>Monday &amp; Wednesday</option>
-              <option value="monday" <%= dayFilter === 'monday' ? 'selected' : '' %>>Monday</option>
-              <option value="wednesday" <%= dayFilter === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+              <option value="" <%= !dayFilter ? 'selected' : '' %>>All Days</option>
+              <% activeDays.forEach(function(d) { %>
+                <option value="<%= d %>" <%= dayFilter === d ? 'selected' : '' %>><%= dayLabels[d] %></option>
+              <% }); %>
             </select>
           </div>
           <div class="category-filter" style="margin: 0;">
@@ -96,10 +97,10 @@
     <% } else if (view === 'playgroundList') { %>
       <div class="view-tab-panel">
         <p class="hint">Anybody can check in and out of the playground &mdash; there's no fixed roster. Pick an hour to see who's checked in and out for a session date.</p>
-        <% [['monday', 'Monday'], ['wednesday', 'Wednesday']].forEach(function(pair) { %>
-          <h3 class="class-schedule-hour-label"><%= pair[1] %></h3>
+        <% activeDays.forEach(function(d) { %>
+          <h3 class="class-schedule-hour-label"><%= dayLabels[d] %></h3>
           <div class="class-roster-list">
-            <% playgroundEntries.filter(function(e) { return e.day === pair[0]; }).forEach(function(e) { %>
+            <% playgroundEntries.filter(function(e) { return e.day === d; }).forEach(function(e) { %>
               <a class="class-roster-row-btn" href="/admin/rosters?tab=playground-<%= e.day %>-<%= e.hour %>">
                 <span class="class-roster-row-name"><%= e.hourLabel %></span>
                 <span class="class-roster-row-meta"><span><%= e.dayLabel %> Playground</span></span>
@@ -139,9 +140,10 @@
           <div class="category-filter" style="margin: 0;">
             <label for="roster-archive-day-select">Day</label>
             <select id="roster-archive-day-select" onchange="window.fullscreenNavigate('/admin/rosters?tab=archive' + (this.value ? '&day=' + this.value : ''))">
-              <option value="" <%= !dayFilter ? 'selected' : '' %>>Monday &amp; Wednesday</option>
-              <option value="monday" <%= dayFilter === 'monday' ? 'selected' : '' %>>Monday</option>
-              <option value="wednesday" <%= dayFilter === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+              <option value="" <%= !dayFilter ? 'selected' : '' %>>All Days</option>
+              <% activeDays.forEach(function(d) { %>
+                <option value="<%= d %>" <%= dayFilter === d ? 'selected' : '' %>><%= dayLabels[d] %></option>
+              <% }); %>
             </select>
           </div>
         </div>
@@ -159,12 +161,12 @@
             </thead>
             <tbody>
               <% if (archives.length === 0) { %>
-                <tr><td colspan="6" class="roster-empty">No archives yet<%= dayFilter ? ' for this day' : '' %> &mdash; use the Archive button on the Monday/Wednesday rosters to save and clear a term's attendance.</td></tr>
+                <tr><td colspan="6" class="roster-empty">No archives yet<%= dayFilter ? ' for this day' : '' %> &mdash; use the Archive button on a day's rosters to save and clear a term's attendance.</td></tr>
               <% } %>
               <% archives.forEach(function(a) { %>
                 <tr>
                   <td><button type="button" class="member-name-link" data-view-archive-id="<%= a.id %>"><%= a.archivedAtLabel %></button></td>
-                  <td><%= a.day === 'monday' ? 'Monday' : 'Wednesday' %></td>
+                  <td><%= dayLabels[a.day] || a.day %></td>
                   <td><%= a.dateCount %></td>
                   <td><%= a.parentCount %></td>
                   <td><%= a.studentCount %></td>
@@ -182,9 +184,15 @@
     <div class="roster-toolbar no-print">
       <div class="roster-toolbar-left">
         <% if (!classId) { %>
+          <%# A real request: "I need to be able to switch between
+              semester views on... attendance... etc." - same combo
+              picker Floater/Setup-Cleanup/Classes already got; daySuffix
+              keeps whichever Parent/Student half is open across a day
+              switch instead of always landing back on Parent. %>
+          <%- include('partials/schedule-combo-picker', { combos, selectedComboId, dayQueryUrl: '/admin/rosters?tab=', daySuffix: '-' + role }) %>
           <div class="day-toggle">
-            <a class="day-toggle-option<%= tab === day + '-parent' ? ' active' : '' %>" href="/admin/rosters?tab=<%= day %>-parent">Parent</a>
-            <a class="day-toggle-option<%= tab === day + '-student' ? ' active' : '' %>" href="/admin/rosters?tab=<%= day %>-student">Student</a>
+            <a class="day-toggle-option<%= tab === day + '-parent' ? ' active' : '' %>" href="/admin/rosters?tab=<%= day %>-parent<%= selectedSemesterId ? '&semesterId=' + selectedSemesterId : '' %>">Parent</a>
+            <a class="day-toggle-option<%= tab === day + '-student' ? ' active' : '' %>" href="/admin/rosters?tab=<%= day %>-student<%= selectedSemesterId ? '&semesterId=' + selectedSemesterId : '' %>">Student</a>
           </div>
         <% } %>
         <span id="roster-save-status" class="volunteer-save-status"></span>
@@ -200,11 +208,11 @@
         <a class="roster-action-btn print-action-btn" href="/admin/rosters/print?tab=<%= tab %>" target="_blank">Print</a>
         <button type="button" class="roster-action-btn" data-open-allergy-log><svg class="icon"><use href="#icon-medical-bag"/></svg> Allergies/Medical</button>
         <% if (!classId) { %>
-          <form method="POST" action="/admin/rosters/<%= day %>/resync" class="inline-block-form" data-confirm="Resync <%= dayLabel %> Parent/Student rosters and floater auto-assignment from the current class schedule and staffing? Anyone automatically added who no longer belongs (for example, a non-primary parent added under old logic) will be removed. Anyone added by hand via + Add Member is left untouched." data-confirm-yes-label="Yes, Resync" data-confirm-icon="icon-rotate" data-confirm-safe="1">
+          <form method="POST" action="/admin/rosters/<%= day %>/resync<%= selectedSemesterId ? '?semesterId=' + selectedSemesterId : '' %>" class="inline-block-form" data-confirm="Resync <%= dayLabel %> Parent/Student rosters and floater auto-assignment from the current class schedule and staffing? Anyone automatically added who no longer belongs (for example, a non-primary parent added under old logic) will be removed. Anyone added by hand via + Add Member is left untouched." data-confirm-yes-label="Yes, Resync" data-confirm-icon="icon-rotate" data-confirm-safe="1">
             <input type="hidden" name="tab" value="<%= tab %>" />
             <button type="submit" class="roster-action-btn">Resync</button>
           </form>
-          <form method="POST" action="/admin/rosters/<%= day %>/archive" class="inline-block-form" data-confirm="Archive all current session dates and attendance for <%= dayLabel %> Parent, Student, and every <%= dayLabel %> class into one permanent record? This clears the live roster's dates and attendance so it can start fresh for a new term &mdash; roster membership is not affected." data-confirm-yes-label="Yes, Archive" data-confirm-icon="icon-save" data-confirm-safe="1">
+          <form method="POST" action="/admin/rosters/<%= day %>/archive<%= selectedSemesterId ? '?semesterId=' + selectedSemesterId : '' %>" class="inline-block-form" data-confirm="Archive all current session dates and attendance for <%= dayLabel %> Parent, Student, and every <%= dayLabel %> class into one permanent record? This clears the live roster's dates and attendance so it can start fresh for a new term &mdash; roster membership is not affected." data-confirm-yes-label="Yes, Archive" data-confirm-icon="icon-save" data-confirm-safe="1">
             <button type="submit" class="roster-action-btn">Archive</button>
           </form>
         <% } %>
@@ -225,7 +233,7 @@
               <tr>
                 <td><%= d.label %></td>
                 <td class="actions-cell">
-                  <form method="POST" action="/admin/rosters/<%= tab %>/dates/<%= d.date %>/remove" class="inline-block-form" data-confirm="Remove <%= d.label %>? Any attendance recorded for this date will be deleted too.">
+                  <form method="POST" action="/admin/rosters/<%= tab %>/dates/<%= d.date %>/remove<%= selectedSemesterId ? '?semesterId=' + selectedSemesterId : '' %>" class="inline-block-form" data-confirm="Remove <%= d.label %>? Any attendance recorded for this date will be deleted too.">
                     <button type="submit" class="link-btn link-btn-danger">Remove</button>
                   </form>
                 </td>
@@ -234,7 +242,7 @@
           </tbody>
         </table>
       </div>
-      <form method="POST" action="/admin/rosters/<%= tab %>/dates/add">
+      <form method="POST" action="/admin/rosters/<%= tab %>/dates/add<%= selectedSemesterId ? '?semesterId=' + selectedSemesterId : '' %>">
         <div class="date-list-wrap">
           <label class="roster-checkbox-label">Add Dates</label>
           <div class="date-list">
@@ -253,7 +261,7 @@
     </dialog>
 
     <dialog id="add-member-dialog" class="member-picker-dialog">
-      <form method="POST" action="/admin/rosters/<%= tab %>/add-member">
+      <form method="POST" action="/admin/rosters/<%= tab %>/add-member<%= selectedSemesterId ? '?semesterId=' + selectedSemesterId : '' %>">
         <h3>Add Members &mdash; <%= tabLabel %></h3>
         <% if (availableMembers.length === 0) { %>
           <p class="hint">Everyone eligible is already on this roster. Add new members on the <a href="/admin/members">Members page</a>.</p>
@@ -347,7 +355,7 @@
                   </td>
                 <% }); %>
                 <td class="actions-cell no-print">
-                  <form method="POST" action="/admin/rosters/<%= tab %>/remove-member/<%= row.member.id %>" class="inline-block-form" data-confirm="Remove <%= row.member.name %> from this roster?">
+                  <form method="POST" action="/admin/rosters/<%= tab %>/remove-member/<%= row.member.id %><%= selectedSemesterId ? '?semesterId=' + selectedSemesterId : '' %>" class="inline-block-form" data-confirm="Remove <%= row.member.name %> from this roster?">
                     <button type="submit" class="icon-btn roster-remove-btn" aria-label="Remove <%= row.member.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
                   </form>
                 </td>

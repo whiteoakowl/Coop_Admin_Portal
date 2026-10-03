@@ -15,33 +15,62 @@ const {
   classRosterIdsForDay,
   HOUR_POSITIONS,
   listSemesters,
+  CLASS_DAYS,
+  CLASS_DAY_LABELS_FULL,
+  CLASS_DAY_WEEKDAY_FULL,
+  isValidClassDay,
+  requireClassDay,
+  listActiveClassDays,
+  listScheduleCombos,
 } = require('../utils/classSchedule');
-const { defaultDay, DAYS, DAY_LABELS, isValidDay, requireDay } = require('../utils/days');
+const { comboSemesterId, qsSemester, appendSemester, findComboId } = require('../utils/scheduleComboLinks');
+const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
 const { absenceFormSubmissionsForRoster } = require('../utils/alerts');
 const { rosterDates, buildRosterGridData } = require('../utils/rosterGrid');
 const { ensurePlaygroundRoster, playgroundHourLabel, playgroundLogForDate } = require('../utils/playground');
 
+// Mirrors routes/admin-schedule.js's own resolveSemesterId - Attendance's
+// Parent/Student rosters, like Classes' own grid, have no single
+// authoritative row of their own to read an effective semester_id back
+// off (unlike Floater/Setup-Cleanup's semester-scoped lists), so an
+// unspecified ?semesterId= falls back to the site-wide active Kiosk
+// semester same as everywhere else that convention already applies.
+async function resolveSemesterId(semesterId) {
+  return semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+}
+
+// A real request: "Full 7 day expansion so... attendance... will work for
+// years to come" - the Day Settings-driven 7-day Classes grid (utils/
+// classDays.js's CLASS_DAYS/CLASS_DAY_LABELS_FULL/requireClassDay) now
+// backs Attendance too, in place of utils/days.js's own older,
+// Monday/Wednesday-only DAYS/DAY_LABELS/isValidDay/requireDay - same
+// migration Floater Assignments and Setup/Cleanup already made.
+
 // The alert log below the grid only makes sense for today, and only when
 // today is actually a session day for this roster's day-of-week (mirrors
 // the Floater Assignments Substitutes board's same-shaped default).
-const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
 function todayIfSessionDay(day) {
   const today = todayISO();
-  return weekdayOf(today) === DAY_WEEKDAY[day] ? today : null;
+  return weekdayOf(today) === CLASS_DAY_WEEKDAY_FULL[day] ? today : null;
 }
 
-// Attendance is 4 always-existing, schedule-driven rosters (membership
-// fills in automatically from class enrollment/staffing - see
-// utils/classSchedule.js) plus a 5th "Class Rosters" tab that lets an
-// admin drill into any one class's own auto-maintained roster
-// (classes.roster_id). A class roster's tab key is "class-<id>" rather
-// than a fixed TABS entry - see classIdFromTab/rosterIdForTab below.
-const TABS = {
-  'monday-parent': { day: 'monday', role: 'parent', label: 'Monday Parents' },
-  'monday-student': { day: 'monday', role: 'student', label: 'Monday Students' },
-  'wednesday-parent': { day: 'wednesday', role: 'parent', label: 'Wednesday Parents' },
-  'wednesday-student': { day: 'wednesday', role: 'student', label: 'Wednesday Students' },
-};
+// Attendance is a pair of always-existing, schedule-driven Parent/Student
+// rosters per active day (membership fills in automatically from class
+// enrollment/staffing - see utils/classSchedule.js) plus a "Class
+// Rosters" tab that lets an admin drill into any one class's own
+// auto-maintained roster (classes.roster_id). A class roster's tab key is
+// "class-<id>" rather than a "<day>-<role>" one - see classIdFromTab/
+// rosterIdForTab below. Unlike the old 2-day TABS lookup object, tabInfo
+// is a pure function - any of the 7 canonical days works structurally,
+// not just whichever ones happen to be "active" (Day Settings) right now,
+// same as classIdFromTab's own regex match just below.
+function tabInfo(tab) {
+  const m = /^([a-z]+)-(parent|student)$/.exec(tab || '');
+  if (!m || !CLASS_DAYS.includes(m[1])) return null;
+  const day = m[1];
+  const role = m[2];
+  return { day, role, label: `${CLASS_DAY_LABELS_FULL[day]} ${role === 'parent' ? 'Parents' : 'Students'}` };
+}
 
 function classIdFromTab(tab) {
   const m = /^class-(\d+)$/.exec(tab || '');
@@ -64,7 +93,7 @@ async function rosterIdForTab(tab) {
     const cls = await db.prepare('SELECT roster_id FROM classes WHERE id = ?').get(classId);
     return cls ? cls.roster_id : null;
   }
-  const cfg = TABS[tab];
+  const cfg = tabInfo(tab);
   return cfg ? ensureDayRoster(cfg.day, cfg.role) : null;
 }
 
@@ -73,7 +102,7 @@ async function rosterIdForTab(tab) {
 // too - everywhere else it matches whichever role that tab tracks.
 function memberTypeForTab(tab) {
   if (classIdFromTab(tab)) return 'student';
-  const cfg = TABS[tab];
+  const cfg = tabInfo(tab);
   return cfg ? cfg.role : null;
 }
 
@@ -174,8 +203,8 @@ async function buildDaySnapshot(day) {
 
   return {
     day,
-    parent: { label: TABS[`${day}-parent`].label, ...archiveGrid(await buildRosterGridData(parentRoster)) },
-    student: { label: TABS[`${day}-student`].label, ...archiveGrid(await buildRosterGridData(studentRoster)) },
+    parent: { label: tabInfo(`${day}-parent`).label, ...archiveGrid(await buildRosterGridData(parentRoster)) },
+    student: { label: tabInfo(`${day}-student`).label, ...archiveGrid(await buildRosterGridData(studentRoster)) },
     classes,
   };
 }
@@ -197,7 +226,7 @@ async function clearDayRosterData(tx, rosterId) {
 async function archiveDay(day) {
   const snapshot = await buildDaySnapshot(day);
   if (snapshot.parent.dates.length === 0 && snapshot.student.dates.length === 0) {
-    return { ok: false, message: `${DAY_LABELS[day]} has no session dates to archive yet.` };
+    return { ok: false, message: `${CLASS_DAY_LABELS_FULL[day]} has no session dates to archive yet.` };
   }
 
   const parentRosterId = await ensureDayRoster(day, 'parent');
@@ -209,7 +238,7 @@ async function archiveDay(day) {
     for (const rosterId of [parentRosterId, studentRosterId, ...classRosterIds]) await clearDayRosterData(tx, rosterId);
   });
 
-  return { ok: true, message: `Archived ${DAY_LABELS[day]} attendance. The live roster has been cleared for a fresh start.` };
+  return { ok: true, message: `Archived ${CLASS_DAY_LABELS_FULL[day]} attendance. The live roster has been cleared for a fresh start.` };
 }
 
 // One row of the Archive tab's log list - counts only, not the full
@@ -235,9 +264,13 @@ async function loadArchive(id) {
 
 router.get('/rosters', requireAdmin, async (req, res) => {
   const requestedTab = req.query.tab || '';
+  const activeDays = await listActiveClassDays();
 
   if (requestedTab === 'archive') {
-    const dayFilter = isValidDay(req.query.day) ? req.query.day : '';
+    // Any of the 7 canonical days, not just currently-active ones - an
+    // archive is a historical record that should stay filterable even if
+    // its day is later deactivated in Day Settings.
+    const dayFilter = isValidClassDay(req.query.day) ? req.query.day : '';
     const rows = await db
       .prepare(`SELECT * FROM roster_archives ${dayFilter ? 'WHERE day = ?' : ''} ORDER BY archived_at DESC`)
       .all(...(dayFilter ? [dayFilter] : []));
@@ -248,13 +281,15 @@ router.get('/rosters', requireAdmin, async (req, res) => {
       view: 'archive',
       archives: rows.map(archiveSummary),
       dayFilter,
+      activeDays,
+      dayLabels: CLASS_DAY_LABELS_FULL,
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
   }
 
   if (requestedTab === 'classes') {
-    const dayFilter = ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '';
+    const dayFilter = activeDays.includes(req.query.day) ? req.query.day : '';
     const hourFilter = HOUR_POSITIONS.includes(parseInt(req.query.hour, 10)) ? parseInt(req.query.hour, 10) : null;
     // A real request: "add semester choice dropdown settings to...
     // Monday/Wednesday attendance" - same optional filter the Classes
@@ -279,6 +314,8 @@ router.get('/rosters', requireAdmin, async (req, res) => {
       view: 'classList',
       classes,
       dayFilter,
+      activeDays,
+      dayLabels: CLASS_DAY_LABELS_FULL,
       hourFilter,
       semesterFilter,
       semesters: await listSemesters(),
@@ -290,15 +327,15 @@ router.get('/rosters', requireAdmin, async (req, res) => {
 
   // Playground: an open drop-in log with no fixed roster - "anybody can
   // check in and out of the playground" - so unlike Classes (a list of
-  // real `classes` rows), there's nothing to list except the 8 fixed
-  // (day, hour) slots themselves. Each links to its own tab key
+  // real `classes` rows), there's nothing to list except each active
+  // day's own 4 fixed hour slots. Each links to its own tab key
   // ("playground-monday-1", mirroring "class-<id>" above), which the
   // regex just below matches against.
   if (requestedTab === 'playground') {
     const entries = [];
-    for (const day of DAYS) {
+    for (const day of activeDays) {
       for (const hour of HOUR_POSITIONS) {
-        entries.push({ day, hour, dayLabel: DAY_LABELS[day], hourLabel: await playgroundHourLabel(day, hour) });
+        entries.push({ day, hour, dayLabel: CLASS_DAY_LABELS_FULL[day], hourLabel: await playgroundHourLabel(day, hour) });
       }
     }
     return res.render('admin-rosters', {
@@ -307,12 +344,14 @@ router.get('/rosters', requireAdmin, async (req, res) => {
       topTab: 'playground',
       view: 'playgroundList',
       playgroundEntries: entries,
+      activeDays,
+      dayLabels: CLASS_DAY_LABELS_FULL,
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
   }
 
-  const playgroundMatch = /^playground-(monday|wednesday)-([1-4])$/.exec(requestedTab);
+  const playgroundMatch = new RegExp(`^playground-(${CLASS_DAYS.join('|')})-([1-4])$`).exec(requestedTab);
   if (playgroundMatch) {
     const pgDay = playgroundMatch[1];
     const pgHour = parseInt(playgroundMatch[2], 10);
@@ -336,7 +375,7 @@ router.get('/rosters', requireAdmin, async (req, res) => {
       view: 'playgroundLog',
       pgDay,
       pgHour,
-      pgDayLabel: DAY_LABELS[pgDay],
+      pgDayLabel: CLASS_DAY_LABELS_FULL[pgDay],
       pgHourLabel: await playgroundHourLabel(pgDay, pgHour),
       pgDates: pgDates.map((d) => ({ date: d, label: formatDateLabel(d) })),
       selectedDate,
@@ -351,6 +390,7 @@ router.get('/rosters', requireAdmin, async (req, res) => {
   let tab = requestedTab;
   let day;
   let tabLabel;
+  let role = null;
 
   if (classId) {
     const cls = await classRosterInfo(classId);
@@ -362,12 +402,27 @@ router.get('/rosters', requireAdmin, async (req, res) => {
     // click the attendance tab. currently it always lands on student
     // roster" - the nav's own Attendance link (partials/admin-nav.ejs)
     // has no ?tab= at all, so this fallback is what every plain click
-    // into Attendance actually lands on.
-    tab = TABS[requestedTab] ? requestedTab : `${defaultDay()}-parent`;
-    const cfg = TABS[tab];
+    // into Attendance actually lands on. activeDays[0] mirrors Classes'
+    // own default-tab fallback (routes/admin-schedule.js).
+    const defaultDay = activeDays[0] || 'monday';
+    tab = tabInfo(requestedTab) ? requestedTab : `${defaultDay}-parent`;
+    const cfg = tabInfo(tab);
     day = cfg.day;
     tabLabel = cfg.label;
+    role = cfg.role;
   }
+
+  // A real request: "I need to be able to switch between semester views
+  // on floaters, setup cleanup, attendance, classes etc." - same combo
+  // picker Floater/Setup-Cleanup/Classes already got, applied to the
+  // Parent/Student grid view only (Class Rosters already has its own
+  // Day/Hour/Semester filters above). semesterId is a view-only choice
+  // threaded through for URL consistency with those other pages - like
+  // Classes' own grid, Attendance's roster data has no semester concept
+  // of its own to actually filter by.
+  const combos = classId ? null : await listScheduleCombos();
+  const resolvedSemesterId = classId ? null : await resolveSemesterId(comboSemesterId(req));
+  const selectedSemesterId = classId ? null : qsSemester(resolvedSemesterId);
 
   const rosterId = await rosterIdForTab(tab);
   const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
@@ -391,9 +446,13 @@ router.get('/rosters', requireAdmin, async (req, res) => {
     view: 'grid',
     classId,
     day,
+    role,
     tabLabel,
-    dayLabel: DAY_LABELS[day],
+    dayLabel: CLASS_DAY_LABELS_FULL[day],
     roster,
+    combos,
+    selectedComboId: classId ? null : findComboId(combos, day, resolvedSemesterId),
+    selectedSemesterId,
     ...(await buildRosterGridData(roster, classId ? dates : undefined)),
     dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
     alertDate,
@@ -433,7 +492,7 @@ router.get('/rosters', requireAdmin, async (req, res) => {
 router.get('/rosters/print', requireAdmin, async (req, res) => {
   const requestedTab = req.query.tab || '';
 
-  const playgroundMatch = /^playground-(monday|wednesday)-([1-4])$/.exec(requestedTab);
+  const playgroundMatch = new RegExp(`^playground-(${CLASS_DAYS.join('|')})-([1-4])$`).exec(requestedTab);
   if (playgroundMatch) {
     const pgDay = playgroundMatch[1];
     const pgHour = parseInt(playgroundMatch[2], 10);
@@ -444,9 +503,9 @@ router.get('/rosters/print', requireAdmin, async (req, res) => {
     const requestedDate = isValidISODate(req.query.date) && pgDates.includes(req.query.date) ? req.query.date : null;
     const selectedDate = requestedDate || [...pgDates].reverse().find((d) => d <= today) || pgDates[pgDates.length - 1] || null;
     return res.render('admin-rosters-print', {
-      title: `${DAY_LABELS[pgDay]} Playground Print Preview`,
+      title: `${CLASS_DAY_LABELS_FULL[pgDay]} Playground Print Preview`,
       view: 'playgroundLog',
-      pgDayLabel: DAY_LABELS[pgDay],
+      pgDayLabel: CLASS_DAY_LABELS_FULL[pgDay],
       pgHourLabel: await playgroundHourLabel(pgDay, pgHour),
       selectedDate,
       selectedDateLabel: selectedDate ? formatDateLabel(selectedDate) : null,
@@ -464,8 +523,10 @@ router.get('/rosters/print', requireAdmin, async (req, res) => {
     day = cls.day;
     tabLabel = `${cls.class_name} (${cls.hourLabel})`;
   } else {
-    tab = TABS[requestedTab] ? requestedTab : `${defaultDay()}-parent`;
-    const cfg = TABS[tab];
+    const activeDays = await listActiveClassDays();
+    const defaultDay = activeDays[0] || 'monday';
+    tab = tabInfo(requestedTab) ? requestedTab : `${defaultDay}-parent`;
+    const cfg = tabInfo(tab);
     day = cfg.day;
     tabLabel = cfg.label;
   }
@@ -524,7 +585,7 @@ router.get('/rosters/print', requireAdmin, async (req, res) => {
     title: `${tabLabel} Print Preview`,
     view: 'grid',
     tabLabel,
-    dayLabel: DAY_LABELS[day],
+    dayLabel: CLASS_DAY_LABELS_FULL[day],
     gridPages,
   });
 });
@@ -541,7 +602,7 @@ router.get('/rosters/print', requireAdmin, async (req, res) => {
 // reporting their own absence via the public form would be told they
 // "aren't on any roster" for a date their own kids' roster had just fine.
 async function siblingRosterId(tab) {
-  const info = TABS[tab];
+  const info = tabInfo(tab);
   if (!info) return null;
   const otherRole = info.role === 'parent' ? 'student' : 'parent';
   return ensureDayRoster(info.day, otherRole);
@@ -557,7 +618,7 @@ async function siblingRosterId(tab) {
 // this same invariant is kept - a class created after dates already
 // exist, and an already-deployed database's existing classes).
 async function dayClassRosterIds(tab) {
-  const info = TABS[tab];
+  const info = tabInfo(tab);
   return info ? classRosterIdsForDay(info.day) : [];
 }
 
@@ -576,7 +637,7 @@ router.post('/rosters/:tab/dates/add', requireAdmin, async (req, res) => {
     if (siblingId) await insertDate.run(siblingId, d);
     for (const classRosterId of classRosterIds) await insertDate.run(classRosterId, d);
   }
-  res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Added ${dates.length} date(s).`));
+  res.redirect(appendSemester(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Added ${dates.length} date(s).`), comboSemesterId(req)));
 });
 
 router.post('/rosters/:tab/dates/:date/remove', requireAdmin, async (req, res) => {
@@ -591,7 +652,7 @@ router.post('/rosters/:tab/dates/:date/remove', requireAdmin, async (req, res) =
     await tx.prepare(`DELETE FROM attendance WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
     await tx.prepare(`DELETE FROM checkouts WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
   });
-  res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Removed ${formatDateLabel(date)} and its attendance records.`));
+  res.redirect(appendSemester(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Removed ${formatDateLabel(date)} and its attendance records.`), comboSemesterId(req)));
 });
 
 // --- Roster membership ---
@@ -602,7 +663,7 @@ router.post('/rosters/:tab/add-member', requireAdmin, async (req, res) => {
   if (!rosterId) return res.status(404).send('Not found');
   const memberIds = [].concat(req.body.memberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
   for (const memberId of memberIds) await addManualRosterMember(rosterId, memberId);
-  res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Added ${memberIds.length} member(s).`));
+  res.redirect(appendSemester(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Added ${memberIds.length} member(s).`), comboSemesterId(req)));
 });
 
 router.post('/rosters/:tab/remove-member/:memberId', requireAdmin, async (req, res) => {
@@ -621,7 +682,7 @@ router.post('/rosters/:tab/remove-member/:memberId', requireAdmin, async (req, r
   await db
     .prepare('INSERT INTO roster_manual_removals (roster_id, member_id) VALUES (?, ?) ON CONFLICT (roster_id, member_id) DO UPDATE SET removed_at = now_text()')
     .run(rosterId, memberId);
-  res.redirect(`/admin/rosters?tab=${tab}`);
+  res.redirect(appendSemester(`/admin/rosters?tab=${tab}`, comboSemesterId(req)));
 });
 
 // --- Manual attendance entry ---
@@ -657,7 +718,7 @@ router.post('/rosters/:tab/attendance', requireAdmin, async (req, res) => {
   }
 
   if (req.get('X-Requested-With') === 'fetch') return res.json({ ok: true });
-  res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent('Attendance saved.'));
+  res.redirect(appendSemester(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent('Attendance saved.'), comboSemesterId(req)));
 });
 
 // Re-runs syncDayMemberRosters(day) on demand instead of only reactively
@@ -668,37 +729,37 @@ router.post('/rosters/:tab/attendance', requireAdmin, async (req, res) => {
 // admin a way to force it without making a throwaway edit. Auto-added
 // ('source'='auto') roster members not in the freshly computed set are
 // removed; anyone added by hand via + Add Member is untouched either way.
-router.post('/rosters/:day/resync', requireAdmin, requireDay, async (req, res) => {
+router.post('/rosters/:day/resync', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   await syncDayMemberRosters(day);
-  const tab = req.body.tab && TABS[req.body.tab] && TABS[req.body.tab].day === day ? req.body.tab : `${day}-student`;
-  res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`${DAY_LABELS[day]} rosters resynced.`));
+  const tab = req.body.tab && tabInfo(req.body.tab) && tabInfo(req.body.tab).day === day ? req.body.tab : `${day}-student`;
+  res.redirect(appendSemester(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`${CLASS_DAY_LABELS_FULL[day]} rosters resynced.`), comboSemesterId(req)));
 });
 
 // --- Archive routes ---
 
-router.post('/rosters/:day/archive', requireAdmin, requireDay, async (req, res) => {
+router.post('/rosters/:day/archive', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const result = await archiveDay(day);
   const query = result.ok
     ? `notice=${encodeURIComponent(result.message)}`
     : `error=${encodeURIComponent(result.message)}`;
-  res.redirect(`/admin/rosters?tab=${day}-student&${query}`);
+  res.redirect(appendSemester(`/admin/rosters?tab=${day}-student&${query}`, comboSemesterId(req)));
 });
 
 router.get('/rosters/archive/:id/view-fragment', requireAdmin, async (req, res) => {
   const archive = await loadArchive(parseInt(req.params.id, 10));
   if (!archive) return res.status(404).send('Not found');
-  res.render('roster-archive-view-fragment', { archive, dayLabel: DAY_LABELS[archive.day] });
+  res.render('roster-archive-view-fragment', { archive, dayLabel: CLASS_DAY_LABELS_FULL[archive.day] });
 });
 
 router.get('/rosters/archive/:id/print', requireAdmin, async (req, res) => {
   const archive = await loadArchive(parseInt(req.params.id, 10));
   if (!archive) return res.status(404).send('Not found');
   res.render('admin-rosters-archive-print', {
-    title: `${DAY_LABELS[archive.day]} Attendance Archive — ${archive.archivedAtLabel}`,
+    title: `${CLASS_DAY_LABELS_FULL[archive.day]} Attendance Archive — ${archive.archivedAtLabel}`,
     archive,
-    dayLabel: DAY_LABELS[archive.day],
+    dayLabel: CLASS_DAY_LABELS_FULL[archive.day],
   });
 });
 
@@ -741,7 +802,7 @@ router.get('/rosters/archive/:id/export.csv', requireAdmin, async (req, res) => 
 router.get('/roster/:tab/export.csv', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
   const classId = classIdFromTab(tab);
-  const label = classId ? ((await classRosterInfo(classId)) || {}).class_name : (TABS[tab] || {}).label;
+  const label = classId ? ((await classRosterInfo(classId)) || {}).class_name : (tabInfo(tab) || {}).label;
   const rosterId = await rosterIdForTab(tab);
   if (!rosterId || !label) return res.status(404).send('Not found');
   const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
