@@ -20,7 +20,7 @@
 // Registration Schedule's own role-scoped windows already cover that.
 const db = require('../db');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('./sections');
-const { ageGroupList, classGlobalSettings } = require('./classSchedule');
+const { ageGroupList, classGlobalSettings, classScheduleIdForClass } = require('./classSchedule');
 const { ageAsOfDate, todayISO } = require('./dates');
 const { createCharge, amountPaidForCharge, cancelCharge, recordPayment } = require('./payments');
 const { isRegistrationOpenForAccount } = require('./registrationWindows');
@@ -69,7 +69,8 @@ async function registerForClass({ classId, studentId, accountId, portalRoles, re
 
   const settings = await classGlobalSettings();
   const restriction = await classSectionIds(classId);
-  if (!(await isRegistrationOpenForAccount(portalRoles, { day: cls.day, sectionIds: restriction }))) {
+  const actionType = registrantType === 'student' ? 'student_register_self' : 'parent_register_student';
+  if (!(await isRegistrationOpenForAccount(portalRoles, { classScheduleId: await classScheduleIdForClass(cls), sectionIds: restriction, actionType }))) {
     return { ok: false, error: 'Registration is not open for your account yet.' };
   }
   if (restriction.length && !memberSatisfiesRestriction(await sectionIdsForMember(studentId), restriction)) {

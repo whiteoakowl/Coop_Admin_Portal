@@ -1,23 +1,11 @@
 <%
-// locals: semesters, missingSemesterCount, missingSemesterBreakdown
-// (optional - the per-category counts behind missingSemesterCount; falls
-// back to just showing the total if not passed), classDays/classDayLabels
-// (every day of the week the "Add a Schedule"/edit checkboxes can offer),
-// classSchedules (every class_schedules row - used here only to work out
-// which days each semester already covers), backUrl (optional - where
-// each form's own POST redirects back to; defaults to the Settings tab).
-// Used both by the Settings tab (its original home) and the "Add/Edit
-// Semester" dialog on each Classes day's own grid (a real request: "on
-// class page add a button that says add/edit semester").
+// locals: semesters, classDays/classDayLabels (every day of the week the
+// "Add a Schedule"/edit checkboxes can offer), classSchedules (every
+// class_schedules row - used here only to work out which days each
+// semester already covers), backUrl (optional - where each form's own
+// POST redirects back to; defaults to the Settings tab). Used by the
+// Settings tab's own Semester sub-tab.
 const semesterBackUrl = typeof backUrl !== 'undefined' && backUrl ? backUrl : '/admin/schedule?tab=settings';
-const breakdown = typeof missingSemesterBreakdown !== 'undefined' ? missingSemesterBreakdown : null;
-const BREAKDOWN_LABELS = {
-  classes: ['class', 'classes'],
-  volunteerLists: ['Floater List', 'Floater Lists'],
-  setupTeams: ['Setup/Cleanup Team', 'Setup/Cleanup Teams'],
-  taskListSections: ['Task List', 'Task Lists'],
-  classSchedules: ['Day Settings record', 'Day Settings records'],
-};
 // classDays is already in calendar order, so filtering it (rather than
 // mapping classSchedules directly) gives each semester's own day list
 // back in calendar order too, not creation order.
@@ -49,46 +37,6 @@ function daysForSemester(semesterId) {
     </div>
   </form>
 </section>
-
-<%# A real request: "create a fall 2026 semester and connect all classes,
-    floater assignments, setup cleanup, attendance, logs, everything on
-    co-op admin portal. I don't want to loose any current data." Classes,
-    Floater Assignments, Setup/Cleanup, and Day Settings records all sit
-    with no semester until tagged - this is the one-click sweep that tags
-    everything still untagged at once (see utils/semesterAssignment.js's
-    own header comment for exactly what this does and doesn't touch -
-    nothing is ever deleted or moved, only tagged). Attendance/checkouts/
-    admin logs aren't listed here - they're plain dated event records with
-    no semester concept of their own to assign. %>
-<% if (missingSemesterCount > 0) { %>
-  <section class="portal-dashboard-card portal-dashboard-card-wide">
-    <h2>Data Missing a Semester</h2>
-    <% if (breakdown) { %>
-      <ul class="hint">
-        <% Object.keys(BREAKDOWN_LABELS).forEach(function(key) { %>
-          <% if (breakdown[key] > 0) { %>
-            <li><%= breakdown[key] %> <%= BREAKDOWN_LABELS[key][breakdown[key] === 1 ? 0 : 1] %> with no semester assigned</li>
-          <% } %>
-        <% }); %>
-      </ul>
-    <% } %>
-    <p class="hint">None of this will show up on Orientation (or any other semester-filtered page) while a specific semester is selected. Connect it all to one semester at once:</p>
-    <form method="POST" action="/admin/schedule/semesters/assign-missing" class="member-form-grid">
-      <input type="hidden" name="back" value="<%= semesterBackUrl %>" />
-      <label class="member-form-full">Assign To
-        <select name="semesterId" required>
-          <option value="">Choose a semester...</option>
-          <% semesters.forEach(function(s) { %>
-            <option value="<%= s.id %>"><%= s.title %></option>
-          <% }); %>
-        </select>
-      </label>
-      <div class="member-form-full">
-        <button type="submit" class="primary-btn">Connect Everything</button>
-      </div>
-    </form>
-  </section>
-<% } %>
 
 <section class="portal-dashboard-section">
   <% if (semesters.length === 0) { %>

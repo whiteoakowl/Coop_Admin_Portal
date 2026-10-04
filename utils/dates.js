@@ -118,6 +118,35 @@ function easternInputToUtcText(datetimeLocalValue) {
   return `${utc.getUTCFullYear()}-${pad(utc.getUTCMonth() + 1)}-${pad(utc.getUTCDate())} ${pad(utc.getUTCHours())}:${pad(utc.getUTCMinutes())}:${pad(utc.getUTCSeconds())}`;
 }
 
+// The inverse of easternInputToUtcText above - given a UTC
+// 'YYYY-MM-DD HH:MM:SS' text value (opens_at/closes_at as stored),
+// renders the <input type="datetime-local"> value an admin would need to
+// re-type to get that same instant back, i.e. that instant's own Eastern
+// wall-clock reading. Unlike the other direction, Intl can read this
+// straight off a real Date with no offset-probing needed. Null/empty in,
+// null out (an Edit dialog's optional Closes At field).
+const EASTERN_INPUT_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  hour12: false,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+function utcTextToEasternInput(utcText) {
+  if (!utcText) return '';
+  const [datePart, timePart] = utcText.split(' ');
+  const [y, m, d] = datePart.split('-').map(Number);
+  const [hh, mm, ss] = (timePart || '00:00:00').split(':').map(Number);
+  const parts = {};
+  for (const part of EASTERN_INPUT_FORMATTER.formatToParts(new Date(Date.UTC(y, m - 1, d, hh, mm, ss || 0)))) {
+    if (part.type !== 'literal') parts[part.type] = part.value;
+  }
+  const hour24 = parts.hour === '24' ? '00' : parts.hour;
+  return `${parts.year}-${parts.month}-${parts.day}T${hour24}:${parts.minute}`;
+}
+
 function isValidISODate(iso) {
   if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
   const d = parseISO(iso);
@@ -370,4 +399,5 @@ module.exports = {
   ageAsOfDate,
   closestUpcomingDate,
   easternInputToUtcText,
+  utcTextToEasternInput,
 };

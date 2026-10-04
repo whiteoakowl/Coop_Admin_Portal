@@ -5,12 +5,11 @@
 // map from utils/days.js (confusingly re-exported under the exact same
 // name as the real CLASS_DAY_LABELS_FULL) - so DAY_LABELS['tuesday'] was
 // undefined, making the Manage Class page, the per-class roster print
-// page, the per-day Schedule print page, and the Class Archive CSV
-// export all show the literal word "undefined" instead of "Tuesday" for
-// any newly-activated 3rd+ day. utils/playground.js and
-// utils/orientation.js had the exact same mistake, baking "undefined"
-// into a Playground roster's own stored name and the Orientation
-// tracker's Day column.
+// page, and the per-day Schedule print page all show the literal word
+// "undefined" instead of "Tuesday" for any newly-activated 3rd+ day.
+// utils/playground.js and utils/orientation.js had the exact same
+// mistake, baking "undefined" into a Playground roster's own stored name
+// and the Orientation tracker's Day column.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -81,19 +80,6 @@ test('the per-day Schedule print page title/label say "Tuesday", not "undefined"
   assert.equal(print.status, 200);
   assert.doesNotMatch(print.text, /undefined/);
   assert.match(print.text, /Tuesday Schedule/);
-});
-
-test('the Class Archive CSV export shows "Tuesday", not the raw lowercase "tuesday", for an archived Tuesday class', async () => {
-  const admin = await loginAsAdmin();
-  await activateTuesday(admin);
-  const classId = await classSchedule.createClass({ day: 'tuesday', hourPosition: 1, className: 'Tuesday Archive Class' });
-  await classSchedule.archiveClasses([classId]);
-
-  const csv = await request(app).get('/admin/class-schedule/archive/export.csv').set('Cookie', admin.cookie);
-  assert.equal(csv.status, 200);
-  assert.match(csv.text, /Tuesday Archive Class/);
-  const row = csv.text.split('\n').find((l) => l.includes('Tuesday Archive Class'));
-  assert.match(row, /^"?Tuesday"?,/, 'the Day column should read "Tuesday" (title case), not the raw lowercase day value');
 });
 
 test('a Tuesday Playground roster is named "Playground - Tuesday ...", not "Playground - undefined ..."', async () => {

@@ -60,14 +60,10 @@ async function datesForList(listId) {
   ).map((r) => r.session_date);
 }
 
-// A real request: "choose date drop down should show all of the dates so
-// far until you click an archive button for each date" - a date used to
-// fall off the manage page's own dropdown (and into the read-only
-// Archive tab) automatically the moment it was no longer today or later.
-// Now that's an explicit admin action (archiveDate below) instead of
-// something session_date vs. today derives on its own, so an admin can
-// still open and fix an already-past date from the manage page until
-// they're actually done with it.
+// The Archive tab/button (and the admin action that set archived_at)
+// have since been removed - nothing sets archived_at anymore, but any
+// date an admin archived back when that feature existed stays excluded
+// here rather than silently reappearing on the manage page's dropdown.
 async function activeDatesForList(listId) {
   return (
     await db
@@ -76,25 +72,15 @@ async function activeDatesForList(listId) {
   ).map((r) => r.session_date);
 }
 
-// The Archive tab's own date list - most recently archived first, same
-// ordering the old date < today filter's own .reverse() produced.
+// Still used by the manage page to keep any already-archived date out of
+// its own dropdown (see activeDatesForList above) - the Archive tab that
+// used to list these for review/restore is gone.
 async function archivedDatesForList(listId) {
   return (
     await db
       .prepare('SELECT session_date FROM volunteer_dates WHERE volunteer_list_id = ? AND archived_at IS NOT NULL ORDER BY session_date DESC')
       .all(listId)
   ).map((r) => r.session_date);
-}
-
-async function archiveDate(listId, date) {
-  await db.prepare('UPDATE volunteer_dates SET archived_at = ? WHERE volunteer_list_id = ? AND session_date = ?').run(new Date().toISOString(), listId, date);
-}
-
-// A misclicked Archive shouldn't be a dead end - the Archive tab's own
-// per-row Restore button (routes/admin-volunteers.js's own /unarchive)
-// uses this to put a date back on the manage page's dropdown.
-async function unarchiveDate(listId, date) {
-  await db.prepare('UPDATE volunteer_dates SET archived_at = NULL WHERE volunteer_list_id = ? AND session_date = ?').run(listId, date);
 }
 
 const RANKS = ['first', 'sometimes', 'backup'];
@@ -266,8 +252,6 @@ module.exports = {
   datesForList,
   activeDatesForList,
   archivedDatesForList,
-  archiveDate,
-  unarchiveDate,
   membersForList,
   setMemberRank,
   membersForSection,

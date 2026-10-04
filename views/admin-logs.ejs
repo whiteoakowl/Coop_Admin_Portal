@@ -11,7 +11,7 @@
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Co-op Check-In/Out Log' : tab === 'classcheckinout' ? 'Class Check-In/Out Log' : tab === 'classrisk' ? 'Class Cancellation Risk' : tab === 'substitutes' ? 'Substitutes Needed' : tab === 'allergies' ? 'Allergies/Medical Log' : 'Name Tag Requests' %></p>
+        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Co-op Check-In/Out Log' : tab === 'classcheckinout' ? 'Class Check-In/Out Log' : tab === 'classrisk' ? 'Class Cancellation Risk' : tab === 'substitutes' ? 'Substitutes Needed' : tab === 'allergies' ? 'Allergies/Medical Log' : tab === 'classregistration' ? 'Class Registration Log' : 'Name Tag Requests' %></p>
       </div>
     </div>
     <h1>Logs</h1>
@@ -20,11 +20,86 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <%# Absence/Check-In-Out/Name Tag Requests/Class Risk/Substitutes/
-        Allergies now live as subpages under the orange bar's own Logs
-        item (views/partials/admin-nav.ejs) instead of a trigger+dialog
-        here. %>
+        Allergies/Class Registration now live as subpages under the
+        orange bar's own Logs item (views/partials/admin-nav.ejs) instead
+        of a trigger+dialog here. %>
     <div class="view-tab-panel">
-      <% if (tab === 'absence') { %>
+      <% if (tab === 'classregistration') { %>
+        <div class="roster-toolbar no-print">
+          <%# Same "calendar bar" date filter as the Absence tab - see its
+              own comment just below for why (auto-submitting on change,
+              same dashboard-date-picker pattern). %>
+          <form method="GET" action="/admin/logs" class="dashboard-date-picker">
+            <input type="hidden" name="tab" value="classregistration" />
+            <svg class="icon"><use href="#icon-calendar-check"/></svg>
+            <span class="dashboard-date-picker-label"><%= dateFilterLabel %></span>
+            <svg class="icon"><use href="#icon-chevron-down"/></svg>
+            <input type="date" name="date" value="<%= dateFilter %>" aria-label="Filter by date" onchange="this.form.requestSubmit()" />
+          </form>
+          <% if (dateFilter) { %><a class="roster-action-btn" href="/admin/logs?tab=classregistration">Clear</a><% } %>
+          <div class="roster-btn-row">
+            <a class="roster-action-btn file-action-btn" href="/admin/logs/classregistration/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
+            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+          </div>
+        </div>
+
+        <%# A real request: "add a class registration tab organized chart
+            by day and family, families grouped together under a
+            particular date" - same family-then-date accordion the
+            Absence Log already uses (routes/admin-logs.js's own
+            groupAbsenceSubmissionsByFamilyAndDate, reused as-is here
+            since the grouping key lines up exactly), just with Class/Day
+            in place of Roster/Reason as each member row's own detail
+            columns. %>
+        <% if (familyGroups.length === 0) { %>
+          <p class="roster-empty no-print">No class registrations<%= dateFilter ? ' for this date' : ' yet' %>.</p>
+        <% } else { %>
+          <div class="absence-family-groups no-print">
+            <% familyGroups.forEach(function(g, i) { %>
+              <div class="absence-family-group">
+                <button type="button" class="absence-family-toggle" aria-expanded="false" aria-controls="classreg-family-<%= i %>">
+                  <span class="absence-family-name"><%= g.familyName %></span>
+                  <span class="absence-family-date"><%= g.dateLabel %></span>
+                  <span class="absence-family-count"><%= g.members.length %> registration<%= g.members.length === 1 ? '' : 's' %></span>
+                  <svg class="icon absence-family-chevron"><use href="#icon-chevron-down"/></svg>
+                </button>
+                <div class="absence-family-members" id="classreg-family-<%= i %>" hidden>
+                  <% g.members.forEach(function(r) { %>
+                    <div class="absence-member-row">
+                      <span class="absence-member-name"><%= r.memberName %></span>
+                      <span class="status-badge <%= r.statusLabel === 'Cancelled' ? 'status-badge-absent' : r.statusLabel === 'Waitlisted' ? 'status-badge-late' : 'status-badge-present' %>"><%= r.statusLabel %></span>
+                      <span class="absence-member-detail"><%= r.className %></span>
+                      <span class="absence-member-detail"><%= r.classDayLabel %></span>
+                    </div>
+                  <% }); %>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+
+        <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref }) %>
+
+        <table class="roster-table members-table condensed-table logs-print-table">
+          <thead>
+            <tr><th>Name</th><th>Class</th><th>Day</th><th>Date</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <% if (allSubmissions.length === 0) { %>
+              <tr><td colspan="5" class="roster-empty">No class registrations<%= dateFilter ? ' for this date' : ' yet' %>.</td></tr>
+            <% } %>
+            <% allSubmissions.forEach(function(r) { %>
+              <tr>
+                <td><%= r.memberName %></td>
+                <td><%= r.className %></td>
+                <td><%= r.classDayLabel %></td>
+                <td><%= r.dateLabel %></td>
+                <td><span class="status-badge <%= r.statusLabel === 'Cancelled' ? 'status-badge-absent' : r.statusLabel === 'Waitlisted' ? 'status-badge-late' : 'status-badge-present' %>"><%= r.statusLabel %></span></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } else if (tab === 'absence') { %>
         <div class="roster-toolbar no-print">
           <%# A real request, with a reference design: a "calendar bar"
               date filter instead of a plain dropdown of only-dates-with-
@@ -335,7 +410,7 @@
       <% } %>
     </div>
   </main>
-  <% if (tab === 'absence') { %>
+  <% if (tab === 'absence' || tab === 'classregistration') { %>
     <script src="/js/absence-log-accordion.js"></script>
   <% } %>
 </body>

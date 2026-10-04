@@ -193,6 +193,35 @@
             <button type="submit" class="primary-btn member-form-full">Save Changes</button>
           </form>
         </div>
+
+        <%# A real request: "Individual class editing. Add a duplicate
+            class button at the bottom." Opens a popup asking whether to
+            also copy the current teachers/assistants and which semester/
+            day grid to add the copy to - see the matching POST route's
+            own comment in routes/admin-class-schedule.js for exactly
+            what gets copied (every Details/Slots/Sections field; never
+            the roster/enrollment). %>
+        <div class="manage-section no-print">
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('duplicate-class-dialog').showModal()">Duplicate Class</button>
+        </div>
+
+        <dialog id="duplicate-class-dialog" class="member-picker-dialog">
+          <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/duplicate">
+            <h3>Duplicate Class</h3>
+            <label class="checkbox-option"><input type="checkbox" name="copyStaff" value="1" /> Also copy the same teachers and class assistants</label>
+            <label>Add the duplicate to
+              <select name="targetComboId" required>
+                <% combos.forEach(function(combo) { %>
+                  <option value="<%= combo.id %>"><%= combo.label %></option>
+                <% }); %>
+              </select>
+            </label>
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Duplicate</button>
+            </div>
+          </form>
+        </dialog>
     <% } else if (activeTab === 'staffRoster') { %>
       <div class="class-manage-roster-col">
         <%# A real request: "# of students, # of teachers, # of class

@@ -12,16 +12,6 @@
     <div class="event-wizard-header">
       <div>
         <h1>Create New Event</h1>
-        <p class="hint">Fill in the details below to create your event.</p>
-      </div>
-      <%# A real request: "After creating an event you can click create
-          draft only, no immediate publishing. Then you can go in and use
-          the full editing features." Publish now only happens from the
-          per-event builder's own toolbar (routes/admin-events.js's
-          already-existing POST /:id/status), once there's a real event to
-          review first. %>
-      <div class="event-wizard-header-actions">
-        <button type="submit" form="event-wizard-form" name="status" value="draft" class="primary-btn">Create Draft</button>
       </div>
     </div>
 
@@ -186,7 +176,7 @@
             event creation... Then you can go in and use the full editing
             features") - the per-event builder's own Settings/Finance/
             Volunteers tabs are the only place any of this is ever set. %>
-        <p class="hint">Creating the draft below takes you to this event's full editor, where Settings (including Permissions and Who Can Register), Finance (including Ticket Types), Attendance, and Volunteers/Donations/Food/Extra Fields are all ready to fill in - and where you can publish it when it's ready.</p>
+        <p class="hint">After you save the event draft you will be able to edit the event to add ticket pricing, volunteer roles, food signups, donation signups and general settings. The event will not appear on the event calendar and be open for registration until you publish the event draft.</p>
 
         <%# A real request: "Save/continue and cancel buttons should be the
             same height and font size" - both are now plain siblings in

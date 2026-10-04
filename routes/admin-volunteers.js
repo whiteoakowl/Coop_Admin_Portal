@@ -29,8 +29,6 @@ const {
   datesForList,
   activeDatesForList,
   archivedDatesForList,
-  archiveDate,
-  unarchiveDate,
   membersForSection,
   setSectionRank,
   removeMemberFromSection,
@@ -40,8 +38,6 @@ const {
   substituteBoard,
   assignedHourCountsForDate,
   jobAssignmentGrid,
-  dailyAssignmentCardsWithLabels,
-  archivedDateSummaries,
   groupedPermanentJobsForDay,
   groupedTemporaryJobsForDayDate,
 } = require('../utils/substitutes');
@@ -181,16 +177,13 @@ router.get('/volunteers/:day/manage', requireAdmin, requireClassDay, async (req,
   // One date now drives the whole page - each hour's floater chart and
   // its "needs a substitute" list are two columns of the same section,
   // so they always describe the same session rather than two
-  // independently picked dates. A real request: "choose date drop down
-  // should show all of the dates so far until you click an archive
-  // button for each date" - a date used to fall off this list (and onto
-  // the read-only Archive tab) automatically once it was no longer today
-  // or later; now that's an explicit per-date action (see the Edit Dates
-  // dialog's own Archive button below), so an admin can still open and
-  // fix an already-past date here until they're actually done with it.
-  // Defaults to the nearest still-upcoming date so the page isn't blank
-  // on first load; falls back to the most recent active date if every
-  // active date has already passed.
+  // independently picked dates. archivedSet only ever holds dates an
+  // admin archived back when that feature existed (the Archive tab/
+  // button have since been removed - nothing archives a date anymore,
+  // but any already-archived date stays excluded here rather than
+  // silently reappearing). Defaults to the nearest still-upcoming date
+  // so the page isn't blank on first load; falls back to the most
+  // recent active date if every active date has already passed.
   const activeDates = dates.filter((d) => !archivedSet.has(d));
   const upcomingActiveDates = activeDates.filter((d) => d >= today);
   const defaultDate = upcomingActiveDates[0] || activeDates[activeDates.length - 1] || null;
@@ -224,7 +217,7 @@ router.get('/volunteers/:day/manage', requireAdmin, requireClassDay, async (req,
     selectedComboId: findComboId(combos, day, list.semester_id),
     semesterId: qsSemester(list.semester_id),
     hours,
-    dates: dates.map((d, i) => ({ date: d, label: dateLabels[i], archived: archivedSet.has(d) })),
+    dates: dates.map((d, i) => ({ date: d, label: dateLabels[i] })),
     dateLabels,
     activeDates: activeDates.map((d) => ({ date: d, label: formatDateLong(d) })),
     selectedDate,
@@ -288,35 +281,6 @@ router.post('/volunteers/:day/dates/:date/remove', requireAdmin, requireClassDay
   res.redirect(manageUrl(day, { notice: `Removed ${formatDateLabel(date)}.`, dialog: dialogParam(req), semesterId: qsSemester(semesterId) }));
 });
 
-// A real request: "choose date drop down should show all of the dates so
-// far until you click an archive button for each date" - the Edit Dates
-// dialog's own per-date Archive button (distinct from Remove, which
-// deletes the date and its job assignments outright: archiving just
-// moves it off this page's Choose Date dropdown and onto the read-only
-// Archive tab, keeping everything intact).
-router.post('/volunteers/:day/dates/:date/archive', requireAdmin, requireClassDay, async (req, res) => {
-  const day = req.params.day;
-  const semesterId = comboSemesterId(req);
-  const list = await getListByDay(day, semesterId);
-  if (!list) return res.redirect(manageUrl(day, { error: 'Floater list not found.', semesterId: qsSemester(semesterId) }));
-  const date = req.params.date;
-  await archiveDate(list.id, date);
-  res.redirect(manageUrl(day, { notice: `Archived ${formatDateLabel(date)}.`, dialog: dialogParam(req), semesterId: qsSemester(semesterId) }));
-});
-
-// The Archive tab's own per-row Restore button - undoes an archive
-// without touching the date's own job assignments, in case it was
-// archived by mistake.
-router.post('/volunteers/:day/archive/:date/unarchive', requireAdmin, requireClassDay, async (req, res) => {
-  const day = req.params.day;
-  const semesterId = comboSemesterId(req);
-  const list = await getListByDay(day, semesterId);
-  if (!list) return res.redirect(appendSemester(`/admin/volunteers/${day}/archive?error=${encodeURIComponent('Floater list not found.')}`, semesterId));
-  const date = req.params.date;
-  await unarchiveDate(list.id, date);
-  res.redirect(appendSemester(`/admin/volunteers/${day}/archive?notice=${encodeURIComponent(`Restored ${formatDateLabel(date)}.`)}`, semesterId));
-});
-
 router.get('/volunteers/:day/export.csv', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day, comboSemesterId(req));
@@ -340,95 +304,6 @@ router.get('/volunteers/:day/export.csv', requireAdmin, requireClassDay, async (
   });
 
   sendCsv(res, `${day}-floater-assignments.csv`, lines);
-});
-
-// --- Floater Archive: past session dates' assignment cards, read-only ---
-
-// A date only counts as "archived" once an admin has explicitly archived
-// it (see the Edit Dates dialog's own Archive button) - guards the three
-// routes below from a tampered/stale date in the URL surfacing a
-// still-active (still-editable-via-Substitutes-Needed) date under the
-// read-only Archive routes.
-async function loadArchivedDate(day, date, semesterId) {
-  if (!isValidISODate(date)) return false;
-  const list = await getListByDay(day, semesterId);
-  if (!list) return false;
-  return (await archivedDatesForList(list.id)).includes(date);
-}
-
-router.get('/volunteers/:day/archive', requireAdmin, requireClassDay, async (req, res) => {
-  const day = req.params.day;
-  const semesterId = comboSemesterId(req);
-  const list = await getListByDay(day, semesterId);
-  if (!list) return res.status(404).render('404', { title: 'Not Found' });
-  const archivedDates = await archivedDatesForList(list.id);
-
-  const dateFilter = archivedDates.includes(req.query.date) ? req.query.date : null;
-  const rows = await archivedDateSummaries(day, dateFilter ? [dateFilter] : archivedDates);
-  const combos = await listScheduleCombos();
-
-  res.render('admin-volunteer-archive', {
-    title: `${DAY_LABELS[day]} Floater Archive`,
-    tab: 'floater',
-    day,
-    dayLabel: DAY_LABELS[day],
-    activeDays: await listActiveClassDays(),
-    dayLabels: DAY_LABELS,
-    combos,
-    selectedComboId: findComboId(combos, day, list.semester_id),
-    semesterId: qsSemester(list.semester_id),
-    dateOptions: archivedDates.map((d) => ({ date: d, label: formatDateLong(d) })),
-    dateFilter,
-    rows: rows.map((r) => ({ ...r, label: formatDateLong(r.date) })),
-    error: req.query.error || null,
-    notice: req.query.notice || null,
-  });
-});
-
-router.get('/volunteers/:day/archive/:date/view-fragment', requireAdmin, requireClassDay, async (req, res) => {
-  const day = req.params.day;
-  const date = req.params.date;
-  const semesterId = comboSemesterId(req);
-  if (!(await loadArchivedDate(day, date, semesterId))) return res.status(404).send('Not found');
-
-  res.render('volunteer-archive-view-fragment', {
-    day,
-    dayLabel: DAY_LABELS[day],
-    date,
-    dateLabel: formatDateLong(date),
-    semesterId: qsSemester(semesterId === undefined ? null : semesterId),
-    cards: await dailyAssignmentCardsWithLabels(day, date),
-  });
-});
-
-router.get('/volunteers/:day/archive/:date/print', requireAdmin, requireClassDay, async (req, res) => {
-  const day = req.params.day;
-  const date = req.params.date;
-  if (!(await loadArchivedDate(day, date, comboSemesterId(req)))) return res.status(404).send('Not found');
-
-  res.render('volunteer-archive-print', {
-    title: `${DAY_LABELS[day]} Floater Assignments — ${formatDateLong(date)}`,
-    dayLabel: DAY_LABELS[day],
-    date,
-    dateLabel: formatDateLong(date),
-    cards: await dailyAssignmentCardsWithLabels(day, date),
-  });
-});
-
-router.get('/volunteers/:day/archive/:date/export.csv', requireAdmin, requireClassDay, async (req, res) => {
-  const day = req.params.day;
-  const date = req.params.date;
-  if (!(await loadArchivedDate(day, date, comboSemesterId(req)))) return res.status(404).send('Not found');
-
-  const cards = await dailyAssignmentCardsWithLabels(day, date);
-  const lines = [toCsvRow(['Hour', 'Position', 'Room', 'Floater Assigned'])];
-  cards.forEach((hour) => {
-    hour.jobs.forEach((job) => {
-      lines.push(toCsvRow([hour.label, job.title, job.room || '', job.assigned ? job.assigned.name : 'Unassigned']));
-    });
-  });
-
-  sendCsv(res, `${day}-floater-assignments-${date}.csv`, lines);
 });
 
 // --- Class Cancellation Risk: same list as the Logs tab, surfaced right
@@ -458,7 +333,7 @@ router.get('/volunteers/:day/risk', requireAdmin, requireClassDay, async (req, r
     // uses today (not yet converted to a real per-semester query - a
     // separate, bigger change tracked for the Classes grid's own picker
     // pass). The combo picker here is for navigation consistency with its
-    // Floater Assignments/Teams/Archive siblings; it doesn't yet change
+    // Floater Assignments/Teams siblings; it doesn't yet change
     // which classes this one list considers at risk.
     selectedComboId: findComboId(combos, day, resolvedSemesterId),
     classesAtRisk: await classesAtRiskForDay(day, alertDate),

@@ -81,7 +81,7 @@ async function createFamilyWithEnrolledStudent(day, overrides) {
   return { familyId, parentId, studentId, classId };
 }
 
-test('Co-op Admin nav: Orientation item with Tour Check-In / Orientation Check-In subpages', async () => {
+test('Co-op Admin nav: Orientation item with Tour Check-In / Open House Check-In subpages', async () => {
   const admin = await loginAsAdmin();
   const navPage = await request(app).get('/admin/orientation').set('Cookie', admin.cookie);
   assert.match(navPage.text, /href="\/admin\/orientation"/);
@@ -124,9 +124,10 @@ test('Orientation list: one row per family (deduped across siblings), with a wor
     .send({ _csrf: admin.csrfToken, field: 'video', value: '1' });
   assert.equal(toggleOn.status, 200);
   const afterOn = await request(app).get('/admin/orientation').set('Cookie', admin.cookie);
-  // 1 of 5 fields complete now that Open House is a 5th column (a real
-  // request: "add a column for open house").
-  assert.match(afterOn.text, />20%</);
+  // 1 of 4 fields complete (video, teacherTraining, tour, openHouse - the
+  // Meet Up column was removed per a real request: "Delete orientation
+  // Meet-up column").
+  assert.match(afterOn.text, />25%</);
 
   const toggleOff = await request(app)
     .post(`/admin/orientation/${parentId}/toggle`)
@@ -208,7 +209,7 @@ test('Tour Check-In subpage: purple Check In button, Copy Link, shows every regi
 // right." public/css/styles.css's own .orientation-checkin-btn-row rules
 // are what deliver that layout - this just locks in the markup contract
 // those rules are scoped to, on both check-in subpages.
-test('Tour Check-In and Orientation Check-In toolbars carry the orientation-checkin-btn-row class their mobile/desktop layout CSS is scoped to', async () => {
+test('Tour Check-In and Open House Check-In toolbars carry the orientation-checkin-btn-row class their mobile/desktop layout CSS is scoped to', async () => {
   const admin = await loginAsAdmin();
   for (const url of ['/admin/orientation/tour-checkin', '/admin/orientation/orientation-checkin']) {
     const page = await request(app).get(url).set('Cookie', admin.cookie);
@@ -233,8 +234,9 @@ test('Orientation list: relabeled columns, a new Open House toggle, a Date Compl
   assert.match(page.text, /<th class="orientation-col-center">\s*Open<br>House\s*<\/th>/);
   assert.match(page.text, /<th class="orientation-col-center">%<br>Complete<\/th>/);
   assert.match(page.text, /<th class="orientation-col-center">Date<br>Completed<\/th>/);
-  // "Orientation Meet Up" is 3 words, so it must NOT be stacked.
-  assert.match(page.text, /Orientation Meet Up/);
+  // The Meet Up column was removed per a real request: "Delete
+  // orientation Meet-up column".
+  assert.doesNotMatch(page.text, /Orientation Meet Up/);
   assert.doesNotMatch(page.text, />Orientation Video</);
   assert.doesNotMatch(page.text, />Teacher Training</);
 
@@ -249,10 +251,11 @@ test('Orientation list: relabeled columns, a new Open House toggle, a Date Compl
   assert.equal(Number(row.open_house_complete), 1);
 
   const afterOn = await request(app).get('/admin/orientation').set('Cookie', admin.cookie);
-  assert.match(afterOn.text, />20%</);
+  // 1 of 4 fields complete now that Meet Up is gone (video, teacherTraining, tour, openHouse).
+  assert.match(afterOn.text, />25%</);
   assert.match(afterOn.text, /data-field="openHouse"\s+data-complete="1"/);
   // Not every field is complete yet, so Date Completed stays blank.
-  assert.match(afterOn.text, /20%<\/td>\s*<td>—<\/td>/);
+  assert.match(afterOn.text, /25%<\/td>\s*<td>—<\/td>/);
 });
 
 test('Date Completed shows the latest completion date once every circle is checked', async () => {
@@ -270,9 +273,13 @@ test('Date Completed shows the latest completion date once every circle is check
   assert.match(page.text, />100%<\/td>\s*<td>\d{4}-\d{2}-\d{2}/);
 });
 
-test('Orientation Check-In subpage marks meetup_complete, independently of the Tour Check-In page', async () => {
+// A real request: "Delete orientation Meet-up column", with "Orientation
+// check in should be linked to open house column" - the subpage keeps
+// its name but now checks in Open House instead of the removed Meet Up
+// field.
+test('Open House Check-In subpage marks open_house_complete, independently of the Tour Check-In page', async () => {
   const admin = await loginAsAdmin();
-  const { parentId } = await createFamilyWithEnrolledStudent('monday', { parentName: 'Meetup Parent' });
+  const { parentId } = await createFamilyWithEnrolledStudent('monday', { parentName: 'Open House Checkin Parent' });
 
   const page = await request(app).get('/admin/orientation/orientation-checkin').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
@@ -287,8 +294,8 @@ test('Orientation Check-In subpage marks meetup_complete, independently of the T
     .send({ _csrf: csrf, semesterId: '', members: [`${parentId}`] });
   assert.equal(checkin.status, 302);
 
-  const row = await db.prepare('SELECT meetup_complete, tour_complete FROM orientation_progress WHERE member_id = ?').get(parentId);
-  assert.equal(Number(row.meetup_complete), 1);
+  const row = await db.prepare('SELECT open_house_complete, tour_complete FROM orientation_progress WHERE member_id = ?').get(parentId);
+  assert.equal(Number(row.open_house_complete), 1);
   assert.equal(Number(row.tour_complete), 0);
 });
 
@@ -341,9 +348,12 @@ test('Semester dropdown scopes the list to only classes assigned to that semeste
 // A real request: "Add button for orientation settings to Link training
 // or check in with each circle check mark column so the information can
 // be linked."
-test('Orientation Settings: saving a link makes that column header a hyperlink on the main list', async () => {
+test('Orientation Settings: linking a Training to a column makes that column header a hyperlink to it on the main list', async () => {
   const admin = await loginAsAdmin();
   await createFamilyWithEnrolledStudent('monday', { parentName: 'Link Header Parent' });
+
+  const { createTraining } = require('../utils/training');
+  const trainingId = await createTraining({ title: 'Parent Orientation Video', passingScore: 80 });
 
   const settingsPage = await request(app).get('/admin/orientation/settings').set('Cookie', admin.cookie);
   assert.equal(settingsPage.status, 200);
@@ -353,17 +363,17 @@ test('Orientation Settings: saving a link makes that column header a hyperlink o
     .post('/admin/orientation/settings')
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ _csrf: csrf, video: 'https://example.com/parent-orientation-video', meetup: '', teacherTraining: '', tour: '', openHouse: '' });
+    .send({ _csrf: csrf, videoTrainingId: String(trainingId) });
 
   const listPage = await request(app).get('/admin/orientation').set('Cookie', admin.cookie);
-  assert.match(listPage.text, /<a href="https:\/\/example\.com\/parent-orientation-video" target="_blank" rel="noopener">\s*Parent<br>Orientation\s*<\/a>/);
+  assert.match(listPage.text, new RegExp(`<a href="/admin/training/${trainingId}/builder">\\s*Parent<br>Orientation\\s*</a>`));
 
-  // Clearing the field removes the link again.
+  // Clearing the dropdown removes the link again.
   await request(app)
     .post('/admin/orientation/settings')
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ _csrf: csrf, video: '', meetup: '', teacherTraining: '', tour: '', openHouse: '' });
+    .send({ _csrf: csrf, videoTrainingId: '' });
   const afterClear = await request(app).get('/admin/orientation').set('Cookie', admin.cookie);
-  assert.doesNotMatch(afterClear.text, /<a href="https:\/\/example\.com\/parent-orientation-video"/);
+  assert.doesNotMatch(afterClear.text, new RegExp(`<a href="/admin/training/${trainingId}/builder"`));
 });

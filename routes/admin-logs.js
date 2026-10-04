@@ -11,7 +11,7 @@ const { substituteBoard } = require('../utils/substitutes');
 const { membersWithMedicalNotes, lastNameOf } = require('../utils/members');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
-const LOG_TABS = ['absence', 'checkinout', 'classcheckinout', 'nametag', 'classrisk', 'substitutes', 'allergies'];
+const LOG_TABS = ['absence', 'checkinout', 'classcheckinout', 'nametag', 'classrisk', 'substitutes', 'allergies', 'classregistration'];
 
 function todayIfSessionDay(day) {
   const today = todayISO();
@@ -113,6 +113,60 @@ async function absenceSubmissionDates() {
     .prepare(`SELECT DISTINCT session_date FROM absence_submissions ORDER BY session_date DESC`)
     .all())
     .map((r) => ({ date: r.session_date, label: formatDateLabel(r.session_date) }));
+}
+
+// A real request: "Under logs tab add a class registration tab organized
+// chart by day and family, families grouped together under a particular
+// date." One row per class_registrations entry (the audit trail of every
+// register/waitlist/cancel action - not class_enrollments, which only
+// ever reflects CURRENT enrollment and would silently drop a since-
+// cancelled registration from the log). `date` is the calendar day the
+// registration action happened (created_at's own date half), the same
+// "group by family, then by day" shape groupAbsenceSubmissionsByFamilyAndDate
+// already builds for the Absence Log - reused as-is below rather than
+// duplicating it, since the grouping key (familyId/familyName/memberName/
+// date/dateLabel) lines up exactly.
+async function allClassRegistrations(dateFilter) {
+  let sql = `SELECT m.name AS "memberName", m.family_id AS "familyId", f.name AS "familyName",
+             c.class_name AS "className", c.day AS "classDay",
+             cr.status AS status, cr.created_at AS "createdAt"
+             FROM class_registrations cr
+             JOIN members m ON m.id = cr.student_id
+             LEFT JOIN families f ON f.id = m.family_id
+             JOIN classes c ON c.id = cr.class_id`;
+  const params = [];
+  if (dateFilter) {
+    sql += ` WHERE substr(cr.created_at, 1, 10) = ?`;
+    params.push(dateFilter);
+  }
+  sql += ' ORDER BY cr.created_at DESC';
+
+  return (await db
+    .prepare(sql)
+    .all(...params))
+    .map((r) => ({
+      memberName: r.memberName,
+      familyId: r.familyId,
+      familyName: r.familyName,
+      className: r.className,
+      classDayLabel: CLASS_DAY_LABELS_FULL[r.classDay] || r.classDay,
+      date: r.createdAt.slice(0, 10),
+      dateLabel: formatDateLabel(r.createdAt.slice(0, 10)),
+      statusLabel: r.status === 'waitlisted' ? 'Waitlisted' : r.status === 'cancelled' ? 'Cancelled' : 'Confirmed',
+    }))
+    .sort(
+      (a, b) =>
+        b.date.localeCompare(a.date) ||
+        lastNameOf(a.memberName).localeCompare(lastNameOf(b.memberName), undefined, { sensitivity: 'base' }) ||
+        a.memberName.localeCompare(b.memberName, undefined, { sensitivity: 'base' })
+    );
+}
+
+async function classRegistrationDates() {
+  return (await db
+    .prepare(`SELECT DISTINCT substr(created_at, 1, 10) AS date FROM class_registrations ORDER BY date DESC`)
+    .all())
+    .map((r) => ({ date: r.date, label: formatDateLabel(r.date) }));
 }
 
 // A real bug report: "There should be a seperate log for Class Check
@@ -298,6 +352,27 @@ router.get('/logs', requireAdmin, async (req, res) => {
     });
   }
 
+  if (tab === 'classregistration') {
+    const allRegistrations = await allClassRegistrations(dateFilter);
+    const allFamilyGroups = groupAbsenceSubmissionsByFamilyAndDate(allRegistrations);
+    const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+    const pagination = paginate(allFamilyGroups, parsePage(req.query.page), pageSize);
+    return res.render('admin-logs', {
+      title: 'Class Registration Log',
+      tab,
+      familyGroups: pagination.items,
+      allSubmissions: allRegistrations,
+      pagination,
+      viewingAll: pageSize === Infinity,
+      baseHref: `/admin/logs?tab=classregistration${dateFilter ? `&date=${encodeURIComponent(dateFilter)}` : ''}&`,
+      dates: await classRegistrationDates(),
+      dateFilter,
+      dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
+      error: req.query.error || null,
+      notice: req.query.notice || null,
+    });
+  }
+
   const allSubmissions = await allAbsenceSubmissions(dateFilter);
   const allFamilyGroups = groupAbsenceSubmissionsByFamilyAndDate(allSubmissions);
   const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
@@ -347,6 +422,16 @@ router.get('/logs/absence/export.csv', requireAdmin, async (req, res) => {
     ...submissions.map((s) => toCsvRow([s.memberName, s.rosterName, s.dateLabel, s.statusLabel, s.reasonLabel, s.description || ''])),
   ];
   sendCsv(res, 'absence-late-log.csv', lines);
+});
+
+router.get('/logs/classregistration/export.csv', requireAdmin, async (req, res) => {
+  const dateFilter = req.query.date || '';
+  const registrations = await allClassRegistrations(dateFilter);
+  const lines = [
+    toCsvRow(['Name', 'Class', 'Day', 'Date', 'Status']),
+    ...registrations.map((r) => toCsvRow([r.memberName, r.className, r.classDayLabel, r.dateLabel, r.statusLabel])),
+  ];
+  sendCsv(res, 'class-registration-log.csv', lines);
 });
 
 router.get('/logs/checkinout/export.csv', requireAdmin, async (req, res) => {

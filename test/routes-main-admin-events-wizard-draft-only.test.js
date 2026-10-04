@@ -187,3 +187,22 @@ test('A newly created draft can still be published afterward from the real build
 
   assert.equal((await db.prepare('SELECT status FROM events WHERE id = ?').get(eventId)).status, 'published');
 });
+
+// A real request: "Create draft button should only be at the bottom. No
+// description at the top. Bottom description says the following..." -
+// the page used to have a second Create Draft button in its own header
+// (tied to the form via form="event-wizard-form") plus a "Fill in the
+// details below to create your event" blurb next to it.
+test('Create Event page: only one Create Draft button (at the bottom), no top description, and the bottom hint reads the exact requested text', async () => {
+  const admin = await loginAsMainAdmin();
+  const res = await request(app).get('/main-admin/events/new').set('Cookie', admin.cookie);
+  assert.equal(res.status, 200);
+
+  const createDraftMatches = res.text.match(/>Create Draft</g) || [];
+  assert.equal(createDraftMatches.length, 1, 'expected exactly one Create Draft button, not a duplicate in the header');
+  assert.doesNotMatch(res.text, /Fill in the details below to create your event/);
+  assert.match(
+    res.text,
+    /After you save the event draft you will be able to edit the event to add ticket pricing, volunteer roles, food signups, donation signups and general settings\. The event will not appear on the event calendar and be open for registration until you publish the event draft\./
+  );
+});

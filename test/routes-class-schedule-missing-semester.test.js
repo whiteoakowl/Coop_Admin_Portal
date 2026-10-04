@@ -69,15 +69,15 @@ test('a brand new class defaults to the most-recently-created semester, and clas
   const laterClassId = await createClass({ day: 'wednesday', hourPosition: 2, className: 'Created After Fall 2026 Existed' });
   assert.equal((await getClass(laterClassId)).semester_id, fall2026.id);
 
-  // The Settings tab should surface the still-unassigned class (and the
-  // always-seeded Monday/Wednesday Day Settings records, which also start
-  // out with no semester - see utils/semesterAssignment.js) and offer a
-  // one-click fix.
+  // The "Data Missing a Semester" UI section was removed (a real
+  // request: "everything is connected to semesters now, remove it") -
+  // the Settings > Semester tab no longer surfaces it at all.
   const settings = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
-  assert.match(settings.text, /Data Missing a Semester/);
-  assert.match(settings.text, /1 class with no semester assigned/);
-  assert.match(settings.text, /2 Day Settings records with no semester assigned/);
+  assert.doesNotMatch(settings.text, /Data Missing a Semester/);
 
+  // The underlying bulk-assign route is still reachable directly (no UI
+  // entry point left, but nothing about the capability itself was asked
+  // to go away) - still correctly tags a pre-existing unassigned class.
   await request(app)
     .post('/admin/schedule/semesters/assign-missing')
     .set('Cookie', admin.cookie)
@@ -85,15 +85,12 @@ test('a brand new class defaults to the most-recently-created semester, and clas
     .send({ semesterId: String(fall2026.id), _csrf: admin.csrfToken });
 
   assert.equal((await getClass(earlyClassId)).semester_id, fall2026.id, 'the previously-unassigned class should now be tagged Fall 2026');
-
-  const settingsAfter = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
-  assert.doesNotMatch(settingsAfter.text, /Data Missing a Semester/, 'the bulk-assign section should disappear once nothing is missing a semester');
 });
 
-test('the Monday/Wednesday Classes page also has an Add/Edit Semester button that opens the same semester manager', async () => {
+test('the Monday/Wednesday Classes page no longer has an Add/Edit Semester button (that setting now lives only under Settings > Semester)', async () => {
   const admin = await loginAsAdmin();
   const page = await request(app).get('/admin/schedule?tab=monday').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /Add\/Edit Semester/);
-  assert.match(page.text, /id="semester-manager-dialog-monday"/);
+  assert.doesNotMatch(page.text, /Add\/Edit Semester/);
+  assert.doesNotMatch(page.text, /id="semester-manager-dialog-monday"/);
 });

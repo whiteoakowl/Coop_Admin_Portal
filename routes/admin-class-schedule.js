@@ -60,12 +60,9 @@ const {
   CLASS_IMAGES_BUCKET,
   setClassSemester,
   listSemesters,
+  listScheduleCombos,
   updateClassSlots,
   deleteClass,
-  archiveClasses,
-  listClassArchives,
-  deleteClassArchive,
-  deleteAllClassArchives,
   setEnrollment,
   addStaff,
   removeStaff,
@@ -434,6 +431,11 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, r
     classImageUrl: classImageUrl(cls.image_key),
     assignments,
     chatMessages,
+    // Duplicate Class dialog's own "which semester/day" dropdown (a real
+    // request) - every class_schedules combo this class could be copied
+    // onto, including the one it's already on (duplicating onto the
+    // exact same grid is allowed, same as any other target).
+    combos: await listScheduleCombos(),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -845,53 +847,80 @@ router.post('/class-schedule/classes/:id/delete', requireFullAdmin, async (req, 
   res.redirect(`/admin/class-schedule/${cls.day}?notice=` + encodeURIComponent(`Deleted "${cls.class_name}".`));
 });
 
-// Archives the checked classes (checkboxes on the day's own grid, or its
-// "Select All") - e.g. clearing a day before re-running Import Classes
-// on a corrected file, without losing the record of what was there.
-// Moves them out of the live schedule and into the Class Archive tab -
-// see archiveClasses' own comment.
-router.post('/class-schedule/:day/archive', requireFullAdmin, requireClassDay, async (req, res) => {
-  const day = req.params.day;
-  const classIds = [].concat(req.body.classIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
-  if (classIds.length === 0) {
-    return res.redirect(`/admin/class-schedule/${day}?error=` + encodeURIComponent('Select at least one class to archive.'));
+// A real request: "Individual class editing. Add a duplicate class
+// button at the bottom... allows you to duplicate the class, all of its
+// details and settings. When you click this button it will ask you, do
+// you want to copy the same teachers and class assistants, it will also
+// have a drop down menu to ask which semester/day it will be added to.
+// Duplicate of class will then appear on the other semester/day grid."
+// Copies every Class Details/Slots/Sections field onto a brand new class
+// row on the chosen class_schedules combo's own day (and semester) -
+// students/enrollment is deliberately never copied (a duplicate is a
+// fresh offering, not last term's roster); staff (teachers/assistants)
+// only copies over if the admin opts in, same addStaff/skipSync + one
+// syncDayMemberRosters-at-the-end pattern the bulk Import Classes flow
+// already uses for "add several staff at once" without a full resync
+// per row.
+router.post('/class-schedule/classes/:id/duplicate', requireFullAdmin, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const cls = await getClass(id);
+  if (!cls) return res.status(404).send('Not found');
+  const back = `/admin/class-schedule/classes/${id}/manage`;
+
+  const targetComboId = parseInt(req.body.targetComboId, 10);
+  const target = (await listScheduleCombos()).find((c) => c.id === targetComboId);
+  if (!target) {
+    return res.redirect(back + '?error=' + encodeURIComponent('Choose a semester/day to duplicate into.'));
   }
-  const count = await archiveClasses(classIds);
-  res.redirect(`/admin/class-schedule/${day}?notice=` + encodeURIComponent(`Archived ${count} class(es) - see the Class Archive tab.`));
+
+  const existingSectionIds = await classSectionIds(id);
+  const newId = await createClass({
+    day: target.day,
+    hourPosition: cls.hour_position,
+    className: cls.class_name,
+    room: cls.room,
+    ageGroup: cls.age_group,
+    numericAges: cls.numeric_ages,
+    color: cls.color,
+    startTime: cls.start_time,
+    endTime: cls.end_time,
+    startDate: cls.start_date,
+    endDate: cls.end_date,
+    capacity: cls.capacity,
+    registrationOpen: !!cls.registration_open,
+    description: cls.description,
+    supplyList: cls.supply_list,
+    allowParentRegister: !!cls.allow_parent_register,
+    allowTeacherRegister: !!cls.allow_teacher_register,
+    allowStudentRegister: !!cls.allow_student_register,
+    teacherSlots: cls.teacher_slots,
+    assistantSlots: cls.assistant_slots,
+    minCapacity: cls.min_capacity,
+    allowCancel: !!cls.allow_cancel,
+    autoRefundOnCancel: !!cls.auto_refund_on_cancel,
+    priceCents: cls.price_cents,
+    pricePer: cls.price_per,
+    lockByGrade: !!cls.lock_by_grade,
+    lockByAge: !!cls.lock_by_age,
+    allowParentCompleteLessons: !!cls.allow_parent_complete_lessons,
+    allowParentChat: !!cls.allow_parent_chat,
+    semesterId: target.semesterId,
+  });
+
+  for (const sectionId of existingSectionIds) {
+    await db.prepare('INSERT INTO class_sections (class_id, section_id) VALUES (?, ?)').run(newId, sectionId);
+  }
+
+  if (req.body.copyStaff === '1' && cls.staff.length) {
+    for (const s of cls.staff) {
+      await addStaff(newId, s.id, s.role, { skipSync: true });
+    }
+    await syncDayMemberRosters(target.day);
+  }
+
+  res.redirect(`/admin/class-schedule/classes/${newId}/manage?notice=` + encodeURIComponent(`Duplicated as "${cls.class_name}" on ${target.label}.`));
 });
 
-router.get('/class-schedule/archive/export.csv', requireFullAdmin, async (req, res) => {
-  const archives = await listClassArchives();
-  const lines = [
-    toCsvRow(['Day', 'Class Name', 'Room', 'Grade', 'Start Time', 'End Time', 'Teachers', 'Assistants', 'Students', 'Description', 'Archived At']),
-    ...archives.map((a) =>
-      toCsvRow([
-        CLASS_DAY_LABELS_FULL[a.day] || a.day,
-        a.class_name,
-        a.room || '',
-        a.age_group || '',
-        a.start_time || '',
-        a.end_time || '',
-        a.teachers || '',
-        a.assistants || '',
-        a.student_count,
-        a.notes || '',
-        a.archived_at,
-      ])
-    ),
-  ];
-  sendCsv(res, 'class-schedule-archive.csv', lines);
-});
-
-router.post('/class-schedule/archive/:id/delete', requireFullAdmin, async (req, res) => {
-  await deleteClassArchive(parseInt(req.params.id, 10));
-  res.redirect('/admin/schedule?tab=archive&notice=' + encodeURIComponent('Deleted from archive.'));
-});
-
-router.post('/class-schedule/archive/delete-all', requireFullAdmin, async (req, res) => {
-  const count = await deleteAllClassArchives();
-  res.redirect('/admin/schedule?tab=archive&notice=' + encodeURIComponent(`Deleted all ${count} archived class(es).`));
-});
 
 // A real bug report: "when adding or deleting new members on edit class
 // popup it goes to an error page." Every one of these 4 routes called

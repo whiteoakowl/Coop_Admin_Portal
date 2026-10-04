@@ -37,11 +37,6 @@
   });
 
   gradeSelect.addEventListener('change', applyGradeFilter);
-
-  document.addEventListener('click', function (e) {
-    document.querySelectorAll('[data-filter-details][open]').forEach((details) => {
-      if (details.contains(e.target)) return;
-      details.removeAttribute('open');
-    });
-  });
+  // Outside-click-to-close for the Filter dropdown is public/js/filter-
+  // details-dismiss.js, shared with every other Filter button in the app.
 })();

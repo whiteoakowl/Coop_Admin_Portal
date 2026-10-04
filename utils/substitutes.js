@@ -758,9 +758,10 @@ async function dailyAssignmentCards(day, date) {
   })).filter((h) => h.jobs.length > 0);
 }
 
-// dailyAssignmentCards with each hour's real label merged in - shared by
-// the Archive tab/print page and the public kiosk view
-// (partials/floater-assignment-cards.ejs needs `label` on every hour).
+// dailyAssignmentCards with each hour's real label merged in
+// (partials/floater-assignment-cards.ejs needs `label` on every hour) -
+// used to back the Floater Archive tab/print page (since removed); kept
+// for its own direct double-period-logic test coverage.
 async function dailyAssignmentCardsWithLabels(day, date) {
   const hourLabelByPosition = {};
   (await hoursForDay(day)).forEach((h) => { hourLabelByPosition[h.position] = h.label; });
@@ -841,10 +842,11 @@ async function publicFloaterCardsForDate(day, date) {
   return result;
 }
 
-// Archive tab: one row per date that's already passed, with how many of
-// that day's permanent-job positions ended up with an approved floater -
-// same underlying data as dailyAssignmentCards, just counted instead of
-// rendered, for the log list before an admin opens one date's full record.
+// Used to back the Floater Archive tab's own date list (since removed):
+// one row per date, with how many of that day's permanent-job positions
+// ended up with an approved floater - same underlying data as
+// dailyAssignmentCards, just counted instead of rendered. Kept for its
+// own direct double-period-logic test coverage.
 // A real bug, the same gap dailyAssignmentCards above was just fixed for:
 // this only ever counted permanent_jobs, so a date fully covered by
 // approved class-coverage substitutes (with zero permanent-job slots

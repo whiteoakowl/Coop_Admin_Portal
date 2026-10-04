@@ -122,24 +122,11 @@ test('saving the main Class Details form (name/room/description) preserves whate
   assert.equal(after.auto_refund_on_cancel, 1);
 });
 
-test('classes.notes is gone - class description is a single merged field, and it is what shows up in the archived record', async () => {
-  const cookie = await loginAsAdmin();
+test('classes.notes is gone - class description is a single merged field', async () => {
   const classId = await createClass({ day: 'wednesday', hourPosition: 1, className: 'Merged Description Class', description: 'One combined description.' });
   const cls = await getClass(classId);
   assert.equal(cls.notes, undefined, 'the classes table should no longer even have a notes column');
   assert.equal(cls.description, 'One combined description.');
-
-  const page = await request(app).get('/admin/schedule?tab=wednesday').set('Cookie', cookie);
-  const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
-  await request(app)
-    .post('/admin/class-schedule/wednesday/archive')
-    .set('Cookie', cookie)
-    .type('form')
-    .send({ classIds: [String(classId)], _csrf: csrfToken });
-
-  const archived = await db.prepare('SELECT * FROM class_schedule_archives WHERE class_name = ?').get('Merged Description Class');
-  assert.ok(archived, 'the class should be archived');
-  assert.equal(archived.notes, 'One combined description.', 'the archive record keeps the merged description, not blank');
 });
 
 test('price_per only accepts students/students_and_staff now, defaulting to students', async () => {

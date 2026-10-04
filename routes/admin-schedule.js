@@ -6,18 +6,10 @@ const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { isValidISODate, easternInputToUtcText, formatTimestamp, ageFromBirthday, todayISO, weekdayOf } = require('../utils/dates');
-const { listWindows, createWindow, deleteWindow } = require('../utils/registrationWindows');
+const { isValidISODate, easternInputToUtcText, utcTextToEasternInput, formatTimestamp, ageFromBirthday, todayISO, weekdayOf } = require('../utils/dates');
+const { listWindows, createWindow, updateWindow, deleteWindow } = require('../utils/registrationWindows');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
-const {
-  getMemberSchedule,
-  schedulesForMembers,
-  scheduleList,
-  archiveMemberSchedules,
-  listMemberScheduleArchives,
-  deleteMemberScheduleArchive,
-  deleteAllMemberScheduleArchives,
-} = require('../utils/schedule');
+const { getMemberSchedule, schedulesForMembers, scheduleList } = require('../utils/schedule');
 const { byLastName, allFamilies } = require('../utils/members');
 const {
   CLASS_DAYS,
@@ -40,7 +32,6 @@ const {
   setEnrollment,
   addStaff,
   syncDayMemberRosters,
-  listClassArchives,
   listSemesters,
   createSemester,
   renameSemester,
@@ -50,8 +41,8 @@ const {
   listScheduleCombos,
 } = require('../utils/classSchedule');
 const { comboSemesterId, qsSemester, findComboId } = require('../utils/scheduleComboLinks');
-const { CLASS_DAY_ORDER } = require('../utils/classDays');
-const { countMissingSemesterData, totalMissing, assignMissingSemesterData } = require('../utils/semesterAssignment');
+const { assignMissingSemesterData } = require('../utils/semesterAssignment');
+const { cloneTaskListFromMostRecentSemester } = require('../utils/taskList');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
 const { scheduleCardDataForMembers, getScheduleCardTemplate } = require('../utils/scheduleCardData');
@@ -84,9 +75,8 @@ const uploadDesignImage = multer({
   fileFilter: imageFileFilter,
 });
 
-const SPECIAL_SCHEDULE_TABS = ['members', 'archive', 'settings'];
-const SETTINGS_SUBTABS = ['general', 'semester', 'registration', 'days'];
-const ARCHIVE_TYPES = ['class', 'student', 'parent'];
+const SPECIAL_SCHEDULE_TABS = ['members', 'settings'];
+const SETTINGS_SUBTABS = ['general', 'semester', 'days'];
 const MEMBER_TYPE_FILTERS = ['student', 'parent'];
 const PAGE_SIZE = 25;
 
@@ -136,6 +126,16 @@ router.get('/schedule', requireAdmin, async (req, res) => {
     return res.redirect('/admin/schedule?' + qs.toString());
   }
 
+  // Registration Schedule used to be its own Settings sub-tab - "this
+  // settings is done through the semester tab" now, folded into Settings
+  // > Semester instead. An old ?settingsTab=registration bookmark still
+  // lands somewhere sensible rather than silently falling back to General.
+  if (req.query.tab === 'settings' && req.query.settingsTab === 'registration') {
+    const qs = new URLSearchParams(req.query);
+    qs.set('settingsTab', 'semester');
+    return res.redirect('/admin/schedule?' + qs.toString());
+  }
+
   // A real request: "Full 7 day expansion so multiple semesters can be
   // created and managed... now day settings." The day-tab list is no
   // longer the hardcoded Monday/Wednesday pair - it's every day of the
@@ -146,15 +146,14 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   const defaultTab = activeDays[0] || 'monday';
   let tab = SPECIAL_SCHEDULE_TABS.includes(req.query.tab) || activeDays.includes(req.query.tab) ? req.query.tab : defaultTab;
 
-  // Member Schedules, the Class Archive, and Settings are all
-  // full-Admin-only. A Co-op Admin only gets the read-only day grid.
-  if ((tab === 'members' || tab === 'archive' || tab === 'settings') && !res.locals.isFullAdmin) {
+  // Member Schedules and Settings are both full-Admin-only. A Co-op
+  // Admin only gets the read-only day grid.
+  if ((tab === 'members' || tab === 'settings') && !res.locals.isFullAdmin) {
     tab = defaultTab;
   }
 
   if (CLASS_DAYS.includes(tab)) {
     const selectedDate = isValidISODate(req.query.date) ? req.query.date : defaultDateForClassDay(tab);
-    const missingSemesterBreakdown = res.locals.isFullAdmin ? await countMissingSemesterData() : null;
     const combos = await listScheduleCombos();
     const resolvedSemesterId = await resolveSemesterId(comboSemesterId(req));
     return res.render('admin-schedule', {
@@ -178,49 +177,10 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
       selectedDate,
       absentIds: await absentMemberIdsForDate(selectedDate),
-      // Needed for the Bulk Edit dialog's own semester dropdown and the
-      // "Add/Edit Semester" dialog (both new - a real request), neither
-      // of which previously existed on this tab (only the Settings tab
-      // had the semester list before). classDays/classSchedules let the
-      // dialog's own Add a Schedule day checkboxes and each semester's
-      // "which days does this cover" display work here too, same as
-      // Settings > Day Settings already has.
+      // Needed for the Bulk Edit dialog's own semester dropdown (a real
+      // request), which didn't previously exist on this tab (only the
+      // Settings tab had the semester list before).
       semesters: await listSemesters(),
-      classDays: CLASS_DAYS,
-      classSchedules: await listClassSchedules(),
-      missingSemesterBreakdown,
-      missingSemesterCount: missingSemesterBreakdown ? totalMissing(missingSemesterBreakdown) : 0,
-      error: req.query.error || null,
-      notice: req.query.notice || null,
-    });
-  }
-
-  // Archive: a pill toggle (Class/Student/Parent) switches between classes
-  // archived from either day's grid (see archiveClasses in
-  // utils/classSchedule.js) and members archived from the Member
-  // Schedules tab (see archiveMemberSchedules in utils/schedule.js) - two
-  // different tables, same "flatten to plain text, drop the FK-linked
-  // detail" archive philosophy either way.
-  if (tab === 'archive') {
-    const archiveType = ARCHIVE_TYPES.includes(req.query.type) ? req.query.type : 'class';
-    const archives = archiveType === 'class' ? await listClassArchives() : await listMemberScheduleArchives(archiveType);
-    // A member-schedule archive's own daySchedules only ever holds
-    // whichever days were active when IT was archived (see
-    // listMemberScheduleArchives' own comment on the two row shapes this
-    // merges) - the table needs one column per day that shows up across
-    // ANY of them, in calendar order, not just whatever's active today.
-    const archiveDays =
-      archiveType === 'class'
-        ? []
-        : [...new Set(archives.flatMap((a) => Object.keys(a.daySchedules)))].sort((a, b) => CLASS_DAY_ORDER[a] - CLASS_DAY_ORDER[b]);
-    return res.render('admin-schedule', {
-      title: 'Schedules',
-      tab,
-      topTab: 'archive',
-      archiveType,
-      archives,
-      archiveDays,
-      dayLabels: CLASS_DAY_LABELS,
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -240,24 +200,25 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   // semester, registration schedule. Move all those features to there
   // designated pages only" - the three sections used to all render
   // stacked on one long page; now each one only renders under its own
-  // sub-tab (same ?settingsTab= pattern as this page's own Archive
-  // Class/Student/Parent sub-tabs).
+  // sub-tab.
   if (tab === 'settings') {
     const settingsTab = SETTINGS_SUBTABS.includes(req.query.settingsTab) ? req.query.settingsTab : 'general';
     const windowRows = await listWindows();
-    const missingSemesterBreakdown = await countMissingSemesterData();
     return res.render('admin-schedule', {
       title: 'Co-op Class Settings',
       tab,
       topTab: 'settings',
       settingsTab,
       dayLabels: CLASS_DAY_LABELS,
-      windows: windowRows.map((w) => ({ ...w, opensLabel: formatTimestamp(w.opens_at), closesLabel: formatTimestamp(w.closes_at) })),
-      roles: await db.prepare('SELECT key, label FROM roles ORDER BY label').all(),
+      windows: windowRows.map((w) => ({
+        ...w,
+        opensLabel: formatTimestamp(w.opens_at),
+        closesLabel: formatTimestamp(w.closes_at),
+        opensInput: utcTextToEasternInput(w.opens_at),
+        closesInput: utcTextToEasternInput(w.closes_at),
+      })),
       sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
       semesters: await listSemesters(),
-      missingSemesterBreakdown,
-      missingSemesterCount: totalMissing(missingSemesterBreakdown),
       classSettings: await classGlobalSettings(),
       // Settings > Day Settings - a real request: "Full 7 day expansion
       // so multiple semesters can be created and managed... now day
@@ -355,38 +316,68 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   });
 });
 
-// --- Classes > Settings: Registration Schedule (staged, day/section/
-// role-targeted class registration windows - see
-// utils/registrationWindows.js's own header comment). A real request:
-// "main admin, classes, settings. Add registration schedule. Be able to
-// control who can signup on each schedule grid monday/Wednesday. Date,
-// time and section and open for teacher or assistant registration" - a
-// follow-up confirmed this should live under Co-op Admin's own Classes >
+// --- Classes > Settings > Semester: Registration Schedule (staged,
+// schedule-grid/sections/action-type-targeted class registration windows -
+// see utils/registrationWindows.js's own header comment). A real
+// request: "main admin, classes, settings. Add registration schedule. Be
+// able to control who can signup on each schedule grid monday/Wednesday.
+// Date, time and section and open for teacher or assistant registration" -
+// a follow-up confirmed this should live under Co-op Admin's own Classes >
 // Settings tab (class settings always live here), not a separate Main
 // Admin page, and should gate everyone who registers for a class
-// (parents/students/teachers), not just teacher/assistant.
+// (parents/students/teachers), not just teacher/assistant. Later
+// requests: replaced the generic role dropdown with 4 specific
+// action-type checkboxes (parents registering to teach/assist, parents
+// registering their own student, students registering themselves - none
+// checked means every action, same as every other "empty means
+// unrestricted" field here); let Sections be multi-selected instead of
+// just one; swapped the day-only Schedule Grid picker for the actual
+// class_schedules catalog (its own admin-given titles); turned "Add a
+// Window" into a button+popup and added an Edit button next to Delete;
+// and finally folded this whole section into Settings > Semester,
+// dropping its own separate sub-tab ("this settings is done through the
+// semester tab").
 router.post('/schedule/registration-windows', requireFullAdmin, async (req, res) => {
   const label = (req.body.label || '').trim();
   const opensAt = easternInputToUtcText(req.body.opensAt);
   const closesAt = easternInputToUtcText(req.body.closesAt);
-  const back = '/admin/schedule?tab=settings&settingsTab=registration';
+  const back = '/admin/schedule?tab=settings&settingsTab=semester';
   if (!label || !opensAt) {
     return res.redirect(back + '&error=' + encodeURIComponent('A label and an opens-at date/time are required.'));
   }
   await createWindow({
     label,
-    roleKey: req.body.roleKey || null,
     opensAt,
     closesAt,
-    day: req.body.day || null,
-    sectionId: req.body.sectionId ? Number(req.body.sectionId) : null,
+    classScheduleId: req.body.classScheduleId ? Number(req.body.classScheduleId) : null,
+    sectionIds: [].concat(req.body.sectionIds || []).map((id) => Number(id)).filter(Boolean),
+    actionTypes: [].concat(req.body.actionTypes || []),
   });
   res.redirect(back + '&notice=' + encodeURIComponent('Registration window added.'));
 });
 
+router.post('/schedule/registration-windows/:id/update', requireFullAdmin, async (req, res) => {
+  const label = (req.body.label || '').trim();
+  const opensAt = easternInputToUtcText(req.body.opensAt);
+  const closesAt = easternInputToUtcText(req.body.closesAt);
+  const back = '/admin/schedule?tab=settings&settingsTab=semester';
+  if (!label || !opensAt) {
+    return res.redirect(back + '&error=' + encodeURIComponent('A label and an opens-at date/time are required.'));
+  }
+  await updateWindow(req.params.id, {
+    label,
+    opensAt,
+    closesAt,
+    classScheduleId: req.body.classScheduleId ? Number(req.body.classScheduleId) : null,
+    sectionIds: [].concat(req.body.sectionIds || []).map((id) => Number(id)).filter(Boolean),
+    actionTypes: [].concat(req.body.actionTypes || []),
+  });
+  res.redirect(back + '&notice=' + encodeURIComponent('Registration window updated.'));
+});
+
 router.post('/schedule/registration-windows/:id/delete', requireFullAdmin, async (req, res) => {
   await deleteWindow(req.params.id);
-  res.redirect('/admin/schedule?tab=settings&settingsTab=registration&notice=' + encodeURIComponent('Registration window removed.'));
+  res.redirect('/admin/schedule?tab=settings&settingsTab=semester&notice=' + encodeURIComponent('Registration window removed.'));
 });
 
 // --- Classes > Settings: Semesters - a real request: "Overall class
@@ -422,6 +413,11 @@ router.post('/schedule/semesters', requireFullAdmin, async (req, res) => {
     for (const day of checkedClassDays(req)) {
       await createClassSchedule({ title: `${semester.title} - ${CLASS_DAY_LABELS[day]}`, dayOfWeek: day, semesterId: semester.id });
     }
+    // A real request: "Setup/cleanup task list should copy over to all
+    // new semesters created." Seeds this brand new semester's own Task
+    // List from whichever semester most recently existed before it -
+    // see cloneTaskListFromMostRecentSemester's own comment.
+    await cloneTaskListFromMostRecentSemester(semester.id);
   } catch (err) {
     return res.redirect(back + sep + 'error=' + encodeURIComponent(err.message));
   }
@@ -795,47 +791,6 @@ router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.sing
     `${redirectBase}&notice=` +
       encodeURIComponent(`Matched ${matched} schedule row(s)` + (skipped ? `, ${skipped} skipped (no matching class or member).` : '.'))
   );
-});
-
-// Archives the checked schedule cards (checkboxes on the Member Schedules
-// grid, or its "Select All") - unenrolls each member from every class
-// they're currently on, saving a snapshot of what they were on first. A
-// selection can freely mix students and parents (archiveMemberSchedules
-// already splits them internally), which the merged tab makes possible
-// now that both are browsed together. See archiveMemberSchedules' own
-// comment in utils/schedule.js.
-router.post('/schedule/:tab/archive', requireFullAdmin, async (req, res) => {
-  if (req.params.tab !== 'members') return res.status(404).send('Not found');
-  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
-  if (memberIds.length === 0) {
-    return res.redirect('/admin/schedule?tab=members&error=' + encodeURIComponent('Select at least one member to archive.'));
-  }
-  const count = await archiveMemberSchedules(memberIds);
-  res.redirect('/admin/schedule?tab=members&notice=' + encodeURIComponent(`Archived ${count} member schedule(s) - see the Archive tab.`));
-});
-
-router.get('/schedule/archive/:type/export.csv', requireFullAdmin, async (req, res) => {
-  const type = req.params.type;
-  if (!['student', 'parent'].includes(type)) return res.status(404).send('Not found');
-  const archives = await listMemberScheduleArchives(type);
-  const archiveDays = [...new Set(archives.flatMap((a) => Object.keys(a.daySchedules)))].sort((a, b) => CLASS_DAY_ORDER[a] - CLASS_DAY_ORDER[b]);
-  const lines = [
-    toCsvRow(['Name', ...archiveDays.map((d) => `${CLASS_DAY_LABELS[d]} Schedule`), 'Archived At']),
-    ...archives.map((a) => toCsvRow([a.member_name, ...archiveDays.map((d) => a.daySchedules[d] || ''), a.archived_at])),
-  ];
-  sendCsv(res, `${type}-schedule-archive.csv`, lines);
-});
-
-router.post('/schedule/archive/:id/delete', requireFullAdmin, async (req, res) => {
-  await deleteMemberScheduleArchive(parseInt(req.params.id, 10));
-  res.redirect('/admin/schedule?tab=archive&notice=' + encodeURIComponent('Deleted from archive.'));
-});
-
-router.post('/schedule/archive/:type/delete-all', requireFullAdmin, async (req, res) => {
-  const type = req.params.type;
-  if (!['student', 'parent'].includes(type)) return res.status(404).send('Not found');
-  const count = await deleteAllMemberScheduleArchives(type);
-  res.redirect(`/admin/schedule?tab=archive&type=${type}&notice=` + encodeURIComponent(`Deleted all ${count} archived ${type} schedule(s).`));
 });
 
 router.post('/schedule/print-cards', requireFullAdmin, async (req, res) => {

@@ -29,8 +29,8 @@ const { CLASS_DAY_LABELS_FULL } = require('./classDays');
 // A real request: "add a column for open house" - same shape as the 4
 // original circle columns (openHouse -> open_house_complete/
 // open_house_completed_at, see the orientation_open_house migration).
-const FIELDS = ['video', 'meetup', 'teacherTraining', 'tour', 'openHouse'];
-const COLUMN_PREFIX = { video: 'video', meetup: 'meetup', teacherTraining: 'teacher_training', tour: 'tour', openHouse: 'open_house' };
+const FIELDS = ['video', 'teacherTraining', 'tour', 'openHouse'];
+const COLUMN_PREFIX = { video: 'video', teacherTraining: 'teacher_training', tour: 'tour', openHouse: 'open_house' };
 
 // The most recently created semester - the default view when no
 // ?semesterId is given, so the page always opens on a concrete semester
@@ -96,7 +96,6 @@ async function orientationRows(semesterId) {
       const progress = progressByMember.get(entry.memberId) || {};
       const flags = {
         video: Number(progress.video_complete) === 1,
-        meetup: Number(progress.meetup_complete) === 1,
         teacherTraining: Number(progress.teacher_training_complete) === 1,
         tour: Number(progress.tour_complete) === 1,
         openHouse: Number(progress.open_house_complete) === 1,
@@ -146,43 +145,39 @@ async function setOrientationField(memberId, semesterId, field, value) {
     .run(memberId, semesterId || null, value ? 1 : 0, value ? 1 : 0);
 }
 
-// --- Orientation Settings: an optional link per checkmark column - a
-// real request: "Add button for orientation settings to Link training
-// or check in with each circle check mark column so the information can
-// be linked." Each column's own header links out to whatever's
-// configured (a training video, an external check-in page, etc.)
-// instead of being purely a plain label.
-async function orientationLinks() {
-  const rows = await db.prepare('SELECT * FROM orientation_settings').all();
-  const byField = {};
-  rows.forEach((r) => {
-    byField[r.field] = r.link_url;
-  });
-  return byField;
-}
-
-// A real request: "Orientation settings should be linking a training
-// already created under training to each selection... when a member
-// completes a training it will automatically register as complete in
-// the correct column next to the member." `trainingId` is a separate,
-// independent column from `link_url` on the same row (see migration
-// 20261023010000_orientation_training_link.sql) - a column can have
-// either, both, or neither, so the row is only deleted once BOTH are
-// empty rather than whenever the plain URL field alone is cleared.
-async function setOrientationLink(field, url, trainingId) {
+// --- Orientation Settings: an optional Training link per checkmark
+// column - a real request: "Add button for orientation settings to Link
+// training... with each circle check mark column so the information can
+// be linked", later refined to "the links for the column check boxes
+// should be dropdown menus of trainings that have been created" - each
+// column's own header links straight to whichever Training module is
+// linked to it (no more hand-typed URL option; a column with nothing
+// linked just stays a plain label).
+async function setOrientationLink(field, trainingId) {
   if (!FIELDS.includes(field)) throw new Error(`Unknown orientation field: ${field}`);
-  const trimmedUrl = (url || '').trim() || null;
   const tId = trainingId || null;
-  if (!trimmedUrl && !tId) {
+  if (!tId) {
     await db.prepare('DELETE FROM orientation_settings WHERE field = ?').run(field);
     return;
   }
   await db
     .prepare(
-      `INSERT INTO orientation_settings (field, link_url, training_id) VALUES (?, ?, ?)
-       ON CONFLICT (field) DO UPDATE SET link_url = ?, training_id = ?`
+      `INSERT INTO orientation_settings (field, training_id) VALUES (?, ?)
+       ON CONFLICT (field) DO UPDATE SET training_id = ?`
     )
-    .run(field, trimmedUrl, tId, trimmedUrl, tId);
+    .run(field, tId, tId);
+
+  // A real bug report: "I linked some of the trainings in orientation
+  // settings and it is not showing green check marks next to those that
+  // completed the trainings." applyTrainingCompletion only ever fires at
+  // the moment utils/training.js's own maybeFinalizeAttempt finalizes an
+  // attempt as passed - a member who passed the training BEFORE this link
+  // existed never got that call, so linking it here must retroactively
+  // backfill every member who already has a passed attempt.
+  const alreadyPassed = await db.prepare("SELECT DISTINCT member_id FROM training_assignments WHERE training_id = ? AND status = 'passed'").all(tId);
+  for (const row of alreadyPassed) {
+    await applyTrainingCompletion(tId, row.member_id);
+  }
 }
 
 async function orientationTrainingLinks() {
@@ -215,7 +210,6 @@ module.exports = {
   orientationRows,
   setOrientationField,
   defaultSemesterId,
-  orientationLinks,
   setOrientationLink,
   orientationTrainingLinks,
   applyTrainingCompletion,

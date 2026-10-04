@@ -1,9 +1,10 @@
 <%
 // One card per hour block, each listing every position for that hour -
 // Position, Room, Floater Assigned - read-only (reassigning happens on
-// the live Chart tab's own cards, not here). Shared by the Archive
-// popup, the public kiosk view, and the Archive print page (a past
-// date) - same partial, same look, everywhere this data is shown.
+// the live Chart tab's own cards, not here). Used by the public kiosk
+// view - previously also shared by the since-removed Floater Archive
+// popup/print page, same partial, same look, everywhere this data was
+// shown.
 // Locals: cards (utils/substitutes.js dailyAssignmentCards, each hour's
 // `label` merged in by the route), dayLabel and (optionally) dateLabel
 // for the per-page print header - only actually rendered under @media

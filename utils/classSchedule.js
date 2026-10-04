@@ -780,6 +780,20 @@ async function listClassSchedules() {
   return db.prepare('SELECT * FROM class_schedules ORDER BY created_at DESC, id DESC').all();
 }
 
+// A class's own class_schedules row - the one Schedule Grid it actually
+// shows up on (same (day_of_week, semester_id) combo listScheduleCombos
+// groups by). Used by Registration Schedule windows (utils/
+// registrationWindows.js) to match a class against a window's own
+// class_schedule_id instead of a raw day string. Null for a class whose
+// day/semester combination has no class_schedules row at all - shouldn't
+// happen in practice (every active day/semester combo gets one), but a
+// window just treats that the same as "doesn't match a schedule-grid-
+// scoped window" rather than crashing.
+async function classScheduleIdForClass(cls) {
+  const row = await db.prepare('SELECT id FROM class_schedules WHERE day_of_week = ? AND semester_id IS NOT DISTINCT FROM ?').get(cls.day, cls.semester_id);
+  return row ? row.id : null;
+}
+
 // The Classes grid's own tab list - every day_of_week that's ever been
 // activated via a class_schedules row, in calendar order (not creation
 // order, so a newly-added Tuesday lands between Monday and Wednesday
@@ -898,71 +912,6 @@ async function deleteClass(id) {
     await tx.prepare('DELETE FROM classes WHERE id = ?').run(id);
   });
   await syncDayMemberRosters(cls.day);
-}
-
-// Snapshots each of the given classes into class_schedule_archives, then
-// deletes it from the live schedule (deleteClass, so its roster gets the
-// same deactivation any other deleted class's does) - the selection-based
-// alternative to deleting classes one at a time by hand, e.g. clearing a
-// day before a fresh Import Classes run without losing the record of
-// what was there. Teacher/assistant names are flattened to a comma-joined
-// string and enrollment to a plain count rather than kept as live
-// class_staff/class_enrollments references - see the table's own
-// migration comment on why. Returns how many were archived.
-async function archiveClasses(classIds) {
-  let archived = 0;
-  for (const id of classIds) {
-    const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(id);
-    if (!cls) continue;
-    const staff = await staffForClass(id);
-    const students = await studentsForClass(id);
-    const teacherNames = staff.filter((s) => s.role === 'teacher').map((s) => s.name).join(', ') || null;
-    await db
-      .prepare(
-        `INSERT INTO class_schedule_archives
-           (day, class_name, room, age_group, color, notes, start_time, end_time, teachers, assistants, student_count)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(
-        cls.day,
-        cls.class_name,
-        cls.room,
-        cls.age_group,
-        cls.color,
-        cls.description,
-        cls.start_time,
-        cls.end_time,
-        teacherNames,
-        staff.filter((s) => s.role === 'assistant').map((s) => s.name).join(', ') || null,
-        students.length
-      );
-    // One row per student who completed this class - the only source of
-    // past-term Transcript data (see student_academic_history's own
-    // migration comment), written here because this is the one place a
-    // class's enrollment is still live at the moment it's retired.
-    for (const student of students) {
-      await db
-        .prepare('INSERT INTO student_academic_history (student_id, class_name, day, age_group, teacher_names) VALUES (?, ?, ?, ?, ?)')
-        .run(student.id, cls.class_name, cls.day, cls.age_group, teacherNames);
-    }
-    await deleteClass(id);
-    archived++;
-  }
-  return archived;
-}
-
-// One row of the Class Archive tab's list.
-async function listClassArchives() {
-  return db.prepare('SELECT * FROM class_schedule_archives ORDER BY archived_at DESC, id DESC').all();
-}
-
-async function deleteClassArchive(id) {
-  await db.prepare('DELETE FROM class_schedule_archives WHERE id = ?').run(id);
-}
-
-async function deleteAllClassArchives() {
-  const result = await db.prepare('DELETE FROM class_schedule_archives').run();
-  return result.changes;
 }
 
 // skipSync - see addStaff's comment on the same option just below; the
@@ -2303,6 +2252,7 @@ module.exports = {
   isValidClassDay,
   requireClassDay,
   listClassSchedules,
+  classScheduleIdForClass,
   listActiveClassDays,
   listScheduleCombos,
   createClassSchedule,
@@ -2310,10 +2260,6 @@ module.exports = {
   deleteClassSchedule,
   updateClassSlots,
   deleteClass,
-  archiveClasses,
-  listClassArchives,
-  deleteClassArchive,
-  deleteAllClassArchives,
   setEnrollment,
   addStaff,
   removeFromFloaterForHour,

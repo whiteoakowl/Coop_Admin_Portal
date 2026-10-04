@@ -37,9 +37,12 @@ async function loginAsAdmin() {
 test('Attendance > Classes tab offers a Semester filter once semesters exist, and it actually filters the list', async () => {
   const cookie = await loginAsAdmin();
 
-  // No semesters yet - the dropdown shouldn't render at all.
+  // No semesters yet - the dropdown shouldn't render at all. (The Day/Hour
+  // selects' own onchange handlers reference the id defensively even when
+  // it's absent, so this checks for the actual <select> tag, not just the
+  // bare id substring.)
   const before = await request(app).get('/admin/rosters?tab=classes').set('Cookie', cookie);
-  assert.doesNotMatch(before.text, /class-roster-semester-select/);
+  assert.doesNotMatch(before.text, /<select id="class-roster-semester-select"/);
 
   const fall = await db.prepare('INSERT INTO semesters (title) VALUES (?) RETURNING *').get('Fall 2026');
   const spring = await db.prepare('INSERT INTO semesters (title) VALUES (?) RETURNING *').get('Spring 2027');
@@ -48,7 +51,7 @@ test('Attendance > Classes tab offers a Semester filter once semesters exist, an
   await createClass({ day: 'monday', hourPosition: 3, className: 'No Semester Class', semesterId: null });
 
   const all = await request(app).get('/admin/rosters?tab=classes').set('Cookie', cookie);
-  assert.match(all.text, /class-roster-semester-select/);
+  assert.match(all.text, /<select id="class-roster-semester-select"/);
   assert.match(all.text, /Fall Class/);
   assert.match(all.text, /Spring Class/);
   assert.match(all.text, /No Semester Class/);

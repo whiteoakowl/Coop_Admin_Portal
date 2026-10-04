@@ -1,12 +1,15 @@
 // A real request: "Go ahead and create a fall 2026 semester and connect
 // all classes, floater assignments, setup cleanup, attendance, logs,
 // everything on co-op admin portal. I don't want to loose any current
-// data." The Settings > Semester tab's "Data Missing a Semester" tool
-// (utils/semesterAssignment.js) is the one-click way to do this: it tags
-// every still-unassigned class, Floater List, Setup/Cleanup Team, Task
-// List, and Day Settings record with a chosen semester at once, never
-// deleting or moving anything - Attendance/checkouts/admin logs aren't
-// semester-scoped containers and have nothing to tag.
+// data." utils/semesterAssignment.js's assignMissingSemesterData is the
+// one-click way to do this: it tags every still-unassigned class,
+// Floater List, Setup/Cleanup Team, Task List, and Day Settings record
+// with a chosen semester at once, never deleting or moving anything -
+// Attendance/checkouts/admin logs aren't semester-scoped containers and
+// have nothing to tag. The Settings > Semester tab's own "Data Missing a
+// Semester" UI section that used to surface this was later removed (a
+// real request: "everything is connected to semesters now, remove it") -
+// the route itself is exercised directly here instead.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -66,14 +69,10 @@ test('Connect Everything: classes, a Floater List (with its members intact), a S
   await request(app).post('/admin/schedule/semesters').set('Cookie', admin.cookie).type('form').send({ title: 'Fall 2026', _csrf: admin.csrfToken });
   const fall = await db.prepare("SELECT * FROM semesters WHERE title = 'Fall 2026'").get();
 
-  const before = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
-  assert.match(before.text, /Data Missing a Semester/);
-  assert.match(before.text, /1 class with no semester assigned/);
-  assert.match(before.text, /2 Floater Lists with no semester assigned/);
-  assert.match(before.text, /1 Setup\/Cleanup Team with no semester assigned/);
-  assert.match(before.text, /2 Day Settings records with no semester assigned/);
-
-  // Connect everything.
+  // Connect everything - the "Data Missing a Semester" UI section that
+  // used to surface these counts was removed (a real request: "everything
+  // is connected to semesters now, remove it"), but the underlying
+  // bulk-assign route is still directly reachable and still works.
   const res = await request(app)
     .post('/admin/schedule/semesters/assign-missing')
     .set('Cookie', admin.cookie)
@@ -99,10 +98,6 @@ test('Connect Everything: classes, a Floater List (with its members intact), a S
 
   const schedules = await db.prepare('SELECT day_of_week, semester_id FROM class_schedules ORDER BY day_of_week').all();
   assert.ok(schedules.every((s) => s.semester_id === fall.id), 'both Day Settings records are now tagged Fall 2026');
-
-  // Nothing left missing a semester.
-  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
-  assert.doesNotMatch(after.text, /Data Missing a Semester/);
 
   // The Classes grid, Floater Assignments, and Setup/Cleanup pages all
   // still work exactly as before - nothing broke navigating to them.

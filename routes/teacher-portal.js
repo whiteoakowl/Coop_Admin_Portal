@@ -11,7 +11,7 @@ const path = require('path');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
-const { allClassesList, removeStaff } = require('../utils/classSchedule');
+const { allClassesList, removeStaff, classScheduleIdForClass } = require('../utils/classSchedule');
 const { createCharge } = require('../utils/payments');
 const {
   assignmentsForClass,
@@ -174,7 +174,8 @@ router.post('/classes/:id/join', async (req, res) => {
   // Schedule (a real request) - Parent/Student Portal registration
   // already gated on this same isRegistrationOpenForAccount check.
   const restriction = await classSectionIds(classId);
-  if (!(await isRegistrationOpenForAccount(req.portalRoles, { day: cls.day, sectionIds: restriction }))) {
+  const actionType = role === 'assistant' ? 'parent_assistant' : 'parent_teacher';
+  if (!(await isRegistrationOpenForAccount(req.portalRoles, { classScheduleId: await classScheduleIdForClass(cls), sectionIds: restriction, actionType }))) {
     return res.redirect(back + '?error=' + encodeURIComponent('Registration is not open for your account yet.'));
   }
   const already = await db.prepare('SELECT 1 FROM class_staff WHERE class_id = ? AND member_id = ?').get(classId, member.id);

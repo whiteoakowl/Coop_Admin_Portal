@@ -11,7 +11,7 @@ const router = express.Router();
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const { isValidISODate } = require('../utils/dates');
-const { allDiplomas, issueDiploma, allTranscriptEntries, addTranscriptEntry } = require('../utils/academics');
+const { allDiplomas, issueDiploma, allTranscriptEntries, addTranscriptEntry, generateTranscriptsForEndedClasses } = require('../utils/academics');
 const { CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
 const { GRADE_OPTIONS } = require('../utils/membership');
 const events = require('../utils/events');
@@ -346,10 +346,13 @@ router.post('/faq/:id/delete', requirePortalPermission('manage_website'), async 
 // One combined page (nav tab: "Academics") - a Main Admin issues
 // diplomas here, and can also hand-add a past term to a student's
 // transcript for history that predates this feature or a transfer
-// student's prior co-op record (see student_academic_history's own
-// migration comment: normally archiveClasses is the only writer).
+// student's prior co-op record. Transcript entries for a class that has
+// simply run its course are generated automatically once that class's
+// own end_date passes (generateTranscriptsForEndedClasses) - backfilled
+// lazily right here rather than needing its own scheduled job.
 
 router.get('/academics', requirePortalPermission('manage_academics'), async (req, res) => {
+  await generateTranscriptsForEndedClasses();
   const diplomas = await allDiplomas();
   const transcriptEntries = await allTranscriptEntries();
   const students = await db.prepare("SELECT id, name FROM members WHERE member_type = 'student' AND active = 1 ORDER BY LOWER(name)").all();

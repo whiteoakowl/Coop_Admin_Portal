@@ -30,7 +30,6 @@
           <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
           <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/assignments/export.csv?semesterId=<%= semesterId %><%= selectedDate ? '&date=' + selectedDate : '' %>">Export</a>
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
-          <a class="roster-action-btn" href="/admin/setup/<%= day %>/archive?semesterId=<%= semesterId %>">Archive</a>
         </div>
       </div>
 
@@ -49,7 +48,7 @@
       <% if (dates.length === 0) { %>
         <p class="roster-empty">Add session dates above first.</p>
       <% } else if (!selectedDate) { %>
-        <p class="roster-empty">No upcoming session dates - add one above, or see past dates on the <a href="/admin/setup/<%= day %>/archive?semesterId=<%= semesterId %>">Archive</a> tab.</p>
+        <p class="roster-empty">No upcoming session dates - add one above.</p>
       <% } else { %>
         <div id="setup-assign-status" class="alert alert-error no-print" hidden></div>
         <div id="setup-assignment-cards-container" data-selected-date="<%= selectedDate %>">

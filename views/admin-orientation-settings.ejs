@@ -6,25 +6,19 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle no-print"><a href="/admin/orientation">&larr; Orientation</a></p>
+    <p class="subtitle no-print"><a href="/admin/orientation">&larr; Orientation Tracking</a></p>
     <h1>Orientation Settings</h1>
     <%# A real request: "Add button for orientation settings to Link
-        training or check in with each circle check mark column so the
-        information can be linked" - one optional URL per column; when
-        set, that column's header on the main Orientation list links out
-        to it (a training video, an external check-in event, etc.)
-        instead of being a plain label. %>
-    <p class="hint">Attach a link to each orientation column - a training video, a sign-up page, or a check-in event. Leave a field blank to remove its link.</p>
-    <%# A later real request: "Orientation settings should be linking a
-        training already created under training to each selection. This
-        [way] when a member completes a training it will automatically
-        register as complete in the correct column next to the member." A
-        second, independent choice per column - the plain URL above is
-        just a clickable header link; THIS is what actually auto-checks
-        the column (utils/orientation.js's own applyTrainingCompletion,
-        called from utils/training.js whenever a training is finalized as
-        passed). %>
-    <p class="hint">Separately, link an actual Training from the Training module to a column so that completing it there automatically checks that column for that member.</p>
+        training... with each circle check mark column", later refined
+        to "the links for the column check boxes should be dropdown
+        menus of trainings that have been created" - link an actual
+        Training from the Training module to a column: completing it
+        there automatically checks that column for that member
+        (utils/orientation.js's own applyTrainingCompletion, called from
+        utils/training.js whenever a training is finalized as passed),
+        and that column's header on the main Orientation Tracking list
+        links straight to it instead of being a plain label. %>
+    <p class="hint">Link an actual Training from the Training module to each orientation column. Leave one set to "No linked training" to keep that column a plain label with no auto-check.</p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
@@ -32,14 +26,10 @@
     <form method="POST" action="/admin/orientation/settings" class="member-form-grid">
       <% [
         ['video', 'Parent Orientation'],
-        ['meetup', 'Orientation Meet Up'],
         ['teacherTraining', 'Teacher Orientation'],
         ['tour', 'Tour'],
         ['openHouse', 'Open House'],
       ].forEach(function(pair) { var field = pair[0], label = pair[1]; %>
-        <label class="member-form-full"><%= label %> Link
-          <input type="url" name="<%= field %>" placeholder="https://..." value="<%= links[field] || '' %>" />
-        </label>
         <label class="member-form-full"><%= label %> - Linked Training
           <select name="<%= field %>TrainingId">
             <option value="">No linked training</option>

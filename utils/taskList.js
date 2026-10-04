@@ -153,6 +153,36 @@ async function createSection(day, title, teamId, semesterId) {
   return info.lastInsertRowid;
 }
 
+// A real request: "Setup/cleanup task list should copy over to all new
+// semesters created. If the task list is edited or added to on a
+// specific semester it will not change the task list on another
+// semester." Each semester's own task_list_sections/items are already
+// fully independent rows (semester_id-scoped) - this just seeds a brand
+// new semester's copy from whichever semester most recently existed
+// before it, via createSection/addItem (never raw INSERTs, so position/
+// barcode/badge-stamping all stay exactly as correct as creating each
+// one by hand would), so the new semester starts from a known-good
+// template instead of empty, and any edit after this point only ever
+// touches ITS OWN copy - the other semester's rows are untouched.
+// team_id is deliberately NOT copied - a brand new semester has no
+// Setup/Cleanup Teams of its own yet either (a separate, still-blank-
+// slate concept this doesn't touch), and badgeContextForSection already
+// falls back to the section's own title when team_id is null, so the
+// copy still displays/prints fine; an admin can re-link it to a real
+// team (once they've created one for this semester) the same way they'd
+// link any other section.
+async function cloneTaskListFromMostRecentSemester(newSemesterId) {
+  const previous = await db.prepare('SELECT id FROM semesters WHERE id != ? ORDER BY id DESC LIMIT 1').get(newSemesterId);
+  if (!previous) return;
+  const sections = await db.prepare('SELECT * FROM task_list_sections WHERE semester_id = ? ORDER BY day, position').all(previous.id);
+  for (const section of sections) {
+    const newSectionId = await createSection(section.day, section.title, null, newSemesterId);
+    for (const item of await itemsForSection(section.id)) {
+      await addItem(newSectionId, item.description);
+    }
+  }
+}
+
 async function updateSection(id, fields) {
   await db.prepare('UPDATE task_list_sections SET title = ?, team_id = ? WHERE id = ?').run(fields.title, fields.teamId || null, id);
   // A section's own title (unlinked) or its team link can both change
@@ -338,6 +368,7 @@ module.exports = {
   taskNumbersByItemId,
   getSection,
   createSection,
+  cloneTaskListFromMostRecentSemester,
   updateSection,
   deleteSection,
   swapSectionPosition,

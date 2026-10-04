@@ -2,11 +2,8 @@
 // One card per Setup/Cleanup team, listing its members and (editable
 // mode only) an Assign/Unassign control per member per task slot -
 // mirrors partials/floater-assignment-cards.ejs's per-hour card look,
-// just per-team instead. Shared by the live Assignments page (editable,
-// day+date passed for each slot's own form action) and the read-only
-// Archive fragment/print for a past date (editable=false, plain text
-// instead of a control - matches floater-assignment-cards.ejs's own
-// "reassigning happens on the live tab, not here" rule).
+// just per-team instead. Used by the live Assignments page (editable,
+// day+date passed for each slot's own form action).
 //
 // A real request: this should "look and work like Floater Assignments" -
 // a suggested-task dropdown next to an Assign button; clicking Assign
@@ -44,11 +41,7 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
           CSS rule that already exists for Floater Assignments (it's
           generic - not scoped to Floater specifically - see styles.css) -
           this reuses it instead of adding a near-duplicate Setup/Cleanup-
-          only rule. dayLabel/dateLabel are optional so this partial's
-          third caller (setup-assignment-cards-fragment.ejs, a live
-          dialog view that's never itself printed - it links out to
-          admin-setup-archive-print.ejs's OWN full print page instead)
-          doesn't need to pass them just to keep this markup valid. %>
+          only rule. dayLabel/dateLabel are optional. %>
       <div class="floater-print-page">
       <div class="print-header">
         <img src="/img/logo.png" alt="" />

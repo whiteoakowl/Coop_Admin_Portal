@@ -7,8 +7,8 @@
 // title/semester/date-range recorded for the record. Covers: the Day
 // Settings tab itself (add/edit/delete), that a newly-activated day
 // (Tuesday) shows up as a real Classes grid tab with its own Add Class/
-// Edit Hours/Bulk Edit/Archive/Import/Export/Print all working (not just
-// the grid's own landing page), and that Monday/Wednesday keep working
+// Edit Hours/Bulk Edit/Import/Export/Print all working (not just the
+// grid's own landing page), and that Monday/Wednesday keep working
 // completely unchanged.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -60,7 +60,7 @@ test('Day Settings tab offers a Day of Week dropdown with all 7 days, and lists 
   assert.match(res.text, />Wednesday<\/td>/);
 });
 
-test('Adding a Tuesday day schedule makes it a real Classes grid tab, with Add Class/Edit Hours/Bulk Edit/Archive/Import/Export/Print all reachable', async () => {
+test('Adding a Tuesday day schedule makes it a real Classes grid tab, with Add Class/Edit Hours/Bulk Edit/Import/Export/Print all reachable', async () => {
   const admin = await loginAsAdmin();
 
   await request(app)
@@ -119,13 +119,6 @@ test('Adding a Tuesday day schedule makes it a real Classes grid tab, with Add C
     .type('form')
     .send({ classIds: String(tuesdayClass.id), _csrf: admin.csrfToken });
   assert.notEqual(bulkEdit.status, 404);
-
-  const archive = await request(app)
-    .post('/admin/class-schedule/tuesday/archive')
-    .set('Cookie', admin.cookie)
-    .type('form')
-    .send({ classIds: [], _csrf: admin.csrfToken });
-  assert.notEqual(archive.status, 404);
 
   const exportCsv = await request(app).get('/admin/class-schedule/tuesday/export.csv').set('Cookie', admin.cookie);
   assert.equal(exportCsv.status, 200);

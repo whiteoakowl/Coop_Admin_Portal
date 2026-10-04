@@ -15,9 +15,9 @@
     </div>
     <h1><%= tab === 'settings' ? 'Co-op Class Settings' : 'Schedules' %></h1>
 
-    <%# Class Schedules/Member Schedules/Archive/Settings now live as
-        subpages under the orange bar's own Schedules item (views/
-        partials/admin-nav.ejs) instead of a trigger+dialog here. %>
+    <%# Class Schedules/Member Schedules/Settings now live as subpages
+        under the orange bar's own Schedules item (views/partials/admin-
+        nav.ejs) instead of a trigger+dialog here. %>
 
     <div class="view-tab-panel">
       <% if (typeof activeDays !== 'undefined') { %>
@@ -32,119 +32,6 @@
             combo-picker.ejs's own dayQueryUrl local). %>
         <%- include('partials/schedule-combo-picker', { combos, selectedComboId, dayQueryUrl: '/admin/schedule?tab=' }) %>
         <%- include('partials/class-schedule-grid', { day, dayLabel, activeDays, classDayLabels, error, notice, selectedDate, hours, roomGrid, rooms, gradeLevels, ageOptions, colorPalette, availableStaff, sections, absentIds, selectedSemesterId, basePath: `/admin/schedule?tab=${tab}&semesterId=${selectedSemesterId}`, readOnly: !isFullAdmin }) %>
-      <% } else if (tab === 'archive') { %>
-        <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
-        <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
-
-        <div class="day-toggle no-print schedule-day-toggle">
-          <a class="day-toggle-option<%= archiveType === 'class' ? ' active' : '' %>" href="/admin/schedule?tab=archive&type=class">Class</a>
-          <a class="day-toggle-option<%= archiveType === 'student' ? ' active' : '' %>" href="/admin/schedule?tab=archive&type=student">Student</a>
-          <a class="day-toggle-option<%= archiveType === 'parent' ? ' active' : '' %>" href="/admin/schedule?tab=archive&type=parent">Parent</a>
-        </div>
-
-        <% if (archiveType === 'class') { %>
-          <div class="roster-toolbar no-print">
-            <div class="roster-btn-row">
-              <a class="roster-action-btn file-action-btn" href="/admin/class-schedule/archive/export.csv">Export</a>
-              <% if (archives.length > 0) { %>
-                <form method="POST" action="/admin/class-schedule/archive/delete-all" class="inline-block-form" data-confirm="Permanently delete all <%= archives.length %> archived class(es)? This cannot be undone.">
-                  <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete All</button>
-                </form>
-              <% } %>
-            </div>
-          </div>
-
-          <% if (archives.length === 0) { %>
-            <p class="roster-empty">No archived classes yet. Select classes on a day's grid and use "Archive" to move them here.</p>
-          <% } else { %>
-            <div class="roster-scroll">
-              <table class="roster-table">
-                <thead>
-                  <tr>
-                    <th>Day</th>
-                    <th>Class Name</th>
-                    <th>Room</th>
-                    <th>Grade</th>
-                    <th>Start Time</th>
-                    <th>End Time</th>
-                    <th>Teachers</th>
-                    <th>Assistants</th>
-                    <th>Students</th>
-                    <th>Archived At</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <% archives.forEach(function(a) { %>
-                    <tr>
-                      <td><%= dayLabels[a.day] || a.day %></td>
-                      <td><%= a.class_name %></td>
-                      <td><%= a.room || '—' %></td>
-                      <td><%= a.age_group || '—' %></td>
-                      <td><%= a.start_time || '—' %></td>
-                      <td><%= a.end_time || '—' %></td>
-                      <td><%= a.teachers || '—' %></td>
-                      <td><%= a.assistants || '—' %></td>
-                      <td><%= a.student_count %></td>
-                      <td><%= a.archived_at %></td>
-                      <td class="actions-cell">
-                        <form method="POST" action="/admin/class-schedule/archive/<%= a.id %>/delete" class="inline-block-form" data-confirm="Permanently delete this archived class (&quot;<%= a.class_name %>&quot;)? This cannot be undone.">
-                          <button type="submit" class="icon-btn" aria-label="Delete archived <%= a.class_name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                        </form>
-                      </td>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
-            </div>
-          <% } %>
-        <% } else { %>
-          <div class="roster-toolbar no-print">
-            <div class="roster-btn-row">
-              <a class="roster-action-btn file-action-btn" href="/admin/schedule/archive/<%= archiveType %>/export.csv">Export</a>
-              <% if (archives.length > 0) { %>
-                <form method="POST" action="/admin/schedule/archive/<%= archiveType %>/delete-all" class="inline-block-form" data-confirm="Permanently delete all <%= archives.length %> archived <%= archiveType %> schedule(s)? This cannot be undone.">
-                  <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete All</button>
-                </form>
-              <% } %>
-            </div>
-          </div>
-
-          <% if (archives.length === 0) { %>
-            <p class="roster-empty">No archived <%= archiveType %> schedules yet. Select <%= archiveType %> cards on the Member Schedules tab (filter to <%= archiveType === 'student' ? 'Students' : 'Parents' %>) and use "Archive" to move them here.</p>
-          <% } else { %>
-            <div class="roster-scroll">
-              <table class="roster-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <% archiveDays.forEach(function(d) { %>
-                      <th><%= dayLabels[d] %> Schedule</th>
-                    <% }); %>
-                    <th>Archived At</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <% archives.forEach(function(a) { %>
-                    <tr>
-                      <td><%= a.member_name %></td>
-                      <% archiveDays.forEach(function(d) { %>
-                        <td><%= a.daySchedules[d] || '—' %></td>
-                      <% }); %>
-                      <td><%= a.archived_at %></td>
-                      <td class="actions-cell">
-                        <form method="POST" action="/admin/schedule/archive/<%= a.id %>/delete" class="inline-block-form" data-confirm="Permanently delete this archived schedule (&quot;<%= a.member_name %>&quot;)? This cannot be undone.">
-                          <button type="submit" class="icon-btn" aria-label="Delete archived schedule for <%= a.member_name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                        </form>
-                      </td>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
-            </div>
-          <% } %>
-        <% } %>
       <% } else if (tab === 'settings') { %>
         <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
         <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
@@ -153,13 +40,10 @@
             semester, registration schedule. Move all those features to
             there designated pages only" - General/Semester/Registration
             Schedule each used to render stacked on one long page; now
-            each one only renders under its own sub-tab, same day-toggle
-            pattern this page's own Archive Class/Student/Parent sub-tabs
-            already use. %>
+            each one only renders under its own sub-tab. %>
         <div class="view-tabs no-print">
           <a class="view-tab<%= settingsTab === 'general' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=general">General</a>
           <a class="view-tab<%= settingsTab === 'semester' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=semester">Semester</a>
-          <a class="view-tab<%= settingsTab === 'registration' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=registration">Registration Schedule</a>
           <a class="view-tab<%= settingsTab === 'days' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=days">Day Settings</a>
         </div>
 
@@ -232,69 +116,33 @@
             class's own assignment is its own Semester dropdown, now on
             that class's own Details tab. %>
         <h2>Semesters</h2>
-        <%- include('partials/semester-manager', { semesters, missingSemesterCount, missingSemesterBreakdown, backUrl: '/admin/schedule?tab=settings&settingsTab=semester' }) %>
-      <% } else if (settingsTab === 'registration') { %>
+        <%- include('partials/semester-manager', { semesters, classDays, classDayLabels, classSchedules, backUrl: '/admin/schedule?tab=settings&settingsTab=semester' }) %>
 
         <%# A real request: "add registration schedule. Be able to
             control who can signup on each schedule grid monday/
             Wednesday. Date, time and section and open for teacher or
-            assistant registration." A follow-up confirmed this gates
-            everyone (parents/students/teachers), and "section" means the
-            existing Sections feature - class settings always live here
-            under Co-op Admin, not a separate Main Admin page. %>
+            assistant registration." Follow-ups: this gates everyone
+            (parents/students/teachers), "section" means the existing
+            Sections feature, and it was later folded in here under
+            Semester - "this settings is done through the semester tab" -
+            dropping its own separate sub-tab, with Add a Window turned
+            into a button+popup and an Edit button added next to Delete. %>
         <h2>Registration Schedule</h2>
         <p class="hint">
-          Stage class registration in rounds (e.g. teachers first, then everyone else), scoped to one day's
-          schedule grid and/or a Sections group if you like. A class only accepts registrations once its own
-          Close Registration checkbox (on that class's own Details tab) is unchecked <em>and</em>, if any windows
-          exist below, the registering member qualifies for one that's currently open. With no windows at all, a
-          class's own registration-open state is the only gate.
+          Stage class registration in rounds (e.g. teachers first, then everyone else), scoped to one specific
+          Schedule Grid and/or one or more Sections if you like, and to specific actions (parents registering to
+          teach/assist, parents registering their own student, students registering themselves) if you like.
+          Leaving Open For, Schedule Grid, and/or Section unset means that window applies to everyone/every grid/
+          every section. A class only accepts registrations once its own Close Registration checkbox (on that
+          class's own Details tab) is unchecked <em>and</em>, if any windows exist below, the registering member
+          qualifies for one that's currently open. With no windows at all, a class's own registration-open state
+          is the only gate.
         </p>
 
-        <section class="portal-dashboard-card portal-dashboard-card-wide">
-          <h2>Add a Window</h2>
-          <form method="POST" action="/admin/schedule/registration-windows" class="member-form-grid">
-            <label class="member-form-full">Label
-              <input type="text" name="label" placeholder="e.g. Teacher Priority Registration" required />
-            </label>
-            <label>Open For
-              <select name="roleKey">
-                <option value="">Everyone</option>
-                <% roles.forEach(function(r) { %>
-                  <option value="<%= r.key %>"><%= r.label %></option>
-                <% }); %>
-              </select>
-            </label>
-            <label>Schedule Grid
-              <select name="day">
-                <option value="">Both days</option>
-                <% Object.keys(dayLabels).forEach(function(key) { %>
-                  <option value="<%= key %>"><%= dayLabels[key] %></option>
-                <% }); %>
-              </select>
-            </label>
-            <label>Section
-              <select name="sectionId">
-                <option value="">All sections</option>
-                <% sections.forEach(function(s) { %>
-                  <option value="<%= s.id %>"><%= s.name %></option>
-                <% }); %>
-              </select>
-            </label>
-            <label>Opens At
-              <input type="datetime-local" name="opensAt" required />
-            </label>
-            <label>Closes At <span class="hint">(optional - blank means it stays open)</span>
-              <input type="datetime-local" name="closesAt" />
-            </label>
-            <div class="member-form-full">
-              <button type="submit" class="primary-btn">Add Window</button>
-            </div>
-          </form>
-        </section>
-
         <section class="portal-dashboard-section">
-          <h2>Current Windows</h2>
+          <div class="roster-btn-row">
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-window-dialog').showModal()">+ Add a Window</button>
+          </div>
           <% if (windows.length === 0) { %>
             <p class="roster-empty">No registration windows yet - every open class is available to every family immediately.</p>
           <% } else { %>
@@ -305,7 +153,7 @@
                     <th>Label</th>
                     <th>Open For</th>
                     <th>Schedule Grid</th>
-                    <th>Section</th>
+                    <th>Sections</th>
                     <th>Opens At</th>
                     <th>Closes At</th>
                     <th></th>
@@ -313,15 +161,23 @@
                 </thead>
                 <tbody>
                   <% windows.forEach(function(w) { %>
+                    <%
+                      var actionLabels = [];
+                      if (w.open_for_parent_teacher) actionLabels.push('Parent: Teach');
+                      if (w.open_for_parent_assistant) actionLabels.push('Parent: Assist');
+                      if (w.open_for_parent_register_student) actionLabels.push('Parent: Register Student');
+                      if (w.open_for_student_register_self) actionLabels.push('Student: Register Self');
+                    %>
                     <tr>
                       <td class="roster-name-col"><%= w.label %></td>
-                      <td><%= w.roleLabel || 'Everyone' %></td>
-                      <td><%= w.day ? (dayLabels[w.day] || w.day) : 'Both days' %></td>
-                      <td><%= w.sectionName || 'All sections' %></td>
+                      <td><%= actionLabels.length ? actionLabels.join(', ') : 'Every action' %></td>
+                      <td><%= w.scheduleTitle || 'Every schedule grid' %></td>
+                      <td><%= w.sectionNames.length ? w.sectionNames.join(', ') : 'All sections' %></td>
                       <td><%= w.opensLabel %></td>
                       <td><%= w.closesLabel || 'Stays open' %></td>
-                      <td>
-                        <form method="POST" action="/admin/schedule/registration-windows/<%= w.id %>/delete" data-confirm="Delete the &quot;<%= w.label %>&quot; window?">
+                      <td class="actions-cell">
+                        <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-window-dialog-<%= w.id %>').showModal()">Edit</button>
+                        <form method="POST" action="/admin/schedule/registration-windows/<%= w.id %>/delete" class="inline-block-form" data-confirm="Delete the &quot;<%= w.label %>&quot; window?">
                           <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
                         </form>
                       </td>
@@ -332,6 +188,17 @@
             </div>
           <% } %>
         </section>
+
+        <dialog id="add-window-dialog" class="member-picker-dialog">
+          <h3>Add a Window</h3>
+          <%- include('partials/registration-window-form', { action: '/admin/schedule/registration-windows', submitLabel: 'Add Window', w: undefined, classSchedules, semesters, sections }) %>
+        </dialog>
+        <% windows.forEach(function(w) { %>
+          <dialog id="edit-window-dialog-<%= w.id %>" class="member-picker-dialog">
+            <h3>Edit Window</h3>
+            <%- include('partials/registration-window-form', { action: `/admin/schedule/registration-windows/${w.id}/update`, submitLabel: 'Save Changes', w, classSchedules, semesters, sections }) %>
+          </dialog>
+        <% }); %>
       <% } else { %>
 
         <%# A real request: "Full 7 day expansion so multiple semesters
@@ -452,32 +319,14 @@
               <svg class="icon"><use href="#icon-filter"/></svg>
               Filter<% if (filterLabelParts.length > 0) { %>: <%= filterLabelParts.join(', ') %><% } %>
             </button>
-            <div class="class-schedule-archive-controls" data-archive-controls="schedule-archive-form-<%= tab %>" hidden>
-              <label class="checkbox-option class-schedule-select-all">
-                <input type="checkbox" data-select-all-for="schedule-archive-form-<%= tab %>" />
-                Select All
-              </label>
-              <button type="submit" form="schedule-archive-form-<%= tab %>" class="roster-action-btn">Archive Selected</button>
-            </div>
           </div>
 
           <div class="roster-btn-row">
             <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('schedule-import-dialog').showModal()">Import</button>
             <a class="roster-action-btn file-action-btn" href="/admin/schedule/export.csv<%= buildQuery({}) %>">Export</a>
             <a class="roster-action-btn print-action-btn" href="/admin/schedule/print<%= buildQuery({}) %>" target="_blank">Print</a>
-            <button type="button" class="roster-action-btn" data-archive-toggle="schedule-archive-form-<%= tab %>" aria-pressed="false">Archive</button>
           </div>
         </div>
-
-        <form
-          id="schedule-archive-form-<%= tab %>"
-          method="POST"
-          action="/admin/schedule/<%= tab %>/archive"
-          data-confirm="Are you sure you want to archive the selected member schedule(s)?"
-          data-confirm-yes-label="Yes, Archive"
-          data-confirm-icon="icon-save"
-          data-confirm-safe="1"
-        ></form>
 
         <dialog id="schedule-filter-dialog" class="member-picker-dialog">
           <form method="GET" action="/admin/schedule">
@@ -549,7 +398,6 @@
           <div class="schedule-card-grid">
             <% rows.forEach(function(r) { %>
               <div class="schedule-card-grid-item">
-                <input type="checkbox" name="memberIds" value="<%= r.member.id %>" form="schedule-archive-form-<%= tab %>" class="archive-select-checkbox no-print" aria-label="Select <%= r.member.name %> for archiving" hidden />
                 <a class="schedule-card-grid-name" href="/admin/schedule/member/<%= r.member.id %>/manage">
                   <%= r.member.name %>
                   <% if (!typeFilter) { %>
@@ -560,29 +408,6 @@
               </div>
             <% }); %>
           </div>
-          <%
-            // "Select All" (public/js/archive-select-toggle.js) only ever
-            // checks checkboxes actually present in the DOM - and this grid
-            // only renders one page's worth of members at a time (see the
-            // route's own PAGE_SIZE slice), so on a multi-page list it used
-            // to silently select just the current page, not everyone. Only
-            // relevant on the real "every active member" view (no single-
-            // person filter picked from the Name dropdown above, which
-            // already shows just the one match with no pagination at all) -
-            // these extra boxes carry the rest of that same, already-known
-            // allNames list (every active member of this type, unfiltered
-            // by page) so "Select All" can reach them too, without needing
-            // a server round trip or a separate "select every page" concept
-            // on the archive route itself.
-            var pageIds = rows.map(function (r) { return r.member.id; });
-          %>
-          <% if (!selectedMemberId) { %>
-            <% allNames.forEach(function(n) { %>
-              <% if (pageIds.indexOf(n.id) === -1) { %>
-                <input type="checkbox" name="memberIds" value="<%= n.id %>" form="schedule-archive-form-<%= tab %>" class="archive-offpage-checkbox" aria-hidden="true" hidden />
-              <% } %>
-            <% }); %>
-          <% } %>
         <% } %>
 
         <% if (totalPages > 1) { %>
@@ -597,7 +422,6 @@
   </main>
   <script src="/js/badge-autofit.js"></script>
   <script src="/js/schedule.js"></script>
-  <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/forum-editor.js"></script>
 </body>
 </html>

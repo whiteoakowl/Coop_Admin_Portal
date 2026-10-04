@@ -5,11 +5,13 @@
 // Day Settings-driven utils/classDays.js the Classes grid, Floater
 // Assignments, and Setup/Cleanup already use. Covers: activating a
 // Tuesday day schedule makes a real tuesday-parent/tuesday-student
-// Attendance tab (grid, dates, membership, resync, archive, print, CSV
-// export all working, not just the grid's own landing page), that the
-// Classes/Playground/Archive tabs' own Day filters list Tuesday too, that
-// the semester+day combo picker offers Tuesday as an option, and that
-// Monday/Wednesday keep working completely unchanged.
+// Attendance tab (grid, dates, membership, resync, print, CSV export all
+// working, not just the grid's own landing page), that the Classes/
+// Playground tabs' own Day filters list Tuesday too, that the
+// semester+day combo picker offers Tuesday as an option, and that
+// Monday/Wednesday keep working completely unchanged. (The Attendance
+// Archive feature this file used to also cover here was later removed
+// entirely.)
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -56,7 +58,7 @@ async function activateTuesday(admin) {
     .send({ title: 'Tuesday Enrichment', dayOfWeek: 'tuesday', _csrf: admin.csrfToken });
 }
 
-test('a newly-activated Tuesday day schedule makes a real tuesday-parent/tuesday-student Attendance tab, with Edit Dates/Add Member/Resync/Archive/Print/Export all reachable', async () => {
+test('a newly-activated Tuesday day schedule makes a real tuesday-parent/tuesday-student Attendance tab, with Edit Dates/Add Member/Resync/Print/Export all reachable', async () => {
   const admin = await loginAsAdmin();
   await activateTuesday(admin);
   await createClass({ day: 'tuesday', hourPosition: 1, className: 'Tuesday Art' });
@@ -111,14 +113,6 @@ test('a newly-activated Tuesday day schedule makes a real tuesday-parent/tuesday
 
   const exportCsv = await request(app).get('/admin/roster/tuesday-parent/export.csv').set('Cookie', admin.cookie);
   assert.equal(exportCsv.status, 200);
-
-  const archive = await request(app)
-    .post('/admin/rosters/tuesday/archive')
-    .set('Cookie', admin.cookie)
-    .type('form')
-    .send({ _csrf: admin.csrfToken });
-  assert.notEqual(archive.status, 404);
-  assert.match(archive.headers.location, /tab=tuesday-student/);
 });
 
 test('the Classes tab Day filter and Playground tab list Tuesday once activated, alongside Monday/Wednesday', async () => {
@@ -144,7 +138,7 @@ test('the Classes tab Day filter and Playground tab list Tuesday once activated,
   assert.match(playgroundLog.text, /Tuesday/);
 });
 
-test('archiving Tuesday creates an archive record filterable by day, and Monday/Wednesday are unaffected', async () => {
+test('activating Tuesday and adding its own session dates leaves Monday/Wednesday rosters completely untouched', async () => {
   const admin = await loginAsAdmin();
   await activateTuesday(admin);
 
@@ -154,21 +148,6 @@ test('archiving Tuesday creates an archive record filterable by day, and Monday/
     .type('form')
     .send({ dates: ['2026-09-08'], _csrf: admin.csrfToken });
 
-  await request(app)
-    .post('/admin/rosters/tuesday/archive')
-    .set('Cookie', admin.cookie)
-    .type('form')
-    .send({ _csrf: admin.csrfToken });
-
-  const archiveRow = await db.prepare("SELECT * FROM roster_archives WHERE day = 'tuesday'").get();
-  assert.ok(archiveRow, 'a Tuesday archive row should have been created');
-
-  const archivePage = await request(app).get('/admin/rosters?tab=archive&day=tuesday').set('Cookie', admin.cookie);
-  assert.equal(archivePage.status, 200);
-  assert.match(archivePage.text, /Tuesday/);
-
-  // Monday/Wednesday rosters remain completely untouched by Tuesday's own
-  // Day Settings activation or archive.
   const mondayPage = await request(app).get('/admin/rosters?tab=monday-parent').set('Cookie', admin.cookie);
   assert.equal(mondayPage.status, 200);
   assert.match(mondayPage.text, /Monday Attendance/);

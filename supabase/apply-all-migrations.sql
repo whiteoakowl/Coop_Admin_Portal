@@ -4408,3 +4408,76 @@ alter table member_schedules add constraint member_schedules_day_check check (da
 -- this expansion already widened.
 alter table permanent_jobs drop constraint if exists permanent_jobs_day_check;
 alter table permanent_jobs add constraint permanent_jobs_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));
+
+-- ===== 20261031010000_registration_windows_action_types.sql =====
+-- A real request: "class settings, registration schedule window. Open
+-- for options, parents can register for teaching positions, parents can
+-- register for class assistant positions, parents can register their
+-- students for classes, students can register for classes... Also keep
+-- choosing schedule grid but now it will have the options of the class
+-- schedule titles that have been created to connect them to." Replaces
+-- the generic role_key "Open For" dropdown with four specific action-type
+-- toggles (none checked = open for every action, same "empty means
+-- unrestricted" convention registration_windows has always used), and
+-- the plain day_check'd `day` column (only ever 'monday'/'wednesday',
+-- never widened for the later 7-day expansion) with a real FK to
+-- class_schedules - the Schedule Grid picker now offers that catalog's
+-- own admin-given titles instead of a hardcoded day list. `section_id`
+-- (always just ONE section) becomes a real join table so a window can
+-- target several sections at once - "section if none are selected it
+-- will be open to everyone... if a section is selected it will also
+-- block anyone not in those sections."
+alter table registration_windows add column if not exists class_schedule_id integer references class_schedules(id) on delete set null;
+alter table registration_windows add column if not exists open_for_parent_teacher boolean not null default false;
+alter table registration_windows add column if not exists open_for_parent_assistant boolean not null default false;
+alter table registration_windows add column if not exists open_for_parent_register_student boolean not null default false;
+alter table registration_windows add column if not exists open_for_student_register_self boolean not null default false;
+create index if not exists idx_registration_windows_class_schedule on registration_windows(class_schedule_id);
+
+create table if not exists registration_window_sections (
+  window_id integer not null references registration_windows(id) on delete cascade,
+  section_id integer not null references sections(id) on delete cascade,
+  primary key (window_id, section_id)
+);
+create index if not exists idx_registration_window_sections_section on registration_window_sections(section_id);
+
+-- Carry forward any existing single-section targeting into the new join
+-- table before the old column goes away.
+insert into registration_window_sections (window_id, section_id)
+select id, section_id from registration_windows where section_id is not null
+on conflict (window_id, section_id) do nothing;
+
+-- role_key (the old generic "Open For" role dropdown) and day (the
+-- never-widened 'monday'/'wednesday'-only column) are both fully
+-- replaced above - no remaining reader anywhere in the app.
+alter table registration_windows drop column if exists role_key;
+alter table registration_windows drop column if exists day;
+alter table registration_windows drop column if exists section_id;
+
+-- ===== 20261101010000_class_archive_removal_auto_transcripts.sql =====
+-- "We don't need any archive features under classes tab either on co-op
+-- admin portal. Everything is connected to semesters so we don't need
+-- individual archiving anymore." The Class/Student/Parent Schedule
+-- Archive features (class_schedule_archives, member_schedule_archives)
+-- are removed from the UI/routes entirely - both tables are left as-is
+-- (any pre-existing archived rows stay queryable directly, just not
+-- through the app anymore).
+--
+-- archiveClasses used to be the ONLY thing that wrote a Transcript entry
+-- (student_academic_history) for a student who completed a class, as a
+-- side effect of manually archiving it. With that manual step gone,
+-- transcripts are generated automatically once a class's own end_date
+-- has passed (see utils/academics.js's generateTranscriptsForEndedClasses,
+-- called from the Academics page) - this adds class_id so that backfill
+-- can tell which classes it's already generated an entry for and never
+-- double-insert one on a later run.
+alter table student_academic_history add column if not exists class_id integer references classes(id) on delete set null;
+create unique index if not exists idx_student_academic_history_student_class on student_academic_history(student_id, class_id) where class_id is not null;
+
+-- ===== 20261102010000_orientation_settings_drop_link_url.sql =====
+-- A real request: "the links for the column check boxes should be
+-- dropdown menus of trainings that have been created" - the plain,
+-- hand-typed link_url field on orientation_settings is removed entirely;
+-- each column's header link now comes only from its own linked Training
+-- (training_id), picked from a dropdown on Orientation Settings.
+alter table orientation_settings drop column if exists link_url;

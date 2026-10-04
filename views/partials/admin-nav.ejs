@@ -42,9 +42,8 @@
         // the week - the page's own semester+day combo picker is how an
         // admin switches days from here now.
         { href: '/admin/rosters', label: 'Parent/Student Rosters' },
-        { href: '/admin/rosters?tab=classes', label: 'Classes' },
-        { href: '/admin/rosters?tab=playground', label: 'Playground' },
-        { href: '/admin/rosters?tab=archive', label: 'Archive' },
+        { href: '/admin/rosters?tab=classes', label: 'Class Rosters' },
+        { href: '/admin/rosters?tab=playground', label: 'Playground Check in/out' },
       ] },
       { href: '/admin/volunteers', icon: 'users', label: 'Floater Assignments' },
       { href: '/admin/setup', icon: 'broom', label: 'Setup/Cleanup' },
@@ -68,7 +67,6 @@
         { href: '/admin/schedule', label: 'Class Schedules' },
         ...(isFullAdmin ? [
           { href: '/admin/schedule?tab=members', label: 'Member Schedules' },
-          { href: '/admin/schedule?tab=archive', label: 'Archive' },
           { href: '/admin/schedule?tab=settings', label: 'Settings' },
         ] : []),
       ] },
@@ -84,6 +82,7 @@
         { href: '/admin/logs?tab=classrisk', label: 'Class Cancellation Risk' },
         { href: '/admin/logs?tab=substitutes', label: 'Substitutes Needed' },
         { href: '/admin/logs?tab=allergies', label: 'Allergies/Medical' },
+        { href: '/admin/logs?tab=classregistration', label: 'Class Registration' },
       ] },
       { href: '/admin/training', icon: 'graduation-cap', label: 'Training' },
     ];
@@ -130,9 +129,9 @@
       // orientation check in." See routes/admin-orientation.js/utils/
       // orientation.js.
       { href: '/admin/orientation', icon: 'check-circle', label: 'Orientation', subpages: [
-        { href: '/admin/orientation', label: 'Orientation' },
+        { href: '/admin/orientation', label: 'Orientation Tracking' },
         { href: '/admin/orientation/tour-checkin', label: 'Tour Check-In' },
-        { href: '/admin/orientation/orientation-checkin', label: 'Orientation Check-In' },
+        { href: '/admin/orientation/orientation-checkin', label: 'Open House Check-In' },
       ] },
     ];
   %>

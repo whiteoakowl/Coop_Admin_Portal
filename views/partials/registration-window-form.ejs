@@ -1,0 +1,60 @@
+<%
+// Shared field set for both the Add a Window and Edit Window dialogs on
+// Settings > Semester (routes/admin-schedule.js's own registration-
+// windows routes) - a real request turned "Add a Window" into a button+
+// popup and added an Edit button next to Delete, so both dialogs now
+// post the exact same fields to two different routes instead of one
+// inline Add form with no edit path at all.
+// Locals: action (form target), submitLabel, w (optional - an existing
+// window's own values to pre-fill for Edit; omit for a blank Add form),
+// classSchedules, semesters, sections (all already in scope on this
+// page, passed through explicitly for clarity).
+const existing = typeof w !== 'undefined' ? w : null;
+const openFor = {
+  parent_teacher: existing ? existing.open_for_parent_teacher : false,
+  parent_assistant: existing ? existing.open_for_parent_assistant : false,
+  parent_register_student: existing ? existing.open_for_parent_register_student : false,
+  student_register_self: existing ? existing.open_for_student_register_self : false,
+};
+const checkedSectionIds = existing ? existing.sectionIds : [];
+%>
+<form method="POST" action="<%= action %>" class="member-form-grid">
+  <label class="member-form-full">Label
+    <input type="text" name="label" placeholder="e.g. Teacher Priority Registration" value="<%= existing ? existing.label : '' %>" required />
+  </label>
+  <div class="member-form-full">
+    <span class="checkbox-group-label">Open For <span class="hint">(none checked means every action below)</span></span>
+    <div class="checkbox-group checkbox-group-boxed">
+      <label class="checkbox-option"><input type="checkbox" name="actionTypes" value="parent_teacher" <%= openFor.parent_teacher ? 'checked' : '' %> /> Parents can register for teaching positions</label>
+      <label class="checkbox-option"><input type="checkbox" name="actionTypes" value="parent_assistant" <%= openFor.parent_assistant ? 'checked' : '' %> /> Parents can register for class assistant positions</label>
+      <label class="checkbox-option"><input type="checkbox" name="actionTypes" value="parent_register_student" <%= openFor.parent_register_student ? 'checked' : '' %> /> Parents can register their students for classes</label>
+      <label class="checkbox-option"><input type="checkbox" name="actionTypes" value="student_register_self" <%= openFor.student_register_self ? 'checked' : '' %> /> Students can register for classes</label>
+    </div>
+  </div>
+  <label>Schedule Grid
+    <select name="classScheduleId">
+      <option value="">Every schedule grid</option>
+      <% classSchedules.forEach(function(cs) { %>
+        <option value="<%= cs.id %>" <%= existing && existing.class_schedule_id === cs.id ? 'selected' : '' %>><%= cs.title %><% var sem = semesters.find(function(s) { return s.id === cs.semester_id; }); %><% if (sem) { %> (<%= sem.title %>)<% } %></option>
+      <% }); %>
+    </select>
+  </label>
+  <div class="member-form-full">
+    <span class="checkbox-group-label">Section <span class="hint">(none selected means open to everyone)</span></span>
+    <div class="checkbox-group checkbox-group-boxed">
+      <% sections.forEach(function(s) { %>
+        <label class="checkbox-option"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= checkedSectionIds.includes(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
+      <% }); %>
+    </div>
+  </div>
+  <label>Opens At
+    <input type="datetime-local" name="opensAt" value="<%= existing ? existing.opensInput : '' %>" required />
+  </label>
+  <label>Closes At <span class="hint">(optional - blank means it stays open)</span>
+    <input type="datetime-local" name="closesAt" value="<%= existing ? existing.closesInput : '' %>" />
+  </label>
+  <div class="member-form-full notes-dialog-actions">
+    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+    <button type="submit" class="primary-btn"><%= submitLabel %></button>
+  </div>
+</form>

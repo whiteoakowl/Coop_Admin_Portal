@@ -70,8 +70,12 @@ test('Co-op Admin nav: the Schedules item is now called Classes', async () => {
   const page = await request(app).get('/admin').set('Cookie', admin.cookie);
   const navMatch = /<nav id="admin-nav-links">([\s\S]*?)<\/nav>/.exec(page.text);
   assert.ok(navMatch);
-  assert.match(navMatch[1], />Classes</);
-  assert.doesNotMatch(navMatch[1], />Schedules</);
+  // The Classes item now has its own subpages (Class Schedules/Member
+  // Schedules/Settings), so it renders as a <details> group summary -
+  // "Classes" followed by the group's own dropdown chevron, not a plain
+  // "Classes</a>" link any more.
+  assert.match(navMatch[1], /Classes <svg class="icon admin-nav-group-chevron"/);
+  assert.doesNotMatch(navMatch[1], /Schedules <svg class="icon admin-nav-group-chevron"/);
 });
 
 test('Class Schedules grid: a class card links straight to its own full Manage page (data-view-class + class-schedule-view.js navigates, no more popup)', async () => {

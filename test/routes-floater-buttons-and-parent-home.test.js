@@ -45,7 +45,7 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
-test('Floater Assignments: Add/Edit Dates and Add/Edit Permanent Positions use roster-action-btn, matching Export/Print/Archive', async () => {
+test('Floater Assignments: Add/Edit Dates and Add/Edit Permanent Positions use roster-action-btn, matching Export/Print', async () => {
   const cookie = await loginAsAdmin();
   const res = await request(app).get('/admin/volunteers/monday/manage').set('Cookie', cookie);
   assert.equal(res.status, 200);

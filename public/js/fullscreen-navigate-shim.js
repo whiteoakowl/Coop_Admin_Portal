@@ -3,12 +3,12 @@
 // and the same silent-no-op affected every other admin page's own
 // Filter/date-picker <select onchange="window.fullscreenNavigate(...)">
 // (admin-design, admin-library, admin-logs, admin-members, admin-name-
-// tag, admin-rosters, admin-setup-archive, admin-setup-assignments,
-// admin-volunteer-archive, admin-volunteers, main-admin-members, main-
-// admin-name-tags - all copied from the same dropdown pattern, none of
-// them kiosk pages). window.fullscreenNavigate is public/js/fullscreen-
-// nav.js's own kiosk-only helper (it swaps page content in place so a
-// kiosk terminal's fullscreen mode survives navigating) - that script is
+// tag, admin-rosters, admin-setup-assignments, admin-volunteers, main-
+// admin-members, main-admin-name-tags - all copied from the same
+// dropdown pattern, none of them kiosk pages). window.fullscreenNavigate
+// is public/js/fullscreen-nav.js's own kiosk-only helper (it swaps page
+// content in place so a kiosk terminal's fullscreen mode survives
+// navigating) - that script is
 // never loaded on these admin pages, which never need fullscreen
 // preserved in the first place, so calling it just threw "not a
 // function" and the dropdown did nothing.

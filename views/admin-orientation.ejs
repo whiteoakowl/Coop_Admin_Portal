@@ -7,12 +7,12 @@
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="roster-toolbar">
-      <div><h1>Orientation</h1></div>
+      <div><h1>Orientation Tracking</h1></div>
       <div class="roster-btn-row no-print">
         <a class="btn-secondary" href="/admin/orientation/settings">Orientation Settings</a>
       </div>
     </div>
-    <p class="hint">Every family with a student registered for classes this semester, and their orientation progress. Click a circle to mark it complete/incomplete by hand - Tour and Orientation Meet Up are usually set from their own Check-In subpage instead.</p>
+    <p class="hint">Every family with a student registered for classes this semester, and their orientation progress. Click a circle to mark it complete/incomplete by hand - Tour and Open House are usually set from their own Check-In subpage instead.</p>
 
     <%# A real request: "Orientation gets a dropdown to pick which
         semester to view" - defaults to the newest semester (see
@@ -51,7 +51,6 @@
         // field keys (utils/orientation.js's own FIELDS) are unchanged.
         var columns = [
           { field: 'video', label: 'Parent Orientation' },
-          { field: 'meetup', label: 'Orientation Meet Up' },
           { field: 'teacherTraining', label: 'Teacher Orientation' },
           { field: 'tour', label: 'Tour' },
           { field: 'openHouse', label: 'Open House' },
@@ -66,8 +65,8 @@
               <th>Day</th>
               <% columns.forEach(function(col) { %>
                 <th class="orientation-col-center">
-                  <% if (links[col.field]) { %>
-                    <a href="<%= links[col.field] %>" target="_blank" rel="noopener"><%- stackedHeader(col.label) %></a>
+                  <% if (trainingLinks[col.field]) { %>
+                    <a href="/admin/training/<%= trainingLinks[col.field] %>/builder"><%- stackedHeader(col.label) %></a>
                   <% } else { %>
                     <%- stackedHeader(col.label) %>
                   <% } %>

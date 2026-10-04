@@ -84,13 +84,6 @@
   document.querySelectorAll('[data-class-schedule-semester-filter]').forEach((select) => {
     applyFilters(select.getAttribute('data-class-schedule-semester-filter'));
   });
-
-  // Close the Filter dropdown on an outside click, same "click anywhere
-  // else closes it" affordance every other popup in this app already has.
-  document.addEventListener('click', function (e) {
-    document.querySelectorAll('[data-filter-details][open]').forEach((details) => {
-      if (details.contains(e.target)) return;
-      details.removeAttribute('open');
-    });
-  });
+  // Outside-click-to-close for the Filter dropdown is public/js/filter-
+  // details-dismiss.js, shared with every other Filter button in the app.
 })();

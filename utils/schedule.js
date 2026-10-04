@@ -1,7 +1,5 @@
 const db = require('../db');
 const {
-  syncClassRosterMembers,
-  syncDayMemberRosters,
   familyAttendanceWindowsForDay,
   liveMemberScheduleRowsForDay,
   minutesToClockLabelLocal,
@@ -243,156 +241,6 @@ async function scheduleList(filters) {
   return rows;
 }
 
-// One line per day summarizing a member's current schedule, for the
-// snapshot archiveMemberSchedules saves before clearing it - not meant to
-// be parsed back, just a readable historical record (same spirit as
-// class_schedule_archives flattening teachers/assistants to plain text).
-function summarizeScheduleDay(rows) {
-  const text = rows
-    .filter((r) => !rowIsBlank(r))
-    .map((r) => [r.time, r.class_name, r.room].filter(Boolean).join(' - '))
-    .join('; ');
-  return text || null;
-}
-
-// Archives the given members' current schedules (one row per member in
-// member_schedule_archives, see its own migration comment) and unenrolls
-// each one from every class they're currently on - as a student,
-// class_enrollments; as a parent, class_staff. This is the Student/Parent
-// Schedules tab's own equivalent of archiveClasses (utils/classSchedule.js):
-// clearing everyone's schedule before importing a new term's file, without
-// losing the record of what they were on. Days actually touched are
-// resynced once each at the end (not once per member/class) for the same
-// reason the Class Schedule Import batches it - see addStaff's own comment
-// on skipSync. Returns how many members were archived.
-//
-// A real live-reported timeout: the original version called
-// getMemberSchedule(memberId) once PER member - and that function redoes
-// each day's ENTIRE live computation (every class's enrollment/staffing,
-// every floater section) from scratch on every call (see
-// liveMemberScheduleRowsForDay's own comment on why - it's built once and
-// reused for a whole page elsewhere, e.g. scheduleList). Fine for the one
-// member a real page normally archives at a time; with the Select-All-
-// across-all-pages fix landing at the same time this bug was found (now
-// a batch can genuinely be hundreds of members), that became hundreds of
-// full-day recomputations against a real, network-latency-bound
-// Postgres connection - long enough to hit Netlify's function timeout
-// before the request ever finished. Fixed the same way
-// arrivalDepartureLabelsForMembers already fixed the identical shape of
-// N+1 for Arrival/Departure: compute both days' live rows ONCE for the
-// whole batch, then reuse them per member.
-async function archiveMemberSchedules(memberIds) {
-  if (memberIds.length === 0) return 0;
-  const placeholders = memberIds.map(() => '?').join(',');
-  const members = await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders})`).all(...memberIds);
-  if (members.length === 0) return 0;
-
-  const activeDays = await listActiveClassDays();
-  const rowsByDay = await Promise.all(activeDays.map((d) => liveMemberScheduleRowsForDay(d)));
-
-  const touchedDays = new Set();
-  const studentIds = [];
-  const parentIds = [];
-  const archiveRows = members.map((member) => {
-    const schedule = {};
-    activeDays.forEach((d, i) => {
-      schedule[d] = fourRows(Object.values(rowsByDay[i][member.id] || {}));
-      if (schedule[d].some((r) => !rowIsBlank(r))) touchedDays.add(d);
-    });
-    (member.member_type === 'student' ? studentIds : parentIds).push(member.id);
-    return { member, schedule };
-  });
-
-  // Every class any archived student is currently enrolled in, gathered
-  // BEFORE the bulk delete below removes the rows that would otherwise
-  // tell us - synced once per distinct class after unenrolling everyone,
-  // not once per (student, class) pair, since more than one archived
-  // student commonly shares the same class.
-  const classIds = new Set();
-  if (studentIds.length) {
-    const studentPlaceholders = studentIds.map(() => '?').join(',');
-    (await db.prepare(`SELECT DISTINCT class_id FROM class_enrollments WHERE student_id IN (${studentPlaceholders})`).all(...studentIds)).forEach(
-      (r) => classIds.add(r.class_id)
-    );
-  }
-
-  await db.withTransaction(async (tx) => {
-    for (const { member, schedule } of archiveRows) {
-      const daySchedules = {};
-      for (const d of activeDays) {
-        const summary = summarizeScheduleDay(schedule[d]);
-        if (summary) daySchedules[d] = summary;
-      }
-      await tx
-        .prepare(
-          `INSERT INTO member_schedule_archives (member_id, member_name, member_type, day_schedules_json)
-           VALUES (?, ?, ?, ?)`
-        )
-        .run(member.id, member.name, member.member_type, JSON.stringify(daySchedules));
-    }
-    if (studentIds.length) {
-      const studentPlaceholders = studentIds.map(() => '?').join(',');
-      await tx.prepare(`DELETE FROM class_enrollments WHERE student_id IN (${studentPlaceholders})`).run(...studentIds);
-    }
-    if (parentIds.length) {
-      const parentPlaceholders = parentIds.map(() => '?').join(',');
-      await tx.prepare(`DELETE FROM class_staff WHERE member_id IN (${parentPlaceholders})`).run(...parentIds);
-    }
-  });
-
-  // Both sync steps read back the rows the transaction above just wrote/
-  // deleted, so they have to run after it commits, not inside it -
-  // syncClassRosterMembers/syncDayMemberRosters each use the module's own
-  // top-level db connection, not the transaction's dedicated one (see
-  // db/postgres.js's own header comment on why a query inside
-  // withTransaction MUST go through the tx handle it hands you - anything
-  // that doesn't is on a different connection, and would either miss the
-  // still-uncommitted deletes above or, worse, race the commit itself).
-  for (const classId of classIds) await syncClassRosterMembers(classId);
-  for (const day of touchedDays) await syncDayMemberRosters(day);
-  return members.length;
-}
-
-// Normalizes both archive row shapes into one daySchedules object: a row
-// archived after 20261029010000 carries day_schedules_json directly
-// ({ [day]: summaryText }, any active day at archive time); an older row
-// has none of that - only its own fixed monday_schedule/wednesday_schedule
-// columns - so those are read back into the same shape instead. Callers
-// (the Archive tab's table, its CSV export) only ever deal with
-// daySchedules, never the raw columns, so neither has to know which shape
-// a given archive was actually saved in.
-function normalizeArchiveRow(row) {
-  let daySchedules;
-  if (row.day_schedules_json) {
-    try {
-      daySchedules = JSON.parse(row.day_schedules_json);
-    } catch (err) {
-      daySchedules = {};
-    }
-  } else {
-    daySchedules = {};
-    if (row.monday_schedule) daySchedules.monday = row.monday_schedule;
-    if (row.wednesday_schedule) daySchedules.wednesday = row.wednesday_schedule;
-  }
-  return { ...row, daySchedules };
-}
-
-async function listMemberScheduleArchives(memberType) {
-  const rows = await db
-    .prepare('SELECT * FROM member_schedule_archives WHERE member_type = ? ORDER BY archived_at DESC, id DESC')
-    .all(memberType);
-  return rows.map(normalizeArchiveRow);
-}
-
-async function deleteMemberScheduleArchive(id) {
-  await db.prepare('DELETE FROM member_schedule_archives WHERE id = ?').run(id);
-}
-
-async function deleteAllMemberScheduleArchives(memberType) {
-  const result = await db.prepare('DELETE FROM member_schedule_archives WHERE member_type = ?').run(memberType);
-  return result.changes;
-}
-
 module.exports = {
   CLASS_NUMBERS,
   STATUS_LABELS,
@@ -406,8 +254,4 @@ module.exports = {
   arrivalDepartureLabelsForMembers,
   parseClockMinutes,
   splitTimeRange,
-  archiveMemberSchedules,
-  listMemberScheduleArchives,
-  deleteMemberScheduleArchive,
-  deleteAllMemberScheduleArchives,
 };

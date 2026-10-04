@@ -6,7 +6,10 @@
 // flex-column wrapper (.cell-detailed) already existed but was never
 // actually applied in the markup. Fixed by wrapping the select/tag/time
 // spans in that div in both the live grid (views/admin-rosters.ejs) and
-// the read-only archive grid (views/partials/roster-archive-grid-table.ejs).
+// the shared read-only print grid (views/partials/roster-archive-grid-
+// table.ejs, also used by the Print Preview page despite its name - the
+// Attendance Archive feature it was originally built for has since been
+// removed).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -64,24 +67,21 @@ test('the live Attendance grid wraps a cell\'s status bubble + check-in/out time
   assert.match(res.text, wrapperRe, 'select/tag/In/Out must all be direct children of one .cell-detailed div');
 });
 
-test('the read-only Archive grid also wraps its tag + check-in/out times in .cell-detailed', async () => {
-  const { cookie, csrfToken } = await loginAsAdmin();
+test('the read-only Print Preview grid also wraps its tag + check-in/out times in .cell-detailed', async () => {
+  const { cookie } = await loginAsAdmin();
 
   const rosterId = (await db.prepare("SELECT id FROM rosters WHERE category = 'Class Schedule' AND schedule_day = 'monday' AND name LIKE '%Student%'").get()).id;
-  const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Archive Cell Layout Student', 'archive-cell-layout-student', 'student')").run()).lastInsertRowid;
+  const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Print Cell Layout Student', 'print-cell-layout-student', 'student')").run()).lastInsertRowid;
   await db.prepare('INSERT INTO roster_members (roster_id, member_id) VALUES (?, ?)').run(rosterId, memberId);
   const today = '2026-01-12'; // different date than the first test in this file - same roster's roster_dates row must not collide
   await db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(rosterId, today);
   await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time) VALUES (?, ?, ?, 'present', ?)").run(memberId, rosterId, today, Date.now());
   await db.prepare('INSERT INTO checkouts (member_id, roster_id, session_date, number, check_out_time) VALUES (?, ?, ?, ?, ?)').run(memberId, rosterId, today, 9, Date.now());
 
-  await request(app).post('/admin/rosters/monday/archive').set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
-
-  const archive = await db.prepare("SELECT id FROM roster_archives WHERE day = 'monday' ORDER BY id DESC LIMIT 1").get();
-  const res = await request(app).get(`/admin/rosters/archive/${archive.id}/view-fragment`).set('Cookie', cookie);
+  const res = await request(app).get('/admin/rosters/print?tab=monday-student').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /Archive Cell Layout Student/);
+  assert.match(res.text, /Print Cell Layout Student/);
 
   const wrapperRe = /<div class="cell-detailed">\s*<span class="cell-tag[^]*?<\/span>\s*<span class="cell-time">In [^<]*<\/span>\s*<span class="cell-time">Out [^<]*<\/span>\s*<\/div>/;
-  assert.match(res.text, wrapperRe, 'tag/In/Out must all be direct children of one .cell-detailed div in the archive view too');
+  assert.match(res.text, wrapperRe, 'tag/In/Out must all be direct children of one .cell-detailed div in the print view too');
 });

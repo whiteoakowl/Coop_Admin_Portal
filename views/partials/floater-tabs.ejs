@@ -1,5 +1,5 @@
 <%
-// locals: day, activeFloaterTab ('assignments' | 'teams' | 'risk' | 'archive'),
+// locals: day, activeFloaterTab ('assignments' | 'teams' | 'risk'),
 // semesterId (optional - the combo picker's own current selection, query-
 // string-ready: a number, 'none', or omitted/undefined).
 // Monday/Wednesday used to be two separate top-level tabs here - now
@@ -7,7 +7,7 @@
 // choice made via the day-toggle on the manage page itself (mirrors the
 // Attendance page's Monday/Wednesday consolidation). The link below
 // carries whichever day is currently in context (passed in as `day` by
-// every one of this partial's 4 callers) so switching from, say,
+// every one of this partial's 3 callers) so switching from, say,
 // Wednesday Teams back to Floater Assignments lands on Wednesday, not a
 // hardcoded default. semesterId does the same job for the newer semester
 // combo picker (routes/admin-volunteers.js's own comboSemesterId) - a
@@ -20,5 +20,4 @@ var semesterQS = typeof semesterId !== 'undefined' && semesterId !== undefined ?
   <a class="view-tab<%= activeFloaterTab === 'assignments' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/manage<%= semesterQS %>">Floater Assignments</a>
   <a class="view-tab<%= activeFloaterTab === 'teams' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/teams<%= semesterQS %>">Floater Teams</a>
   <a class="view-tab<%= activeFloaterTab === 'risk' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/risk<%= semesterQS %>">Class Cancellation Risk</a>
-  <a class="view-tab<%= activeFloaterTab === 'archive' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/archive<%= semesterQS %>">Archive</a>
 </div>

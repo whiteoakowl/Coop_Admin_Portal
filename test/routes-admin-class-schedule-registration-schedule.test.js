@@ -7,8 +7,15 @@
 // existing Sections feature; (3) class settings always live under Co-op
 // Admin's own Classes > Settings tab, not a separate Main Admin page -
 // so this extends the existing (previously orphaned - zero inbound nav
-// links) registration_windows feature with day + section scoping, hosts
-// it on /admin/schedule?tab=settings, and wires it into real enforcement.
+// links) registration_windows feature with schedule-grid + section
+// scoping, hosts it on /admin/schedule?tab=settings, and wires it into
+// real enforcement. A later request replaced the generic role_key "Open
+// For" dropdown with 4 specific action-type checkboxes (parents
+// registering to teach/assist, parents registering their own student,
+// students registering themselves), let Section be multi-selected, and
+// swapped the day-only Schedule Grid picker for the real class_schedules
+// catalog (its own admin-given titles) - see utils/registrationWindows.js's
+// own header comment.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -54,6 +61,11 @@ async function clearWindows() {
 
 async function createSection(name) {
   return (await db.prepare('INSERT INTO sections (name) VALUES (?)').run(name)).lastInsertRowid;
+}
+
+async function classScheduleIdForDay(day) {
+  const row = await db.prepare('SELECT id FROM class_schedules WHERE day_of_week = ? AND semester_id IS NULL').get(day);
+  return row.id;
 }
 
 let classCounter = 0;
@@ -128,28 +140,96 @@ async function createTeacherAccount() {
   return { cookie, csrfToken: extractCsrf(homePage.text) };
 }
 
-test('Classes > Settings tab: Add a Window form has Schedule Grid and Section fields; a day+section-scoped window shows in Current Windows', async () => {
+test('Classes > Settings tab: Add a Window form has Schedule Grid, Section, and action-type fields; a schedule-grid+section-scoped window shows in Current Windows', async () => {
   await clearWindows();
   const admin = await loginAsAdmin();
   const sectionId = await createSection('Teen Co-op');
+  const mondayScheduleId = await classScheduleIdForDay('monday');
 
-  const page = await request(app).get('/admin/schedule?tab=settings&settingsTab=registration').set('Cookie', admin.cookie);
+  // The Registration Schedule section moved under Settings > Semester,
+  // dropping its own separate sub-tab - a real request: "this settings
+  // is done through the semester tab." An old bookmark still redirects
+  // there instead of 404ing/landing on General.
+  const oldLink = await request(app).get('/admin/schedule?tab=settings&settingsTab=registration').set('Cookie', admin.cookie);
+  assert.equal(oldLink.status, 302);
+  assert.match(oldLink.headers.location, /settingsTab=semester/);
+
+  const page = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /Registration Schedule/);
-  assert.match(page.text, /<select name="day">/);
-  assert.match(page.text, /<select name="sectionId">/);
+  // "Add a Window" is now a button that opens a popup, not an always-
+  // visible inline form.
+  assert.match(page.text, /id="add-window-dialog"/);
+  assert.match(page.text, /\+ Add a Window/);
+  assert.match(page.text, /<select name="classScheduleId">/);
+  assert.match(page.text, /name="sectionIds" value="[^"]*"/);
+  assert.match(page.text, /name="actionTypes" value="parent_teacher"/);
+  assert.match(page.text, /name="actionTypes" value="parent_assistant"/);
+  assert.match(page.text, /name="actionTypes" value="parent_register_student"/);
+  assert.match(page.text, /name="actionTypes" value="student_register_self"/);
   assert.match(page.text, /Teen Co-op/);
+  assert.match(page.text, />Monday</);
 
   await request(app)
     .post('/admin/schedule/registration-windows')
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ label: 'Monday Teen Window', day: 'monday', sectionId: String(sectionId), opensAt: '2020-01-01T00:00', _csrf: admin.csrfToken });
+    .send({
+      label: 'Monday Teen Window',
+      classScheduleId: String(mondayScheduleId),
+      sectionIds: String(sectionId),
+      actionTypes: 'parent_register_student',
+      opensAt: '2020-01-01T00:00',
+      _csrf: admin.csrfToken,
+    });
 
-  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=registration').set('Cookie', admin.cookie);
+  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
   assert.match(after.text, /Monday Teen Window/);
   assert.match(after.text, />Monday</);
   assert.match(after.text, /Teen Co-op/);
+  assert.match(after.text, /Parent: Register Student/);
+
+  // An Edit button next to Delete opens a pre-filled popup for that window.
+  const win = await db.prepare("SELECT id FROM registration_windows WHERE label = 'Monday Teen Window'").get();
+  assert.match(after.text, new RegExp(`id="edit-window-dialog-${win.id}"`));
+  assert.match(after.text, new RegExp(`action="/admin/schedule/registration-windows/${win.id}/update"`));
+  const editDialog = /<dialog id="edit-window-dialog-\d+"[^]*?<\/dialog>/.exec(after.text)[0];
+  assert.match(editDialog, /value="Monday Teen Window"/);
+  assert.match(editDialog, new RegExp(`name="sectionIds" value="${sectionId}" checked`));
+  assert.match(editDialog, /name="actionTypes" value="parent_register_student" checked/);
+});
+
+test('Editing a registration window updates its fields', async () => {
+  await clearWindows();
+  const admin = await loginAsAdmin();
+  const wednesdayScheduleId = await classScheduleIdForDay('wednesday');
+  await request(app)
+    .post('/admin/schedule/registration-windows')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ label: 'Editable Window', opensAt: '2020-01-01T00:00', _csrf: admin.csrfToken });
+  const win = await db.prepare("SELECT id FROM registration_windows WHERE label = 'Editable Window'").get();
+
+  await request(app)
+    .post(`/admin/schedule/registration-windows/${win.id}/update`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({
+      label: 'Renamed Window',
+      classScheduleId: String(wednesdayScheduleId),
+      actionTypes: 'student_register_self',
+      opensAt: '2021-02-02T00:00',
+      _csrf: admin.csrfToken,
+    });
+
+  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
+  assert.match(after.text, /Renamed Window/);
+  assert.doesNotMatch(after.text, /Editable Window</);
+  assert.match(after.text, /Student: Register Self/);
+
+  const updated = await db.prepare('SELECT * FROM registration_windows WHERE id = ?').get(win.id);
+  assert.equal(updated.class_schedule_id, wednesdayScheduleId);
+  assert.equal(updated.open_for_student_register_self, true);
 });
 
 test('Deleting a registration window removes it from Current Windows', async () => {
@@ -163,14 +243,15 @@ test('Deleting a registration window removes it from Current Windows', async () 
   const win = await db.prepare("SELECT id FROM registration_windows WHERE label = 'To Delete'").get();
 
   await request(app).post(`/admin/schedule/registration-windows/${win.id}/delete`).set('Cookie', admin.cookie).type('form').send({ _csrf: admin.csrfToken });
-  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=registration').set('Cookie', admin.cookie);
+  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
   assert.doesNotMatch(after.text, /To Delete/);
 });
 
-test('A day-scoped registration window only gates registration for classes on that schedule grid', async () => {
+test('A schedule-grid-scoped registration window only gates registration for classes on that schedule grid', async () => {
   await clearWindows();
   const { createWindow } = require('../utils/registrationWindows');
-  await createWindow({ label: 'Monday Only', roleKey: null, opensAt: '2020-01-01 00:00:00', closesAt: null, day: 'monday' });
+  const mondayScheduleId = await classScheduleIdForDay('monday');
+  await createWindow({ label: 'Monday Only', opensAt: '2020-01-01 00:00:00', closesAt: null, classScheduleId: mondayScheduleId });
 
   const admin = await loginAsAdmin();
   const mondayClass = await createClass(admin, { day: 'monday', className: 'Monday Gated Class' });
@@ -196,7 +277,7 @@ test('A section-scoped registration window only gates registration for classes r
   await clearWindows();
   const sectionId = await createSection('Section-Gated Group');
   const { createWindow } = require('../utils/registrationWindows');
-  await createWindow({ label: 'Section Only', roleKey: null, opensAt: '2020-01-01 00:00:00', closesAt: null, sectionId });
+  await createWindow({ label: 'Section Only', opensAt: '2020-01-01 00:00:00', closesAt: null, sectionIds: [sectionId] });
 
   const admin = await loginAsAdmin();
   const openClass = await createClass(admin, { className: 'Unrestricted Class' });
@@ -223,7 +304,7 @@ test('A section-scoped registration window only gates registration for classes r
 test('Teacher Portal self-signup is also gated by a registration window (previously had zero enforcement)', async () => {
   await clearWindows();
   const { createWindow } = require('../utils/registrationWindows');
-  await createWindow({ label: 'Not Open Yet', roleKey: 'teacher', opensAt: '2099-01-01 00:00:00', closesAt: null });
+  await createWindow({ label: 'Not Open Yet', opensAt: '2099-01-01 00:00:00', closesAt: null, actionTypes: ['parent_teacher'] });
 
   const admin = await loginAsAdmin();
   const cls = await createClass(admin, { className: 'Teacher Gated Class' });
@@ -243,4 +324,45 @@ test('Teacher Portal self-signup is also gated by a registration window (previou
     .type('form')
     .send({ role: 'teacher', _csrf: teacher.csrfToken });
   assert.match(decodeURIComponent(allowed.headers.location), /notice=/);
+});
+
+// Action-type scoping follows the exact same "match ALL of at least one
+// window's own restrictions" rule schedule-grid/section scoping already
+// use (see the section-scoped test above: creating even one narrowly-
+// scoped window makes every OTHER action/class opt-in too, unless a
+// second, unrestricted window also exists to cover it) - a window
+// scoped to only 'parent_teacher' still blocks assistant/parent/student
+// actions it doesn't apply to, exactly as a section-only window blocks
+// classes outside that section.
+test('A window scoped to only the "parent_teacher" action blocks assistant self-signup too (same all-or-nothing rule as section/schedule-grid scoping) until a second, unrestricted window also exists', async () => {
+  await clearWindows();
+  const { createWindow } = require('../utils/registrationWindows');
+  await createWindow({ label: 'Teachers Only Window', opensAt: '2020-01-01 00:00:00', closesAt: null, actionTypes: ['parent_teacher'] });
+
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'Assistant Gated Class' });
+  const teacher = await createTeacherAccount();
+
+  const teacherAllowed = await request(app)
+    .post(`/teacher/classes/${cls.id}/join`)
+    .set('Cookie', teacher.cookie)
+    .type('form')
+    .send({ role: 'teacher', _csrf: teacher.csrfToken });
+  assert.match(decodeURIComponent(teacherAllowed.headers.location), /notice=/);
+
+  await db.prepare('DELETE FROM class_staff WHERE class_id = ?').run(cls.id);
+  const assistantBlocked = await request(app)
+    .post(`/teacher/classes/${cls.id}/join`)
+    .set('Cookie', teacher.cookie)
+    .type('form')
+    .send({ role: 'assistant', _csrf: teacher.csrfToken });
+  assert.match(decodeURIComponent(assistantBlocked.headers.location), /Registration is not open for your account yet/);
+
+  await createWindow({ label: 'Everyone Else', opensAt: '2020-01-01 00:00:00', closesAt: null, actionTypes: ['parent_assistant'] });
+  const assistantAllowed = await request(app)
+    .post(`/teacher/classes/${cls.id}/join`)
+    .set('Cookie', teacher.cookie)
+    .type('form')
+    .send({ role: 'assistant', _csrf: teacher.csrfToken });
+  assert.match(decodeURIComponent(assistantAllowed.headers.location), /notice=/);
 });

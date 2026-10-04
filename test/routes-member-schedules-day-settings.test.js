@@ -1,15 +1,14 @@
 // A real bug report, found while generalizing the rest of the app off the
 // old 2-day utils/days.js: Member Schedules (utils/schedule.js) had every
 // one of its own functions (getMemberSchedule, scheduleList,
-// archiveMemberSchedules, arrivalDepartureLabels) hardcoded to exactly
-// Monday + Wednesday - deeper than a missing day-list, since
-// member_schedule_archives itself had fixed monday_schedule/
-// wednesday_schedule columns. Covers the member profile Schedule tab, its
-// fetch-on-open fragment, Print, CSV export, archiving, and the Archive
-// tab's own display, all for a 3rd day (Tuesday) - while Member Schedules'
-// own Schedule CARD printing (the physical badge, utils/scheduleCardData.js)
-// is deliberately left Monday/Wednesday-only, a separate badge-template
-// redesign, not touched here.
+// arrivalDepartureLabels) hardcoded to exactly Monday + Wednesday.
+// Covers the member profile Schedule tab, its fetch-on-open fragment,
+// Print, and CSV export, for a 3rd day (Tuesday) - while Member
+// Schedules' own Schedule CARD printing (the physical badge, utils/
+// scheduleCardData.js) is deliberately left Monday/Wednesday-only, a
+// separate badge-template redesign, not touched here. (The Member
+// Schedule Archive feature this file used to also cover was later
+// removed entirely, along with its own dedicated test file.)
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -102,35 +101,3 @@ test('a Tuesday class enrollment shows up on the member profile Schedule tab, it
   assert.match(manage.text, /Tuesday Robotics/);
 });
 
-test('archiving a member with a Tuesday class snapshots it, and the Archive tab shows a Tuesday Schedule column', async () => {
-  const admin = await loginAsAdmin();
-  const classId = await activateTuesdayWithClass(admin);
-
-  const studentInfo = await db
-    .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Tuesday Archive Kid', 'Tuesday Archive Kid', 'student')")
-    .run();
-  const studentId = studentInfo.lastInsertRowid;
-  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId, studentId);
-
-  const archiveRes = await request(app)
-    .post('/admin/schedule/members/archive')
-    .set('Cookie', admin.cookie)
-    .type('form')
-    .send({ memberIds: String(studentId), _csrf: admin.csrfToken });
-  assert.equal(archiveRes.status, 302);
-
-  const archived = await db.prepare("SELECT * FROM member_schedule_archives WHERE member_name = 'Tuesday Archive Kid'").get();
-  assert.ok(archived);
-  const daySchedules = JSON.parse(archived.day_schedules_json);
-  assert.match(daySchedules.tuesday || '', /Tuesday Robotics/);
-
-  const archivePage = await request(app).get('/admin/schedule?tab=archive&type=student').set('Cookie', admin.cookie);
-  assert.equal(archivePage.status, 200);
-  assert.match(archivePage.text, /Tuesday Schedule/);
-  assert.match(archivePage.text, /Tuesday Robotics/);
-
-  const archiveCsv = await request(app).get('/admin/schedule/archive/student/export.csv').set('Cookie', admin.cookie);
-  assert.equal(archiveCsv.status, 200);
-  assert.match(archiveCsv.text, /Tuesday Schedule/);
-  assert.match(archiveCsv.text, /Tuesday Robotics/);
-});

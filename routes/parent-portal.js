@@ -26,6 +26,7 @@ const {
   allClassesList,
   attendanceHistoryForRoster,
   GRADE_LEVELS,
+  classScheduleIdForClass,
 } = require('../utils/classSchedule');
 const { CLASS_DAY_ORDER } = require('../utils/classDays');
 const { getHandbookHtml } = require('../utils/membershipHandbook');
@@ -247,8 +248,8 @@ router.get('/classes', async (req, res) => {
       ).map((r) => r.class_id)
     : [];
 
-  const windowOpen = await isRegistrationOpenForAccount(req.portalRoles);
-  const nextWindow = windowOpen ? null : await nextWindowForAccount(req.portalRoles);
+  const windowOpen = await isRegistrationOpenForAccount(req.portalRoles, { actionType: 'parent_register_student' });
+  const nextWindow = windowOpen ? null : await nextWindowForAccount(req.portalRoles, { actionType: 'parent_register_student' });
 
   res.render('parent-classes', {
     title: 'Class Registration',
@@ -351,7 +352,7 @@ router.get('/classes/:id/fragment', async (req, res) => {
     hasChildren: children.length > 0,
     enrolledIds: [...enrolledIds],
     waitlistPositionByStudentId,
-    windowOpen: await isRegistrationOpenForAccount(req.portalRoles, { day: cls.day, sectionIds: restriction }),
+    windowOpen: await isRegistrationOpenForAccount(req.portalRoles, { classScheduleId: await classScheduleIdForClass(cls), sectionIds: restriction, actionType: 'parent_register_student' }),
   });
 });
 

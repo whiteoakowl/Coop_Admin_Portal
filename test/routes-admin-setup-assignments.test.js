@@ -1,13 +1,13 @@
 // Coverage for the new Setup/Cleanup Assignments tab (routes/admin-setup.js's
-// /setup/:day/assignments* + /setup/:day/dates* + /setup/:day/archive*
-// routes, backed by utils/setup.js's date/assignment helpers) - a real
-// user request: "setup/cleanup page should have similar tabs and setup to
-// floaters tab pages... assignment page will be similar to floaters where
-// it shows the list of team members with a dropdown menu next to each
-// name suggesting a different task from that team." Mirrors Floater
-// Assignments' own date-scoped manage/archive shape (see
-// test/routes-admin-volunteers*.test.js for the model this follows), just
-// per-member task suggestion instead of per-hour position/room.
+// /setup/:day/assignments* + /setup/:day/dates* routes, backed by
+// utils/setup.js's date/assignment helpers) - a real user request:
+// "setup/cleanup page should have similar tabs and setup to floaters tab
+// pages... assignment page will be similar to floaters where it shows the
+// list of team members with a dropdown menu next to each name suggesting
+// a different task from that team." Mirrors Floater Assignments' own
+// date-scoped manage shape (see test/routes-admin-volunteers*.test.js for
+// the model this follows), just per-member task suggestion instead of
+// per-hour position/room.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -234,14 +234,8 @@ test('Setup/Cleanup Assignments', async (t) => {
   });
 });
 
-test('Setup/Cleanup Archive', async (t) => {
+test('Setup/Cleanup Assignments: past dates are excluded from the live "Choose Date" dropdown', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
-
-  const team = await db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'Archive Crew')").run();
-  const section = await db.prepare("INSERT INTO task_list_sections (day, title, team_id, position) VALUES ('monday', 'Archive Tasks', ?, 0)").run(team.lastInsertRowid);
-  const item = await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 0)').run(section.lastInsertRowid, 'Sweep the floor');
-  const member = await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Archive Parent', 'assign-archive-parent', 'parent')").run();
-  await db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(team.lastInsertRowid, member.lastInsertRowid);
 
   await t.test('a date in the past never shows up as a <option> in the live Assignments "Choose Date" dropdown', async () => {
     await request(app).post('/admin/setup/monday/dates/add').set('Cookie', cookie).type('form').send({ dates: '2020-01-06', _csrf: csrfToken });
@@ -251,43 +245,6 @@ test('Setup/Cleanup Archive', async (t) => {
     // It's still listed in the Edit Dates dialog (so it can be removed) -
     // just not offered as a live-assignable date.
     assert.match(res.text, /2020-01-06/);
-  });
-
-  await t.test('but it does show up on the Archive tab\'s date list', async () => {
-    const res = await request(app).get('/admin/setup/monday/archive').set('Cookie', cookie);
-    assert.equal(res.status, 200);
-    assert.match(res.text, /data-view-setup-archive-date="2020-01-06"/);
-  });
-
-  await t.test('the archive view-fragment renders that date\'s cards read-only (no editable dropdown)', async () => {
-    await db.prepare('INSERT INTO setup_task_assignments (day, member_id, session_date, task_item_id) VALUES (?, ?, ?, ?)').run(
-      'monday',
-      member.lastInsertRowid,
-      '2020-01-06',
-      item.lastInsertRowid
-    );
-    const res = await request(app).get('/admin/setup/monday/archive/2020-01-06/view-fragment').set('Cookie', cookie);
-    assert.equal(res.status, 200);
-    assert.match(res.text, /Archive Crew/);
-    assert.match(res.text, /Archive Parent/);
-    assert.match(res.text, /Sweep the floor/);
-    assert.doesNotMatch(res.text, /<select/, 'the archive fragment is read-only - no editable <select>');
-  });
-
-  await t.test('the archive print page and CSV export both work for a real archived date', async () => {
-    const printRes = await request(app).get('/admin/setup/monday/archive/2020-01-06/print').set('Cookie', cookie);
-    assert.equal(printRes.status, 200);
-    assert.match(printRes.text, /Sweep the floor/);
-
-    const csvRes = await request(app).get('/admin/setup/monday/archive/2020-01-06/export.csv').set('Cookie', cookie);
-    assert.equal(csvRes.status, 200);
-    assert.match(csvRes.text, /Sweep the floor/);
-  });
-
-  await t.test('a date that was never added 404s on every archive sub-route', async () => {
-    assert.equal((await request(app).get('/admin/setup/monday/archive/2019-01-01/view-fragment').set('Cookie', cookie)).status, 404);
-    assert.equal((await request(app).get('/admin/setup/monday/archive/2019-01-01/print').set('Cookie', cookie)).status, 404);
-    assert.equal((await request(app).get('/admin/setup/monday/archive/2019-01-01/export.csv').set('Cookie', cookie)).status, 404);
   });
 });
 
@@ -377,11 +334,11 @@ test('Setup/Cleanup Assignments: Assign/Unassign + mutual exclusion (mirrors Flo
   });
 });
 
-test('Setup/Cleanup Teams page gained an Archive button and the shared 4-tab bar', async () => {
+test('Setup/Cleanup Teams page has the shared 3-tab bar and no Archive tab', async () => {
   const { cookie } = await loginAsAdmin();
   const res = await request(app).get('/admin/setup/monday/manage').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /href="\/admin\/setup\/monday\/archive\?semesterId=[^"]*">Archive</);
+  assert.doesNotMatch(res.text, /\/admin\/setup\/monday\/archive/, 'the Archive feature was removed - no link to it should remain');
   assert.match(res.text, /Setup\/Cleanup Assignments/);
   assert.match(res.text, /Setup\/Cleanup Teams/);
   assert.match(res.text, /Task List/);

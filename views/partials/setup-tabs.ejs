@@ -1,5 +1,5 @@
 <%
-// locals: day, activeSetupTab ('assignments' | 'teams' | 'tasks' | 'archive'),
+// locals: day, activeSetupTab ('assignments' | 'teams' | 'tasks'),
 // semesterId (optional - the combo picker's own current selection, query-
 // string-ready: a number, 'none', or omitted/undefined).
 // Mirrors partials/floater-tabs.ejs's shape exactly - one shared "Setup/
@@ -17,5 +17,4 @@ var semesterQS = typeof semesterId !== 'undefined' && semesterId !== undefined ?
   <a class="view-tab<%= activeSetupTab === 'assignments' ? ' active' : '' %>" href="/admin/setup/<%= day %>/assignments<%= semesterQS %>">Setup/Cleanup Assignments</a>
   <a class="view-tab<%= activeSetupTab === 'teams' ? ' active' : '' %>" href="/admin/setup/<%= day %>/manage<%= semesterQS %>">Setup/Cleanup Teams</a>
   <a class="view-tab<%= activeSetupTab === 'tasks' ? ' active' : '' %>" href="/admin/setup/<%= day %>/tasks<%= semesterQS %>">Task List</a>
-  <a class="view-tab<%= activeSetupTab === 'archive' ? ' active' : '' %>" href="/admin/setup/<%= day %>/archive<%= semesterQS %>">Archive</a>
 </div>

@@ -173,11 +173,10 @@ async function transcriptForStudent(studentId) {
 }
 
 // All student_academic_history rows, across every student, newest term
-// first - the Academics page's own "manually add a past term" form
-// writes here directly (see the migration's header comment: normally
-// only archiveClasses ever writes this table; this is the one other,
-// admin-driven way a row gets created, for history predating this
-// feature or transfer students).
+// first - most rows come from generateTranscriptsForEndedClasses below
+// (automatic, once a class's own end_date passes); the Academics page's
+// own "manually add a past term" form writes here directly too, for
+// history predating this feature or transfer students.
 async function allTranscriptEntries() {
   const rows = await db
     .prepare(`SELECT h.*, m.name AS student_name FROM student_academic_history h JOIN members m ON m.id = h.student_id ORDER BY h.term_ended_at DESC`)
@@ -193,6 +192,49 @@ async function addTranscriptEntry({ studentId, className, day, ageGroup, teacher
     )
     .run(studentId, className, day || null, ageGroup || null, teacherNames || null, termEndedAt);
   return info.lastInsertRowid;
+}
+
+// Automatically backfills a Transcript entry (student_academic_history)
+// for every student enrolled in a class whose own end_date has passed -
+// the replacement for archiveClasses' old side effect, now that the
+// Class Archive feature (and the manual "archive this class" step that
+// used to trigger it) has been removed entirely: "everything is
+// connected to semesters now, we don't need individual archiving
+// anymore." A class simply stays in place once its term ends (no more
+// snapshot-then-delete), so this just needs to notice the date has
+// passed and backfill, same idea as the other lazy self-heal-on-load
+// checks elsewhere in this app. Idempotent via the (student_id, class_id)
+// unique index on student_academic_history - a class already backfilled
+// on an earlier call is silently skipped, not duplicated, on every later
+// one, so this is safe to call on every Academics page load.
+async function generateTranscriptsForEndedClasses() {
+  const today = todayISO();
+  const endedClasses = await db.prepare('SELECT * FROM classes WHERE end_date IS NOT NULL AND end_date < ?').all(today);
+  for (const cls of endedClasses) {
+    const studentIds = (await db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(cls.id)).map((r) => r.student_id);
+    if (studentIds.length === 0) continue;
+    const alreadyDone = new Set(
+      (await db.prepare('SELECT student_id FROM student_academic_history WHERE class_id = ?').all(cls.id)).map((r) => r.student_id)
+    );
+    const stillNeeded = studentIds.filter((id) => !alreadyDone.has(id));
+    if (stillNeeded.length === 0) continue;
+    const teacherNames =
+      (
+        await db
+          .prepare("SELECT m.name FROM class_staff cs JOIN members m ON m.id = cs.member_id WHERE cs.class_id = ? AND cs.role = 'teacher'")
+          .all(cls.id)
+      )
+        .map((r) => r.name)
+        .join(', ') || null;
+    for (const studentId of stillNeeded) {
+      await db
+        .prepare(
+          `INSERT INTO student_academic_history (student_id, class_name, day, age_group, teacher_names, term_ended_at, class_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(studentId, cls.class_name, cls.day, cls.age_group, teacherNames, cls.end_date, cls.id);
+    }
+  }
 }
 
 // --- Lesson content items (video/text/file/quiz/assignment_upload) ---
@@ -520,6 +562,7 @@ module.exports = {
   transcriptForStudent,
   allTranscriptEntries,
   addTranscriptEntry,
+  generateTranscriptsForEndedClasses,
   getContentItem,
   contentItemsForAssignment,
   createContentItem,

@@ -111,13 +111,6 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
       ><svg class="icon"><use href="#icon-clipboard-list"/></svg></button>
     </div>
     <% if (!gridReadOnly) { %>
-      <div class="class-schedule-archive-controls" id="class-schedule-archive-controls-<%= day %>" data-archive-controls="class-archive-form-<%= day %>" hidden>
-        <label class="checkbox-option class-schedule-select-all">
-          <input type="checkbox" data-select-all-for="class-archive-form-<%= day %>" />
-          Select All
-        </label>
-        <button type="submit" form="class-archive-form-<%= day %>" class="roster-action-btn">Archive Selected</button>
-      </div>
       <%# Bulk Edit's own Select All lives in List view instead of Grid -
           the checkboxes themselves only exist on the list rows (see
           below), so there's nothing to select while Grid is showing. %>
@@ -134,12 +127,6 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
       <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog-<%= day %>').showModal()">+ Add Class</button>
       <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-schedule-dialog-<%= day %>').showModal()">Edit</button>
       <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog-<%= day %>').showModal()">Import</button>
-      <button type="button" class="roster-action-btn" data-archive-toggle="class-archive-form-<%= day %>" aria-pressed="false">Archive</button>
-      <%# A real request: "on class page add a button that says add/edit
-          semester" - same Add/rename/delete semester list the Settings
-          tab already has (partials/semester-manager.ejs), reachable
-          right from the day grid instead of only buried in Settings. %>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('semester-manager-dialog-<%= day %>').showModal()">Add/Edit Semester</button>
       <button type="button" class="roster-action-btn" data-bulk-edit-toggle="class-bulk-edit-form-<%= day %>" data-bulk-edit-dialog="bulk-edit-dialog-<%= day %>" aria-pressed="false">Bulk Edit</button>
     <% } %>
     <a class="roster-action-btn print-action-btn" href="/admin/class-schedule/<%= day %>/print" target="_blank">Print</a>
@@ -147,15 +134,6 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 </div>
 
 <% if (!gridReadOnly) { %>
-  <form
-    id="class-archive-form-<%= day %>"
-    method="POST"
-    action="/admin/class-schedule/<%= day %>/archive"
-    data-confirm="Are you sure you want to archive the selected class(es)?"
-    data-confirm-yes-label="Yes, Archive"
-    data-confirm-icon="icon-save"
-    data-confirm-safe="1"
-  ></form>
   <%# Never submitted itself - just an id for the List view's own
       checkboxes to carry a form="..." attribute, the same trick
       class-schedule-bulk-edit.js's own query selectors key off of. The
@@ -431,13 +409,9 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
                     features" - that listener now navigates straight to
                     the class's own tabbed Manage page (admin-class-
                     schedule-manage.ejs) instead of opening a quick-view
-                    popup. Can't use a <button class="class-card-clickable">
-                    wrapper here the way Parent Portal's own read-only
-                    class cards do (views/parent-classes.ejs) - a <button>
-                    can't legally contain the archive checkbox below, so
-                    this stays a <div> with role=button/tabindex for the
-                    same keyboard behavior (class-schedule-view.js's own
-                    keydown handler). %>
+                    popup. Stays a <div> with role=button/tabindex rather
+                    than a real <button> for the same keyboard behavior
+                    (class-schedule-view.js's own keydown handler). %>
                   <div
                     class="class-card<% if (!gridReadOnly) { %> class-card-clickable<% } %>"
                     style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 42%, white);"
@@ -449,9 +423,6 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
                     <% } %>
                   >
                     <div class="class-card-header">
-                      <% if (!gridReadOnly) { %>
-                        <input type="checkbox" name="classIds" value="<%= cls.id %>" form="class-archive-form-<%= day %>" class="class-card-checkbox no-print" aria-label="Select <%= cls.class_name %> for archiving" hidden />
-                      <% } %>
                       <h3><%= cls.class_name %></h3>
                     </div>
                     <%# Grade/teacher/assistant only - no student roster here;
@@ -549,6 +520,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 </div>
 <script src="/js/class-schedule-view-toggle.js"></script>
 <script src="/js/class-schedule-filters.js"></script>
+<script src="/js/filter-details-dismiss.js"></script>
 <script src="/js/multi-select-checkbox.js"></script>
 
 <% if (!gridReadOnly) { %>
@@ -558,14 +530,6 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 <script src="/js/class-schedule-view.js"></script>
 <script src="/js/allergy-log-popup.js"></script>
 <script src="/js/room-row-reorder.js"></script>
-
-<dialog id="semester-manager-dialog-<%= day %>" class="member-picker-dialog">
-  <h3>Add/Edit Semester</h3>
-  <%- include('semester-manager', { semesters, missingSemesterCount, missingSemesterBreakdown, backUrl: gridBasePath }) %>
-  <div class="member-form-full">
-    <button type="button" class="btn-secondary" onclick="document.getElementById('semester-manager-dialog-<%= day %>').close()">Close</button>
-  </div>
-</dialog>
 
 <%# A real request: "One form popsup showing title, room number, class
     start time and end time, open and close class check boxes,

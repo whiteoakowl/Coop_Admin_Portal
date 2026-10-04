@@ -179,8 +179,8 @@ router.get('/classes', async (req, res) => {
     waitlistPositionByClassId[r.class_id] = r.waitlist_position;
   });
 
-  const windowOpen = await isRegistrationOpenForAccount(req.portalRoles);
-  const nextWindow = windowOpen ? null : await nextWindowForAccount(req.portalRoles);
+  const windowOpen = await isRegistrationOpenForAccount(req.portalRoles, { actionType: 'student_register_self' });
+  const nextWindow = windowOpen ? null : await nextWindowForAccount(req.portalRoles, { actionType: 'student_register_self' });
 
   // The day-filter toggle (public/js/classes-day-filter.js) used to hardcode
   // just Monday/Wednesday buttons, so a Tuesday (or any 3rd+ day) class had

@@ -73,8 +73,8 @@ test('Add a Semester now has a day-checkbox "Add a Schedule" section, and checki
 
   // The list below shows the new semester's own days - scoped to after
   // the list table itself starts, since "Fall 2026" also appears earlier
-  // on the page as a plain <option> in the "Data Missing a Semester"
-  // card's own Assign To dropdown.
+  // on the page as the "Add a Semester" form's own title placeholder
+  // text ("e.g. Fall 2026").
   const afterPage = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
   const tableStart = afterPage.text.indexOf('semester-list-table');
   const rowStart = afterPage.text.indexOf('Fall 2026', tableStart);

@@ -22,7 +22,6 @@
         <div class="roster-btn-row">
           <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/export.csv?semesterId=<%= semesterId %>">Export</a>
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
-          <a class="roster-action-btn" href="/admin/volunteers/<%= day %>/archive?semesterId=<%= semesterId %>">Archive</a>
         </div>
       </div>
 
@@ -30,7 +29,7 @@
         <h2><%= dayLabel %> Floater Assignments</h2>
         <%# A real request: "edit dates and add/edit positions buttons
             should be smaller size to match orange buttons on that page" -
-            same .roster-action-btn class/size the Export/Print/Archive
+            same .roster-action-btn class/size the Export/Print
             buttons above already use, instead of the larger .btn-secondary. %>
         <div class="roster-btn-row no-print">
           <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Add/Edit Dates</button>
@@ -54,7 +53,7 @@
       <% if (dates.length === 0) { %>
         <p class="roster-empty">Add session dates above first.</p>
       <% } else if (!selectedDate) { %>
-        <p class="roster-empty">Every date has been archived - add one above, or see them on the <a href="/admin/volunteers/<%= day %>/archive?semesterId=<%= semesterId %>">Archive</a> tab.</p>
+        <p class="roster-empty">No dates available - add one above.</p>
       <% } else { %>
         <div id="floater-assign-status" class="alert alert-error no-print" hidden></div>
         <div id="floater-cards-container" data-selected-date="<%= selectedDate %>">
@@ -73,19 +72,8 @@
             <% } %>
             <% dates.forEach(function(d) { %>
               <tr>
-                <td><%= d.label %><% if (d.archived) { %> <span class="hint">(archived)</span><% } %></td>
+                <td><%= d.label %></td>
                 <td class="actions-cell">
-                  <%# A real request: "choose date drop down should show
-                      all of the dates so far until you click an archive
-                      button for each date" - Archive just moves the date
-                      off the manage page's own Choose Date dropdown and
-                      onto the read-only Archive tab; Remove (still below)
-                      deletes it and its job assignments outright. %>
-                  <% if (!d.archived) { %>
-                    <form method="POST" action="/admin/volunteers/<%= day %>/dates/<%= d.date %>/archive?dialog=dates&semesterId=<%= semesterId %>" class="inline-block-form">
-                      <button type="submit" class="link-btn">Archive</button>
-                    </form>
-                  <% } %>
                   <form method="POST" action="/admin/volunteers/<%= day %>/dates/<%= d.date %>/remove?dialog=dates&semesterId=<%= semesterId %>" class="inline-block-form" data-confirm="Remove <%= d.label %>? Any position/room assignments for this date will be deleted too.">
                     <button type="submit" class="link-btn link-btn-danger">Remove</button>
                   </form>

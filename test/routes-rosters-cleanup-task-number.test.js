@@ -343,11 +343,11 @@ test('end-to-end via the real kiosk endpoints: a "log on check in" member\'s tas
   });
 });
 
-test('an archived roster keeps the "<team>-#" line in its frozen snapshot', async () => {
-  const { cookie, csrfToken } = await loginAsAdmin();
+test('the read-only Print Preview grid keeps the "<team>-#" line too', async () => {
+  const { cookie } = await loginAsAdmin();
 
   const rosterId = (await db.prepare("SELECT id FROM rosters WHERE category = 'Class Schedule' AND schedule_day = 'monday' AND name LIKE '%Student%'").get()).id;
-  const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Archive Cleanup Student', 'archive-cleanup-student', 'student')").run()).lastInsertRowid;
+  const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Print Cleanup Student', 'print-cleanup-student', 'student')").run()).lastInsertRowid;
   await db.prepare('INSERT INTO roster_members (roster_id, member_id) VALUES (?, ?)').run(rosterId, memberId);
   const today = '2026-02-23';
   await db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(rosterId, today);
@@ -355,11 +355,8 @@ test('an archived roster keeps the "<team>-#" line in its frozen snapshot', asyn
   const targetItemId = await createEighthTaskItem('monday');
   await recordCheckoutScan(memberId, rosterId, today, targetItemId);
 
-  await request(app).post('/admin/rosters/monday/archive').set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
-
-  const archive = await db.prepare("SELECT id FROM roster_archives WHERE day = 'monday' ORDER BY id DESC LIMIT 1").get();
-  const res = await request(app).get(`/admin/rosters/archive/${archive.id}/view-fragment`).set('Cookie', cookie);
+  const res = await request(app).get('/admin/rosters/print?tab=monday-student').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /Archive Cleanup Student/);
-  assert.match(res.text, /Snack Table Team-#8/, 'the archived snapshot must keep the scanned task\'s display Number and team label');
+  assert.match(res.text, /Print Cleanup Student/);
+  assert.match(res.text, /Snack Table Team-#8/, 'the print grid must keep the scanned task\'s display Number and team label');
 });

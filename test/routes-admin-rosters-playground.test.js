@@ -41,7 +41,7 @@ test('the Playground tab appears in the Attendance tab bar and lists all 8 (day,
   const cookie = await loginAsAdmin();
   const res = await request(app).get('/admin/rosters?tab=playground').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /href="\/admin\/rosters\?tab=playground">Playground<\/a>/);
+  assert.match(res.text, /href="\/admin\/rosters\?tab=playground">Playground Check in\/out<\/a>/);
   for (const day of ['monday', 'wednesday']) {
     for (let h = 1; h <= 4; h++) {
       assert.match(res.text, new RegExp(`href="/admin/rosters\\?tab=playground-${day}-${h}"`));

@@ -76,7 +76,7 @@ async function failTraining(trainingId, quizLessonId, memberId) {
   return T.submitQuiz(assignment.id, quizLessonId, { [questions[0].id]: wrong });
 }
 
-test('Orientation Settings: a Training can be linked to a column, independently of that column\'s plain URL', async () => {
+test('Orientation Settings: a Training can be linked to a column via its dropdown', async () => {
   const admin = await loginAsAdmin();
   const { trainingId } = await buildOneQuestionTraining('Teacher Orientation Video');
 
@@ -88,7 +88,7 @@ test('Orientation Settings: a Training can be linked to a column, independently 
     .post('/admin/orientation/settings')
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ _csrf: csrf, video: '', meetup: '', teacherTraining: '', tour: '', openHouse: '', teacherTrainingTrainingId: String(trainingId) });
+    .send({ _csrf: csrf, teacherTrainingTrainingId: String(trainingId) });
 
   const links = await orientationTrainingLinks();
   assert.equal(links.teacherTraining, trainingId);
@@ -99,9 +99,9 @@ test('Orientation Settings: a Training can be linked to a column, independently 
 });
 
 test('passing a linked Training auto-checks the matching Orientation column for that member', async () => {
-  await setOrientationLink('tour', '', null);
+  await setOrientationLink('tour', null);
   const { trainingId, quizLessonId } = await buildOneQuestionTraining('Facility Tour Walkthrough');
-  await setOrientationLink('tour', '', trainingId);
+  await setOrientationLink('tour', trainingId);
 
   const memberId = await makeMember('Auto Complete Parent', 'auto-complete-1');
   const before = await db.prepare('SELECT tour_complete FROM orientation_progress WHERE member_id = ?').get(memberId);
@@ -120,7 +120,7 @@ test('passing a linked Training auto-checks the matching Orientation column for 
 
 test('a FAILED attempt at a linked Training does not auto-complete anything', async () => {
   const { trainingId, quizLessonId } = await buildOneQuestionTraining('Open House Orientation (fail path)');
-  await setOrientationLink('openHouse', '', trainingId);
+  await setOrientationLink('openHouse', trainingId);
 
   const memberId = await makeMember('Fail Path Parent', 'fail-path-1');
   const result = await failTraining(trainingId, quizLessonId, memberId);
@@ -128,6 +128,46 @@ test('a FAILED attempt at a linked Training does not auto-complete anything', as
 
   const row = await db.prepare('SELECT * FROM orientation_progress WHERE member_id = ?').get(memberId);
   assert.equal(row, undefined, 'a failed attempt must never auto-complete an orientation column');
+});
+
+// A real bug report: "I linked some of the trainings in orientation
+// settings and it is not showing green check marks next to those that
+// completed the trainings." - the member had ALREADY passed the training
+// before the admin ever linked it to a column, so the normal "auto-check
+// on pass" path (above) never ran for them. Linking it after the fact
+// must retroactively check the column.
+test('linking a Training that members already passed retroactively checks their column', async () => {
+  const { trainingId, quizLessonId } = await buildOneQuestionTraining('Already Passed Before Linking');
+  const memberId = await makeMember('Already Passed Parent', 'already-passed-1');
+
+  const result = await passTraining(trainingId, quizLessonId, memberId);
+  assert.equal(result.passed, true);
+  const beforeLink = await db.prepare('SELECT * FROM orientation_progress WHERE member_id = ?').get(memberId);
+  assert.equal(beforeLink, undefined, 'nothing to auto-complete yet - the column is not linked');
+
+  await setOrientationLink('openHouse', trainingId);
+
+  const semesterId = await defaultSemesterId();
+  const row = await db
+    .prepare('SELECT open_house_complete FROM orientation_progress WHERE member_id = ? AND (?::int IS NULL AND semester_id IS NULL OR semester_id = ?::int)')
+    .get(memberId, semesterId, semesterId);
+  assert.ok(row, 'linking the training should backfill an orientation_progress row for the already-passed member');
+  assert.equal(Number(row.open_house_complete), 1);
+});
+
+// A failed attempt must stay failed even once the training gets linked
+// afterward - only a passed attempt should ever backfill a column.
+test('linking a Training does not retroactively check the column for a member who only FAILED it', async () => {
+  const { trainingId, quizLessonId } = await buildOneQuestionTraining('Already Failed Before Linking');
+  const memberId = await makeMember('Already Failed Parent', 'already-failed-1');
+
+  const result = await failTraining(trainingId, quizLessonId, memberId);
+  assert.equal(result.passed, false);
+
+  await setOrientationLink('video', trainingId);
+
+  const row = await db.prepare('SELECT * FROM orientation_progress WHERE member_id = ?').get(memberId);
+  assert.equal(row, undefined, 'a failed attempt must never be backfilled, even after the training is linked');
 });
 
 test('a Training with no linked column does not touch Orientation at all', async () => {

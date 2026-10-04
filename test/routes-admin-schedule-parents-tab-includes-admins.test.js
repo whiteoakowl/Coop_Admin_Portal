@@ -76,15 +76,10 @@ test('Parent Schedules tab: selecting an admin by memberId filters the grid down
   const parentworth = await db.prepare("SELECT id FROM members WHERE name = 'Parentworth Regular'").get();
   const res = await request(app).get(`/admin/schedule?tab=members&type=parent&memberId=${admin.id}`).set('Cookie', cookie);
   assert.equal(res.status, 200);
-  // archive-select-checkbox is only ever rendered once per row in the
-  // (filtered) card grid itself - unlike allNames' own hidden
-  // archive-offpage-checkbox, which intentionally still lists every
-  // active parent/admin regardless of the memberId filter (see its own
-  // comment in the view) so "select all across every page" keeps working.
-  assert.match(res.text, new RegExp(`class="archive-select-checkbox[^>]*value="${admin.id}"|value="${admin.id}"[^>]*class="archive-select-checkbox`));
+  assert.match(res.text, new RegExp(`href="/admin/schedule/member/${admin.id}/manage"`));
   assert.doesNotMatch(
     res.text,
-    new RegExp(`class="archive-select-checkbox[^>]*value="${parentworth.id}"|value="${parentworth.id}"[^>]*class="archive-select-checkbox`),
+    new RegExp(`href="/admin/schedule/member/${parentworth.id}/manage"`),
     'filtering to one admin member should narrow the card grid to just them, the same as it would for a parent'
   );
 });

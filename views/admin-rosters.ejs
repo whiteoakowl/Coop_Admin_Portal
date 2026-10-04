@@ -11,16 +11,16 @@
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= view === 'classList' ? 'Class Rosters' : view === 'archive' ? 'Attendance Archive' : view === 'playgroundList' ? 'Playground' : view === 'playgroundLog' ? `${pgDayLabel} Playground — ${pgHourLabel}` : tabLabel %> &mdash; Attendance Spreadsheet</p>
+        <p class="print-header-sub"><%= view === 'classList' ? 'Class Rosters' : view === 'playgroundList' ? 'Playground' : view === 'playgroundLog' ? `${pgDayLabel} Playground — ${pgHourLabel}` : tabLabel %> &mdash; Attendance Spreadsheet</p>
       </div>
     </div>
     <%# A real request: "at the top of the monday attendance page, it
         should say monday attendance. at the top of the wednesday
         attendance page it should say wednesday attendance." Only the
         day-scoped grid view (Parent/Student/class tabs, all of which
-        carry a real `day`) has a single day to name this way - the
-        Classes list and Attendance Archive views span both days at once,
-        so they keep the plain "Attendance" title. A later real request:
+        carry a real `day`) has a single day to name this way - the Class
+        Rosters list spans both days at once, so it keeps the plain
+        "Attendance" title. A later real request:
         "playground attendance page title should be playground
         attendance" - playgroundList/playgroundLog both span both days
         too (same reasoning), but are their own distinct page, not just
@@ -30,50 +30,65 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <%# Monday/Wednesday/Classes/Playground/Archive now live as subpages
-        under the orange bar's own Attendance item (views/partials/
-        admin-nav.ejs) instead of a trigger+dialog here. %>
+    <%# Monday/Wednesday/Class Rosters/Playground Check in/out now live as
+        subpages under the orange bar's own Attendance item (views/
+        partials/admin-nav.ejs) instead of a trigger+dialog here. %>
 
     <% if (view === 'classList') { %>
       <div class="view-tab-panel">
         <div class="roster-toolbar no-print">
-          <div class="category-filter" style="margin: 0;">
-            <label for="class-roster-day-select">Day</label>
-            <%# Each filter's onchange rebuilds the URL from BOTH selects'
-                current values, not just its own - so picking an Hour
-                keeps whatever Day is already chosen, and vice versa
-                (either filter, or both together). %>
-            <select id="class-roster-day-select" onchange="window.fullscreenNavigate('/admin/rosters?tab=classes' + (this.value ? '&day=' + this.value : '') + (document.getElementById('class-roster-hour-select').value ? '&hour=' + document.getElementById('class-roster-hour-select').value : ''))">
-              <option value="" <%= !dayFilter ? 'selected' : '' %>>All Days</option>
-              <% activeDays.forEach(function(d) { %>
-                <option value="<%= d %>" <%= dayFilter === d ? 'selected' : '' %>><%= dayLabels[d] %></option>
-              <% }); %>
-            </select>
+          <div class="filter-row">
+            <%# A real request: "Day, hour and semester dropdown menus
+                should all be under one button called filter" - same
+                <details>/Filter-button pattern the Classes grid's own
+                Filter popup uses (views/partials/class-schedule-grid.ejs),
+                including the shared outside-click-to-close script
+                (public/js/filter-details-dismiss.js). Still server-side
+                navigation on each select's own onchange, not a client-
+                side re-filter - unchanged from before, just regrouped. %>
+            <details class="filter-details" data-filter-details>
+              <summary class="roster-action-btn">Filter</summary>
+              <div class="filter-panel">
+                <div class="category-filter">
+                  <label for="class-roster-day-select">Day</label>
+                  <%# Each filter's onchange rebuilds the URL from ALL
+                      THREE selects' current values, not just its own - so
+                      picking one keeps whatever the others are already
+                      set to. %>
+                  <select id="class-roster-day-select" onchange="window.fullscreenNavigate('/admin/rosters?tab=classes' + (this.value ? '&day=' + this.value : '') + (document.getElementById('class-roster-hour-select').value ? '&hour=' + document.getElementById('class-roster-hour-select').value : '') + (document.getElementById('class-roster-semester-select') && document.getElementById('class-roster-semester-select').value ? '&semesterId=' + document.getElementById('class-roster-semester-select').value : ''))">
+                    <option value="" <%= !dayFilter ? 'selected' : '' %>>All Days</option>
+                    <% activeDays.forEach(function(d) { %>
+                      <option value="<%= d %>" <%= dayFilter === d ? 'selected' : '' %>><%= dayLabels[d] %></option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="category-filter">
+                  <label for="class-roster-hour-select">Hour</label>
+                  <select id="class-roster-hour-select" onchange="window.fullscreenNavigate('/admin/rosters?tab=classes' + (document.getElementById('class-roster-day-select').value ? '&day=' + document.getElementById('class-roster-day-select').value : '') + (this.value ? '&hour=' + this.value : '') + (document.getElementById('class-roster-semester-select') && document.getElementById('class-roster-semester-select').value ? '&semesterId=' + document.getElementById('class-roster-semester-select').value : ''))">
+                    <option value="" <%= !hourFilter ? 'selected' : '' %>>All Hours</option>
+                    <% hourPositions.forEach(function(h) { %>
+                      <option value="<%= h %>" <%= hourFilter === h ? 'selected' : '' %>>Hour <%= h %></option>
+                    <% }); %>
+                  </select>
+                </div>
+                <%# A real request: "add semester choice dropdown settings
+                    to... Monday/Wednesday attendance" - filters the Class
+                    Rosters list the same way Day/Hour already do. %>
+                <% if (semesters.length > 0) { %>
+                  <div class="category-filter">
+                    <label for="class-roster-semester-select">Semester</label>
+                    <select id="class-roster-semester-select" onchange="window.fullscreenNavigate('/admin/rosters?tab=classes' + (document.getElementById('class-roster-day-select').value ? '&day=' + document.getElementById('class-roster-day-select').value : '') + (document.getElementById('class-roster-hour-select').value ? '&hour=' + document.getElementById('class-roster-hour-select').value : '') + (this.value ? '&semesterId=' + this.value : ''))">
+                      <option value="" <%= !semesterFilter ? 'selected' : '' %>>All Semesters</option>
+                      <option value="none" <%= semesterFilter === 'none' ? 'selected' : '' %>>No Semester</option>
+                      <% semesters.forEach(function(s) { %>
+                        <option value="<%= s.id %>" <%= semesterFilter === String(s.id) ? 'selected' : '' %>><%= s.title %></option>
+                      <% }); %>
+                    </select>
+                  </div>
+                <% } %>
+              </div>
+            </details>
           </div>
-          <div class="category-filter" style="margin: 0;">
-            <label for="class-roster-hour-select">Hour</label>
-            <select id="class-roster-hour-select" onchange="window.fullscreenNavigate('/admin/rosters?tab=classes' + (document.getElementById('class-roster-day-select').value ? '&day=' + document.getElementById('class-roster-day-select').value : '') + (this.value ? '&hour=' + this.value : ''))">
-              <option value="" <%= !hourFilter ? 'selected' : '' %>>All Hours</option>
-              <% hourPositions.forEach(function(h) { %>
-                <option value="<%= h %>" <%= hourFilter === h ? 'selected' : '' %>>Hour <%= h %></option>
-              <% }); %>
-            </select>
-          </div>
-          <%# A real request: "add semester choice dropdown settings to...
-              Monday/Wednesday attendance" - filters the Classes tab's own
-              list the same way Day/Hour already do. %>
-          <% if (semesters.length > 0) { %>
-            <div class="category-filter" style="margin: 0;">
-              <label for="class-roster-semester-select">Semester</label>
-              <select id="class-roster-semester-select" onchange="window.fullscreenNavigate('/admin/rosters?tab=classes' + (document.getElementById('class-roster-day-select').value ? '&day=' + document.getElementById('class-roster-day-select').value : '') + (document.getElementById('class-roster-hour-select').value ? '&hour=' + document.getElementById('class-roster-hour-select').value : '') + (this.value ? '&semesterId=' + this.value : ''))">
-                <option value="" <%= !semesterFilter ? 'selected' : '' %>>All Semesters</option>
-                <option value="none" <%= semesterFilter === 'none' ? 'selected' : '' %>>No Semester</option>
-                <% semesters.forEach(function(s) { %>
-                  <option value="<%= s.id %>" <%= semesterFilter === String(s.id) ? 'selected' : '' %>><%= s.title %></option>
-                <% }); %>
-              </select>
-            </div>
-          <% } %>
         </div>
         <% if (classes.length === 0) { %>
           <p class="roster-empty">No classes yet &mdash; add one on the <a href="/admin/schedule">Schedules</a> page.</p>
@@ -134,50 +149,6 @@
 
         <%- include('partials/playground-log-table', { pgDayLabel, pgHourLabel, selectedDate, selectedDateLabel, log }) %>
       </div>
-    <% } else if (view === 'archive') { %>
-      <div class="view-tab-panel">
-        <div class="roster-toolbar no-print">
-          <div class="category-filter" style="margin: 0;">
-            <label for="roster-archive-day-select">Day</label>
-            <select id="roster-archive-day-select" onchange="window.fullscreenNavigate('/admin/rosters?tab=archive' + (this.value ? '&day=' + this.value : ''))">
-              <option value="" <%= !dayFilter ? 'selected' : '' %>>All Days</option>
-              <% activeDays.forEach(function(d) { %>
-                <option value="<%= d %>" <%= dayFilter === d ? 'selected' : '' %>><%= dayLabels[d] %></option>
-              <% }); %>
-            </select>
-          </div>
-        </div>
-        <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
-            <thead>
-              <tr>
-                <th>Archived</th>
-                <th>Day</th>
-                <th>Session Dates</th>
-                <th>Parents</th>
-                <th>Students</th>
-                <th>Classes</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% if (archives.length === 0) { %>
-                <tr><td colspan="6" class="roster-empty">No archives yet<%= dayFilter ? ' for this day' : '' %> &mdash; use the Archive button on a day's rosters to save and clear a term's attendance.</td></tr>
-              <% } %>
-              <% archives.forEach(function(a) { %>
-                <tr>
-                  <td><button type="button" class="member-name-link" data-view-archive-id="<%= a.id %>"><%= a.archivedAtLabel %></button></td>
-                  <td><%= dayLabels[a.day] || a.day %></td>
-                  <td><%= a.dateCount %></td>
-                  <td><%= a.parentCount %></td>
-                  <td><%= a.studentCount %></td>
-                  <td><%= a.classCount %></td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
-        <dialog id="roster-archive-view-dialog" class="roster-archive-view-dialog"></dialog>
-      </div>
     <% } else { %>
     <% if (classId) { %><p class="subtitle no-print"><a href="/admin/rosters?tab=classes">&larr; All Class Rosters</a></p><% } %>
 
@@ -211,9 +182,6 @@
           <form method="POST" action="/admin/rosters/<%= day %>/resync<%= selectedSemesterId ? '?semesterId=' + selectedSemesterId : '' %>" class="inline-block-form" data-confirm="Resync <%= dayLabel %> Parent/Student rosters and floater auto-assignment from the current class schedule and staffing? Anyone automatically added who no longer belongs (for example, a non-primary parent added under old logic) will be removed. Anyone added by hand via + Add Member is left untouched." data-confirm-yes-label="Yes, Resync" data-confirm-icon="icon-rotate" data-confirm-safe="1">
             <input type="hidden" name="tab" value="<%= tab %>" />
             <button type="submit" class="roster-action-btn">Resync</button>
-          </form>
-          <form method="POST" action="/admin/rosters/<%= day %>/archive<%= selectedSemesterId ? '?semesterId=' + selectedSemesterId : '' %>" class="inline-block-form" data-confirm="Archive all current session dates and attendance for <%= dayLabel %> Parent, Student, and every <%= dayLabel %> class into one permanent record? This clears the live roster's dates and attendance so it can start fresh for a new term &mdash; roster membership is not affected." data-confirm-yes-label="Yes, Archive" data-confirm-icon="icon-save" data-confirm-safe="1">
-            <button type="submit" class="roster-action-btn">Archive</button>
           </form>
         <% } %>
       </div>
@@ -475,7 +443,7 @@
   <script src="/js/attendance-grid.js"></script>
   <script src="/js/fragment-dialog.js"></script>
   <script src="/js/allergy-log-popup.js"></script>
-  <script src="/js/roster-archive-view.js"></script>
+  <script src="/js/filter-details-dismiss.js"></script>
   <script src="/js/print-shrink-to-fit.js"></script>
 </body>
 </html>
