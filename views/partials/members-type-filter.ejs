@@ -1,0 +1,25 @@
+<%
+// The Members/Archive page's own type+family filter dropdown - shared
+// between two different spots on views/main-admin-members.ejs depending
+// on activeTab: a real request moved it into the Members tab's own
+// button toolbar (as the lead item of its mobile "row 3": "filter,
+// import, export, print"), but the Archive tab has no such toolbar at
+// all, so it keeps rendering this same dropdown in the original
+// .members-search-filter-row spot next to the search box.
+%>
+<div class="category-filter">
+  <label for="type-select">Filter</label>
+  <select id="type-select" onchange="window.fullscreenNavigate(this.value)">
+    <option value="/main-admin/members?tab=<%= activeTab %>" <%= (!typeFilter && !familyFilter) ? 'selected' : '' %>>All</option>
+    <option value="/main-admin/members?tab=<%= activeTab %>&type=parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
+    <option value="/main-admin/members?tab=<%= activeTab %>&type=student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
+    <option value="/main-admin/members?tab=<%= activeTab %>&type=admin" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
+    <% if (families.length > 0) { %>
+      <optgroup label="Family">
+        <% families.forEach(function(f) { %>
+          <option value="/main-admin/members?tab=<%= activeTab %>&family=<%= f.id %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %></option>
+        <% }); %>
+      </optgroup>
+    <% } %>
+  </select>
+</div>

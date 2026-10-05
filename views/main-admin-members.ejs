@@ -82,14 +82,22 @@
             them for as long as edit mode is on, leaving just this row's
             own Cancel (the toggle itself, relabeled) and the Save button
             down in the Select All/Actions row below. %>
+        <%# A real request: "member page button order on mobile. Add
+            member, edit member list, add/edit family. 2nd row
+            underneath, edit permissions, add/edit sections. 3rd row
+            underneath filter, import, export, print." Reordered to
+            match, with two mobile-only .roster-btn-row-break spacers
+            (styles.css) forcing exactly those 3/2/4 groupings on a
+            narrow phone regardless of how each button's own text width
+            would otherwise wrap - desktop is untouched (those spacers
+            render as nothing there, same flex-wrap-as-space-allows
+            layout as before). The Filter dropdown moves into this row
+            as "row 3"'s lead item (partials/members-type-filter.ejs,
+            shared with the Archive tab's own copy further down, which
+            has no button toolbar of its own to join). %>
         <div class="roster-btn-row roster-btn-row-fit-text no-print">
           <a class="roster-action-btn" href="/main-admin/members/new" data-archive-hide-while="members-select-form">+ Add Member</a>
-          <button type="button" class="roster-action-btn" data-permissions-toggle="members-table" aria-pressed="false" data-archive-hide-while="members-select-form">Edit Permissions</button>
-          <button type="submit" form="permissions-bulk-form" class="roster-action-btn" data-permissions-save="members-table" hidden>Save Permissions</button>
           <button type="button" class="roster-action-btn" data-archive-toggle="members-select-form" data-archive-toggle-label="Edit Member List" aria-pressed="false">Edit Member List</button>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('main-admin-import-dialog').showModal()" data-archive-hide-while="members-select-form">Import</button>
-          <a class="roster-action-btn file-action-btn" href="/main-admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>" data-archive-hide-while="members-select-form">Export</a>
-          <a class="roster-action-btn" href="/main-admin/sections" data-archive-hide-while="members-select-form">Add/Edit Sections</a>
           <%# A real request: "remove manage family blue bar and make it
               an orange button with the rest of the orange buttons that
               says add/edit family" - replaces the old standalone
@@ -97,6 +105,14 @@
               page; same #manage-families-dialog, just opened from here
               now. %>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-families-dialog').showModal()" data-archive-hide-while="members-select-form">Add/Edit Family</button>
+          <span class="roster-btn-row-break" aria-hidden="true"></span>
+          <button type="button" class="roster-action-btn" data-permissions-toggle="members-table" aria-pressed="false" data-archive-hide-while="members-select-form">Edit Permissions</button>
+          <button type="submit" form="permissions-bulk-form" class="roster-action-btn" data-permissions-save="members-table" hidden>Save Permissions</button>
+          <a class="roster-action-btn" href="/main-admin/sections" data-archive-hide-while="members-select-form">Add/Edit Sections</a>
+          <span class="roster-btn-row-break" aria-hidden="true"></span>
+          <%- include('partials/members-type-filter', { activeTab, typeFilter, familyFilter, families }) %>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('main-admin-import-dialog').showModal()" data-archive-hide-while="members-select-form">Import</button>
+          <a class="roster-action-btn file-action-btn" href="/main-admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>" data-archive-hide-while="members-select-form">Export</a>
           <button type="button" class="roster-action-btn" onclick="window.print()" data-archive-hide-while="members-select-form">Print</button>
         </div>
 
@@ -117,7 +133,11 @@
           down next to it on the right. This should appear on the left
           side of the screen." Both used to be their own separate rows
           (search full-width above, filter pushed to the far right of
-          the toolbar below it) - now one row, left-aligned. %>
+          the toolbar below it) - now one row, left-aligned. A later real
+          request moved the Filter dropdown out of here for the Members
+          tab specifically (into the button toolbar above, as "row 3"'s
+          lead item) - the Archive tab has no such toolbar, so it keeps
+          its own copy of the filter in its original spot right here. %>
       <div class="members-search-filter-row no-print">
         <form method="GET" action="/main-admin/members" class="members-search-bar">
           <input type="hidden" name="tab" value="<%= activeTab %>" />
@@ -127,22 +147,9 @@
           <input id="q-input" type="search" name="q" value="<%= q %>" placeholder="Search members&hellip;" aria-label="Search members" />
         </form>
 
-        <div class="category-filter">
-          <label for="type-select">Filter</label>
-          <select id="type-select" onchange="window.fullscreenNavigate(this.value)">
-            <option value="/main-admin/members?tab=<%= activeTab %>" <%= (!typeFilter && !familyFilter) ? 'selected' : '' %>>All</option>
-            <option value="/main-admin/members?tab=<%= activeTab %>&type=parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
-            <option value="/main-admin/members?tab=<%= activeTab %>&type=student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
-            <option value="/main-admin/members?tab=<%= activeTab %>&type=admin" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
-            <% if (families.length > 0) { %>
-              <optgroup label="Family">
-                <% families.forEach(function(f) { %>
-                  <option value="/main-admin/members?tab=<%= activeTab %>&family=<%= f.id %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %></option>
-                <% }); %>
-              </optgroup>
-            <% } %>
-          </select>
-        </div>
+        <% if (activeTab !== 'members') { %>
+          <%- include('partials/members-type-filter', { activeTab, typeFilter, familyFilter, families }) %>
+        <% } %>
       </div>
 
       <%# Edit mode's Select All/None + Actions dropdown - hidden until the

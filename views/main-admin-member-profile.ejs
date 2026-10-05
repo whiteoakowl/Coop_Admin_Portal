@@ -78,38 +78,48 @@
           </div>
         <% } %>
         <% if (scheduleFamilyAll) { %>
+          <%# A real request: "each family member's schedule for all days
+              should be in one card. Family member name as title in
+              card." Each member below is now ONE .form-section card
+              (name as its own <h2> title) holding every one of their
+              days, instead of a separate card PER DAY - a real request
+              also moved+renamed this button: "print all schedules
+              should say print schedules and should be at the top of the
+              page." %>
+          <a class="roster-action-btn print-action-btn no-print" href="/main-admin/members/schedule-print?familyId=<%= member.family_id %>" target="_blank">Print Schedules</a>
           <% familySchedules.forEach(function(fs) { %>
-            <div class="schedule-day-columns member-profile-family-schedule">
+            <div class="form-section member-profile-family-schedule-card">
               <h2 class="member-profile-family-schedule-name"><%= fs.member.name %></h2>
-              <% fs.schedule.activeDays.forEach(function (d) { %>
-                <% var dayLabel = dayLabels[d], rows = fs.schedule.byDay[d]; %>
-                <div class="form-section">
-                  <h3><%= dayLabel %></h3>
-                  <div class="roster-scroll schedule-table-scroll">
-                    <table class="roster-table condensed-table schedule-edit-table">
-                      <thead><tr><th>#</th><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>
-                      <tbody>
-                        <% var anyRows = rows.some(function (r) { return r.class_name || r.time || r.room || r.teacher; }); %>
-                        <% if (!anyRows) { %>
-                          <tr><td colspan="4" class="roster-empty">No classes on <%= dayLabel %> yet.</td></tr>
-                        <% } %>
-                        <% rows.forEach(function (r, i) { %>
-                          <% if (!r.class_name && !r.time && !r.room && !r.teacher) return; %>
-                          <tr>
-                            <td class="schedule-edit-label"><%= i + 1 %></td>
-                            <td><%= r.time || '—' %></td>
-                            <td><%= r.class_name || '—' %></td>
-                            <td><%= r.room || '—' %></td>
-                          </tr>
-                        <% }); %>
-                      </tbody>
-                    </table>
+              <div class="schedule-day-columns">
+                <% fs.schedule.activeDays.forEach(function (d) { %>
+                  <% var dayLabel = dayLabels[d], rows = fs.schedule.byDay[d]; %>
+                  <div>
+                    <h3><%= dayLabel %></h3>
+                    <div class="roster-scroll schedule-table-scroll">
+                      <table class="roster-table condensed-table schedule-edit-table">
+                        <thead><tr><th>#</th><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>
+                        <tbody>
+                          <% var anyRows = rows.some(function (r) { return r.class_name || r.time || r.room || r.teacher; }); %>
+                          <% if (!anyRows) { %>
+                            <tr><td colspan="4" class="roster-empty">No classes on <%= dayLabel %> yet.</td></tr>
+                          <% } %>
+                          <% rows.forEach(function (r, i) { %>
+                            <% if (!r.class_name && !r.time && !r.room && !r.teacher) return; %>
+                            <tr>
+                              <td class="schedule-edit-label"><%= i + 1 %></td>
+                              <td><%= r.time || '—' %></td>
+                              <td><%= r.class_name || '—' %></td>
+                              <td><%= r.room || '—' %></td>
+                            </tr>
+                          <% }); %>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
-              <% }); %>
+                <% }); %>
+              </div>
             </div>
           <% }); %>
-          <a class="roster-action-btn print-action-btn no-print" href="/main-admin/members/schedule-print?familyId=<%= member.family_id %>" target="_blank">Print All Schedules</a>
         <% } else { %>
           <div class="schedule-day-columns">
             <% schedule.activeDays.forEach(function (d) { %>

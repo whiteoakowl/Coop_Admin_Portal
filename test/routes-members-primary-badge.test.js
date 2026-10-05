@@ -55,12 +55,17 @@ test('Main Admin Members list: no inline Primary badge, search bar sits next to 
   assert.equal(res.status, 200);
   assert.match(res.text, /MainAdminBadge Primary Parent/);
   assert.doesNotMatch(res.text, /primary-parent-badge/);
-  // Search bar and Filter dropdown share one row (.members-search-filter-row),
-  // left-aligned, not split across separate toolbar rows.
-  const rowMatch = /<div class="members-search-filter-row no-print">([\s\S]*?)<div class="roster-toolbar/.exec(res.text);
-  assert.ok(rowMatch, 'expected a members-search-filter-row wrapping both the search bar and filter dropdown');
+  // A later real request moved the Filter dropdown out of the search row
+  // and into the button toolbar's own mobile "row 3" (with Import/
+  // Export/Print) for the Members tab specifically - the search row now
+  // holds only the search bar there.
+  const rowMatch = /<div class="members-search-filter-row no-print">([\s\S]*?)<\/div>/.exec(res.text);
+  assert.ok(rowMatch, 'expected a members-search-filter-row wrapping the search bar');
   assert.match(rowMatch[1], /class="members-search-bar"/);
-  assert.match(rowMatch[1], /class="category-filter"/);
+  assert.doesNotMatch(rowMatch[1], /class="category-filter"/);
+  const toolbarMatch = /<div class="roster-btn-row roster-btn-row-fit-text no-print">([\s\S]*?)<\/div>\s*<dialog/.exec(res.text);
+  assert.ok(toolbarMatch, 'expected the button toolbar');
+  assert.match(toolbarMatch[1], /class="category-filter"/);
 });
 
 test('Co-op Admin Members list: no inline Primary badge, search bar sits next to filter dropdown', async () => {

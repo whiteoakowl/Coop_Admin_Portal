@@ -2980,6 +2980,13 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 .filter-row { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; margin: 0.75rem 0; }
 .filter-row .category-filter { margin: 0; }
 
+/* The Members page's own Filter dropdown now sits inside its button
+   toolbar (a real request - see views/main-admin-members.ejs's own
+   comment) - same reasoning as .filter-row above, its default
+   top/bottom margin would misalign it against the buttons beside it,
+   which have none. */
+.roster-btn-row .category-filter { margin: 0; }
+
 /* A single "Filter" button that opens a small dropdown panel of fields
    (a real request: "Class page filter drop down. Filter button, grade
    level, hour, day, full") - a native <details>/<summary>, same
@@ -7473,6 +7480,28 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   }
 }
 
+/* A real request: "member page button order on mobile" with an exact
+   3/2/4 grouping (views/main-admin-members.ejs) - .roster-btn-row-fit-
+   text's own flex-wrap above wraps purely based on each button's text
+   width, which can't guarantee a SPECIFIC grouping regardless of label
+   lengths or viewport width. An invisible full-row-width spacer between
+   groups forces the wrap exactly there instead (the standard flexbox
+   "fake line break" - an item with flex-basis: 100% and zero size pushes
+   everything after it onto a new line without needing JS). Hidden
+   outside mobile entirely, so desktop's existing flow (unscoped
+   .roster-btn-row's own flex-wrap, styles.css above) is untouched. */
+.roster-btn-row-break { display: none; }
+@media (max-width: 640px) {
+  .roster-btn-row-break {
+    display: block;
+    flex-basis: 100%;
+    width: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+  }
+}
+
 /* Parent Portal's Classes grid: same room x hour grid as Co-op Admin's
    own Class Schedule (.class-schedule-room-grid/.class-card above -
    reused as-is, unchanged, so it looks like the same grid), but every
@@ -8224,18 +8253,39 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .schedule-edit-table input[type="text"]:focus { outline: 2px solid var(--brand-dark); outline-offset: 1px; }
 
-.schedule-day-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+/* minmax(0, 1fr), not a bare 1fr - same "grid items don't shrink to fit"
+   gotcha .member-form-grid's own comment (styles.css, above) already
+   documents: a bare 1fr track still sizes itself off its widest child's
+   intrinsic content (a wide schedule table here), so the whole grid -
+   and the page around it - could grow past the viewport on a narrow
+   phone instead of each track shrinking to fit and letting its own
+   .roster-scroll handle any real overflow. A real bug report on the
+   Member Profile Schedule tab: "it drifts off the page to the right and
+   you can see it all" (sic - couldn't see it all). */
+.schedule-day-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; align-items: start; }
 
-/* Class Schedule tab's "View All" - each family member's own pair of
-   day columns, stacked one under the other with a name heading and a
-   divider so it's clear where one member's schedule ends and the next
-   begins. */
+/* Attendance tab's own "View All" grouping - each family member's own
+   section, stacked one under the other with a name heading and a
+   divider so it's clear where one member's history ends and the next
+   begins. Schedule's own near-identical "View All" (familySchedules)
+   uses .member-profile-family-schedule-card below instead - a real
+   request: "each family member's schedule for all days should be in
+   one card" - so the two tabs' structure diverged; this class is now
+   Attendance-only. */
 .member-profile-family-schedule { margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
 .member-profile-family-schedule:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 .member-profile-family-schedule-name { grid-column: 1 / -1; margin: 0 0 0.5rem; }
 
+/* Schedule tab's own "View All" - a real request: "each family member's
+   schedule for all days should be in one card. Family member name as
+   title in card." One plain .form-section card per member (border/
+   shadow/padding/spacing all already come from .form-section itself),
+   its name as a real heading rather than a divider-separated run of day
+   cards. */
+.member-profile-family-schedule-card .member-profile-family-schedule-name { margin: 0 0 1rem; }
+
 @media (max-width: 900px) {
-  .schedule-day-columns { grid-template-columns: 1fr; }
+  .schedule-day-columns { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* A real request: "viewing schedules under member profiles. The times and

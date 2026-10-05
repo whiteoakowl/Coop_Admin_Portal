@@ -69,7 +69,13 @@ test('Members Class Schedule tab: "View All" and its compact family print', asyn
     assert.match(res.text, /View All Parent/);
     assert.match(res.text, /View All Student/);
     assert.match(res.text, /View All Test Class/);
-    assert.match(res.text, /Print All Schedules/);
+    // A real request: "print all schedules should say print schedules
+    // and should be at the top of the page."
+    assert.match(res.text, />Print Schedules</);
+    assert.doesNotMatch(res.text, /Print All Schedules/);
+    const printBtnIdx = res.text.indexOf('>Print Schedules<');
+    const firstMemberCardIdx = res.text.indexOf('member-profile-family-schedule-card');
+    assert.ok(printBtnIdx > -1 && printBtnIdx < firstMemberCardIdx, 'Print Schedules should come before the family members\' own cards');
     assert.match(res.text, new RegExp(`/admin/schedule/print\\?familyId=${familyId}`));
   });
 
