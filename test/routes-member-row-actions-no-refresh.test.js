@@ -164,6 +164,27 @@ test('Main Admin Members list per-row Archive/Delete/Reactivate', async (t) => {
     assert.match(res.text, /data-member-delete-message="Permanently delete Main Row Action Archived\? This removes them from all rosters and attendance history\. This cannot be undone\."/);
   });
 
+  // A real request: "if a member is archived on main admin portal it
+  // should show the date they were archived."
+  await t.test('archiving a member records today\'s date, shown on the Archive tab; reactivating clears it', async () => {
+    const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Archived Date Member', 'archived-date-member', 'student') RETURNING id").get()).id;
+    const page = await request(app).get('/main-admin/members').set('Cookie', cookie);
+    const csrfToken = extractCsrf(page.text);
+
+    await request(app).post(`/main-admin/members/${memberId}/archive`).set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
+
+    const member = await db.prepare('SELECT archived_at FROM members WHERE id = ?').get(memberId);
+    assert.ok(member.archived_at, 'archived_at should be set once archived');
+    const today = member.archived_at.slice(0, 10);
+
+    const archivePage = await request(app).get('/main-admin/members?tab=archive').set('Cookie', cookie);
+    assert.match(archivePage.text, new RegExp(`Archived ${today}`));
+
+    await request(app).post(`/main-admin/members/${memberId}/unarchive`).set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
+    const afterUnarchive = await db.prepare('SELECT archived_at FROM members WHERE id = ?').get(memberId);
+    assert.equal(afterUnarchive.archived_at, null, 'reactivating should clear archived_at');
+  });
+
   await t.test('a fetch()-style POST to archive returns JSON instead of redirecting', async () => {
     const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Main Fetch Archive', 'main-fetch-archive', 'student') RETURNING id").get()).id;
     const page = await request(app).get('/main-admin/members').set('Cookie', cookie);
@@ -250,5 +271,8 @@ test('Main Admin Members list bulk actions preserve the Members tab\'s own filte
       .send({ _csrf: csrfToken, memberIds: [String(id)] });
     assert.equal(res.status, 302);
     assert.equal(res.headers.location, '/main-admin/members?notice=Archived%201%20member(s).');
+
+    const member = await db.prepare('SELECT archived_at FROM members WHERE id = ?').get(id);
+    assert.ok(member.archived_at, 'bulk-archive should also record archived_at, not just single-member archive');
   });
 });

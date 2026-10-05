@@ -23,7 +23,7 @@
         </div>
       </div>
     <% } %>
-    <h1>Members</h1>
+    <h1><%= activeTab === 'approvals' ? 'Approvals' : activeTab === 'archive' ? 'Archive' : activeTab === 'settings' ? 'Settings' : 'Members' %></h1>
 
     <%# A real request: "under members in main admin portal there should
         be a tab that says approvals... there should be another tab
@@ -327,13 +327,19 @@
                     twice. %>
                 <% var memberSectionIds = sectionIdsByMember[m.id]; %>
                 <% var memberSections = memberSectionIds ? sections.filter(function(s) { return memberSectionIds.has(s.id); }) : []; %>
-                <% if (m.member_type === 'student' || memberSections.length > 0) { %>
+                <% if (m.member_type === 'student' || memberSections.length > 0 || (showArchived && m.archived_at)) { %>
                   <div class="member-row-icon-row">
                     <% if (m.member_type === 'student') { %>
                       <span class="member-row-subline"><svg class="icon"><use href="#icon-graduation-cap"/></svg> <%= m.grade_level || '—' %><% if (m.age != null) { %> &middot; age <%= m.age %><% } %></span>
                     <% } %>
                     <% if (memberSections.length > 0) { %>
                       <span class="member-row-subline"><svg class="icon"><use href="#icon-clipboard-list"/></svg> <%= memberSections.map(function(s) { return s.name; }).join(', ') %></span>
+                    <% } %>
+                    <%# A real request: "if a member is archived on main
+                        admin portal it should show the date they were
+                        archived." %>
+                    <% if (showArchived && m.archived_at) { %>
+                      <span class="member-row-subline"><svg class="icon"><use href="#icon-calendar-check"/></svg> Archived <%= m.archived_at.slice(0, 10) %></span>
                     <% } %>
                   </div>
                 <% } %>

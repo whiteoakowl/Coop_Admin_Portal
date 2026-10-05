@@ -441,7 +441,7 @@ router.post('/bulk-archive', async (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length > 0) {
     const placeholders = memberIds.map(() => '?').join(',');
-    await db.prepare(`UPDATE members SET active = 0 WHERE id IN (${placeholders})`).run(...memberIds);
+    await db.prepare(`UPDATE members SET active = 0, archived_at = now_text() WHERE id IN (${placeholders})`).run(...memberIds);
   }
   res.redirect(membersRedirectUrl(req, { notice: `Archived ${memberIds.length} member(s).` }));
 });
@@ -938,7 +938,7 @@ router.post('/:id/request-name-tag', async (req, res) => {
 
 router.post('/:id/archive', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  await db.prepare('UPDATE members SET active = 0 WHERE id = ?').run(id);
+  await db.prepare('UPDATE members SET active = 0, archived_at = now_text() WHERE id = ?').run(id);
   if (isFetch(req)) return res.json({ ok: true });
   res.redirect('/main-admin/members?notice=' + encodeURIComponent('Member archived.'));
 });
@@ -948,7 +948,7 @@ router.post('/:id/archive', async (req, res) => {
 // and remove them from the archive list."
 router.post('/:id/unarchive', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  await db.prepare('UPDATE members SET active = 1 WHERE id = ?').run(id);
+  await db.prepare('UPDATE members SET active = 1, archived_at = NULL WHERE id = ?').run(id);
   if (isFetch(req)) return res.json({ ok: true });
   res.redirect('/main-admin/members?tab=archive&notice=' + encodeURIComponent('Member reactivated.'));
 });

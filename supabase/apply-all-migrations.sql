@@ -4481,3 +4481,25 @@ create unique index if not exists idx_student_academic_history_student_class on 
 -- each column's header link now comes only from its own linked Training
 -- (training_id), picked from a dropdown on Orientation Settings.
 alter table orientation_settings drop column if exists link_url;
+
+-- ===== 20261103010000_event_extra_fields_family_scope.sql =====
+-- A real request: "event editing resources and fields. Requires for
+-- each member or family. If required for family is selected only the
+-- parent will be asked to choose or fill out those extra fields. If for
+-- each member is selected then it will ask that for each member." Every
+-- Extra Field used to be asked identically of whoever was registering
+-- (parent or child, same question every time) - this adds who the field
+-- actually applies to, independent of whether it's required: 'each_member'
+-- (today's behavior, the default) asks it of every registering member;
+-- 'family' asks it only when the registering member is a parent/admin
+-- (utils/events.js's own member-type check, same "admins count as
+-- parents" convention Orientation already uses), never a student.
+alter table event_extra_fields add column if not exists scope text not null default 'each_member' check (scope in ('each_member', 'family'));
+
+-- ===== 20261104010000_members_archived_at.sql =====
+-- A real request: "if a member is archived on main admin portal it
+-- should show the date they were archived." Members were already being
+-- archived (active = 0) with no record of WHEN - this adds that
+-- timestamp, set on archive and cleared on reactivate (routes/main-
+-- admin-members.js's own /:id/archive, /:id/unarchive, /bulk-archive).
+alter table members add column if not exists archived_at text;
