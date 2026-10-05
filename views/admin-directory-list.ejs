@@ -113,7 +113,10 @@
     <% } %>
   </main>
 
-  <dialog id="add-category-dialog" class="member-picker-dialog">
+  <%# A real request: "the popup the title and text box overlap" - same
+      flex-column label stacking fix as every other dialog-label-stack
+      popup in the app. %>
+  <dialog id="add-category-dialog" class="member-picker-dialog dialog-label-stack">
     <form method="POST" action="/main-admin/directory/categories">
       <h3>Add Category</h3>
       <label for="add-directory-category-title">Category Name

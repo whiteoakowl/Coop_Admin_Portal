@@ -112,7 +112,11 @@
     <% } %>
   </main>
 
-  <dialog id="add-category-dialog" class="member-picker-dialog">
+  <%# A real request: "same issues and edits need to be fixed on
+      classifieds" (the Business Directory popup's title/textbox overlap)
+      - same flex-column label stacking fix as every other dialog-label-
+      stack popup in the app. %>
+  <dialog id="add-category-dialog" class="member-picker-dialog dialog-label-stack">
     <form method="POST" action="/main-admin/classifieds/categories">
       <h3>Add Category</h3>
       <label for="add-classifieds-category-title">Category Name

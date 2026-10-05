@@ -184,3 +184,40 @@ test('an account cannot post a classifieds listing for a member outside its own 
   const row = await db.prepare("SELECT 1 FROM classified_listings WHERE title = 'Sneaky Item'").get();
   assert.equal(row, undefined);
 });
+
+// A real bug report: "the popup the title and text box overlap." Both
+// Add Category popups get the same dialog-label-stack fix (flex-column
+// label stacking) every other popup in the app already relies on - see
+// public/css/styles.css's own comment on why plain .member-picker-dialog
+// alone isn't always enough.
+test('Business Directory and Classifieds Add Category popups use dialog-label-stack, and newly added categories show up in the list', async () => {
+  const admin = await loginAsMainAdmin();
+
+  const directoryPage = await request(app).get('/main-admin/directory').set('Cookie', admin.cookie);
+  assert.match(directoryPage.text, /id="add-category-dialog" class="member-picker-dialog dialog-label-stack"/);
+
+  const addDirectoryCategory = await request(app)
+    .post('/main-admin/directory/categories')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Photography', _csrf: admin.csrfToken });
+  assert.equal(addDirectoryCategory.status, 302);
+  assert.doesNotMatch(addDirectoryCategory.headers.location, /error=/);
+
+  const directoryAfter = await request(app).get('/main-admin/directory').set('Cookie', admin.cookie);
+  assert.match(directoryAfter.text, /Photography/);
+
+  const classifiedsPage = await request(app).get('/main-admin/classifieds').set('Cookie', admin.cookie);
+  assert.match(classifiedsPage.text, /id="add-category-dialog" class="member-picker-dialog dialog-label-stack"/);
+
+  const addClassifiedsCategory = await request(app)
+    .post('/main-admin/classifieds/categories')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Furniture', _csrf: admin.csrfToken });
+  assert.equal(addClassifiedsCategory.status, 302);
+  assert.doesNotMatch(addClassifiedsCategory.headers.location, /error=/);
+
+  const classifiedsAfter = await request(app).get('/main-admin/classifieds').set('Cookie', admin.cookie);
+  assert.match(classifiedsAfter.text, /Furniture/);
+});
