@@ -107,6 +107,16 @@ async function listIssues() {
   return db.prepare('SELECT * FROM newsletter_issues ORDER BY created_at DESC').all();
 }
 
+// A real request: "check box under send automatically every week for
+// send newsletter immediately for a quick one time send out off
+// schedule." There's no issue selected on the schedule page itself, so
+// "send newsletter immediately" acts on the most recently created
+// issue that hasn't gone out yet - the one a weekly auto-send would
+// have picked up next.
+async function mostRecentUnsentIssue() {
+  return db.prepare("SELECT * FROM newsletter_issues WHERE status IN ('draft', 'scheduled') ORDER BY created_at DESC, id DESC LIMIT 1").get();
+}
+
 async function getIssue(id) {
   return db.prepare('SELECT * FROM newsletter_issues WHERE id = ?').get(id);
 }
@@ -158,6 +168,7 @@ async function deleteIssue(id) {
 module.exports = {
   assembleContent,
   listIssues,
+  mostRecentUnsentIssue,
   getIssue,
   createDraft,
   updateIssue,

@@ -21,42 +21,17 @@
 
     <div class="grid-box-header">
       <h2>Newsletter</h2>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('new-issue-dialog').showModal()">+ New Issue</button>
+      <div class="roster-btn-row">
+        <%# A real request: "weekly schedule should also be an orange
+            buttons and say edit weekly schedule and be a popup." Same
+            roster-action-btn/dialog pattern as every other settings
+            popup in the app, instead of a <details> disclosure. %>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-schedule-dialog').showModal()">Edit Weekly Schedule</button>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('new-issue-dialog').showModal()">+ New Issue</button>
+      </div>
     </div>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
-
-    <details class="manage-section" style="margin-bottom: 1rem;" <%= schedule.enabled ? 'open' : '' %>>
-      <summary><svg class="icon"><use href="#icon-clock"/></svg> Weekly Send Schedule</summary>
-      <p class="hint" style="margin-top: 0.5rem;">
-        Controls when the newsletter would go out automatically once a real email provider is connected - no email
-        provider is configured yet, so nothing sends automatically regardless of this setting. Issues can still be
-        marked sent manually below.
-      </p>
-      <form method="POST" action="/main-admin/newsletter/settings" class="stack-form" style="margin-top: 0.75rem;">
-        <label class="checkbox-option">
-          <input type="checkbox" name="enabled" value="1" <%= schedule.enabled ? 'checked' : '' %> />
-          Send automatically every week
-        </label>
-        <div class="class-form-row">
-          <div class="class-form-field">
-            <span class="class-form-field-label">Day</span>
-            <select name="day">
-              <% weekdays.forEach(function(d) { %>
-                <option value="<%= d %>" <%= schedule.day === d ? 'selected' : '' %>><%= d %></option>
-              <% }); %>
-            </select>
-          </div>
-          <div class="class-form-field">
-            <span class="class-form-field-label">Time</span>
-            <input type="time" name="time" value="<%= schedule.time %>" />
-          </div>
-        </div>
-        <div>
-          <button type="submit" class="primary-btn">Save Schedule</button>
-        </div>
-      </form>
-    </details>
 
     <% if (issues.length === 0) { %>
       <p class="roster-empty">No issues yet &mdash; create one above.</p>
@@ -90,6 +65,50 @@
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
           <button type="submit" class="primary-btn">Create Draft</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="edit-schedule-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/newsletter/settings">
+        <h3>Edit Weekly Schedule</h3>
+        <p class="hint">
+          Controls when the newsletter would go out automatically once a real email provider is connected - no email
+          provider is configured yet, so nothing sends automatically regardless of this setting. Issues can still be
+          marked sent manually from their own edit page.
+        </p>
+        <label class="checkbox-option">
+          <input type="checkbox" name="enabled" value="1" <%= schedule.enabled ? 'checked' : '' %> />
+          Send automatically every week
+        </label>
+        <%# A real request: "check box under send automatically every
+            week for send newsletter immediately for a quick one time
+            send out off schedule. Reverts back to schedule settings
+            after." A one-time action, never itself persisted - the
+            schedule above saves exactly as submitted either way, and
+            this checkbox is always unchecked again next time the
+            dialog opens. %>
+        <label class="checkbox-option">
+          <input type="checkbox" name="sendNow" value="1" />
+          Send newsletter immediately <span class="hint">(one-time, outside the schedule)</span>
+        </label>
+        <div class="class-form-row">
+          <div class="class-form-field">
+            <span class="class-form-field-label">Day</span>
+            <select name="day">
+              <% weekdays.forEach(function(d) { %>
+                <option value="<%= d %>" <%= schedule.day === d ? 'selected' : '' %>><%= d %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="class-form-field">
+            <span class="class-form-field-label">Time</span>
+            <input type="time" name="time" value="<%= schedule.time %>" />
+          </div>
+        </div>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Save Schedule</button>
         </div>
       </form>
     </dialog>

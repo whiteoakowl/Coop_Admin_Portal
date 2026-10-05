@@ -250,3 +250,59 @@ test('deleting a draft removes it', async () => {
   const issue = await db.prepare('SELECT * FROM newsletter_issues WHERE id = ?').get(id);
   assert.equal(issue, undefined);
 });
+
+// A real request: "weekly schedule should also be an orange buttons and
+// say edit weekly schedule and be a popup."
+test('Edit Weekly Schedule is a popup dialog, not a <details> disclosure', async () => {
+  const admin = await loginAsMainAdmin();
+  const page = await request(app).get('/main-admin/newsletter').set('Cookie', admin.cookie);
+  assert.equal(page.status, 200);
+  assert.doesNotMatch(page.text, /Weekly Send Schedule<\/summary>/, 'the old <details> disclosure should be gone');
+  assert.match(page.text, /<dialog id="edit-schedule-dialog" class="member-picker-dialog">/);
+  assert.match(page.text, /onclick="document\.getElementById\('edit-schedule-dialog'\)\.showModal\(\)">Edit Weekly Schedule</);
+  assert.match(page.text, /<h3>Edit Weekly Schedule<\/h3>/);
+});
+
+// A real request: "check box under send automatically every week for
+// send newsletter immediately for a quick one time send out off
+// schedule. Reverts back to schedule settings after."
+test('Send newsletter immediately sends the most recent unsent issue, and the schedule settings save independently either way', async () => {
+  const admin = await loginAsMainAdmin();
+  const olderId = await createDraft(admin, 'Older Draft');
+  const newerId = await createDraft(admin, 'Newer Draft');
+
+  const res = await request(app)
+    .post('/main-admin/newsletter/settings')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ day: 'Friday', time: '09:30', enabled: '1', sendNow: '1', _csrf: admin.csrfToken });
+  assert.equal(res.status, 302);
+  assert.match(decodeURIComponent(res.headers.location), /sent immediately/);
+
+  const newer = await db.prepare('SELECT * FROM newsletter_issues WHERE id = ?').get(newerId);
+  const older = await db.prepare('SELECT * FROM newsletter_issues WHERE id = ?').get(olderId);
+  assert.equal(newer.status, 'sent', 'the most recently created unsent issue should be the one sent immediately');
+  assert.equal(older.status, 'draft', 'an older draft should be left alone');
+
+  const page = await request(app).get('/main-admin/newsletter').set('Cookie', admin.cookie);
+  assert.match(page.text, /value="Friday" selected/);
+  assert.match(page.text, /value="09:30"/);
+  assert.match(page.text, /name="enabled" value="1" checked/);
+  // sendNow is a one-time action, never persisted - always unchecked again.
+  assert.doesNotMatch(page.text, /name="sendNow" value="1" checked/);
+});
+
+test('Send newsletter immediately with nothing eligible still saves the schedule and says so', async () => {
+  const admin = await loginAsMainAdmin();
+  // Clear out every draft/scheduled issue (including any left over from
+  // earlier tests in this file) so there's genuinely nothing eligible.
+  await db.prepare("DELETE FROM newsletter_issues WHERE status IN ('draft', 'scheduled')").run();
+
+  const res = await request(app)
+    .post('/main-admin/newsletter/settings')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ day: 'Monday', time: '08:00', sendNow: '1', _csrf: admin.csrfToken });
+  assert.equal(res.status, 302);
+  assert.match(decodeURIComponent(res.headers.location), /Nothing to send immediately/);
+});

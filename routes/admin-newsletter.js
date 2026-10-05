@@ -46,12 +46,27 @@ router.get('/', async (req, res) => {
   });
 });
 
+// A real request: "check box under send automatically every week for
+// send newsletter immediately for a quick one time send out off
+// schedule. Reverts back to schedule settings after." The schedule
+// fields (day/time/enabled) always save exactly as submitted, same as
+// before - sendNow is a one-time action layered on top, never itself
+// persisted, so the checkbox is always unchecked again on reload
+// regardless of whether a send just happened.
 router.post('/settings', async (req, res) => {
   const day = WEEKDAYS.includes(req.body.day) ? req.body.day : 'Monday';
   const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(req.body.time || '') ? req.body.time : '08:00';
   await setAppSetting(NEWSLETTER_SEND_DAY_KEY, day);
   await setAppSetting(NEWSLETTER_SEND_TIME_KEY, time);
   await setAppSetting(NEWSLETTER_SEND_ENABLED_KEY, req.body.enabled === '1' ? '1' : '0');
+
+  if (req.body.sendNow === '1') {
+    const issue = await newsletter.mostRecentUnsentIssue();
+    if (!issue) return res.redirect('/main-admin/newsletter?notice=' + encodeURIComponent('Schedule saved. Nothing to send immediately - create an issue first.'));
+    await newsletter.markSent(issue.id);
+    return res.redirect('/main-admin/newsletter?notice=' + encodeURIComponent(`Schedule saved. "${issue.subject}" sent immediately.`));
+  }
+
   res.redirect('/main-admin/newsletter?notice=' + encodeURIComponent('Send schedule saved.'));
 });
 
