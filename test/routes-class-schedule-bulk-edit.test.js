@@ -64,6 +64,11 @@ test('List view renders a Bulk Edit toggle, a per-class checkbox, and the bulk-e
   assert.match(page.text, /name="startDate"/);
   assert.match(page.text, /name="endDate"/);
   assert.match(page.text, /name="semesterId"/);
+  // A real bug: archive-select-toggle.js (which powers the Select All
+  // checkbox's own change handler) was never included on this page, so
+  // Select All checked nothing and a 2nd Bulk Edit click always saw zero
+  // selected classes and silently cancelled instead of opening the dialog.
+  assert.match(page.text, /<script src="\/js\/archive-select-toggle\.js">/);
 });
 
 test('bulk-editing a blank field leaves that column alone on every selected class', async () => {
