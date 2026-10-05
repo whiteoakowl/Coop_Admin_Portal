@@ -16,13 +16,18 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
       <h1><%= category.name %></h1>
-      <%# A real request: "edit button should be on chat group page... no
-          moderation tab/subpage," later: "instead of a popup edit chat to
-          be a page with save button" - the same name/description/allow
-          comments/sections/moderator settings the old Moderate tab's
-          popup used to edit now live on their own page instead of a
-          dialog here. %>
-      <a class="roster-action-btn" href="/main-admin/forums/<%= category.id %>/edit">Edit</a>
+      <div class="roster-btn-row">
+        <%# A real request: "edit button should be on chat group page...
+            no moderation tab/subpage," later: "instead of a popup edit
+            chat to be a page with save button" - the same name/
+            description/allow comments/sections/moderator settings the
+            old Moderate tab's popup used to edit now live on their own
+            page instead of a dialog here. %>
+        <a class="roster-action-btn" href="/main-admin/forums/<%= category.id %>/edit">Edit</a>
+        <%# A real request: "next to edit button should be add thread
+            button. A thread or comment could be added by an admin." %>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-thread-dialog').showModal()">Add Thread</button>
+      </div>
     </div>
     <p><a href="/main-admin/forums">&larr; Chat</a></p>
     <% if (category.is_locked) { %><span class="badge-pill badge-pill-gray">Locked</span><% } %>
@@ -71,6 +76,26 @@
         </table>
       </div>
     <% } %>
+
+    <dialog id="add-thread-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/forums/<%= category.id %>/threads">
+        <h3>Add Thread</h3>
+        <label>Title
+          <input type="text" name="title" required />
+        </label>
+        <div data-forum-editor>
+          <label>Message</label>
+          <%- include('partials/forum-editor-toolbar') %>
+          <div class="forum-editable" data-forum-editable contenteditable="true"></div>
+          <input type="hidden" name="body" data-forum-body-input />
+        </div>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Post Thread</button>
+        </div>
+      </form>
+    </dialog>
   </main>
+  <script src="/js/forum-editor.js"></script>
 </body>
 </html>

@@ -152,6 +152,21 @@ router.post('/:id/settings', async (req, res) => {
   res.redirect(`/main-admin/forums/${req.params.id}/edit?notice=` + encodeURIComponent('Chat group settings updated.'));
 });
 
+// A real request: "next to edit button should be add thread button. A
+// thread or comment could be added by an admin." Attributed to the
+// Main Admin account's own members row (every portal account - see
+// db/bootstrapPg.js's own Main Admin seed - has one), same as any
+// member starting a thread through routes/forums.js.
+router.post('/:id/threads', async (req, res) => {
+  const category = await forums.getCategory(req.params.id);
+  if (!category) return res.status(404).render('404', { title: 'Not Found' });
+  const title = (req.body.title || '').trim();
+  const body = (req.body.body || '').trim();
+  if (!title || !body) return res.redirect(`/main-admin/forums/${req.params.id}?error=` + encodeURIComponent('Title and message are both required.'));
+  const threadId = await forums.createThread(category.id, title, body, req.portalAccount.member_id, req.portalAccount.id);
+  res.redirect(`/main-admin/forums/threads/${threadId}`);
+});
+
 // Archive tab's own "restore" action - see archivedThreads()'s comment in
 // utils/forums.js for why this is a thread-level, not category-level,
 // operation. Namespaced under /threads/ so it can never collide with the
@@ -258,6 +273,16 @@ router.post('/threads/:threadId/posts/:postId/edit', async (req, res) => {
   if (!body) return res.redirect(`/main-admin/forums/threads/${req.params.threadId}?error=` + encodeURIComponent('A message is required.'));
   await forums.editPost(req.params.postId, body);
   await forums.logEdit(req.portalAccount.id, req.params.postId);
+  res.redirect(`/main-admin/forums/threads/${req.params.threadId}`);
+});
+
+// Same real request as POST /:id/threads above - an admin adding a
+// comment/reply to an existing thread, not just moderating ones members
+// already posted.
+router.post('/threads/:threadId/posts', async (req, res) => {
+  const body = (req.body.body || '').trim();
+  if (!body) return res.redirect(`/main-admin/forums/threads/${req.params.threadId}?error=` + encodeURIComponent('A message is required.'));
+  await forums.addPost(req.params.threadId, body, req.portalAccount.member_id, req.portalAccount.id);
   res.redirect(`/main-admin/forums/threads/${req.params.threadId}`);
 });
 

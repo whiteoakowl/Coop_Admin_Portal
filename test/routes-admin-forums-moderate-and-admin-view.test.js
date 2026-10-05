@@ -353,3 +353,108 @@ test('admin Trash and Edit actually remove/edit a post from the admin thread vie
   const thread = await db.prepare('SELECT status FROM forum_threads WHERE id = ?').get(threadId);
   assert.equal(thread.status, 'archived');
 });
+
+// A real request: "next to edit button should be add thread button. A
+// thread or comment could be added by an admin."
+test('Add Thread button opens a dialog that posts a new thread attributed to the Main Admin account', async () => {
+  const admin = await loginAsMainAdmin();
+  await request(app).post('/main-admin/forums').set('Cookie', admin.cookie).type('form').send({ name: 'Admin Thread Chat', scope: 'general', _csrf: admin.csrfToken });
+  const category = await db.prepare("SELECT * FROM forum_categories WHERE name = 'Admin Thread Chat'").get();
+
+  const categoryPage = await request(app).get(`/main-admin/forums/${category.id}`).set('Cookie', admin.cookie);
+  assert.match(categoryPage.text, /<dialog id="add-thread-dialog" class="member-picker-dialog">/);
+  assert.match(categoryPage.text, /onclick="document\.getElementById\('add-thread-dialog'\)\.showModal\(\)">Add Thread</);
+  assert.match(categoryPage.text, new RegExp(`<form method="POST" action="/main-admin/forums/${category.id}/threads">`));
+
+  const res = await request(app)
+    .post(`/main-admin/forums/${category.id}/threads`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Admin-Started Thread', body: '<p>Posted by an admin</p>', _csrf: admin.csrfToken });
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /\/main-admin\/forums\/threads\/\d+/);
+
+  const thread = await db.prepare("SELECT * FROM forum_threads WHERE title = 'Admin-Started Thread'").get();
+  assert.ok(thread);
+  assert.equal(thread.category_id, category.id);
+  const mainAdminMember = await db.prepare("SELECT id FROM members WHERE name = 'Main Admin'").get();
+  assert.equal(thread.member_id, mainAdminMember.id);
+
+  const threadView = await request(app).get(`/main-admin/forums/threads/${thread.id}`).set('Cookie', admin.cookie);
+  assert.equal(threadView.status, 200);
+  assert.match(threadView.text, /Posted by an admin/);
+  assert.match(threadView.text, /Main Admin/);
+});
+
+test('Add Thread requires both a title and a message', async () => {
+  const admin = await loginAsMainAdmin();
+  await request(app).post('/main-admin/forums').set('Cookie', admin.cookie).type('form').send({ name: 'Add Thread Validation Chat', scope: 'general', _csrf: admin.csrfToken });
+  const category = await db.prepare("SELECT * FROM forum_categories WHERE name = 'Add Thread Validation Chat'").get();
+
+  const res = await request(app)
+    .post(`/main-admin/forums/${category.id}/threads`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: '', body: '', _csrf: admin.csrfToken });
+  assert.equal(res.status, 302);
+  assert.match(decodeURIComponent(res.headers.location), /Title and message are both required/);
+  const count = (await db.prepare('SELECT COUNT(*) AS c FROM forum_threads WHERE category_id = ?').get(category.id)).c;
+  assert.equal(Number(count), 0);
+});
+
+// Same real request - "a comment could be added by an admin" to an
+// EXISTING thread, not just a new one.
+test('admin can reply to an existing thread via the thread view\'s own Reply form', async () => {
+  const admin = await loginAsMainAdmin();
+  await request(app).post('/main-admin/forums').set('Cookie', admin.cookie).type('form').send({ name: 'Admin Reply Chat', scope: 'general', _csrf: admin.csrfToken });
+  const category = await db.prepare("SELECT * FROM forum_categories WHERE name = 'Admin Reply Chat'").get();
+
+  const author = await createParentAccount();
+  const threadRes = await request(app)
+    .post(`/forums/${category.id}/threads`)
+    .set('Cookie', author.cookie)
+    .type('form')
+    .send({ title: 'Member Started Thread', body: '<p>Original post</p>', _csrf: author.csrfToken });
+  const threadId = /\/forums\/threads\/(\d+)/.exec(threadRes.headers.location)[1];
+
+  const threadPageBefore = await request(app).get(`/main-admin/forums/threads/${threadId}`).set('Cookie', admin.cookie);
+  assert.match(threadPageBefore.text, new RegExp(`<form method="POST" action="/main-admin/forums/threads/${threadId}/posts" data-forum-editor>`));
+  assert.match(threadPageBefore.text, />Post Reply</);
+
+  const replyRes = await request(app)
+    .post(`/main-admin/forums/threads/${threadId}/posts`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ body: '<p>Admin reply</p>', _csrf: admin.csrfToken });
+  assert.equal(replyRes.status, 302);
+
+  const threadPageAfter = await request(app).get(`/main-admin/forums/threads/${threadId}`).set('Cookie', admin.cookie);
+  assert.match(threadPageAfter.text, /Admin reply/);
+
+  const newPost = await db.prepare("SELECT * FROM forum_posts WHERE thread_id = ? ORDER BY id DESC LIMIT 1").get(threadId);
+  const mainAdminMember = await db.prepare("SELECT id FROM members WHERE name = 'Main Admin'").get();
+  assert.equal(newPost.member_id, mainAdminMember.id);
+});
+
+test('admin reply requires a message', async () => {
+  const admin = await loginAsMainAdmin();
+  await request(app).post('/main-admin/forums').set('Cookie', admin.cookie).type('form').send({ name: 'Admin Reply Validation Chat', scope: 'general', _csrf: admin.csrfToken });
+  const category = await db.prepare("SELECT * FROM forum_categories WHERE name = 'Admin Reply Validation Chat'").get();
+  const author = await createParentAccount();
+  const threadRes = await request(app)
+    .post(`/forums/${category.id}/threads`)
+    .set('Cookie', author.cookie)
+    .type('form')
+    .send({ title: 'Validation Thread', body: '<p>Original post</p>', _csrf: author.csrfToken });
+  const threadId = /\/forums\/threads\/(\d+)/.exec(threadRes.headers.location)[1];
+
+  const res = await request(app)
+    .post(`/main-admin/forums/threads/${threadId}/posts`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ body: '', _csrf: admin.csrfToken });
+  assert.equal(res.status, 302);
+  assert.match(decodeURIComponent(res.headers.location), /A message is required/);
+  const count = (await db.prepare('SELECT COUNT(*) AS c FROM forum_posts WHERE thread_id = ?').get(threadId)).c;
+  assert.equal(Number(count), 1, 'only the original post should exist');
+});

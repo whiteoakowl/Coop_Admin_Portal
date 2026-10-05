@@ -71,6 +71,24 @@
         </dialog>
       <% } %>
     <% }); %>
+
+    <%# A real request: "a thread or comment could be added by an
+        admin" - same reply form routes/forums.js's own member-facing
+        thread view already offers, admin always has moderator-
+        equivalent rights so there's no lock/allow-comments gate here. %>
+    <% if (thread.status === 'active') { %>
+      <div class="manage-section">
+        <% if (!category.is_chat_room) { %><div class="grid-box-header"><h2>Reply</h2></div><% } %>
+        <form method="POST" action="/main-admin/forums/threads/<%= thread.id %>/posts" data-forum-editor>
+          <%- include(category.is_chat_room ? 'partials/forum-editor-toolbar-chat' : 'partials/forum-editor-toolbar') %>
+          <div class="forum-editable" data-forum-editable contenteditable="true"></div>
+          <input type="hidden" name="body" data-forum-body-input />
+          <button type="submit" class="primary-btn" style="margin-top: 0.75rem;"><%= category.is_chat_room ? 'Send' : 'Post Reply' %></button>
+        </form>
+      </div>
+    <% } else { %>
+      <p class="hint">This thread is archived - no new replies.</p>
+    <% } %>
   </main>
   <script src="/js/forum-editor.js"></script>
 </body>
