@@ -367,11 +367,18 @@ const FULL_ADMIN_ONLY_TABS = ['account', 'classcheckin', 'kiosk'];
 
 async function renderSettings(req, res, error, success, activeTab) {
   const isFullAdmin = !!req.session.adminId;
+  // A real request: "change co-op admin settings gear to cards for each
+  // tab like main admin portal settings gear." No tab (or an unknown
+  // one) now lands on a card-grid hub - same shape as Main Admin's own
+  // /main-admin/settings - instead of silently defaulting to the
+  // Username/Password tab the way this used to. An explicit, invalid
+  // ?tab= still falls through to the hub rather than erroring.
+  //
   // A Co-op Admin (a member, not the master admin account) only ever gets
   // Quick Links and Install App here - Username/Password manages the
   // single master admin account.
-  let tab = SETTINGS_TABS.includes(activeTab) ? activeTab : 'account';
-  if (FULL_ADMIN_ONLY_TABS.includes(tab) && !isFullAdmin) tab = 'quicklinks';
+  let tab = SETTINGS_TABS.includes(activeTab) ? activeTab : null;
+  if (tab && FULL_ADMIN_ONLY_TABS.includes(tab) && !isFullAdmin) tab = 'quicklinks';
   res.render('admin-settings', {
     title: 'Settings',
     username: req.session.username,

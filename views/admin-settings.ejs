@@ -11,20 +11,54 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
 
-    <%# Settings is reached via the mobile TOP bar's gear icon, not the
-        orange bottom bar - no bottom-bar slot to attach a popup to, so
-        this stays the plain connected file-tab strip every other tabbed
-        page used before the orange-bar popup existed, instead of a popup
-        with nothing to open it from. %>
-    <div class="view-tabs no-print">
-      <% if (isFullAdmin) { %>
-        <a class="view-tab<%= activeTab === 'account' ? ' active' : '' %>" href="/admin/settings?tab=account">Username/Password</a>
-        <a class="view-tab<%= activeTab === 'classcheckin' ? ' active' : '' %>" href="/admin/settings?tab=classcheckin">Class Check-In PIN</a>
-        <a class="view-tab<%= activeTab === 'kiosk' ? ' active' : '' %>" href="/admin/settings?tab=kiosk">Kiosk</a>
-      <% } %>
-      <a class="view-tab<%= activeTab === 'quicklinks' ? ' active' : '' %>" href="/admin/settings?tab=quicklinks">Quick Links</a>
-      <a class="view-tab<%= activeTab === 'install' ? ' active' : '' %>" href="/admin/settings?tab=install">Install App</a>
-    </div>
+    <% if (!activeTab) { %>
+      <%# A real request: "change co-op admin settings gear to cards for
+          each tab like main admin portal settings gear." Same
+          .team-card-grid/.team-info-card hub component Main Admin's own
+          /main-admin/settings uses - Username/Password, Class Check-In
+          PIN, and Kiosk only show for the full master admin account
+          (same restriction the old tab strip enforced). %>
+      <div class="team-card-grid">
+        <% if (isFullAdmin) { %>
+          <div class="team-col">
+            <a class="team-info-card" href="/admin/settings?tab=account">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-user-circle"/></svg></span>
+              <h3 class="team-info-title">Username/Password</h3>
+              <p class="hint">Change the shared admin login's username or password.</p>
+            </a>
+          </div>
+          <div class="team-col">
+            <a class="team-info-card" href="/admin/settings?tab=classcheckin">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-badge"/></svg></span>
+              <h3 class="team-info-title">Class Check-In PIN</h3>
+              <p class="hint">The shared PIN staff enter at the kiosk's Class Check-In screen.</p>
+            </a>
+          </div>
+          <div class="team-col">
+            <a class="team-info-card" href="/admin/settings?tab=kiosk">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-sliders"/></svg></span>
+              <h3 class="team-info-title">Kiosk</h3>
+              <p class="hint">Choose which semester the Kiosk is currently running.</p>
+            </a>
+          </div>
+        <% } %>
+        <div class="team-col">
+          <a class="team-info-card" href="/admin/settings?tab=quicklinks">
+            <span class="team-info-icon"><svg class="icon"><use href="#icon-link"/></svg></span>
+            <h3 class="team-info-title">Quick Links</h3>
+            <p class="hint">Shortcut links shown to members.</p>
+          </a>
+        </div>
+        <div class="team-col">
+          <a class="team-info-card" href="/admin/settings?tab=install">
+            <span class="team-info-icon"><svg class="icon"><use href="#icon-file-text"/></svg></span>
+            <h3 class="team-info-title">Install App</h3>
+            <p class="hint">Add this site to your device's home screen or app list.</p>
+          </a>
+        </div>
+      </div>
+    <% } else { %>
+    <p class="subtitle no-print"><a href="/admin/settings">&larr; Back to Settings Menu</a></p>
     <div class="view-tab-panel">
       <% if (activeTab === 'account') { %>
         <div class="settings-account-grid">
@@ -126,6 +160,7 @@
         </div>
       <% } %>
     </div>
+    <% } %>
   </main>
   <script src="/js/edit-toggle.js"></script>
 </body>
