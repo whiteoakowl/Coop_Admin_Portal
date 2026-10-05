@@ -7,7 +7,7 @@ const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { isValidISODate, easternInputToUtcText, utcTextToEasternInput, formatTimestamp, ageFromBirthday, todayISO, weekdayOf } = require('../utils/dates');
-const { listWindows, createWindow, updateWindow, deleteWindow } = require('../utils/registrationWindows');
+const { listWindows, createWindow, updateWindow, deleteWindow, cloneRegistrationWindowsFromMostRecentSemester } = require('../utils/registrationWindows');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const { getMemberSchedule, schedulesForMembers, scheduleList } = require('../utils/schedule');
 const { byLastName, allFamilies } = require('../utils/members');
@@ -418,6 +418,9 @@ router.post('/schedule/semesters', requireFullAdmin, async (req, res) => {
     // List from whichever semester most recently existed before it -
     // see cloneTaskListFromMostRecentSemester's own comment.
     await cloneTaskListFromMostRecentSemester(semester.id);
+    // A real request: "also the registration schedule settings [should
+    // copy over to new semesters]" - see cloneRegistrationWindowsFromMostRecentSemester's own comment.
+    await cloneRegistrationWindowsFromMostRecentSemester(semester.id);
   } catch (err) {
     return res.redirect(back + sep + 'error=' + encodeURIComponent(err.message));
   }

@@ -161,4 +161,58 @@ async function nextWindowForAccount(accountRoles, { classScheduleId, sectionIds,
   return applicable.reduce((earliest, w) => (w.opens_at < earliest.opens_at ? w : earliest));
 }
 
-module.exports = { listWindows, createWindow, updateWindow, deleteWindow, isRegistrationOpenForAccount, nextWindowForAccount };
+// A real request: "also the registration schedule settings [should copy
+// over to new semesters]" - the same "clone from whichever semester most
+// recently existed before this one" shape utils/taskList.js's own
+// cloneTaskListFromMostRecentSemester already uses. Only windows tied to
+// a SPECIFIC Schedule Grid (class_schedule_id not null) belong to one
+// semester and need a next-semester counterpart; a window with no
+// Schedule Grid at all already applies to every semester by definition
+// (isRegistrationOpenForAccount's own "null means every grid" rule), so
+// re-cloning it would just create a confusing duplicate entry. Per a real
+// request, this copies every field EXACTLY, opens_at/closes_at included
+// - the admin is expected to edit each clone's dates afterward, same as
+// they'd have to re-create it by hand otherwise. The one field that
+// can't be copied verbatim is class_schedule_id itself: the old semester's
+// own Schedule Grid row doesn't exist in the new semester, so this maps
+// it to the new semester's own grid for the SAME day of week - skipping a
+// window outright if the new semester doesn't meet that day at all.
+async function cloneRegistrationWindowsFromMostRecentSemester(newSemesterId) {
+  const previous = await db.prepare('SELECT id FROM semesters WHERE id != ? ORDER BY id DESC LIMIT 1').get(newSemesterId);
+  if (!previous) return;
+  const windows = await db
+    .prepare(
+      `SELECT w.*, cs.day_of_week AS "dayOfWeek" FROM registration_windows w
+       JOIN class_schedules cs ON cs.id = w.class_schedule_id
+       WHERE cs.semester_id = ?`
+    )
+    .all(previous.id);
+  if (windows.length === 0) return;
+
+  const newSchedules = await db.prepare('SELECT * FROM class_schedules WHERE semester_id = ?').all(newSemesterId);
+  const newScheduleIdByDay = new Map(newSchedules.map((s) => [s.day_of_week, s.id]));
+  const sectionsByWindow = await sectionIdsByWindow();
+
+  for (const w of windows) {
+    const newClassScheduleId = newScheduleIdByDay.get(w.dayOfWeek);
+    if (!newClassScheduleId) continue;
+    await createWindow({
+      label: w.label,
+      opensAt: w.opens_at,
+      closesAt: w.closes_at,
+      classScheduleId: newClassScheduleId,
+      sectionIds: sectionsByWindow[w.id] || [],
+      actionTypes: Object.keys(ACTION_TYPE_COLUMNS).filter((key) => !!w[ACTION_TYPE_COLUMNS[key]]),
+    });
+  }
+}
+
+module.exports = {
+  listWindows,
+  createWindow,
+  updateWindow,
+  deleteWindow,
+  isRegistrationOpenForAccount,
+  nextWindowForAccount,
+  cloneRegistrationWindowsFromMostRecentSemester,
+};
