@@ -409,7 +409,7 @@ router.post('/resources/submit', async (req, res) => {
 // whatever Main/Co-op Admin has designed.
 router.get('/name-tag', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
-  res.render('student-name-tag', { title: 'Name Tag', member, error: req.query.error || null });
+  res.render('student-name-tag', { title: 'Name Tag Form', member, error: req.query.error || null });
 });
 
 router.post('/name-tag/print', async (req, res) => {

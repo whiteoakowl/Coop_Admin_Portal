@@ -25,7 +25,7 @@ router.get('/announcements', requireAdmin, async (req, res) => {
   const roleLabelByKey = Object.fromEntries(roles.map((r) => [r.key, r.label]));
   const log = await announcements.listAnnouncementLog();
   res.render('admin-announcements', {
-    title: 'Communication',
+    title: 'Announcements',
     roles,
     log,
     targetLabels: (targets) => announcements.targetLabels(targets, roleLabelByKey),
@@ -67,7 +67,7 @@ router.get('/announcements/email', requireAdmin, async (req, res) => {
     emailComposer.listCampaigns(),
   ]);
   res.render('admin-email', {
-    title: 'Communication',
+    title: 'Email',
     roles,
     sections,
     gradeLevels,
@@ -144,7 +144,7 @@ router.get('/announcements/text', requireAdmin, async (req, res) => {
     textComposer.listCampaigns(),
   ]);
   res.render('admin-text', {
-    title: 'Communication',
+    title: 'Text',
     roles,
     sections,
     gradeLevels,
