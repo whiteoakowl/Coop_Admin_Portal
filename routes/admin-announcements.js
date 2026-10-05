@@ -41,6 +41,14 @@ router.post('/announcements', requireAdmin, async (req, res) => {
   if (!title || !body) return res.redirect('/admin/announcements?error=' + encodeURIComponent('Title and body are required.'));
   if (targets.length === 0) return res.redirect('/admin/announcements?error=' + encodeURIComponent('Choose at least one recipient.'));
 
+  // Same "send announcements now / schedule for later" split as Main
+  // Admin's own Communication > Announcements tab.
+  const scheduledAt = (req.body.scheduledAt || '').trim();
+  if (scheduledAt) {
+    await announcements.scheduleAnnouncement({ title, body, targets, scheduledAt, sentByAccountId: null, sentByPortal: 'coop_admin' });
+    return res.redirect('/admin/announcements?notice=' + encodeURIComponent(`Scheduled for ${scheduledAt}.`));
+  }
+
   const { recipientCount } = await announcements.sendAnnouncement({
     title,
     body,
@@ -205,6 +213,17 @@ router.post('/announcements/text/:id/send', requireAdmin, async (req, res) => {
   const campaign = await textComposer.sendScheduled(req.params.id);
   if (!campaign) return res.redirect('/admin/announcements/text?error=' + encodeURIComponent('That text was already sent or does not exist.'));
   res.redirect('/admin/announcements/text?notice=' + encodeURIComponent(`Sent to ${campaign.recipient_count} member(s).`));
+});
+
+// Must come last - /announcements/:id matches /announcements/email,
+// /announcements/text, etc. just like the literal routes above
+// (Express tries routes in registration order). Same ordering
+// requirement as routes/main-admin-announcements.js's own copy of
+// this route.
+router.post('/announcements/:id/send', requireAdmin, async (req, res) => {
+  const result = await announcements.sendScheduledAnnouncement(req.params.id);
+  if (!result) return res.redirect('/admin/announcements?error=' + encodeURIComponent('That announcement was already sent or does not exist.'));
+  res.redirect('/admin/announcements?notice=' + encodeURIComponent(`Sent to ${result.recipientCount} member(s).`));
 });
 
 module.exports = router;

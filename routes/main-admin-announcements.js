@@ -41,6 +41,15 @@ router.post('/', async (req, res) => {
   if (!title || !body) return res.redirect('/main-admin/announcements?error=' + encodeURIComponent('Title and body are required.'));
   if (targets.length === 0) return res.redirect('/main-admin/announcements?error=' + encodeURIComponent('Choose at least one recipient.'));
 
+  // A real request: "send announcement should say send announcements
+  // now. Button next to it should say schedule for later. That button
+  // allows you to pick a date and time to send."
+  const scheduledAt = (req.body.scheduledAt || '').trim();
+  if (scheduledAt) {
+    await announcements.scheduleAnnouncement({ title, body, targets, scheduledAt, sentByAccountId: req.portalAccount.id, sentByPortal: 'main_admin' });
+    return res.redirect('/main-admin/announcements?notice=' + encodeURIComponent(`Scheduled for ${scheduledAt}.`));
+  }
+
   const { recipientCount } = await announcements.sendAnnouncement({
     title,
     body,
@@ -203,6 +212,18 @@ router.post('/text/:id/send', async (req, res) => {
   const campaign = await textComposer.sendScheduled(req.params.id);
   if (!campaign) return res.redirect('/main-admin/announcements/text?error=' + encodeURIComponent('That text was already sent or does not exist.'));
   res.redirect('/main-admin/announcements/text?notice=' + encodeURIComponent(`Sent to ${campaign.recipient_count} member(s).`));
+});
+
+// Must come last - /:id matches a single path segment just like every
+// literal /email.../text... route above (Express tries routes in
+// registration order), so registering this first would have caught
+// POST /email/send etc. with id="email" before they ever reached their
+// own handlers. Same ordering requirement documented in routes/main-
+// admin-resource-links.js/routes/admin-directory.js.
+router.post('/:id/send', async (req, res) => {
+  const result = await announcements.sendScheduledAnnouncement(req.params.id);
+  if (!result) return res.redirect('/main-admin/announcements?error=' + encodeURIComponent('That announcement was already sent or does not exist.'));
+  res.redirect('/main-admin/announcements?notice=' + encodeURIComponent(`Sent to ${result.recipientCount} member(s).`));
 });
 
 module.exports = router;

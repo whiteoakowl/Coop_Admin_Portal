@@ -14,7 +14,7 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <form method="POST" action="/admin/announcements" class="stack-form member-form-page-panel">
+    <form method="POST" action="/admin/announcements" id="announcement-form" class="stack-form member-form-page-panel">
       <label class="member-form-full">Title
         <input type="text" name="title" placeholder="e.g. Wednesday session cancelled" required />
       </label>
@@ -24,22 +24,66 @@
         <div class="forum-editable" data-forum-editable contenteditable="true"></div>
         <input type="hidden" name="body" data-forum-body-input />
       </div>
+      <%# A real request: "send to should be a clean check dropdown menu
+          of check boxes" - same checkbox-dropdown widget used site-wide
+          (Lock by Age/Grade, Chat Sections, Resource Links' Show On),
+          instead of the always-open checkbox list. %>
       <div class="member-form-full">
-        <span class="checkbox-group-label">Send to</span>
-        <div class="checkbox-group checkbox-group-stack checkbox-group-boxed">
-          <label class="checkbox-option"><input type="checkbox" name="targets" value="everyone" /> Everyone (all active members)</label>
-          <% roles.forEach(function(r) { %>
-            <label class="checkbox-option"><input type="checkbox" name="targets" value="<%= r.key %>" /> <%= r.label %></label>
-          <% }); %>
-          <label class="checkbox-option"><input type="checkbox" name="targets" value="public" /> Public Homepage</label>
-        </div>
+        <span class="roster-checkbox-label">Send to</span>
+        <%- include('partials/multi-select-checkbox', {
+          name: 'targets',
+          options: [{ value: 'everyone', label: 'Everyone (all active members)' }]
+            .concat(roles.map(function(r) { return { value: r.key, label: r.label }; }))
+            .concat([{ value: 'public', label: 'Public Homepage' }]),
+          selected: [],
+          placeholder: 'Choose who to send to',
+        }) %>
       </div>
+      <input type="hidden" name="scheduledAt" id="announcement-scheduled-at" />
       <div class="member-form-footer">
         <div class="member-form-footer-edit">
-          <button type="submit" class="primary-btn">Send Announcement</button>
+          <%# A real request: "send announcement should say send
+              announcements now. Button next to it should say schedule
+              for later." %>
+          <button type="submit" class="primary-btn">Send Announcements Now</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('schedule-announcement-dialog').showModal()">Schedule for Later</button>
         </div>
       </div>
     </form>
+
+    <%# A real request: "that button allows you to pick a date and time
+        to send. Date calendar picker separate from time picker. Modern
+        font." Same separate-date-input + time-of-day-dropdown pattern
+        (and its own "modern" typography) Events' Registration Opens/
+        Closes fields already use. %>
+    <dialog id="schedule-announcement-dialog" class="member-picker-dialog">
+      <h3>Schedule for Later</h3>
+      <p class="hint">Saves this announcement to send later - an admin still has to come back and it will show as ready to send, same as a scheduled email or text.</p>
+      <div class="date-time-two-col-row registration-dates-modern">
+        <label>Date
+          <input type="date" data-date-time-date data-date-time-group="announceSchedule" />
+        </label>
+        <label>Time
+          <%- include('partials/time-select', { dataGroup: 'announceSchedule' }) %>
+        </label>
+      </div>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+        <button type="button" class="primary-btn" id="schedule-announcement-confirm">Schedule</button>
+      </div>
+    </dialog>
+    <script src="/js/event-date-time-picker.js"></script>
+    <script>
+      document.getElementById('schedule-announcement-confirm').addEventListener('click', function () {
+        var hidden = document.querySelector('[data-date-time-hidden="announceSchedule"]');
+        if (!hidden || !hidden.value) {
+          alert('Choose a date and time first.');
+          return;
+        }
+        document.getElementById('announcement-scheduled-at').value = hidden.value;
+        document.getElementById('announcement-form').requestSubmit();
+      });
+    </script>
 
     <h2>Past Announcements</h2>
     <% if (log.length === 0) { %>
@@ -47,7 +91,7 @@
     <% } else { %>
       <div class="roster-scroll">
         <table class="roster-table condensed-table">
-          <thead><tr><th>Title</th><th>Message</th><th>Portals</th><th>Recipients</th><th>Sent</th></tr></thead>
+          <thead><tr><th>Title</th><th>Message</th><th>Portals</th><th>Recipients</th><th>Sent</th><th></th></tr></thead>
           <tbody>
             <% log.forEach(function(s) { %>
               <tr>
@@ -55,7 +99,17 @@
                 <td class="forum-editable-display"><%- s.body %></td>
                 <td><%= targetLabels(s.targets).join(', ') %></td>
                 <td><%= s.recipient_count %></td>
-                <td><%= s.created_at %></td>
+                <% if (s.status === 'scheduled') { %>
+                  <td><span class="badge-pill badge-pill-orange">Scheduled for <%= s.scheduled_at %></span></td>
+                  <td>
+                    <form method="POST" action="/admin/announcements/<%= s.id %>/send" class="inline-block-form">
+                      <button type="submit" class="roster-action-btn">Send Now</button>
+                    </form>
+                  </td>
+                <% } else { %>
+                  <td><%= s.sent_at || s.created_at %></td>
+                  <td></td>
+                <% } %>
               </tr>
             <% }); %>
           </tbody>
@@ -64,5 +118,6 @@
     <% } %>
   </main>
   <script src="/js/forum-editor.js"></script>
+  <script src="/js/multi-select-checkbox.js"></script>
 </body>
 </html>

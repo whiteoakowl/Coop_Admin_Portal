@@ -164,3 +164,105 @@ test('Email/Text tabs render on both portals instead of 404ing', async () => {
   const coopText = await request(app).get('/admin/announcements/text').set('Cookie', coop.cookie);
   assert.equal(coopText.status, 200);
 });
+
+// A real request: "send to should be a clean check dropdown menu of
+// check boxes. Send announcement should say send announcements now.
+// Button next to it should say schedule for later."
+test('Main Admin: Send to is a checkbox-dropdown, buttons renamed, Schedule for Later dialog present', async () => {
+  const { cookie } = await loginAsMainAdmin();
+  const page = await request(app).get('/main-admin/announcements').set('Cookie', cookie);
+  assert.match(page.text, /class="multi-select-checkbox"/);
+  assert.match(page.text, />Send Announcements Now</);
+  assert.match(page.text, /onclick="document\.getElementById\('schedule-announcement-dialog'\)\.showModal\(\)">Schedule for Later</);
+  assert.match(page.text, /<dialog id="schedule-announcement-dialog" class="member-picker-dialog">/);
+  assert.match(page.text, /<input type="date" data-date-time-date data-date-time-group="announceSchedule" \/>/);
+  assert.match(page.text, /data-date-time-time data-date-time-group="announceSchedule"/);
+});
+
+// A real request: "that button allows you to pick a date and time to
+// send... reverts back to schedule settings after" (same "schedule
+// saves it, an admin still has to press Send" shape Email/Text already
+// use).
+test('Main Admin: scheduling an announcement saves it without notifying yet, and Send Now on it dispatches', async () => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+  const parentAccountId = await activeParentAccount('sched1');
+
+  const scheduleRes = await request(app)
+    .post('/main-admin/announcements')
+    .type('form')
+    .set('Cookie', cookie)
+    .send({ _csrf: csrfToken, title: 'Scheduled Announcement', body: '<p>later</p>', targets: ['parent'], scheduledAt: '2027-01-01T09:00' });
+  assert.equal(scheduleRes.status, 302);
+  assert.match(decodeURIComponent(scheduleRes.headers.location), /Scheduled for 2027-01-01T09:00/);
+
+  const scheduled = await db.prepare("SELECT * FROM announcement_log WHERE title = 'Scheduled Announcement'").get();
+  assert.equal(scheduled.status, 'scheduled');
+  assert.equal(scheduled.scheduled_at, '2027-01-01T09:00');
+
+  const notifiedYet = await db.prepare("SELECT * FROM notifications WHERE type_key = 'announcement' AND member_account_id = ? AND title = 'Scheduled Announcement'").get(parentAccountId);
+  assert.equal(notifiedYet, undefined, 'nothing should be notified until Send Now is actually pressed');
+
+  const listPage = await request(app).get('/main-admin/announcements').set('Cookie', cookie);
+  assert.match(listPage.text, /Scheduled for 2027-01-01T09:00/);
+  assert.match(listPage.text, new RegExp(`action="/main-admin/announcements/${scheduled.id}/send"`));
+
+  const sendRes = await request(app).post(`/main-admin/announcements/${scheduled.id}/send`).set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
+  assert.equal(sendRes.status, 302);
+  assert.match(decodeURIComponent(sendRes.headers.location), /Sent to \d+ member\(s\)/);
+
+  const sent = await db.prepare("SELECT * FROM announcement_log WHERE id = ?").get(scheduled.id);
+  assert.equal(sent.status, 'sent');
+  assert.ok(sent.sent_at);
+
+  const notifiedNow = await db.prepare("SELECT * FROM notifications WHERE type_key = 'announcement' AND member_account_id = ? AND title = 'Scheduled Announcement'").get(parentAccountId);
+  assert.ok(notifiedNow);
+});
+
+test('Main Admin: sending an already-sent/nonexistent scheduled announcement again errors instead of double-sending', async () => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+  const res = await request(app).post('/main-admin/announcements/999999/send').set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
+  assert.equal(res.status, 302);
+  assert.match(decodeURIComponent(res.headers.location), /already sent or does not exist/);
+});
+
+// Co-op Admin gets the identical scheduling flow, sharing the same
+// utils/announcements.js backend.
+test('Co-op Admin: scheduling and Send Now work the same way as Main Admin', async () => {
+  const { cookie, csrfToken } = await loginAsAdmin();
+  const parentAccountId = await activeParentAccount('sched2');
+
+  const scheduleRes = await request(app)
+    .post('/admin/announcements')
+    .type('form')
+    .set('Cookie', cookie)
+    .send({ _csrf: csrfToken, title: 'Coop Scheduled', body: '<p>later</p>', targets: ['parent'], scheduledAt: '2027-02-01T10:00' });
+  assert.equal(scheduleRes.status, 302);
+  const scheduled = await db.prepare("SELECT * FROM announcement_log WHERE title = 'Coop Scheduled'").get();
+  assert.equal(scheduled.status, 'scheduled');
+
+  const sendRes = await request(app).post(`/admin/announcements/${scheduled.id}/send`).set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
+  assert.equal(sendRes.status, 302);
+  const sent = await db.prepare('SELECT * FROM announcement_log WHERE id = ?').get(scheduled.id);
+  assert.equal(sent.status, 'sent');
+
+  const notified = await db.prepare("SELECT * FROM notifications WHERE type_key = 'announcement' AND member_account_id = ? AND title = 'Coop Scheduled'").get(parentAccountId);
+  assert.ok(notified);
+});
+
+// A real bug class this session already fixed twice elsewhere (Resource
+// Links, this same file's own email/text sends): the new /:id/send
+// route must not be caught by an earlier /email/send or /text/send
+// route (or vice versa) due to Express's registration-order matching.
+test('scheduled-announcement /:id/send does not collide with the Email/Text send routes', async () => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+  const emailSendRes = await request(app)
+    .post('/main-admin/announcements/email/send')
+    .type('form')
+    .set('Cookie', cookie)
+    .send({ _csrf: csrfToken, recipientIds: [], subject: '', body: '' });
+  // Should hit the real email/send handler (missing recipients/subject
+  // re-renders the compose page), never the /:id/send handler (which
+  // would redirect with "already sent or does not exist").
+  assert.equal(emailSendRes.status, 200);
+  assert.doesNotMatch(emailSendRes.text, /already sent or does not exist/);
+});

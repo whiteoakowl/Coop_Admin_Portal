@@ -26,6 +26,19 @@ function normalizeTargets(targets) {
   return [...new Set(raw.filter((t) => valid.has(t)))];
 }
 
+async function accountIdsForTargets(normalizedTargets) {
+  let accountIds = new Set();
+  if (normalizedTargets.includes('everyone')) {
+    (await everyoneAccountIds()).forEach((id) => accountIds.add(id));
+  } else {
+    for (const target of normalizedTargets) {
+      if (target === 'public') continue;
+      (await recipientAccountIdsForRole(target)).forEach((id) => accountIds.add(id));
+    }
+  }
+  return accountIds;
+}
+
 async function recipientAccountIdsForRole(roleKey) {
   const rows = await db
     .prepare(
@@ -48,16 +61,7 @@ async function everyoneAccountIds() {
 // unified log).
 async function sendAnnouncement({ title, body, targets, sentByAccountId, sentByPortal }) {
   const normalizedTargets = normalizeTargets(targets);
-  let accountIds = new Set();
-
-  if (normalizedTargets.includes('everyone')) {
-    (await everyoneAccountIds()).forEach((id) => accountIds.add(id));
-  } else {
-    for (const target of normalizedTargets) {
-      if (target === 'public') continue;
-      (await recipientAccountIdsForRole(target)).forEach((id) => accountIds.add(id));
-    }
-  }
+  const accountIds = await accountIdsForTargets(normalizedTargets);
 
   // A real performance issue: this used to await notify() one recipient
   // at a time - each call several DB round trips (and, when the type's
@@ -74,10 +78,47 @@ async function sendAnnouncement({ title, body, targets, sentByAccountId, sentByP
   }
 
   await db
-    .prepare('INSERT INTO announcement_log (title, body, targets, recipient_count, sent_by_portal) VALUES (?, ?, ?, ?, ?)')
+    .prepare("INSERT INTO announcement_log (title, body, targets, recipient_count, sent_by_portal, status, sent_at) VALUES (?, ?, ?, ?, ?, 'sent', now_text())")
     .run(title, body, JSON.stringify(normalizedTargets), accountIds.size, sentByPortal);
 
   return { recipientCount: accountIds.size, targets: normalizedTargets };
+}
+
+// A real request: "send announcement should say send announcements
+// now. Button next to it should say schedule for later. That button
+// allows you to pick a date and time to send." Same "schedule saves
+// it, an admin still has to press Send" shape utils/emailComposer.js's
+// own email_campaigns already use - saves a row now, an estimated
+// recipient_count for display, and nothing is notified until
+// sendScheduledAnnouncement actually runs.
+async function scheduleAnnouncement({ title, body, targets, scheduledAt, sentByAccountId, sentByPortal }) {
+  const normalizedTargets = normalizeTargets(targets);
+  const estimatedCount = (await accountIdsForTargets(normalizedTargets)).size;
+  const info = await db
+    .prepare(
+      "INSERT INTO announcement_log (title, body, targets, recipient_count, sent_by_portal, status, scheduled_at) VALUES (?, ?, ?, ?, ?, 'scheduled', ?) RETURNING id"
+    )
+    .get(title, body, JSON.stringify(normalizedTargets), estimatedCount, sentByPortal, scheduledAt);
+  return { id: info.id, recipientCount: estimatedCount, targets: normalizedTargets };
+}
+
+// Manually dispatches an already-scheduled announcement - recomputes
+// recipients fresh (role membership may have changed since it was
+// scheduled), same as an immediate send.
+async function sendScheduledAnnouncement(id) {
+  const row = await db.prepare('SELECT * FROM announcement_log WHERE id = ?').get(id);
+  if (!row || row.status !== 'scheduled') return null;
+  const normalizedTargets = JSON.parse(row.targets || '[]');
+  const accountIds = await accountIdsForTargets(normalizedTargets);
+
+  await mapWithConcurrency(Array.from(accountIds), 20, (accountId) => notify(accountId, 'announcement', { title: row.title, body: row.body }));
+
+  if (normalizedTargets.includes('public')) {
+    await db.prepare('INSERT INTO announcements (title, body, is_public, created_by_account_id) VALUES (?, ?, 1, NULL)').run(row.title, row.body);
+  }
+
+  await db.prepare("UPDATE announcement_log SET status = 'sent', recipient_count = ?, sent_at = now_text() WHERE id = ?").run(accountIds.size, id);
+  return { recipientCount: accountIds.size, title: row.title };
 }
 
 // A friendly label per target for the Past Announcements list -
@@ -96,4 +137,4 @@ async function listAnnouncementLog(limit = 25) {
   return rows.map((r) => ({ ...r, targets: JSON.parse(r.targets || '[]') }));
 }
 
-module.exports = { normalizeTargets, sendAnnouncement, targetLabels, listAnnouncementLog };
+module.exports = { normalizeTargets, sendAnnouncement, scheduleAnnouncement, sendScheduledAnnouncement, targetLabels, listAnnouncementLog };
