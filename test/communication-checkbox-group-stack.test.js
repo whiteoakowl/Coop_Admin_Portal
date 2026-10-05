@@ -18,6 +18,13 @@
 // starts at the same x position regardless of the checkbox above/below
 // it. This suite has no browser/CSS layout harness, so it can only
 // assert the markup wiring is present.
+//
+// A still later real request: "send to should be a clean check dropdown
+// menu of check boxes" replaced the always-open checkbox-group-stack/
+// -boxed block with the site-wide multi-select-checkbox widget (closed
+// by default, one checkbox per option in a clean column once opened) -
+// the mobile-stacking problem this file was originally written for is
+// solved by that widget's own single-column panel instead.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -55,18 +62,18 @@ async function loginAsMainAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
-test('Co-op Admin Announcements "Send to" checkbox group carries the stack + boxed modifier classes, each row using .checkbox-option', async () => {
+test('Co-op Admin Announcements "Send to" is the multi-select-checkbox dropdown, one clean column of checkbox-option rows', async () => {
   const cookie = await loginAsAdmin();
   const res = await request(app).get('/admin/announcements').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /<div class="checkbox-group checkbox-group-stack checkbox-group-boxed">/);
-  assert.match(res.text, /<label class="checkbox-option"><input type="checkbox" name="targets" value="everyone" \/> Everyone \(all active members\)<\/label>/);
+  assert.match(res.text, /class="multi-select-checkbox"/);
+  assert.match(res.text, /<label class="checkbox-option">\s*<input type="checkbox" name="targets" value="everyone"[^>]*\/>\s*Everyone \(all active members\)/);
 });
 
-test('Main Admin Announcements "Send to" checkbox group carries the stack + boxed modifier classes, each row using .checkbox-option', async () => {
+test('Main Admin Announcements "Send to" is the multi-select-checkbox dropdown, one clean column of checkbox-option rows', async () => {
   const cookie = await loginAsMainAdmin();
   const res = await request(app).get('/main-admin/announcements').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /<div class="checkbox-group checkbox-group-stack checkbox-group-boxed">/);
-  assert.match(res.text, /<label class="checkbox-option"><input type="checkbox" name="targets" value="everyone" \/> Everyone \(all active members\)<\/label>/);
+  assert.match(res.text, /class="multi-select-checkbox"/);
+  assert.match(res.text, /<label class="checkbox-option">\s*<input type="checkbox" name="targets" value="everyone"[^>]*\/>\s*Everyone \(all active members\)/);
 });
