@@ -4582,6 +4582,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .roster-btn-row > .class-schedule-view-toggle {
     grid-column: 1 / -1;
   }
+  /* A real request: "communication email, select all or none on
+     mobile should be next to each other on the same row. Same with
+     text page." Email/Text's own Select All/Select None row
+     (.email-toolbar-row) holds two .checkbox-option labels, neither a
+     .roster-action-btn nor a .btn-secondary - roster-btn-row-grid.js's
+     item count finds zero of them and returns before ever setting a
+     column count, same bug class as the .btn-secondary/.class-
+     schedule-view-toggle cases above, leaving each checkbox stacked
+     on its own row instead of side by side. Set directly here instead
+     of widening the JS's selector, since this is the only toolbar
+     shaped like "exactly two checkboxes, nothing else". */
+  .email-toolbar-row:has(> .email-select-all) {
+    grid-template-columns: 1fr 1fr;
+  }
   /* A toolbar action that's really a tiny <form method="POST"> (Resync,
      Archive, ...) around its own .roster-action-btn button, not a plain
      <button>, is still a .roster-btn-row grid item - display: contents
