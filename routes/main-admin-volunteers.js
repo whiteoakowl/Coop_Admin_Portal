@@ -170,14 +170,14 @@ router.post('/signup-lists/:id/delete', async (req, res) => {
 // the list. Enable button turns into disable button. If you click
 // disable button nobody can signup on the list but they can still view
 // the link."
-router.post('/signup-lists/:id/open', async (req, res) => {
-  await volunteers.setSignUpListOpen(req.params.id, true);
-  res.redirect(`/main-admin/volunteers/signup-lists/${req.params.id}?notice=` + encodeURIComponent('Signups opened.'));
-});
-
-router.post('/signup-lists/:id/close', async (req, res) => {
-  await volunteers.setSignUpListOpen(req.params.id, false);
-  res.redirect(`/main-admin/volunteers/signup-lists/${req.params.id}?notice=` + encodeURIComponent('Signups closed.'));
+// A real request: "removed disable signups button in edit because now
+// we have an enable check box on the list page next to each list" - one
+// checkbox toggle on the list page (same shape as Committees' own
+// enabled checkbox) replaces the detail page's separate Enable/Disable
+// Signups buttons.
+router.post('/signup-lists/:id/enabled', async (req, res) => {
+  await volunteers.setSignUpListOpen(req.params.id, req.body.enabled === '1');
+  res.redirect('/main-admin/volunteers?tab=signup-lists&notice=' + encodeURIComponent('Sign-up list updated.'));
 });
 
 router.get('/signup-lists/:id/export.csv', async (req, res) => {
@@ -270,14 +270,11 @@ router.post('/volunteer-lists/:id/delete', async (req, res) => {
   res.redirect('/main-admin/volunteers?tab=volunteer-lists&notice=' + encodeURIComponent('List deleted.'));
 });
 
-router.post('/volunteer-lists/:id/open', async (req, res) => {
-  await volunteers.setVolunteerListOpen(req.params.id, true);
-  res.redirect(`/main-admin/volunteers/volunteer-lists/${req.params.id}?notice=` + encodeURIComponent('Signups opened.'));
-});
-
-router.post('/volunteer-lists/:id/close', async (req, res) => {
-  await volunteers.setVolunteerListOpen(req.params.id, false);
-  res.redirect(`/main-admin/volunteers/volunteer-lists/${req.params.id}?notice=` + encodeURIComponent('Signups closed.'));
+// Same "one checkbox on the list page" replacement as the Sign-Up Lists
+// route above.
+router.post('/volunteer-lists/:id/enabled', async (req, res) => {
+  await volunteers.setVolunteerListOpen(req.params.id, req.body.enabled === '1');
+  res.redirect('/main-admin/volunteers?tab=volunteer-lists&notice=' + encodeURIComponent('Volunteer list updated.'));
 });
 
 router.get('/volunteer-lists/:id/export.csv', async (req, res) => {

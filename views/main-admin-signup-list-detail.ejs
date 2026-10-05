@@ -13,15 +13,10 @@
     <div class="grid-box-header">
       <h1><%= list.title %> <% if (!list.is_open) { %><span class="badge-pill badge-pill-gray">Signups Closed</span><% } %></h1>
       <div class="roster-btn-row roster-btn-row-fit-text">
-        <%# A real request: "add delete button after edit button. Add to
-            beginning of button row, enable button when you click it
-            members can signup on the list. Enable button turns into
-            disable button." Same pattern as the Volunteer List page. %>
-        <% if (list.is_open) { %>
-          <form method="POST" action="/main-admin/volunteers/signup-lists/<%= list.id %>/close" class="inline-block-form"><button type="submit" class="roster-action-btn roster-action-btn-danger">Disable Signups</button></form>
-        <% } else { %>
-          <form method="POST" action="/main-admin/volunteers/signup-lists/<%= list.id %>/open" class="inline-block-form"><button type="submit" class="roster-action-btn">Enable Signups</button></form>
-        <% } %>
+        <%# A real request: "removed disable signups button in edit
+            because now we have an enable check box on the list page
+            next to each list." The Enable/Disable Signups toggle moved
+            to a checkbox on the Sign-Up Lists table itself. %>
         <button type="button" class="roster-action-btn" data-copy-link="<%= memberLink %>">Copy Link</button>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-list-dialog').showModal()">Edit</button>
         <form method="POST" action="/main-admin/volunteers/signup-lists/<%= list.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= list.title %>&quot;? This removes every item and claim on it. This cannot be undone.">

@@ -318,6 +318,43 @@ test('Sign-Up Lists: create multiple lists, attach one to an event, add items, a
   assert.equal(claim.quantity_claimed, 1);
 });
 
+// A real request: "add enable column with check box next to each
+// signup list on the table... removed disable signups button in edit
+// because now we have an enable check box on the list page next to
+// each list. Same for volunteer lists page."
+test('Sign-Up Lists and Volunteer Lists: Enable checkbox on the list page replaces the detail page\'s Enable/Disable Signups buttons', async () => {
+  const admin = await loginAsMainAdmin();
+  await request(app).post('/main-admin/volunteers/signup-lists').set('Cookie', admin.cookie).type('form').send({ title: 'Enable Checkbox Signup List', _csrf: admin.csrfToken });
+  const signupList = await db.prepare("SELECT * FROM sign_up_lists WHERE title = 'Enable Checkbox Signup List'").get();
+  await request(app).post('/main-admin/volunteers/volunteer-lists').set('Cookie', admin.cookie).type('form').send({ title: 'Enable Checkbox Volunteer List', _csrf: admin.csrfToken });
+  const volunteerList = await db.prepare("SELECT * FROM volunteer_signup_lists WHERE title = 'Enable Checkbox Volunteer List'").get();
+  assert.equal(signupList.is_open, 1, 'a new sign-up list starts open');
+  assert.equal(volunteerList.is_open, 1, 'a new volunteer list starts open');
+
+  const signupDetail = await request(app).get(`/main-admin/volunteers/signup-lists/${signupList.id}`).set('Cookie', admin.cookie);
+  assert.doesNotMatch(signupDetail.text, /Disable Signups/);
+  assert.doesNotMatch(signupDetail.text, /Enable Signups/);
+  const volunteerDetail = await request(app).get(`/main-admin/volunteers/volunteer-lists/${volunteerList.id}`).set('Cookie', admin.cookie);
+  assert.doesNotMatch(volunteerDetail.text, /Disable Signups/);
+  assert.doesNotMatch(volunteerDetail.text, /Enable Signups/);
+
+  const signupListPage = await request(app).get('/main-admin/volunteers?tab=signup-lists').set('Cookie', admin.cookie);
+  assert.match(signupListPage.text, new RegExp(`action="/main-admin/volunteers/signup-lists/${signupList.id}/enabled"[\\s\\S]*?<input type="hidden" name="enabled" value="0"[\\s\\S]*?<input type="checkbox" onchange="this.form.requestSubmit\\(\\)" checked`));
+
+  await request(app).post(`/main-admin/volunteers/signup-lists/${signupList.id}/enabled`).set('Cookie', admin.cookie).type('form').send({ enabled: '0', _csrf: admin.csrfToken });
+  assert.equal((await db.prepare('SELECT is_open FROM sign_up_lists WHERE id = ?').get(signupList.id)).is_open, 0);
+
+  const volunteerListPage = await request(app).get('/main-admin/volunteers?tab=volunteer-lists').set('Cookie', admin.cookie);
+  assert.match(volunteerListPage.text, new RegExp(`action="/main-admin/volunteers/volunteer-lists/${volunteerList.id}/enabled"[\\s\\S]*?<input type="hidden" name="enabled" value="0"[\\s\\S]*?<input type="checkbox" onchange="this.form.requestSubmit\\(\\)" checked`));
+
+  await request(app).post(`/main-admin/volunteers/volunteer-lists/${volunteerList.id}/enabled`).set('Cookie', admin.cookie).type('form').send({ enabled: '0', _csrf: admin.csrfToken });
+  assert.equal((await db.prepare('SELECT is_open FROM volunteer_signup_lists WHERE id = ?').get(volunteerList.id)).is_open, 0);
+
+  // Trash buttons are small icon-only buttons, same fix as Committees.
+  assert.match(signupListPage.text, new RegExp(`<button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete Enable Checkbox Signup List"`));
+  assert.match(volunteerListPage.text, new RegExp(`<button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete Enable Checkbox Volunteer List"`));
+});
+
 test('Sign-Up/Volunteer List Add & Edit dialogs: Attach to Member dropdown lists members ABC by last name and persists on create/update', async () => {
   const admin = await loginAsMainAdmin();
   const zebraId = (await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Amy Zebra', 'zebra-1', 'parent', 1) RETURNING id").get()).id;
