@@ -6,16 +6,23 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle no-print"><a href="/admin/members">&larr; Members</a></p>
+    <%# The Profile tab's own member-profile-card partial below already
+        carries a "Member Profile" banner with its own Back/Edit links -
+        this older subtitle+h1+Edit toolbar stays for Schedule/Attendance
+        (which have no banner of their own), skipped on Profile so the
+        two headers don't show side by side. %>
+    <% if (tab !== 'profile') { %>
+      <p class="subtitle no-print"><a href="/admin/members">&larr; Members</a></p>
 
-    <div class="roster-toolbar">
-      <div>
-        <h1><%= member.name %><%- include('partials/medical-flag', { member: member }) %><% if (member.member_type === 'admin') { %> <span class="member-admin-star" title="Admin"><svg class="icon"><use href="#icon-star"/></svg></span><% } %></h1>
+      <div class="roster-toolbar">
+        <div>
+          <h1><%= member.name %><%- include('partials/medical-flag', { member: member }) %><% if (member.member_type === 'admin') { %> <span class="member-admin-star" title="Admin"><svg class="icon"><use href="#icon-star"/></svg></span><% } %></h1>
+        </div>
+        <div class="roster-btn-row no-print">
+          <a class="roster-action-btn" href="/admin/members/<%= member.id %>/edit">Edit Profile</a>
+        </div>
       </div>
-      <div class="roster-btn-row no-print">
-        <a class="roster-action-btn" href="/admin/members/<%= member.id %>/edit">Edit Profile</a>
-      </div>
-    </div>
+    <% } %>
 
     <%# One specific member's own Profile/Class Schedule/Attendance tabs -
         no top-level nav entry to attach a popup to (reached by clicking
@@ -31,93 +38,40 @@
 
     <div class="view-tab-panel">
       <% if (tab === 'profile') { %>
-        <div class="member-profile-header">
-          <% if (member.photo_path) { %>
-            <img class="member-photo-preview" src="<%= photoUrl(member.photo_path) %>" alt="" />
-          <% } %>
-          <div>
-            <span class="badge-pill"><%= member.member_type === 'parent' ? 'Parent' : member.member_type === 'admin' ? 'Admin' : 'Student' %></span>
-          </div>
-        </div>
-        <dl class="member-profile-list">
-          <%# A real request: "member rows remove primary column. it can
-              already be seen when viewing the profile" - shown here so
-              that's still true once the Members list card drops it. %>
-          <% if (member.is_primary_parent) { %><dt>Primary Parent</dt><dd>Yes</dd><% } %>
-          <% if (member.member_code) { %><dt>Member ID</dt><dd><%= member.member_code %></dd><% } %>
-          <% if (member.address || member.city || member.state || member.zip) { %>
-            <dt>Address</dt>
-            <dd><%= [member.address, member.city, [member.state, member.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') %></dd>
-          <% } %>
-          <% if (member.phone) { %><dt>Phone</dt><dd><%= member.phone %></dd><% } %>
-          <% if (member.email) { %><dt>Email</dt><dd><%= member.email %></dd><% } %>
-          <% if (member.member_type !== 'parent') { %>
-            <% if (member.birthday) { %><dt>Birthday</dt><dd><%= member.birthdayLabel %></dd><% } %>
-            <% if (member.grade_level) { %><dt>Grade Level</dt><dd><%= member.grade_level %></dd><% } %>
-            <% if (member.medical_notes) { %><dt>Medical/Allergy Notes</dt><dd><%= member.medical_notes %></dd><% } %>
-          <% } %>
-          <dt>Family</dt>
-          <dd>
-            <% if (familyName) { %>The <%= familyName %> Family<% } else { %>—<% } %>
-            <%# A real request: "the family should be a list in a nice
-                column with parents listed under parent title, and
-                children listed under children title. Should show grade
-                levels next to students in parenthesis." Admins count as
-                "Parents" here too (both are adults) - member_type ===
-                'student' is the only thing that puts someone under
-                Children. %>
-            <% if (familyMembers.length) { %>
-              <% var famParents = familyMembers.filter(function(m) { return m.member_type !== 'student'; }); %>
-              <% var famChildren = familyMembers.filter(function(m) { return m.member_type === 'student'; }); %>
-              <div class="member-profile-family-list">
-                <% if (famParents.length) { %>
-                  <div class="member-profile-family-group">
-                    <span class="member-profile-family-group-label">Parents</span>
-                    <ul>
-                      <% famParents.forEach(function(m) { %><li><%= m.name %></li><% }); %>
-                    </ul>
-                  </div>
-                <% } %>
-                <% if (famChildren.length) { %>
-                  <div class="member-profile-family-group">
-                    <span class="member-profile-family-group-label">Children</span>
-                    <ul>
-                      <% famChildren.forEach(function(m) { %><li><%= m.name %><% if (m.grade_level) { %> (<%= m.grade_level %>)<% } %></li><% }); %>
-                    </ul>
-                  </div>
-                <% } %>
-              </div>
+        <%
+        var famParents = familyMembers.filter(function(m) { return m.member_type !== 'student'; });
+        var famChildren = familyMembers.filter(function(m) { return m.member_type === 'student'; });
+        %>
+        <%- include('partials/member-profile-card', {
+          member,
+          familyName,
+          famParents,
+          famChildren,
+          memberSections,
+          memberPortalRoles: portalRoles,
+          backHref: '/admin/members',
+          backLabel: 'Back to Members',
+          editHref: '/admin/members/' + member.id + '/edit',
+          familyMemberHref: function(id) { return '/admin/members/' + id; },
+        }) %>
+
+        <%# Co-op Admin-only extras the shared card above doesn't carry
+            (Main Admin has no equivalent "which attendance Roster" or
+            free-text Notes concept) - same side-card look, its own
+            section below the shared two-column cards. %>
+        <% if (rosters.length > 0 || member.notes) { %>
+          <section class="member-profile-side-card member-profile-extra-card">
+            <% if (rosters.length > 0) { %>
+              <span class="member-profile-side-card-label">Rosters</span>
+              <p><% rosters.forEach(function(r) { %><span class="badge-pill"><%= r.name %></span> <% }); %></p>
             <% } %>
-          </dd>
-          <dt>Rosters</dt>
-          <dd>
-            <% if (rosters.length === 0) { %>—<% } %>
-            <% rosters.forEach(function(r) { %><span class="badge-pill"><%= r.name %></span><% }); %>
-          </dd>
-          <% if (member.notes) { %><dt>Notes</dt><dd><%= member.notes %></dd><% } %>
-          <%# Admin-only category - a real request: "portal permissions
-              should be an admin only category on each member form/
-              profile." Every view on this route is already Co-op
-              Admin-only, so this is always shown here; editing happens
-              from the Members list's own "Edit Permissions" bulk mode
-              (see routes/admin-members.js's own /members/bulk-
-              permissions route), not on this page. %>
-          <dt>Sections</dt>
-          <dd>
-            <% if (memberSections.length === 0) { %>—<% } else { %>
-              <% memberSections.forEach(function(s) { %><span class="badge-pill"><%= s.name %></span> <% }); %>
+            <% if (member.notes) { %>
+              <span class="member-profile-side-card-label">Notes</span>
+              <p><%= member.notes %></p>
             <% } %>
-          </dd>
-          <dt>Portal Permissions</dt>
-          <dd>
-            <% if (portalRoles === null) { %>
-              No portal account
-            <% } else if (portalRoles.length === 0) { %>—<% } else { %>
-              <% portalRoles.forEach(function(r) { %><span class="badge-pill"><%= r.label %></span> <% }); %>
-            <% } %>
-            <a class="roster-action-btn" href="/admin/members">Edit Permissions</a>
-          </dd>
-        </dl>
+          </section>
+        <% } %>
+
       <% } else if (tab === 'schedule') { %>
         <% if (familyRoster.length > 1) { %>
           <div class="category-filter member-profile-family-select">

@@ -85,5 +85,5 @@ test('Co-op Admin member profile still shows Primary Parent status now that the 
 
   const res = await request(app).get(`/admin/members/${parentId}`).set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /<dt>Primary Parent<\/dt>\s*<dd>Yes<\/dd>/);
+  assert.match(res.text, /Parent\s*&middot;\s*Primary Parent/);
 });

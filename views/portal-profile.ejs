@@ -79,6 +79,24 @@
           <button type="submit" class="primary-btn">Save</button>
         </div>
       </form>
+
+      <%# A real request: "Member profile for... parent portal should
+          match the image attached," answered with "Click a family
+          member's name to open it" as the entry point - this list leads
+          into views/parent-member-profile.ejs's own read-only Member
+          Profile page. Not a resurrection of the removed "My Family"
+          dashboard card (that one was explicitly replaced with upcoming
+          events) - this is a plain list on the existing Profile tab. %>
+      <% if (otherFamilyMembers.length > 0) { %>
+        <div class="form-section">
+          <h2>My Family</h2>
+          <ul class="member-profile-plain-list">
+            <% otherFamilyMembers.forEach(function(m) { %>
+              <li><a href="/portal/family/<%= m.id %>"><%= m.name %></a><% if (m.grade_level) { %> <span class="hint">(<%= m.grade_level %>)</span><% } %></li>
+            <% }); %>
+          </ul>
+        </div>
+      <% } %>
     <% } else if (activeTab === 'schedules') { %>
       <% if (schedule.length === 0) { %>
         <p class="hint">No class schedule on file yet.</p>

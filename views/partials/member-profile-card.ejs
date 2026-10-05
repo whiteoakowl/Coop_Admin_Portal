@@ -1,0 +1,120 @@
+<%
+// Shared "Member Profile" layout (a real request: redesign it to match a
+// provided mockup - dark banner, avatar+contact card, then Portal
+// Permissions/Family side by side) - views/admin-member-profile.ejs
+// (Co-op Admin), views/main-admin-member-profile.ejs (Main Admin), and
+// views/parent-member-profile.ejs (Parent Portal, read-only) all render
+// this exact same partial so the three portals' own profile pages never
+// visually drift apart from one another. photoUrl comes from server.js's
+// own res.locals, available to every view already.
+//
+// Locals:
+//   member - the member row (name, member_type, is_primary_parent,
+//     photo_path, address, city, state, zip, phone, email, grade_level)
+//   familyName - string or null
+//   famParents / famChildren - arrays of { id, name, grade_level },
+//     already split the way utils/members.js's own convention does
+//     (admins count as parents) - the member being viewed is left OUT
+//     of both (showing them in their own Family card would be redundant)
+//   memberSections - array of { name }
+//   memberPortalRoles - null (no portal account) or array of { label }
+//   backHref / backLabel - the page's own "back to list" link
+//   editHref - optional - shows an Edit link in the banner (Co-op/Main
+//     Admin only; Parent Portal's own read-only page leaves this out)
+//   familyMemberHref - optional function(memberId) -> href, or falsy to
+//     leave a family member's name as plain text (no link) - Parent
+//     Portal's own read-only page passes none, since a parent can only
+//     ever open their OWN family's profiles, already enforced by the
+//     list this card itself is built from.
+var roleLabel = member.member_type === 'admin' ? 'Admin' : member.member_type === 'parent' ? 'Parent' : 'Student';
+var fullAddress = [member.address, member.city, [member.state, member.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+var otherParents = famParents.filter(function(m) { return m.id !== member.id; });
+var otherChildren = famChildren.filter(function(m) { return m.id !== member.id; });
+%>
+<div class="member-profile-banner">
+  <span class="member-profile-banner-title"><svg class="icon"><use href="#icon-users"/></svg> Member Profile</span>
+  <div class="member-profile-banner-actions">
+    <% if (typeof editHref !== 'undefined' && editHref) { %><a class="member-profile-banner-back" href="<%= editHref %>">Edit</a><% } %>
+    <a class="member-profile-banner-back" href="<%= backHref %>">&larr; <%= backLabel %></a>
+  </div>
+</div>
+
+<div class="member-profile-main-card">
+  <span class="member-profile-avatar-lg">
+    <% if (member.photo_path) { %>
+      <img src="<%= photoUrl(member.photo_path) %>" alt="" />
+    <% } else { %>
+      <svg class="icon"><use href="#icon-user-circle"/></svg>
+    <% } %>
+  </span>
+  <div class="member-profile-main-info">
+    <div class="member-profile-main-top">
+      <h1><%= member.name %></h1>
+      <% if (familyName) { %><span class="badge-pill member-profile-family-badge">Family: <%= familyName %></span><% } %>
+    </div>
+    <p class="member-profile-role-line">
+      <%= roleLabel %><% if (member.is_primary_parent) { %> &middot; Primary Parent<% } %><% if (member.member_type === 'student' && member.grade_level) { %> &middot; <%= member.grade_level %><% } %>
+    </p>
+    <% if (fullAddress) { %><p class="member-profile-contact-row"><svg class="icon"><use href="#icon-home"/></svg> <%= fullAddress %></p><% } %>
+    <% if (member.phone) { %><p class="member-profile-contact-row"><svg class="icon"><use href="#icon-phone"/></svg> <%= member.phone %></p><% } %>
+    <% if (member.email) { %><p class="member-profile-contact-row"><svg class="icon"><use href="#icon-mail"/></svg> <%= member.email %></p><% } %>
+    <%# Real data the mockup's own example member (an adult with no
+        extras) never shows a row for, but still needs to be somewhere on
+        a page this detailed - same conditional-row treatment, so a
+        member who HAS one of these still sees it. %>
+    <% if (member.member_code) { %><p class="member-profile-contact-row"><svg class="icon"><use href="#icon-badge"/></svg> Member ID: <%= member.member_code %></p><% } %>
+    <% if (member.member_type === 'student' && member.birthdayLabel) { %><p class="member-profile-contact-row"><svg class="icon"><use href="#icon-calendar-check"/></svg> Born <%= member.birthdayLabel %></p><% } %>
+    <% if (member.medical_notes) { %><p class="member-profile-contact-row member-profile-medical-row"><svg class="icon"><use href="#icon-medical-bag"/></svg> <%= member.medical_notes %></p><% } %>
+  </div>
+</div>
+
+<div class="member-profile-cards-grid">
+  <section class="member-profile-side-card">
+    <h2><svg class="icon"><use href="#icon-shield"/></svg> Portal Permissions</h2>
+    <span class="member-profile-side-card-label">Sections</span>
+    <% if (memberSections.length === 0) { %>
+      <p class="hint">—</p>
+    <% } else { %>
+      <ul class="member-profile-plain-list">
+        <% memberSections.forEach(function(s) { %><li><%= s.name %></li><% }); %>
+      </ul>
+    <% } %>
+    <span class="member-profile-side-card-label member-profile-side-card-label-icon"><svg class="icon"><use href="#icon-user-circle"/></svg> Portal Roles</span>
+    <% if (memberPortalRoles === null) { %>
+      <p class="hint">No portal account</p>
+    <% } else if (memberPortalRoles.length === 0) { %>
+      <p class="hint">—</p>
+    <% } else { %>
+      <ul class="member-profile-plain-list">
+        <% memberPortalRoles.forEach(function(r) { %><li><%= r.label %></li><% }); %>
+      </ul>
+    <% } %>
+  </section>
+
+  <section class="member-profile-side-card">
+    <h2><svg class="icon"><use href="#icon-users"/></svg> Family</h2>
+    <% if (otherParents.length === 0 && otherChildren.length === 0) { %>
+      <p class="hint">—</p>
+    <% } else { %>
+      <% if (otherParents.length) { %>
+        <span class="member-profile-side-card-label">Parents</span>
+        <ul class="member-profile-plain-list">
+          <% otherParents.forEach(function(m) { %>
+            <li><% if (typeof familyMemberHref === 'function' && familyMemberHref(m.id)) { %><a href="<%= familyMemberHref(m.id) %>"><%= m.name %></a><% } else { %><%= m.name %><% } %></li>
+          <% }); %>
+        </ul>
+      <% } %>
+      <% if (otherChildren.length) { %>
+        <span class="member-profile-side-card-label">Children</span>
+        <ul class="member-profile-plain-list">
+          <% otherChildren.forEach(function(m) { %>
+            <li>
+              <% if (typeof familyMemberHref === 'function' && familyMemberHref(m.id)) { %><a href="<%= familyMemberHref(m.id) %>"><%= m.name %></a><% } else { %><%= m.name %><% } %>
+              <% if (m.grade_level) { %> <span class="hint">(<%= m.grade_level %>)</span><% } %>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+    <% } %>
+  </section>
+</div>

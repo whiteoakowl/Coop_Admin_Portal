@@ -10,7 +10,8 @@ const { generateMemberCode } = require('../utils/members');
 const { createFailureRateLimiter } = require('../utils/loginRateLimit');
 const { GRADE_OPTIONS } = require('../utils/membership');
 const { CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
-const { isValidISODate } = require('../utils/dates');
+const { isValidISODate, formatDateNumeric } = require('../utils/dates');
+const { portalStatusForMembers, sectionIdsForMembers } = require('../utils/portalPermissions');
 const membershipHandbook = require('../utils/membershipHandbook');
 const membershipFormFields = require('../utils/membershipFormFields');
 
@@ -369,6 +370,12 @@ async function renderProfile(req, res, error, notice, activeTab) {
   res.render('portal-profile', {
     title: 'My Profile',
     member,
+    // Everyone else sharing this account's family - a real request:
+    // "Click a family member's name to open it" as the entry point into
+    // the new Member Profile page (views/parent-member-profile.ejs) below.
+    // Self is left out the same way member-profile-card.ejs's own
+    // famParents/famChildren already exclude the profile's own subject.
+    otherFamilyMembers: family.filter((m) => m.id !== member.id),
     activeTab: tab,
     schedule,
     signups,
@@ -382,6 +389,41 @@ async function renderProfile(req, res, error, notice, activeTab) {
 router.get('/portal/profile', async (req, res) => {
   if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile');
   await renderProfile(req, res, req.query.error || null, req.query.notice || null, req.query.tab);
+});
+
+// A real request: "Member profile for co-op admin portal, main admin
+// portal, parent portal should match the image attached," answered with
+// "Click a family member's name to open it" as this page's own entry
+// point (the My Profile page's new "My Family" list above). Read-only -
+// unlike the Co-op/Main Admin versions, there's no editHref and no
+// Edit link in the banner (see views/partials/member-profile-card.ejs's
+// own header comment). Family-scoped the same way every other family-
+// wide portal feature already is: familyForAccount(req.portalAccount.id)
+// IS the account's complete, real family roster, so a memberId outside
+// it (someone else's family, or a typo) simply isn't found in that list -
+// never a raw, unscoped `SELECT * FROM members WHERE id = ?`.
+router.get('/portal/family/:memberId', async (req, res) => {
+  if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile');
+  const family = await familyForAccount(req.portalAccount.id);
+  const member = family.find((m) => m.id === parseInt(req.params.memberId, 10));
+  if (!member) return res.status(404).send('Not found');
+  member.birthdayLabel = member.birthday ? formatDateNumeric(member.birthday) : null;
+
+  const familyRow = member.family_id ? await db.prepare('SELECT name FROM families WHERE id = ?').get(member.family_id) : null;
+  const allSections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
+  const memberSectionIds = (await sectionIdsForMembers([member.id]))[member.id];
+  const portalStatus = (await portalStatusForMembers([member.id]))[member.id];
+  const allRoles = await db.prepare('SELECT * FROM roles ORDER BY label').all();
+
+  res.render('parent-member-profile', {
+    title: member.name,
+    member,
+    familyName: familyRow ? familyRow.name : null,
+    famParents: family.filter((m) => m.member_type !== 'student'),
+    famChildren: family.filter((m) => m.member_type === 'student'),
+    memberSections: allSections.filter((s) => memberSectionIds.has(s.id)),
+    memberPortalRoles: portalStatus.account ? allRoles.filter((r) => portalStatus.roleIds.has(r.id)) : null,
+  });
 });
 
 // Deliberately narrow - only the fields the admin-side membership form

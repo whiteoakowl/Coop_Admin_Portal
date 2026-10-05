@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: sharedPortalTitle('My Profile'),
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <%- include('partials/member-profile-card', {
+      member,
+      familyName,
+      famParents,
+      famChildren,
+      memberSections,
+      memberPortalRoles,
+      backHref: '/portal/profile',
+      backLabel: 'Back to My Profile',
+      familyMemberHref: function(id) { return '/portal/family/' + id; },
+    }) %>
+  </main>
+</body>
+</html>
