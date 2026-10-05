@@ -4788,6 +4788,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .admins-table th, .admins-table td { padding: 0.3rem 0.4rem; }
 }
 
+/* Main Admin Volunteers > Committees list - a real request: "shrink
+   columns and table for cleaner view on desktop and especially
+   mobile." Same compacting treatment as .admins-table/.registrations-
+   table above. */
+.committees-table th, .committees-table td { padding: 0.55rem 0.75rem; }
+@media (max-width: 640px) {
+  .committees-table { font-size: 0.78rem; }
+  .committees-table th, .committees-table td { padding: 0.3rem 0.4rem; }
+}
+
 .settings-account-grid { display: flex; gap: 1.5rem; flex-wrap: wrap; }
 .settings-account-grid .stack-form-narrow {
   flex: 1 1 260px;

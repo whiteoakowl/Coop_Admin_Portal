@@ -33,7 +33,7 @@
         <p class="roster-empty">No committees yet &mdash; add one above.</p>
       <% } else { %>
         <div class="roster-scroll">
-          <table class="roster-table condensed-table">
+          <table class="roster-table condensed-table committees-table">
             <thead><tr><th>Name</th><th>Leader</th><th>Volunteers</th><th>Enabled</th><th></th></tr></thead>
             <tbody>
               <% committees.forEach(function(c) { %>
@@ -50,10 +50,20 @@
                     </form>
                   </td>
                   <td>
-                    <div class="roster-btn-row">
-                      <a class="roster-action-btn" href="/main-admin/volunteers/committees/<%= c.id %>">Edit</a>
+                    <%# A real request: "edit and trash button should fit
+                        properly in their bubble button colors" - the
+                        base .roster-action-btn's flex:1 0 auto/min-width
+                        was stretching both buttons evenly across the
+                        row, leaving the trash icon floating in an
+                        oversized pill. roster-btn-row-nowrap sizes every
+                        child to its own content instead, and the trash
+                        action switches to the small icon-only button
+                        every other delete action in the app already
+                        uses. %>
+                    <div class="roster-btn-row roster-btn-row-nowrap">
+                      <a class="roster-action-btn roster-action-btn-fit" href="/main-admin/volunteers/committees/<%= c.id %>">Edit</a>
                       <form method="POST" action="/main-admin/volunteers/committees/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= c.name %>&quot;? This cannot be undone.">
-                        <button type="submit" class="roster-action-btn roster-action-btn-danger"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= c.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                       </form>
                     </div>
                   </td>

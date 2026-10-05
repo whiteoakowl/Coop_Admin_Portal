@@ -151,6 +151,23 @@ test('Committees: create with a leader picked from admin positions, edit, enable
   assert.equal(await db.prepare('SELECT * FROM committees WHERE id = ?').get(committee.id), undefined);
 });
 
+// A real request: "edit and trash button should fit properly in their
+// bubble button colors" - Edit stays a roster-action-btn but sized to
+// its own text (roster-action-btn-fit), and Trash becomes the same
+// small icon-only button every other delete action in the app uses,
+// instead of both stretching evenly across the row.
+test('Committees list: Edit fits its own text, Trash is a small icon-only button', async () => {
+  const admin = await loginAsMainAdmin();
+  await request(app).post('/main-admin/volunteers/committees').set('Cookie', admin.cookie).type('form').send({ name: 'Button Fit Committee', _csrf: admin.csrfToken });
+  const committee = await db.prepare("SELECT * FROM committees WHERE name = 'Button Fit Committee'").get();
+
+  const listRes = await request(app).get('/main-admin/volunteers').set('Cookie', admin.cookie);
+  assert.equal(listRes.status, 200);
+  assert.match(listRes.text, /class="roster-btn-row roster-btn-row-nowrap"/);
+  assert.match(listRes.text, new RegExp(`<a class="roster-action-btn roster-action-btn-fit" href="/main-admin/volunteers/committees/${committee.id}">Edit</a>`));
+  assert.match(listRes.text, new RegExp(`<button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete Button Fit Committee"`));
+});
+
 test('Committee detail: Add Member button adds a plain committee member (separate from Positions/signups), and can be removed', async () => {
   const admin = await loginAsMainAdmin();
   await request(app).post('/main-admin/volunteers/committees').set('Cookie', admin.cookie).type('form').send({ name: 'Hospitality Committee', _csrf: admin.csrfToken });
