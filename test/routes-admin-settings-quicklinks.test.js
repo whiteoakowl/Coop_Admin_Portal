@@ -46,6 +46,7 @@ test('Quick Links: Setup/Cleanup Teams and Floater Assignments point at the memb
 
   assert.match(res.text, /<a class="admin-card" href="\/setup" target="_blank">Setup\/Cleanup Teams<\/a>/);
   assert.match(res.text, /<a class="admin-card" href="\/volunteers" target="_blank">Floater Assignments<\/a>/);
+  assert.match(res.text, /<a class="admin-card" href="\/welcome" target="_blank">Public Homepage<\/a>/);
 
   // Scoped to the Quick Links card grid itself - the admin nav sidebar on
   // this same page legitimately links to /admin/setup and /admin/volunteers
@@ -79,4 +80,5 @@ test('Main Admin\'s own Quick Links tab: same cleanup - no "(public link)" suffi
   assert.doesNotMatch(res.text, /public link/i);
   assert.doesNotMatch(res.text, /Kiosk screens, public forms, and admin pages, opened in a new tab\./);
   assert.match(res.text, /<a class="admin-card" href="\/register" target="_blank">Request Membership<\/a>/);
+  assert.match(res.text, /<a class="admin-card" href="\/welcome" target="_blank">Public Homepage<\/a>/);
 });
