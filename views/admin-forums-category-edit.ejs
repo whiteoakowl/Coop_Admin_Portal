@@ -54,24 +54,35 @@
           <label class="member-form-full">Description
             <textarea name="description" rows="2"><%= category.description || '' %></textarea>
           </label>
-          <div class="member-form-full">
-            <span class="roster-checkbox-label">Allow comments</span>
-            <div class="grade-pill-grid">
-              <label class="grade-pill"><input type="checkbox" name="allowComments" <%= category.allow_comments ? 'checked' : '' %> /> Allow comments</label>
-            </div>
+          <%# A real request: "allow comments the check box should be in
+              the left column, first sentence starts on the same row as
+              the check box clean." Plain .checkbox-option (checkbox then
+              its own label text, one row) as an ordinary grid cell - no
+              more full-width heading-plus-pill wrapper duplicating "Allow
+              comments" twice. Secure sits beside it in the right column
+              - a real request: "another check box... secure... If you
+              only want certain families to be able to access this
+              category, check this box AND select which families can
+              access it below." %>
+          <label class="checkbox-option">
+            <input type="checkbox" name="allowComments" <%= category.allow_comments ? 'checked' : '' %> />
+            Allow comments
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="isSecure" onchange="document.getElementById('secure-families-row').style.display = this.checked ? '' : 'none';" <%= category.is_secure ? 'checked' : '' %> />
+            Secure - if you only want certain families to be able to access this category, check this box AND select which families can access it below.
+          </label>
+          <div class="member-form-full" id="secure-families-row" style="<%= category.is_secure ? '' : 'display: none;' %>">
+            <span class="roster-checkbox-label">Families</span>
+            <%- include('partials/multi-select-checkbox', {
+              name: 'familyIds',
+              options: allFamilies.map(function(f) { return { value: f.id, label: f.name }; }),
+              selected: [...allowedFamilyIds].map(String),
+              placeholder: 'Select families',
+            }) %>
           </div>
-          <div class="member-form-full">
-            <span class="roster-checkbox-label">Sections <span class="hint">(leave all unchecked to allow every section)</span></span>
-            <% if (allSections.length === 0) { %>
-              <p class="hint">No sections defined yet.</p>
-            <% } else { %>
-              <div class="grade-pill-grid">
-                <% allSections.forEach(function(s) { %>
-                  <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= sectionIds.includes(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
-                <% }); %>
-              </div>
-            <% } %>
-          </div>
+          <%# A real request: "moderator choice should be under all
+              comment selection." %>
           <label class="member-form-full">Member to Moderate
             <select name="moderatorMemberId">
               <option value="">None</option>
@@ -80,6 +91,23 @@
               <% }); %>
             </select>
           </label>
+          <%# A real request: "sections choices should be in a clean
+              dropdown menu with check boxes" - same checkbox-dropdown
+              widget Lock by Age/Grade (Events) already use, instead of
+              the old wall of grade-pill checkboxes. %>
+          <div class="member-form-full">
+            <span class="roster-checkbox-label">Sections <span class="hint">(leave all unchecked to allow every section)</span></span>
+            <% if (allSections.length === 0) { %>
+              <p class="hint">No sections defined yet.</p>
+            <% } else { %>
+              <%- include('partials/multi-select-checkbox', {
+                name: 'sectionIds',
+                options: allSections.map(function(s) { return { value: s.id, label: s.name }; }),
+                selected: sectionIds.map(String),
+                placeholder: 'All sections',
+              }) %>
+            <% } %>
+          </div>
         </div>
       </div>
 

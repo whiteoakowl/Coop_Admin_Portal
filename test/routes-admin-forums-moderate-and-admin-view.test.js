@@ -94,8 +94,37 @@ test('the Add Category dialog has no nested <form> - Save is associated via form
   const admin = await loginAsMainAdmin();
   const res = await request(app).get('/main-admin/forums').set('Cookie', admin.cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /<form method="POST" action="\/main-admin\/forums" id="add-forum-category-form">/);
+  assert.match(res.text, /<form method="POST" action="\/main-admin\/forums" id="add-forum-category-form" class="forum-add-dialog-form">/);
   assert.match(res.text, /<button type="submit" form="add-forum-category-form" class="primary-btn">Save<\/button>/);
+});
+
+// A real request: "there should be another sub page that says chat
+// rooms. With the same layout and settings as chat groups subpage... add
+// chat group or add chat room buttons should fit to text clean."
+test('the Chat Rooms subpage has its own Add dialog with a hidden isChatRoom field, separate from Chat Groups', async () => {
+  const admin = await loginAsMainAdmin();
+
+  const roomsPage = await request(app).get('/main-admin/forums?tab=rooms').set('Cookie', admin.cookie);
+  assert.equal(roomsPage.status, 200);
+  assert.match(roomsPage.text, /<h1>Chat Rooms<\/h1>/);
+  assert.match(roomsPage.text, /\+ Add Chat Room/);
+  assert.doesNotMatch(roomsPage.text, /\+ Add Chat Group/);
+  assert.match(roomsPage.text, /<form method="POST" action="\/main-admin\/forums" id="add-forum-room-form" class="forum-add-dialog-form">/);
+  assert.match(roomsPage.text, /<input type="hidden" name="isChatRoom" value="on" \/>/);
+
+  const groupsPage = await request(app).get('/main-admin/forums?tab=new').set('Cookie', admin.cookie);
+  assert.match(groupsPage.text, /<h1>Chat Groups<\/h1>/);
+  assert.match(groupsPage.text, /\+ Add Chat Group/);
+  assert.doesNotMatch(groupsPage.text, /\+ Add Chat Room/);
+
+  const createRes = await request(app)
+    .post('/main-admin/forums')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ name: 'Subpage Test Room', scope: 'general', isChatRoom: 'on', _csrf: admin.csrfToken });
+  assert.equal(createRes.status, 302);
+  assert.match(createRes.headers.location, /tab=rooms/);
+  assert.match(createRes.headers.location, new RegExp(encodeURIComponent('Chat room added.')));
 });
 
 test('the chat group page (not a Moderate tab) has an Edit button linking to a settings page', async () => {

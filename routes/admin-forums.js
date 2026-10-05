@@ -40,12 +40,20 @@ const router = express.Router();
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const forums = require('../utils/forums');
-const { activeMemberOptions, membersWithDetails, avatarColorFor } = require('../utils/members');
+const { activeMemberOptions, membersWithDetails, avatarColorFor, allFamilies } = require('../utils/members');
 const { forumCategorySectionIds } = require('../utils/sections');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_forum'));
 
-const FORUMS_TABS = ['new', 'archive'];
+// A real request: "there should be another sub page that says chat
+// rooms. With the same layout and settings as chat groups subpage."
+// Chat Groups and Chat Rooms are now two separate listings of the same
+// forum_categories table, split on is_chat_room - a plain chat group is
+// never shown on the Rooms tab and vice versa. Creating either one goes
+// through the same POST / below; which kind it becomes is decided by
+// which dialog/page submitted it (isChatRoom is a hidden "1" on the Add
+// Chat Room dialog, absent entirely on Add Chat Group's).
+const FORUMS_TABS = ['new', 'rooms', 'archive'];
 
 router.get('/', async (req, res) => {
   const activeTab = FORUMS_TABS.includes(req.query.tab) ? req.query.tab : 'new';
@@ -55,8 +63,9 @@ router.get('/', async (req, res) => {
   let categories = [];
   let classes = [];
   let archived = [];
-  if (activeTab === 'new') {
-    categories = await forums.listCategories();
+  if (activeTab === 'new' || activeTab === 'rooms') {
+    const allCategories = await forums.listCategories();
+    categories = activeTab === 'rooms' ? allCategories.filter((c) => c.is_chat_room) : allCategories.filter((c) => !c.is_chat_room);
     classes = await db.prepare('SELECT id, class_name FROM classes ORDER BY LOWER(class_name)').all();
   } else {
     archived = await forums.archivedThreads();
@@ -66,18 +75,20 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
+  const isChatRoom = req.body.isChatRoom === 'on';
+  const backTab = isChatRoom ? 'rooms' : 'new';
   const name = (req.body.name || '').trim();
   const scope = req.body.scope === 'class' ? 'class' : 'general';
-  if (!name) return res.redirect('/main-admin/forums?error=' + encodeURIComponent('Name is required.'));
-  if (scope === 'class' && !req.body.classId) return res.redirect('/main-admin/forums?error=' + encodeURIComponent('Choose a class for a private class chat.'));
+  if (!name) return res.redirect(`/main-admin/forums?tab=${backTab}&error=` + encodeURIComponent('Name is required.'));
+  if (scope === 'class' && !req.body.classId) return res.redirect(`/main-admin/forums?tab=${backTab}&error=` + encodeURIComponent('Choose a class for a private class chat.'));
   await forums.createCategory({
     name,
     description: (req.body.description || '').trim(),
     scope,
     classId: req.body.classId ? parseInt(req.body.classId, 10) : null,
-    isChatRoom: req.body.isChatRoom === 'on',
+    isChatRoom,
   });
-  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Chat group added.'));
+  res.redirect(`/main-admin/forums?tab=${backTab}&notice=` + encodeURIComponent(isChatRoom ? 'Chat room added.' : 'Chat group added.'));
 });
 
 // A real request: "lock the chat group should be under edit, not on the
@@ -109,8 +120,10 @@ router.post('/:id/unarchive', async (req, res) => {
 });
 
 router.post('/:id/delete', async (req, res) => {
+  const category = await forums.getCategory(req.params.id);
   await forums.deleteCategory(req.params.id);
-  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Chat group deleted.'));
+  const backTab = category && category.is_chat_room ? 'rooms' : 'new';
+  res.redirect(`/main-admin/forums?tab=${backTab}&notice=` + encodeURIComponent(category && category.is_chat_room ? 'Chat room deleted.' : 'Chat group deleted.'));
 });
 
 // The chat group's own Edit page - see this file's own header comment
@@ -124,6 +137,7 @@ router.post('/:id/settings', async (req, res) => {
   const name = (req.body.name || '').trim();
   if (!name) return res.redirect(`/main-admin/forums/${req.params.id}/edit?error=` + encodeURIComponent('Name is required.'));
   const sectionIds = [].concat(req.body.sectionIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  const familyIds = [].concat(req.body.familyIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
   const notifyMemberIds = [].concat(req.body.notifyMemberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
   await forums.updateCategorySettings(req.params.id, {
     name,
@@ -131,6 +145,8 @@ router.post('/:id/settings', async (req, res) => {
     allowComments: req.body.allowComments === 'on',
     sectionIds,
     moderatorMemberId: req.body.moderatorMemberId ? parseInt(req.body.moderatorMemberId, 10) : null,
+    isSecure: req.body.isSecure === 'on',
+    familyIds,
   });
   await forums.setSubscribers(req.params.id, notifyMemberIds);
   res.redirect(`/main-admin/forums/${req.params.id}/edit?notice=` + encodeURIComponent('Chat group settings updated.'));
@@ -195,6 +211,8 @@ router.get('/:id/edit', async (req, res) => {
   // ones make sense to offer a notification checkbox for here.
   const allMembers = (await membersWithDetails()).filter((m) => m.active);
   const subscriberIds = await forums.subscriberMemberIds(category.id);
+  const allFamiliesList = await allFamilies();
+  const allowedFamilyIds = await forums.allowedFamilyIds(category.id);
   res.render('admin-forums-category-edit', {
     title: `Edit ${category.name}`,
     category,
@@ -204,6 +222,8 @@ router.get('/:id/edit', async (req, res) => {
     allMembers,
     subscriberIds,
     avatarColorFor,
+    allFamilies: allFamiliesList,
+    allowedFamilyIds,
     notice: req.query.notice || null,
     error: req.query.error || null,
   });

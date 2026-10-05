@@ -95,13 +95,25 @@ async function setSubscribers(categoryId, memberIds) {
 async function updateCategorySettings(id, data) {
   await db.withTransaction(async (tx) => {
     await tx
-      .prepare('UPDATE forum_categories SET name = ?, description = ?, allow_comments = ?, moderator_member_id = ? WHERE id = ?')
-      .run(data.name, data.description || null, data.allowComments ? 1 : 0, data.moderatorMemberId || null, id);
+      .prepare('UPDATE forum_categories SET name = ?, description = ?, allow_comments = ?, moderator_member_id = ?, is_secure = ? WHERE id = ?')
+      .run(data.name, data.description || null, data.allowComments ? 1 : 0, data.moderatorMemberId || null, data.isSecure ? 1 : 0, id);
     await tx.prepare('DELETE FROM forum_category_sections WHERE category_id = ?').run(id);
     for (const sectionId of data.sectionIds || []) {
       await tx.prepare('INSERT INTO forum_category_sections (category_id, section_id) VALUES (?, ?) ON CONFLICT DO NOTHING').run(id, sectionId);
     }
+    // A real request: "secure - if you only want certain families to be
+    // able to access this category, check this box AND select which
+    // families can access it below."
+    await tx.prepare('DELETE FROM forum_category_families WHERE category_id = ?').run(id);
+    for (const familyId of data.familyIds || []) {
+      await tx.prepare('INSERT INTO forum_category_families (category_id, family_id) VALUES (?, ?) ON CONFLICT DO NOTHING').run(id, familyId);
+    }
   });
+}
+
+async function allowedFamilyIds(categoryId) {
+  const rows = await db.prepare('SELECT family_id FROM forum_category_families WHERE category_id = ?').all(categoryId);
+  return new Set(rows.map((r) => r.family_id));
 }
 
 // A 'general' category is open to any signed-in account, any role
@@ -130,12 +142,27 @@ async function canAccessCategory(category, family) {
     if (!enrolledMatch) return false;
   }
   const restriction = await forumCategorySectionIds(category.id);
-  if (restriction.length === 0) return true;
-  const familySectionIds = new Set();
-  for (const m of family) {
-    for (const sectionId of await sectionIdsForMember(m.id)) familySectionIds.add(sectionId);
+  if (restriction.length > 0) {
+    const familySectionIds = new Set();
+    for (const m of family) {
+      for (const sectionId of await sectionIdsForMember(m.id)) familySectionIds.add(sectionId);
+    }
+    if (!memberSatisfiesRestriction(familySectionIds, restriction)) return false;
   }
-  return memberSatisfiesRestriction(familySectionIds, restriction);
+
+  // A real request: "secure - if you only want certain families to be
+  // able to access this category, check this box AND select which
+  // families can access it below." A secure category with no families
+  // opted in yet lets no one in - same "nothing picked means nothing
+  // allowed" shape the section restriction above already has once any
+  // rows exist, just unconditional here since checking the box at all is
+  // the admin's explicit "lock this down" signal.
+  if (category.is_secure) {
+    const allowed = await allowedFamilyIds(category.id);
+    const inFamily = family.some((m) => m.family_id != null && allowed.has(m.family_id));
+    if (!inFamily) return false;
+  }
+  return true;
 }
 
 // True if `memberId` is the one member specifically assigned to moderate
@@ -320,6 +347,7 @@ module.exports = {
   setCategoryArchived,
   deleteCategory,
   updateCategorySettings,
+  allowedFamilyIds,
   subscriberMemberIds,
   setSubscribers,
   canAccessCategory,

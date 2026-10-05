@@ -10,9 +10,11 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
-      <h1><%= activeTab === 'archive' ? 'Archive' : 'Chat Groups' %></h1>
+      <h1><%= activeTab === 'archive' ? 'Archive' : activeTab === 'rooms' ? 'Chat Rooms' : 'Chat Groups' %></h1>
       <% if (activeTab === 'new') { %>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Chat Group</button>
+      <% } else if (activeTab === 'rooms') { %>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-room-dialog').showModal()">+ Add Chat Room</button>
       <% } %>
     </div>
 
@@ -36,9 +38,9 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <% if (activeTab === 'new') { %>
+    <% if (activeTab === 'new' || activeTab === 'rooms') { %>
       <% if (categories.length === 0) { %>
-        <p class="roster-empty">No chat groups yet &mdash; add one above.</p>
+        <p class="roster-empty"><%= activeTab === 'rooms' ? 'No chat rooms yet' : 'No chat groups yet' %> &mdash; add one above.</p>
       <% } %>
 
       <div class="team-card-grid">
@@ -48,7 +50,6 @@
               <span class="team-info-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
               <h3 class="team-info-title"><a href="/main-admin/forums/<%= c.id %>"><%= c.name %></a></h3>
               <% if (c.scope === 'class') { %><span class="badge-pill">Class: <%= c.class_name %></span><% } else { %><span class="badge-pill badge-pill-green">General</span><% } %>
-              <% if (c.is_chat_room) { %><span class="badge-pill badge-pill-green">Live Chat Room</span><% } %>
               <% if (c.is_locked) { %><span class="badge-pill badge-pill-gray">Locked</span><% } %>
               <%# A real request: "Lock the chat group should be under
                   edit, not on the front of the chat group card" - Lock/
@@ -101,7 +102,7 @@
         browser closes the outer form early at the first nested </form>,
         which used to leave Save attached to nothing once a category
         existed - "add one category and it won't let me add more"). %>
-    <form method="POST" action="/main-admin/forums" id="add-forum-category-form">
+    <form method="POST" action="/main-admin/forums" id="add-forum-category-form" class="forum-add-dialog-form">
       <h3>Add Chat Group</h3>
       <label for="add-forum-category-name">Chat Group Name
         <input id="add-forum-category-name" type="text" name="name" placeholder="e.g. Field Trip Planning" required />
@@ -120,15 +121,6 @@
           <% classes.forEach(function(c) { %><option value="<%= c.id %>"><%= c.class_name %></option><% }); %>
         </select>
       </label>
-      <%# A real request: "add chat room where people can talk to each
-          other in a live continuous feed" - a chat room skips the normal
-          titled-thread list entirely in favor of one continuous message
-          feed (see routes/admin-forums.js and routes/forums.js's own
-          is_chat_room redirect to the group's single underlying thread). %>
-      <label class="checkbox-option">
-        <input type="checkbox" name="isChatRoom" />
-        Make this a live chat room (one continuous message feed, instead of separate discussion threads)
-      </label>
     </form>
     <% if (categories.length > 0) { %>
       <p class="hint">Existing chat groups</p>
@@ -146,6 +138,44 @@
     <div class="notes-dialog-actions">
       <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
       <button type="submit" form="add-forum-category-form" class="primary-btn">Save</button>
+    </div>
+  </dialog>
+
+  <%# A real request: "there should be another sub page that says chat
+      rooms. With the same layout and settings as chat groups subpage."
+      Same dialog shape as Add Chat Group above, minus the Type/Class
+      fields (a chat room is always a plain, non-class-scoped category
+      today) and with isChatRoom hard-coded true via a hidden field
+      instead of the removed visible checkbox - a real request: "remove
+      make this a live chat room" (from Add Chat Group's own dialog;
+      being on this page at all is now what makes it a room). %>
+  <dialog id="add-room-dialog" class="member-picker-dialog">
+    <form method="POST" action="/main-admin/forums" id="add-forum-room-form" class="forum-add-dialog-form">
+      <input type="hidden" name="isChatRoom" value="on" />
+      <h3>Add Chat Room</h3>
+      <label for="add-forum-room-name">Chat Room Name
+        <input id="add-forum-room-name" type="text" name="name" placeholder="e.g. Lunchroom Chat" required />
+      </label>
+      <label for="add-forum-room-description">Description
+        <textarea id="add-forum-room-description" name="description" rows="2"></textarea>
+      </label>
+    </form>
+    <% if (categories.length > 0) { %>
+      <p class="hint">Existing chat rooms</p>
+      <div class="grade-pill-grid">
+        <% categories.forEach(function(c) { %>
+          <form method="POST" action="/main-admin/forums/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= c.name %>&quot;? This removes every thread and post in it. This cannot be undone.">
+            <span class="badge-pill">
+              <%= c.name %>
+              <button type="submit" class="badge-pill-x" aria-label="Delete <%= c.name %>" title="Delete">&times;</button>
+            </span>
+          </form>
+        <% }); %>
+      </div>
+    <% } %>
+    <div class="notes-dialog-actions">
+      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+      <button type="submit" form="add-forum-room-form" class="primary-btn">Save</button>
     </div>
   </dialog>
 </body>

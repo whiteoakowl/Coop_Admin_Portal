@@ -224,15 +224,18 @@ test('admin-facing: opening a chat room category from the Chat Groups list goes 
   assert.match(threadView.text, /Live Chat Room/);
 });
 
-test('the Chat Groups list shows a Live Chat Room badge for a chat room and not for a normal group', async () => {
+test('a chat room appears on the Chat Rooms tab, never on the Chat Groups tab, and vice versa for a normal group', async () => {
   const admin = await loginAsMainAdmin();
-  await createChatRoom(admin, 'Badge List Room');
-  await request(app).post('/main-admin/forums').set('Cookie', admin.cookie).type('form').send({ name: 'Badge List Group', scope: 'general', _csrf: admin.csrfToken });
+  await createChatRoom(admin, 'Split Tab Room');
+  await request(app).post('/main-admin/forums').set('Cookie', admin.cookie).type('form').send({ name: 'Split Tab Group', scope: 'general', _csrf: admin.csrfToken });
 
-  const listView = await request(app).get('/main-admin/forums?tab=new').set('Cookie', admin.cookie);
-  assert.match(listView.text, /Badge List Room[\s\S]*?Live Chat Room/);
-  const groupSection = listView.text.split('Badge List Group')[1] || '';
-  assert.doesNotMatch(groupSection.split('</div>')[0], /Live Chat Room/);
+  const groupsView = await request(app).get('/main-admin/forums?tab=new').set('Cookie', admin.cookie);
+  assert.match(groupsView.text, /Split Tab Group/);
+  assert.doesNotMatch(groupsView.text, /Split Tab Room/);
+
+  const roomsView = await request(app).get('/main-admin/forums?tab=rooms').set('Cookie', admin.cookie);
+  assert.match(roomsView.text, /Split Tab Room/);
+  assert.doesNotMatch(roomsView.text, /Split Tab Group/);
 });
 
 // A real request: "Full text features on chat rooms isn't necessary for
