@@ -22,6 +22,8 @@ process.env.UPLOADS_DIR = testUploadsDir;
 process.env.SESSION_SECRET = 'test-secret-not-for-real-use';
 process.env.ADMIN_USERNAME = 'testadmin';
 process.env.ADMIN_PASSWORD = 'testpassword123';
+process.env.MAIN_ADMIN_EMAIL = 'mainadmin@coop.local';
+process.env.MAIN_ADMIN_PASSWORD = 'changeme123';
 
 const request = require('supertest');
 const app = require('../server');
@@ -68,4 +70,35 @@ test('Design/Print hub offers Primary Parents Only on every member-based print p
   const primaryParentOptionCount = (res.text.match(/<option value="primaryParent"[^>]*>Primary Parents Only<\/option>/g) || []).length;
   assert.equal(primaryParentOptionCount, 5, 'Schedule Cards, Name Tags, Cards Duplex, Barcodes Only, and Barcode Labels should each offer it');
   assert.match(res.text, /<select class="name-tag-bulk-filter-select" id="schedule-print-filter-select">/, 'Schedule Cards should now have its own type filter select');
+});
+
+// A real request: "search dropdown menu should be next to search bar.
+// Search bar doesn't need search title because it has a description in
+// the text bar."
+test('Schedule Cards search: the filter select and search box share one group, and the Search label is screen-reader only', async () => {
+  const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
+  const cookie = loginRes.headers['set-cookie'];
+
+  const res = await request(app).get('/admin/design?tab=print').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /<label for="schedule-print-search-input" class="sr-only">Search<\/label>/);
+  assert.match(
+    res.text,
+    /<div class="schedule-search-group">\s*<select class="name-tag-bulk-filter-select" id="schedule-print-filter-select">/,
+    'the filter select and the search box should share one wrapper, next to each other'
+  );
+});
+
+test('Main Admin Name Tags page: same search-group fix as Co-op Admin', async () => {
+  const loginRes = await request(app).post('/login').type('form').send({ email: process.env.MAIN_ADMIN_EMAIL, password: process.env.MAIN_ADMIN_PASSWORD, next: '/main-admin' });
+  const cookie = loginRes.headers['set-cookie'];
+
+  const res = await request(app).get('/main-admin/name-tags?tab=print').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /<label for="schedule-print-search-input" class="sr-only">Search<\/label>/);
+  assert.match(
+    res.text,
+    /<div class="schedule-search-group">\s*<select class="name-tag-bulk-filter-select" id="schedule-print-filter-select">/,
+    'the filter select and the search box should share one wrapper, next to each other'
+  );
 });

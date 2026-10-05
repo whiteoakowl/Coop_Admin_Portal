@@ -244,10 +244,18 @@
           <form method="POST" action="/main-admin/name-tags/print-cards" target="_blank" id="schedule-print-form" data-bulk-print-refresh>
             <div class="roster-toolbar no-print">
               <div class="schedule-filters">
-                <%- include('partials/bulk-print-filter-select', { id: 'schedule-print-filter-select', families: families }) %>
-                <div class="category-filter schedule-search">
-                  <label for="schedule-print-search-input">Search</label>
-                  <input type="search" id="schedule-print-search-input" placeholder="Search by member name&hellip;" />
+                <%# A real request: "search dropdown menu should be next
+                    to search bar. Search bar doesn't need search title
+                    because it has a description in the text bar." Both
+                    share one wrapper so they wrap together as a pair
+                    (not split apart by Select All) on narrow screens,
+                    and the placeholder alone now explains the field. %>
+                <div class="schedule-search-group">
+                  <%- include('partials/bulk-print-filter-select', { id: 'schedule-print-filter-select', families: families }) %>
+                  <div class="category-filter schedule-search">
+                    <label for="schedule-print-search-input" class="sr-only">Search</label>
+                    <input type="search" id="schedule-print-search-input" placeholder="Search by member name&hellip;" />
+                  </div>
                 </div>
                 <label class="checkbox-option schedule-print-select-all">
                   <input type="checkbox" id="schedule-print-select-all-checkbox" />

@@ -8205,6 +8205,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .schedule-filters { display: flex; align-items: center; gap: 1rem 1.5rem; flex-wrap: wrap; }
 .schedule-filters .category-filter { margin: 0; }
+/* A real request: "search dropdown menu should be next to search bar" -
+   groups the Type/Family filter select and the search box as one unit
+   so they stay paired, wrapping together rather than Select All landing
+   between them on a narrow screen. */
+.schedule-search-group { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .schedule-search input[type="search"] {
   padding: var(--control-padding-compact);
   border: 1px solid var(--border);
