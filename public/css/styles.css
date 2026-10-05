@@ -9683,6 +9683,21 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
 .store-admin-card-meta-row .icon { width: 16px; height: 16px; flex-shrink: 0; }
 .store-admin-card-status { align-self: flex-start; margin-top: 0.2rem; }
 
+/* A real request: "main admin portal shop, product page, shrink the
+   product card on mobile to better easily view on the screen." Scoped
+   to the admin card only (not .store-product-card, the member Shop's
+   own card sharing the same grid/image/body classes) - a shorter image,
+   tighter padding/gaps, and smaller text fit more of the grid on screen
+   at once instead of one near-full-width card per row. */
+@media (max-width: 480px) {
+  .store-product-grid:has(.store-admin-product-card) { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.7rem; }
+  .store-admin-product-card .store-product-card-image-wrap { aspect-ratio: 16 / 9; }
+  .store-admin-product-card .store-product-card-body { padding: 0.6rem 0.7rem 0.7rem; gap: 0.35rem; }
+  .store-admin-product-card .store-product-card-name { font-size: 0.85rem; }
+  .store-admin-product-card .store-product-card-price { font-size: 0.95rem; }
+  .store-admin-product-card .store-admin-card-meta-row { font-size: 0.75rem; }
+}
+
 /* Forums (Community & Commerce track) - category/thread cards reuse
    .team-card-grid/.team-info-card and .training-lesson-list already
    defined elsewhere in this file; the only genuinely new shape here is
