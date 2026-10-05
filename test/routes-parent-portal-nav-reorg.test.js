@@ -94,12 +94,14 @@ test('Achievements and Leaderboard are buttons on the Reading Challenge page', a
 test('GET /parent/resources shows role-scoped resource links', async () => {
   const { cookie } = await createParentAndLogin('Resources Parent', 'resources-parent@example.com');
   await db.prepare("INSERT INTO resource_link_categories (title, position) VALUES ('Homeschool Groups', 0)").run();
-  await db
-    .prepare("INSERT INTO resource_links (title, url, role_key, status, position) VALUES ('Parent Co-op Guide', 'https://example.com/guide', 'parent', 'approved', 0)")
-    .run();
-  await db
-    .prepare("INSERT INTO resource_links (title, url, role_key, status, position) VALUES ('Student Only Link', 'https://example.com/student', 'student', 'approved', 0)")
-    .run();
+  const parentLink = await db
+    .prepare("INSERT INTO resource_links (title, url, status, position) VALUES ('Parent Co-op Guide', 'https://example.com/guide', 'approved', 0) RETURNING id")
+    .get();
+  await db.prepare('INSERT INTO resource_link_roles (resource_link_id, role_key) VALUES (?, ?)').run(parentLink.id, 'parent');
+  const studentLink = await db
+    .prepare("INSERT INTO resource_links (title, url, status, position) VALUES ('Student Only Link', 'https://example.com/student', 'approved', 0) RETURNING id")
+    .get();
+  await db.prepare('INSERT INTO resource_link_roles (resource_link_id, role_key) VALUES (?, ?)').run(studentLink.id, 'student');
 
   const res = await request(app).get('/parent/resources').set('Cookie', cookie);
   assert.equal(res.status, 200);
