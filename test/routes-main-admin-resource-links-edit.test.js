@@ -99,6 +99,57 @@ test('resource title is a clickable button carrying the row data the Edit Resour
   assert.equal(updated.description, 'Updated note');
 });
 
+// A real bug report: "when saving a new category it says title and
+// website are required as an error. It should create a category." -
+// POST /:id (registered first, before this fix) was catching POST
+// /categories with id="categories" before Express ever reached the real
+// category handler.
+test('adding a category actually creates it, instead of hitting the resource title/website validation', async () => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+
+  const res = await request(app)
+    .post('/main-admin/resource-links/categories')
+    .type('form')
+    .set('Cookie', cookie)
+    .send({ _csrf: csrfToken, title: 'Local Field Trips' });
+  assert.equal(res.status, 302);
+  assert.doesNotMatch(res.headers.location, /error=/);
+  assert.match(res.headers.location, /notice=Added/);
+
+  const category = await db.prepare("SELECT * FROM resource_link_categories WHERE title = 'Local Field Trips'").get();
+  assert.ok(category, 'the category should actually have been created');
+});
+
+// A real request: "show on choosing a portal dropdown should be a clean
+// checkbox dropdown. Checkboxes next to each portal."
+test('Show on is a checkbox-dropdown that can select multiple portals, enforced on both the admin list and member-facing reads', async () => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+  const addPage = await request(app).get('/main-admin/resource-links').set('Cookie', cookie);
+  assert.match(addPage.text, /name="roleKeys"/);
+  assert.match(addPage.text, /class="multi-select-checkbox"/);
+
+  const res = await request(app)
+    .post('/main-admin/resource-links')
+    .type('form')
+    .set('Cookie', cookie)
+    .send({ _csrf: csrfToken, title: 'Multi-Portal Link', url: 'https://example.com/multi', roleKeys: ['parent', 'student'] });
+  assert.equal(res.status, 302);
+
+  const link = await db.prepare("SELECT * FROM resource_links WHERE title = 'Multi-Portal Link'").get();
+  const resourceLinks = require('../utils/resourceLinks');
+  const roleKeys = await resourceLinks.roleKeysForLink(link.id);
+  assert.deepEqual(roleKeys.sort(), ['parent', 'student']);
+
+  const listPage = await request(app).get('/main-admin/resource-links').set('Cookie', cookie);
+  assert.match(listPage.text, /Multi-Portal Link/);
+  assert.match(listPage.text, /Parent, Student|Student, Parent/);
+
+  const forStudent = await resourceLinks.listResourceLinksForRole('student');
+  assert.ok(forStudent.some((l) => l.title === 'Multi-Portal Link'));
+  const forTeacher = await resourceLinks.listResourceLinksForRole('teacher');
+  assert.ok(!forTeacher.some((l) => l.title === 'Multi-Portal Link'));
+});
+
 test('resource update requires a title and website, same as create', async () => {
   const { cookie, csrfToken } = await loginAsMainAdmin();
   const link = await db.prepare("INSERT INTO resource_links (title, url, status) VALUES ('Keep Me', 'https://example.com', 'approved') RETURNING id").get();

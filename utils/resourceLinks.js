@@ -6,15 +6,35 @@
 const db = require('../db');
 
 // Every APPROVED link visible to a given portal role, plus every
-// unscoped (role_key IS NULL) link - oldest-first position, then id,
-// matching the order they were added in the admin list. A member's own
-// portal view never shows a still-pending submission (theirs or anyone
-// else's) - only routes/main-admin-resource-links.js's Approvals tab
-// does, via listPendingResourceLinks below.
+// unscoped (no resource_link_roles rows at all) link - oldest-first
+// position, then id, matching the order they were added in the admin
+// list. A member's own portal view never shows a still-pending
+// submission (theirs or anyone else's) - only routes/main-admin-
+// resource-links.js's Approvals tab does, via listPendingResourceLinks
+// below.
 async function listResourceLinksForRole(roleKey) {
   return db
-    .prepare("SELECT * FROM resource_links WHERE status = 'approved' AND (role_key IS NULL OR role_key = ?) ORDER BY position ASC, id ASC")
+    .prepare(
+      `SELECT * FROM resource_links rl WHERE rl.status = 'approved' AND (
+         NOT EXISTS (SELECT 1 FROM resource_link_roles rr WHERE rr.resource_link_id = rl.id)
+         OR EXISTS (SELECT 1 FROM resource_link_roles rr WHERE rr.resource_link_id = rl.id AND rr.role_key = ?)
+       ) ORDER BY rl.position ASC, rl.id ASC`
+    )
     .all(roleKey);
+}
+
+async function roleKeysForLink(resourceLinkId) {
+  const rows = await db.prepare('SELECT role_key FROM resource_link_roles WHERE resource_link_id = ?').all(resourceLinkId);
+  return rows.map((r) => r.role_key);
+}
+
+async function setRoleKeys(resourceLinkId, roleKeys) {
+  await db.withTransaction(async (tx) => {
+    await tx.prepare('DELETE FROM resource_link_roles WHERE resource_link_id = ?').run(resourceLinkId);
+    for (const roleKey of roleKeys || []) {
+      await tx.prepare('INSERT INTO resource_link_roles (resource_link_id, role_key) VALUES (?, ?) ON CONFLICT DO NOTHING').run(resourceLinkId, roleKey);
+    }
+  });
 }
 
 // Every APPROVED link, grouped by category for the admin management
@@ -30,9 +50,16 @@ async function listApprovedResourceLinksByCategory() {
        ORDER BY rc.position ASC NULLS LAST, LOWER(rc.title) ASC NULLS LAST, rl.position ASC, rl.id ASC`
     )
     .all();
+  const roleRows = await db.prepare('SELECT resource_link_id, role_key FROM resource_link_roles').all();
+  const roleKeysByLink = new Map();
+  for (const r of roleRows) {
+    if (!roleKeysByLink.has(r.resource_link_id)) roleKeysByLink.set(r.resource_link_id, []);
+    roleKeysByLink.get(r.resource_link_id).push(r.role_key);
+  }
   const groups = [];
   const byCategoryId = new Map();
   for (const row of rows) {
+    row.roleKeys = roleKeysByLink.get(row.id) || [];
     const key = row.category_id || 'none';
     let group = byCategoryId.get(key);
     if (!group) {
@@ -94,14 +121,15 @@ async function renameCategory(id, title) {
   await db.prepare('UPDATE resource_link_categories SET title = ? WHERE id = ?').run(trimmed, id);
 }
 
-async function createResourceLink({ title, url, description, roleKey, city, state, categoryId, createdByAccountId }) {
+async function createResourceLink({ title, url, description, roleKeys, city, state, categoryId, createdByAccountId }) {
   const info = await db
     .prepare(
-      `INSERT INTO resource_links (title, url, description, role_key, city, state, category_id, status, created_by_account_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', ?)`
+      `INSERT INTO resource_links (title, url, description, city, state, category_id, status, created_by_account_id)
+       VALUES (?, ?, ?, ?, ?, ?, 'approved', ?) RETURNING id`
     )
-    .run(title, url, description || null, roleKey || null, city || null, state || null, categoryId || null, createdByAccountId || null);
-  return info.lastInsertRowid;
+    .get(title, url, description || null, city || null, state || null, categoryId || null, createdByAccountId || null);
+  await setRoleKeys(info.id, roleKeys);
+  return info.id;
 }
 
 // Member-facing submission - a real request: "members can submit
@@ -136,17 +164,19 @@ async function deleteResourceLink(id) {
 
 // A real request: "click on the resource, a window should pop up where
 // you can edit the category and info and save."
-async function updateResourceLink(id, { title, url, description, roleKey, city, state, categoryId }) {
+async function updateResourceLink(id, { title, url, description, roleKeys, city, state, categoryId }) {
   await db
     .prepare(
-      `UPDATE resource_links SET title = ?, url = ?, description = ?, role_key = ?, city = ?, state = ?, category_id = ?
+      `UPDATE resource_links SET title = ?, url = ?, description = ?, city = ?, state = ?, category_id = ?
        WHERE id = ?`
     )
-    .run(title, url, description || null, roleKey || null, city || null, state || null, categoryId || null, id);
+    .run(title, url, description || null, city || null, state || null, categoryId || null, id);
+  await setRoleKeys(id, roleKeys);
 }
 
 module.exports = {
   listResourceLinksForRole,
+  roleKeysForLink,
   listApprovedResourceLinksByCategory,
   listPendingResourceLinks,
   listCategories,

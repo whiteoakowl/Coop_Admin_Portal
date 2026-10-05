@@ -8,6 +8,19 @@
     portalTitle: 'Main Admin',
   }) %>
 
+  <%
+  // "Show on" now stores a set of role keys (resource_link_roles) instead
+  // of one nullable role_key - a real request: "show on choosing a portal
+  // dropdown should be a clean checkbox dropdown. Checkboxes next to each
+  // portal." Empty set still means "Everyone (every portal)".
+  function roleKeysLabel(keys) {
+    if (!keys || keys.length === 0) return 'Everyone';
+    return keys.map(function (k) {
+      var role = roles.find(function (r) { return r.key === k; });
+      return role ? role.label : k;
+    }).join(', ');
+  }
+  %>
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="roster-toolbar">
       <h1><%= activeTab === 'approvals' ? 'Approvals' : 'Resources' %></h1>
@@ -57,13 +70,13 @@
                           data-city="<%= l.city || '' %>"
                           data-state="<%= l.state || '' %>"
                           data-category-id="<%= l.category_id || '' %>"
-                          data-role-key="<%= l.role_key || '' %>"
+                          data-role-keys='<%- JSON.stringify(l.roleKeys || []) %>'
                         ><%= l.title %></button>
                         <% if (l.description) { %><span class="member-row-subline"><%= l.description %></span><% } %>
                       </td>
                       <td><a href="<%= l.url %>" target="_blank" rel="noopener"><%= l.url %></a></td>
                       <td><%= [l.city, l.state].filter(Boolean).join(', ') || '—' %></td>
-                      <td><%= l.role_key || 'Everyone' %></td>
+                      <td><%= roleKeysLabel(l.roleKeys) %></td>
                       <td>
                         <form method="POST" action="/main-admin/resource-links/<%= l.id %>/delete" data-confirm="Remove &quot;<%= l.title %>&quot;?">
                           <button type="submit" class="icon-btn" aria-label="Delete <%= l.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
@@ -175,14 +188,15 @@
           <% }); %>
         </select>
       </label>
-      <label for="add-resource-role">Show on
-        <select id="add-resource-role" name="roleKey">
-          <option value="">Everyone (every portal)</option>
-          <% roles.forEach(function(r) { %>
-            <option value="<%= r.key %>"><%= r.label %> only</option>
-          <% }); %>
-        </select>
-      </label>
+      <div class="member-form-full">
+        <span class="roster-checkbox-label">Show on <span class="hint">(leave all unchecked to show on every portal)</span></span>
+        <%- include('partials/multi-select-checkbox', {
+          name: 'roleKeys',
+          options: roles.map(function(r) { return { value: r.key, label: r.label }; }),
+          selected: [],
+          placeholder: 'Every portal',
+        }) %>
+      </div>
       <div class="notes-dialog-actions">
         <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
         <button type="submit" class="primary-btn">Save</button>
@@ -220,14 +234,15 @@
           <% }); %>
         </select>
       </label>
-      <label for="edit-resource-role">Show on
-        <select id="edit-resource-role" name="roleKey">
-          <option value="">Everyone (every portal)</option>
-          <% roles.forEach(function(r) { %>
-            <option value="<%= r.key %>"><%= r.label %> only</option>
-          <% }); %>
-        </select>
-      </label>
+      <div class="member-form-full" id="edit-resource-role-picker">
+        <span class="roster-checkbox-label">Show on <span class="hint">(leave all unchecked to show on every portal)</span></span>
+        <%- include('partials/multi-select-checkbox', {
+          name: 'roleKeys',
+          options: roles.map(function(r) { return { value: r.key, label: r.label }; }),
+          selected: [],
+          placeholder: 'Every portal',
+        }) %>
+      </div>
       <div class="notes-dialog-actions">
         <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
         <button type="submit" class="primary-btn">Save</button>
@@ -244,7 +259,10 @@
         document.getElementById('edit-resource-city').value = button.dataset.city || '';
         document.getElementById('edit-resource-state').value = button.dataset.state || '';
         document.getElementById('edit-resource-category').value = button.dataset.categoryId || '';
-        document.getElementById('edit-resource-role').value = button.dataset.roleKey || '';
+        var roleKeys = JSON.parse(button.dataset.roleKeys || '[]');
+        var roleCheckboxes = document.querySelectorAll('#edit-resource-role-picker input[type="checkbox"]');
+        roleCheckboxes.forEach(function (cb) { cb.checked = roleKeys.indexOf(cb.value) !== -1; });
+        if (roleCheckboxes.length) roleCheckboxes[0].dispatchEvent(new Event('change', { bubbles: true }));
         document.getElementById('edit-resource-dialog').showModal();
       });
     });

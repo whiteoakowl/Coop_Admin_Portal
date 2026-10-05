@@ -2,9 +2,9 @@
 // links (a Google Classroom folder, a reading list, a permission-slip
 // form, city/state-specific resources, etc.) shown on member portals,
 // currently just Student Portal's "Resource Links" tab (routes/student-
-// portal.js). Optionally scoped to one role via roleKey, the same
-// null-means-everyone convention Main Admin's own Announcements screen
-// already uses for "Send to" - see routes/main-admin-announcements.js.
+// portal.js). Optionally scoped to any number of roles (resource_link_
+// roles) - no rows means everyone, same convention utils/forums.js's own
+// forum_category_sections already uses.
 //
 // A real request: "resource links should have add category button on
 // admin side. and add resource button. add resource button should pop
@@ -46,33 +46,23 @@ router.post('/', async (req, res) => {
   const description = (req.body.description || '').trim();
   const city = (req.body.city || '').trim();
   const state = (req.body.state || '').trim();
-  const roleKey = (req.body.roleKey || '').trim();
+  const roleKeys = [].concat(req.body.roleKeys || []);
   const categoryId = parseInt(req.body.categoryId, 10) || null;
   if (!title || !url) return res.redirect('/main-admin/resource-links?error=' + encodeURIComponent('Title and website are required.'));
 
-  await resourceLinks.createResourceLink({ title, url, description, roleKey, city, state, categoryId, createdByAccountId: req.portalAccount.id });
+  await resourceLinks.createResourceLink({ title, url, description, roleKeys, city, state, categoryId, createdByAccountId: req.portalAccount.id });
   res.redirect('/main-admin/resource-links?notice=' + encodeURIComponent('Resource added.'));
 });
 
-router.post('/:id', async (req, res) => {
-  const title = (req.body.title || '').trim();
-  const url = (req.body.url || '').trim();
-  const description = (req.body.description || '').trim();
-  const city = (req.body.city || '').trim();
-  const state = (req.body.state || '').trim();
-  const roleKey = (req.body.roleKey || '').trim();
-  const categoryId = parseInt(req.body.categoryId, 10) || null;
-  if (!title || !url) return res.redirect('/main-admin/resource-links?error=' + encodeURIComponent('Title and website are required.'));
-
-  await resourceLinks.updateResourceLink(parseInt(req.params.id, 10), { title, url, description, roleKey, city, state, categoryId });
-  res.redirect('/main-admin/resource-links?notice=' + encodeURIComponent('Resource updated.'));
-});
-
-router.post('/:id/delete', async (req, res) => {
-  await resourceLinks.deleteResourceLink(parseInt(req.params.id, 10));
-  res.redirect('/main-admin/resource-links?notice=' + encodeURIComponent('Resource removed.'));
-});
-
+// These three must be registered before the bare POST /:id below - a
+// real bug report: "add a category under... the popup... won't allow
+// saving a category" - Express tries routes in registration order, and
+// /:id matches a single path segment just like these literal /categories
+// paths do, so POST /categories was being caught by /:id (id="categories")
+// and hitting the title+url-required resource-link validation above
+// instead of ever reaching the category handler below. Same ordering
+// requirement documented in routes/admin-directory.js/routes/admin-
+// classifieds.js, which already got this right.
 router.post('/categories', async (req, res) => {
   const title = (req.body.title || '').trim();
   if (!title) return res.redirect('/main-admin/resource-links?error=' + encodeURIComponent('Category name is required.'));
@@ -90,6 +80,25 @@ router.post('/categories/:id', async (req, res) => {
 router.post('/categories/:id/delete', async (req, res) => {
   await resourceLinks.deleteCategory(parseInt(req.params.id, 10));
   res.redirect('/main-admin/resource-links?notice=' + encodeURIComponent('Category removed.'));
+});
+
+router.post('/:id', async (req, res) => {
+  const title = (req.body.title || '').trim();
+  const url = (req.body.url || '').trim();
+  const description = (req.body.description || '').trim();
+  const city = (req.body.city || '').trim();
+  const state = (req.body.state || '').trim();
+  const roleKeys = [].concat(req.body.roleKeys || []);
+  const categoryId = parseInt(req.body.categoryId, 10) || null;
+  if (!title || !url) return res.redirect('/main-admin/resource-links?error=' + encodeURIComponent('Title and website are required.'));
+
+  await resourceLinks.updateResourceLink(parseInt(req.params.id, 10), { title, url, description, roleKeys, city, state, categoryId });
+  res.redirect('/main-admin/resource-links?notice=' + encodeURIComponent('Resource updated.'));
+});
+
+router.post('/:id/delete', async (req, res) => {
+  await resourceLinks.deleteResourceLink(parseInt(req.params.id, 10));
+  res.redirect('/main-admin/resource-links?notice=' + encodeURIComponent('Resource removed.'));
 });
 
 router.post('/:id/approve', async (req, res) => {
