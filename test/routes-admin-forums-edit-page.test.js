@@ -215,3 +215,102 @@ test('Secure categories: checking Secure with no families selected blocks everyo
   const anyFamily = [{ id: 1, family_id: familyId }];
   assert.equal(await forums.canAccessCategory(fullCategory, anyFamily), false);
 });
+
+// A real request: "chat room settings and chat group settings add
+// clean dropdown menu for controlling and selecting grade levels by
+// checkbox. Another for select by age level. And one for portal
+// control on where these chat rooms can show up."
+test('Edit page: Grade/Age/Show-on checkbox-dropdowns render, and saving them persists', async () => {
+  const admin = await loginAsMainAdmin();
+  const category = await createCategory(admin, 'Grade Age Portal Test Chat');
+
+  const editPage = await request(app).get(`/main-admin/forums/${category.id}/edit`).set('Cookie', admin.cookie);
+  assert.equal(editPage.status, 200);
+  assert.match(editPage.text, /name="lockByGrade"/);
+  assert.match(editPage.text, /name="gradeRestriction" value="3rd Grade"/);
+  assert.match(editPage.text, /name="lockByAge"/);
+  assert.match(editPage.text, /name="ageRestriction" value="9"/);
+  assert.match(editPage.text, /name="roleKeys" value="parent"/);
+
+  const saveRes = await request(app)
+    .post(`/main-admin/forums/${category.id}/settings`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ name: category.name, lockByGrade: 'on', gradeRestriction: ['3rd Grade', '4th Grade'], lockByAge: 'on', ageRestriction: ['9', '10'], roleKeys: ['parent', 'student'], _csrf: admin.csrfToken });
+  assert.equal(saveRes.status, 302);
+
+  const updated = await db.prepare('SELECT * FROM forum_categories WHERE id = ?').get(category.id);
+  assert.equal(Number(updated.lock_by_grade), 1);
+  assert.equal(updated.grade_restriction, '3rd Grade,4th Grade');
+  assert.equal(Number(updated.lock_by_age), 1);
+  assert.equal(updated.age_restriction, '9,10');
+
+  const forums = require('../utils/forums');
+  const roleKeys = await forums.categoryRoleKeys(category.id);
+  assert.deepEqual(roleKeys.sort(), ['parent', 'student']);
+});
+
+// A real request: "if it is controlled by age or grade levels it will
+// only show up on the student and parent portals for those ages or
+// grades."
+test('Grade/age lock restricts access to family members matching, and implicitly to parent/student roles only', async () => {
+  const admin = await loginAsMainAdmin();
+  const category = await createCategory(admin, 'Grade Lock Enforcement Chat');
+  await request(app)
+    .post(`/main-admin/forums/${category.id}/settings`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ name: category.name, lockByGrade: 'on', gradeRestriction: ['5th Grade'], _csrf: admin.csrfToken });
+
+  const forums = require('../utils/forums');
+  const fullCategory = await db.prepare('SELECT * FROM forum_categories WHERE id = ?').get(category.id);
+
+  const matchingFamily = [{ id: 1, grade_level: '5th Grade' }];
+  const nonMatchingFamily = [{ id: 2, grade_level: '2nd Grade' }];
+
+  assert.equal(await forums.canAccessCategory(fullCategory, matchingFamily, ['parent']), true, 'a parent whose child matches the grade should see it');
+  assert.equal(await forums.canAccessCategory(fullCategory, nonMatchingFamily, ['parent']), false, 'a non-matching grade should be blocked');
+  assert.equal(await forums.canAccessCategory(fullCategory, matchingFamily, ['teacher']), false, 'grade/age-locked chats only show on Parent/Student portals, even with a matching grade');
+});
+
+test('Age lock restricts access to family members matching that exact age', async () => {
+  const admin = await loginAsMainAdmin();
+  const category = await createCategory(admin, 'Age Lock Enforcement Chat');
+  await request(app)
+    .post(`/main-admin/forums/${category.id}/settings`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ name: category.name, lockByAge: 'on', ageRestriction: ['10'], _csrf: admin.csrfToken });
+
+  const forums = require('../utils/forums');
+  const fullCategory = await db.prepare('SELECT * FROM forum_categories WHERE id = ?').get(category.id);
+  const tenYearsAgo = new Date();
+  tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
+  const eightYearsAgo = new Date();
+  eightYearsAgo.setFullYear(eightYearsAgo.getFullYear() - 8);
+
+  const matchingFamily = [{ id: 1, birthday: tenYearsAgo.toISOString().slice(0, 10) }];
+  const nonMatchingFamily = [{ id: 2, birthday: eightYearsAgo.toISOString().slice(0, 10) }];
+
+  assert.equal(await forums.canAccessCategory(fullCategory, matchingFamily, ['student']), true);
+  assert.equal(await forums.canAccessCategory(fullCategory, nonMatchingFamily, ['student']), false);
+});
+
+// A real request about "portal control" by itself, unrelated to any
+// age/grade lock.
+test('Show on (portal control) restricts a non-locked category to the selected roles only', async () => {
+  const admin = await loginAsMainAdmin();
+  const category = await createCategory(admin, 'Portal Control Only Chat');
+  await request(app)
+    .post(`/main-admin/forums/${category.id}/settings`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ name: category.name, roleKeys: ['teacher'], _csrf: admin.csrfToken });
+
+  const forums = require('../utils/forums');
+  const fullCategory = await db.prepare('SELECT * FROM forum_categories WHERE id = ?').get(category.id);
+  const anyFamily = [{ id: 1 }];
+
+  assert.equal(await forums.canAccessCategory(fullCategory, anyFamily, ['teacher']), true);
+  assert.equal(await forums.canAccessCategory(fullCategory, anyFamily, ['parent']), false);
+});

@@ -139,6 +139,9 @@ router.post('/:id/settings', async (req, res) => {
   const sectionIds = [].concat(req.body.sectionIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
   const familyIds = [].concat(req.body.familyIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
   const notifyMemberIds = [].concat(req.body.notifyMemberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  const roleKeys = [].concat(req.body.roleKeys || []);
+  const gradeRestriction = [].concat(req.body.gradeRestriction || []);
+  const ageRestriction = [].concat(req.body.ageRestriction || []);
   await forums.updateCategorySettings(req.params.id, {
     name,
     description: (req.body.description || '').trim(),
@@ -147,6 +150,11 @@ router.post('/:id/settings', async (req, res) => {
     moderatorMemberId: req.body.moderatorMemberId ? parseInt(req.body.moderatorMemberId, 10) : null,
     isSecure: req.body.isSecure === 'on',
     familyIds,
+    roleKeys,
+    lockByGrade: req.body.lockByGrade === 'on',
+    gradeRestriction,
+    lockByAge: req.body.lockByAge === 'on',
+    ageRestriction,
   });
   await forums.setSubscribers(req.params.id, notifyMemberIds);
   res.redirect(`/main-admin/forums/${req.params.id}/edit?notice=` + encodeURIComponent('Chat group settings updated.'));
@@ -228,8 +236,16 @@ router.get('/:id/edit', async (req, res) => {
   const subscriberIds = await forums.subscriberMemberIds(category.id);
   const allFamiliesList = await allFamilies();
   const allowedFamilyIds = await forums.allowedFamilyIds(category.id);
+  const roles = await db.prepare('SELECT key, label FROM roles ORDER BY label').all();
+  const categoryRoleKeys = await forums.categoryRoleKeys(category.id);
   res.render('admin-forums-category-edit', {
     title: `Edit ${category.name}`,
+    gradeOptions: forums.GRADE_OPTIONS,
+    selectedGrades: forums.parseAgeGroupList(category.grade_restriction),
+    ageOptions: forums.AGE_OPTIONS,
+    selectedAges: forums.parseAgeGroupList(category.age_restriction),
+    roles,
+    categoryRoleKeys,
     category,
     allSections,
     members,

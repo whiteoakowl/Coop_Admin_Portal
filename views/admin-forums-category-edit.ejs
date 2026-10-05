@@ -108,6 +108,46 @@
               }) %>
             <% } %>
           </div>
+          <%# A real request: "chat room settings and chat group
+              settings add clean dropdown menu for controlling and
+              selecting grade levels by checkbox. Another for select by
+              age level." Same lock-checkbox + checkbox-dropdown pattern
+              Events' own Lock by Age/Grade already uses. %>
+          <div class="member-form-full">
+            <span class="roster-checkbox-label">Grade Level <span class="hint">(leave all unchecked to allow every grade)</span></span>
+            <label class="checkbox-option"><input type="checkbox" name="lockByGrade" value="1" <%= category.lock_by_grade ? 'checked' : '' %> /> Lock to grade level</label>
+            <%- include('partials/multi-select-checkbox', {
+              name: 'gradeRestriction',
+              options: gradeOptions.map(function(g) { return { value: g, label: g }; }),
+              selected: selectedGrades,
+              placeholder: 'All grades',
+            }) %>
+          </div>
+          <div class="member-form-full">
+            <span class="roster-checkbox-label">Age <span class="hint">(leave all unchecked to allow every age)</span></span>
+            <label class="checkbox-option"><input type="checkbox" name="lockByAge" value="1" <%= category.lock_by_age ? 'checked' : '' %> /> Lock to age level</label>
+            <%- include('partials/multi-select-checkbox', {
+              name: 'ageRestriction',
+              options: ageOptions.map(function(a) { return { value: a, label: a }; }),
+              selected: selectedAges,
+              placeholder: 'All ages',
+            }) %>
+          </div>
+          <%# A real request: "one for portal control on where these
+              chat rooms can show up. If it is controlled by age or
+              grade levels it will only show up on the student and
+              parent portals for those ages or grades" - enforced in
+              utils/forums.js's own canAccessCategory regardless of
+              what's picked here. %>
+          <div class="member-form-full">
+            <span class="roster-checkbox-label">Show on <span class="hint">(leave all unchecked to show on every portal)</span></span>
+            <%- include('partials/multi-select-checkbox', {
+              name: 'roleKeys',
+              options: roles.map(function(r) { return { value: r.key, label: r.label }; }),
+              selected: categoryRoleKeys,
+              placeholder: 'Every portal',
+            }) %>
+          </div>
         </div>
       </div>
 

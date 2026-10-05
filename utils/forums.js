@@ -6,6 +6,8 @@ const db = require('../db');
 const { sanitizePostBody } = require('./sanitizeHtml');
 const { forumCategorySectionIds, sectionIdsForMember, memberSatisfiesRestriction } = require('./sections');
 const { formatChatTimestamp } = require('./dates');
+const { GRADE_OPTIONS, AGE_OPTIONS, parseAgeGroupList } = require('./events');
+const { ageFromBirthday } = require('./emailComposer');
 
 const CATEGORY_SELECT = `SELECT c.*, cl.class_name AS "class_name", mo.name AS "moderatorName"
    FROM forum_categories c
@@ -95,8 +97,22 @@ async function setSubscribers(categoryId, memberIds) {
 async function updateCategorySettings(id, data) {
   await db.withTransaction(async (tx) => {
     await tx
-      .prepare('UPDATE forum_categories SET name = ?, description = ?, allow_comments = ?, moderator_member_id = ?, is_secure = ? WHERE id = ?')
-      .run(data.name, data.description || null, data.allowComments ? 1 : 0, data.moderatorMemberId || null, data.isSecure ? 1 : 0, id);
+      .prepare(
+        `UPDATE forum_categories SET name = ?, description = ?, allow_comments = ?, moderator_member_id = ?, is_secure = ?,
+         lock_by_grade = ?, grade_restriction = ?, lock_by_age = ?, age_restriction = ? WHERE id = ?`
+      )
+      .run(
+        data.name,
+        data.description || null,
+        data.allowComments ? 1 : 0,
+        data.moderatorMemberId || null,
+        data.isSecure ? 1 : 0,
+        data.lockByGrade ? 1 : 0,
+        (data.gradeRestriction || []).join(','),
+        data.lockByAge ? 1 : 0,
+        (data.ageRestriction || []).join(','),
+        id
+      );
     await tx.prepare('DELETE FROM forum_category_sections WHERE category_id = ?').run(id);
     for (const sectionId of data.sectionIds || []) {
       await tx.prepare('INSERT INTO forum_category_sections (category_id, section_id) VALUES (?, ?) ON CONFLICT DO NOTHING').run(id, sectionId);
@@ -108,12 +124,23 @@ async function updateCategorySettings(id, data) {
     for (const familyId of data.familyIds || []) {
       await tx.prepare('INSERT INTO forum_category_families (category_id, family_id) VALUES (?, ?) ON CONFLICT DO NOTHING').run(id, familyId);
     }
+    // A real request: "one for portal control on where these chat
+    // rooms can show up."
+    await tx.prepare('DELETE FROM forum_category_roles WHERE category_id = ?').run(id);
+    for (const roleKey of data.roleKeys || []) {
+      await tx.prepare('INSERT INTO forum_category_roles (category_id, role_key) VALUES (?, ?) ON CONFLICT DO NOTHING').run(id, roleKey);
+    }
   });
 }
 
 async function allowedFamilyIds(categoryId) {
   const rows = await db.prepare('SELECT family_id FROM forum_category_families WHERE category_id = ?').all(categoryId);
   return new Set(rows.map((r) => r.family_id));
+}
+
+async function categoryRoleKeys(categoryId) {
+  const rows = await db.prepare('SELECT role_key FROM forum_category_roles WHERE category_id = ?').all(categoryId);
+  return rows.map((r) => r.role_key);
 }
 
 // A 'general' category is open to any signed-in account, any role
@@ -131,7 +158,8 @@ async function allowedFamilyIds(categoryId) {
 // the whole family the same way class access is, so a parent whose own
 // section membership differs from their enrolled child's still sees a
 // section-restricted class chat their child belongs to.
-async function canAccessCategory(category, family) {
+async function canAccessCategory(category, family, accountRoleKeys) {
+  const roleKeys = accountRoleKeys || [];
   if (category.scope === 'class') {
     const memberIds = family.map((m) => m.id);
     if (!memberIds.length) return false;
@@ -162,6 +190,33 @@ async function canAccessCategory(category, family) {
     const inFamily = family.some((m) => m.family_id != null && allowed.has(m.family_id));
     if (!inFamily) return false;
   }
+
+  // A real request: "add... one for portal control on where these chat
+  // rooms can show up. If it is controlled by age or grade levels it
+  // will only show up on the student and parent portals for those ages
+  // or grades." A grade/age lock implicitly narrows visibility to
+  // Parent/Student regardless of the portal-control list below, since
+  // an age/grade restriction is only meaningful for an enrolled student
+  // or their own parent.
+  const gradeOrAgeLocked = !!(category.lock_by_grade || category.lock_by_age);
+  if (gradeOrAgeLocked && !roleKeys.some((k) => k === 'parent' || k === 'student')) return false;
+  if (!gradeOrAgeLocked) {
+    const allowedRoles = await categoryRoleKeys(category.id);
+    if (allowedRoles.length > 0 && !roleKeys.some((k) => allowedRoles.includes(k))) return false;
+  }
+
+  // Same "any family member satisfies it unlocks access for the whole
+  // family" shape the section restriction above already uses - a parent
+  // whose own grade/age obviously doesn't apply still sees a chat their
+  // enrolled child qualifies for.
+  if (category.lock_by_grade) {
+    const allowed = parseAgeGroupList(category.grade_restriction);
+    if (allowed.length > 0 && !family.some((m) => allowed.includes(m.grade_level))) return false;
+  }
+  if (category.lock_by_age) {
+    const allowed = parseAgeGroupList(category.age_restriction);
+    if (allowed.length > 0 && !family.some((m) => { const age = ageFromBirthday(m.birthday); return age != null && allowed.includes(String(age)); })) return false;
+  }
   return true;
 }
 
@@ -173,11 +228,11 @@ function isCategoryModerator(category, memberId) {
   return !!memberId && category.moderator_member_id === memberId;
 }
 
-async function accessibleCategories(family) {
+async function accessibleCategories(family, accountRoleKeys) {
   const all = await listCategories();
   const out = [];
   for (const c of all) {
-    if (await canAccessCategory(c, family)) out.push(c);
+    if (await canAccessCategory(c, family, accountRoleKeys)) out.push(c);
   }
   return out;
 }
@@ -348,6 +403,10 @@ module.exports = {
   deleteCategory,
   updateCategorySettings,
   allowedFamilyIds,
+  categoryRoleKeys,
+  GRADE_OPTIONS,
+  AGE_OPTIONS,
+  parseAgeGroupList,
   subscriberMemberIds,
   setSubscribers,
   canAccessCategory,

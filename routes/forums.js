@@ -52,7 +52,7 @@ async function loadCategory(req, res, next) {
   const category = await forums.getCategory(req.params.categoryId);
   if (!category) return res.status(404).render('404', { title: 'Not Found' });
   const family = await familyForAccount(req.portalAccount.id);
-  if (!(await forums.canAccessCategory(category, family))) {
+  if (!(await forums.canAccessCategory(category, family, req.portalRoles.map((r) => r.key)))) {
     return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have access to this chat.", backHref: '/forums', backLabel: 'Back to Chat' });
   }
   req.category = category;
@@ -67,7 +67,7 @@ async function loadThread(req, res, next) {
   if (!thread) return res.status(404).render('404', { title: 'Not Found' });
   const category = await forums.getCategory(thread.category_id);
   const family = await familyForAccount(req.portalAccount.id);
-  if (!(await forums.canAccessCategory(category, family))) {
+  if (!(await forums.canAccessCategory(category, family, req.portalRoles.map((r) => r.key)))) {
     return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have access to this chat.", backHref: '/forums', backLabel: 'Back to Chat' });
   }
   req.thread = thread;
@@ -77,7 +77,7 @@ async function loadThread(req, res, next) {
 
 router.get('/', async (req, res) => {
   const family = await familyForAccount(req.portalAccount.id);
-  const categories = await forums.accessibleCategories(family);
+  const categories = await forums.accessibleCategories(family, req.portalRoles.map((r) => r.key));
   res.render('forums-list', { title: 'Chat', categories });
 });
 
