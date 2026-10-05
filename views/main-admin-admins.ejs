@@ -28,8 +28,16 @@
     <%- include('partials/main-admin-settings-tabs', { activeSettingsTab: 'admins' }) %>
     <div class="grid-box-header">
       <h1>Admins</h1>
-      <div class="roster-btn-row no-print">
-        <button type="button" class="primary-btn" onclick="document.getElementById('add-position-dialog').showModal()">Add/Edit Admin Position</button>
+      <%# A real request: "buttons should be similar size to other pages
+          and fit on the same row side by side. Height of button should
+          be the same." Add/Edit Admin Position used .primary-btn (a
+          taller, differently-padded button) next to Print's own
+          .roster-action-btn - same fix already established elsewhere in
+          this app (e.g. Members' own + Add Member button): switch to
+          .roster-action-btn so every button here shares one height/size
+          system. %>
+      <div class="roster-btn-row roster-btn-row-fit-text no-print">
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-position-dialog').showModal()">Add/Edit Admin Position</button>
         <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
       </div>
     </div>
@@ -40,8 +48,11 @@
     <% if (rows.length === 0) { %>
       <p class="hint">No admin positions added yet.</p>
     <% } else { %>
+      <%# A real request: "shrink admin table on mobile so that all
+          information still fits clean on one row but you can see all
+          of it at once." %>
       <div class="roster-scroll">
-      <table class="roster-table">
+      <table class="roster-table condensed-table admins-table">
         <thead><tr><th>Admin Position</th><th>Admin Name</th><th>Phone</th><th>Email</th><th></th></tr></thead>
         <tbody>
           <% rows.forEach(function(row) { %>
@@ -97,7 +108,11 @@
 
     <% adminPositions.forEach(function(p) { %>
       <dialog id="edit-position-dialog-<%= p.id %>" class="member-picker-dialog role-permissions-dialog">
-        <form method="POST" action="/main-admin/admins/positions/<%= p.id %>/update">
+        <%# A real request: "correct spacing between titles and
+            features." admin-edit-dialog-spacing gives this one dialog's
+            own title/field/section gaps a bit more room than the
+            default .member-picker-dialog spacing (styles.css). %>
+        <form method="POST" action="/main-admin/admins/positions/<%= p.id %>/update" class="admin-edit-dialog-spacing">
           <h3><%= p.title %></h3>
           <label for="edit-position-member-<%= p.id %>">Member
             <select id="edit-position-member-<%= p.id %>" name="memberId">
@@ -107,6 +122,12 @@
               <% }); %>
             </select>
           </label>
+          <%# A real request: "editing admin, email box should be under
+              the title email" - Email's own input sits directly under
+              its own "Email" label/title, same as every field here;
+              admin-edit-dialog-spacing's extra margin keeps that
+              relationship visually unambiguous instead of reading as
+              crowded against the Member field above it. %>
           <label for="edit-position-email-<%= p.id %>">Email
             <input id="edit-position-email-<%= p.id %>" type="email" name="email" placeholder="Chosen member's email" />
           </label>

@@ -4740,7 +4740,36 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .condensed-table th, .condensed-table td { padding: 0.4rem 0.6rem; }
 
+/* Event editing's own Registrations table (views/admin-events-
+   registrations.ejs) - a real request: "column titles should be two
+   rows to condense." .roster-table's own base th/td is white-space:
+   nowrap (every single-word header stays on one line, which is fine) -
+   this allows the <br> each multi-word header now has to actually
+   break, and caps those headers' width so the column shrinks to match
+   instead of just wrapping within whatever width nowrap already forced.
+   Same request: "shrink everything on the table list of signed up
+   members on mobile to better view everything on one screen" - a
+   smaller base font and tighter cell padding than .condensed-table's
+   own already-reduced padding, scoped to this one table so other,
+   already-fine condensed tables elsewhere are untouched. */
+.registrations-table th { white-space: normal; max-width: 5rem; vertical-align: bottom; }
+.registrations-table .roster-name-col { white-space: nowrap; max-width: none; }
+@media (max-width: 640px) {
+  .registrations-table { font-size: 0.78rem; }
+  .registrations-table th, .registrations-table td { padding: 0.3rem 0.4rem; }
+}
+
 /* ---------- Settings ---------- */
+
+/* Main Admin Settings > Admins - a real request: "shrink admin table on
+   mobile so that all information still fits clean on one row but you
+   can see all of it at once." Same mobile-only compacting treatment as
+   .registrations-table above. */
+.roster-scroll:has(.admins-table) { margin-top: 1rem; }
+@media (max-width: 640px) {
+  .admins-table { font-size: 0.78rem; }
+  .admins-table th, .admins-table td { padding: 0.3rem 0.4rem; }
+}
 
 .settings-account-grid { display: flex; gap: 1.5rem; flex-wrap: wrap; }
 .settings-account-grid .stack-form-narrow {
@@ -6842,6 +6871,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .member-picker-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
 .member-picker-dialog h3 { margin: 0 0 0.75rem; }
 .member-picker-dialog .hint { margin: 0 0 0.5rem; }
+
+/* Main Admin Settings > Admins' own edit-position dialog - a real
+   request: "correct spacing between titles and features" (and "email
+   box should be under the title email" - the Email field already sits
+   directly under its own label, this just keeps that relationship from
+   reading as crowded against the Member field above it). Gives each
+   label/field a bit more breathing room than the default .member-
+   picker-dialog spacing, plus real separation before the "Roles &
+   Permissions" section instead of it butting straight up against Phone. */
+.admin-edit-dialog-spacing label { margin-bottom: 0.9rem; }
+.admin-edit-dialog-spacing h4 { margin: 1.25rem 0 0.35rem; }
 
 /* Edit Families dialog (#edit-families-dialog) - one row per family: an
    inline rename form (text input + Save), its live member count, and a
@@ -9859,6 +9899,11 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .portal-dashboard-section h2 { font-size: 1.2rem; color: var(--ink); margin-bottom: 0.75rem; }
 
 .main-admin-role-list { display: flex; flex-direction: column; gap: 1.25rem; }
+/* A real request: "each portal card should have a centered title,
+   portal key listed stacked underneath in next row." Scoped to this one
+   list (not .portal-dashboard-card itself, shared by every portal's own
+   home dashboard, left/top-aligned there by design). */
+.main-admin-portal-permissions-card { align-items: center; text-align: center; }
 .permission-checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.5rem 1rem; margin: 0.75rem 0 1rem; }
 /* A real request: "click on each admin title and then there will be a
    popup to check which permissions that admin may have." At

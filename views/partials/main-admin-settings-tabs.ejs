@@ -1,44 +1,13 @@
 <%
-// Sub-tab bar for Main Admin's Settings area (reached via the gear icon
-// - views/partials/portal-nav.ejs's settingsHref, routes/main-admin.js's
-// /settings redirect). Admins, Website, FAQ, and Quick Links are real
-// separate pages/routes under the hood (unchanged), not panels of one
-// shared template - this is just the tab strip every one of them
-// includes at the top of <main> so switching between them still reads as
-// one settings area. `activeSettingsTab` local: 'admins' | 'website' |
-// 'faq' | 'quicklinks'.
-//
-// A real request: "make every member a user... take away user settings.
-// all members will have accounts." The standalone Users tab (account
-// list + role editor) is gone - every member already has an account
-// managed from their own profile (routes/main-admin-members.js), and
-// membership/account approval already has its own home at Members >
-// Approvals (utils/membershipApprovals.js).
-//
-// A later real request folded admin-position permission editing into
-// this same Admins page: "you can click on each admin position... the
-// roles and permissions are listed below... we won't need a separate
-// roles/permissions tab under settings." /main-admin/roles itself is
-// unchanged and still reachable directly - it still owns the
-// permissions granted to every OTHER role (teacher, parent, coop_admin),
-// unrelated to admin positions - it's just no longer linked from this
-// tab strip, since managing an admin position's own permissions never
-// needs it anymore.
+// Shared header for every page under Main Admin's Settings area (reached
+// via the gear icon - views/main-admin-settings-hub.ejs's own card grid).
+// A real request: "every time you click on a subpage 4 tabs pop up still
+// on each page. There should only be a back link with arrow that says
+// back to settings menu." Replaces the old 4-tab strip (Admins/Website/
+// FAQ/Quick Links) - that strip never even covered every page it was on
+// (Roles & Permissions included it with none of the 4 ever active) and
+// duplicated the real navigation the Settings hub's own card grid already
+// provides. activeSettingsTab is no longer read by this partial, but
+// every caller still passes it harmlessly.
 %>
-<div class="view-tabs">
-  <%# A real request: "co-op admin portal. settings gear, admins tab.
-      this tab should be located under the main admin portal settings
-      gear as a tab. it should not be on co-op admin portal." Moved from
-      Co-op Admin's own Settings (routes/admin.js used to have a
-      'leaders' tab there) - unchanged otherwise, still just the Admin
-      Positions/Leaders manager (utils/adminPositions.js). %>
-  <a class="view-tab<%= activeSettingsTab === 'admins' ? ' active' : '' %>" href="/main-admin/admins">Admins</a>
-  <a class="view-tab<%= activeSettingsTab === 'website' ? ' active' : '' %>" href="/main-admin/website">Website</a>
-  <%# A real request: "faq should be it's own tab under settings, not
-      under website tab." Split out of the Website page (routes/main-
-      admin.js used to render it as one more section on that same page) -
-      unchanged CRUD/data (utils' own faqs table), just its own tab/route
-      now. %>
-  <a class="view-tab<%= activeSettingsTab === 'faq' ? ' active' : '' %>" href="/main-admin/faq">FAQ</a>
-  <a class="view-tab<%= activeSettingsTab === 'quicklinks' ? ' active' : '' %>" href="/main-admin/quick-links">Quick Links</a>
-</div>
+<p class="subtitle no-print"><a href="/main-admin/settings">&larr; Back to Settings Menu</a></p>

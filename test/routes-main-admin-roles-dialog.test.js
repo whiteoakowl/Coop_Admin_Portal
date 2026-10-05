@@ -38,24 +38,35 @@ async function loginAsMainAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
-test('Roles & Permissions: each non-Main-Admin role has a clickable title opening its own dialog with Save/Close, not an always-visible grid', async () => {
+test('Portal Permissions: each non-Main-Admin role has a centered title, portal key underneath, and a "View" button opening its own dialog with Save/Close', async () => {
   const cookie = await loginAsMainAdmin();
   const res = await request(app).get('/main-admin/roles').set('Cookie', cookie);
   assert.equal(res.status, 200);
+  assert.match(res.text, /<h1>Portal Permissions<\/h1>/);
 
   const role = await db.prepare("SELECT * FROM roles WHERE key != 'main_admin' LIMIT 1").get();
   assert.ok(role, 'expected at least one non-Main-Admin role to exist');
 
-  // The title itself is the trigger - a plain-link-styled button, not a
-  // static heading, and it opens THIS role's own dialog by id.
-  const titleBtnRe = new RegExp(
-    `<button type="button" class="member-name-link" onclick="document\\.getElementById\\('role-permissions-dialog-${role.id}'\\)\\.showModal\\(\\)">${role.label}</button>`
+  // A real request: "each portal card should have a centered title,
+  // portal key listed stacked underneath in next row." The title is now
+  // a plain heading (not the dialog trigger itself) - a separate "View"
+  // button opens this role's own dialog by id.
+  const cardRe = new RegExp(
+    `<section class="portal-dashboard-card main-admin-portal-permissions-card">\\s*<h2>${role.label}</h2>\\s*<p class="hint">portal key: ${role.key}</p>`
   );
-  assert.match(res.text, titleBtnRe);
+  assert.match(res.text, cardRe);
+  const viewBtnRe = new RegExp(`<button type="button" class="roster-action-btn" onclick="document\\.getElementById\\('role-permissions-dialog-${role.id}'\\)\\.showModal\\(\\)">View</button>`);
+  assert.match(res.text, viewBtnRe);
 
   const dialogMatch = new RegExp(`<dialog id="role-permissions-dialog-${role.id}"[^]*?</dialog>`).exec(res.text);
   assert.ok(dialogMatch, 'expected this role to have its own dialog');
   const dialogHtml = dialogMatch[0];
+  // A real request: "it says view, not manage. Portals will not have
+  // management controls. Only admins." Same editable checkboxes/Save as
+  // before (only an account with manage_roles can even reach this page)
+  // - just worded as viewing a portal's pages rather than "managing
+  // permissions".
+  assert.match(dialogHtml, new RegExp(`<h3>View ${role.label}'s Pages</h3>`));
   assert.match(dialogHtml, /class="permission-checkbox-grid"/);
   assert.match(dialogHtml, new RegExp(`action="/main-admin/roles/${role.id}/permissions"`));
   assert.match(dialogHtml, /<button type="button" class="btn-secondary" onclick="this\.closest\('dialog'\)\.close\(\)">Close<\/button>/);

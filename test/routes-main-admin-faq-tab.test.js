@@ -38,17 +38,21 @@ async function loginAsMainAdmin() {
   return { cookie, csrfToken };
 }
 
-test('FAQ has its own Settings tab, separate from Website', async () => {
+test('FAQ has its own Settings page, separate from Website', async () => {
   const { cookie } = await loginAsMainAdmin();
 
-  const settingsTabs = await request(app).get('/main-admin/faq').set('Cookie', cookie);
-  assert.equal(settingsTabs.status, 200);
-  assert.match(settingsTabs.text, /<a class="view-tab active" href="\/main-admin\/faq">FAQ<\/a>/);
+  // A later real request replaced the old 4-tab strip (Admins/Website/
+  // FAQ/Quick Links) shared across these pages with a plain "Back to
+  // Settings Menu" link: "every time you click on a subpage 4 tabs pop
+  // up still on each page. There should only be a back link."
+  const faqPage = await request(app).get('/main-admin/faq').set('Cookie', cookie);
+  assert.equal(faqPage.status, 200);
+  assert.match(faqPage.text, /<a href="\/main-admin\/settings">&larr; Back to Settings Menu<\/a>/);
 
   const websitePage = await request(app).get('/main-admin/website').set('Cookie', cookie);
   assert.equal(websitePage.status, 200);
   assert.doesNotMatch(websitePage.text, />FAQs</, 'FAQ section should no longer render on the Website page');
-  assert.match(websitePage.text, /<a class="view-tab" href="\/main-admin\/faq">FAQ<\/a>/, 'the Website page still offers the FAQ tab to switch to');
+  assert.match(websitePage.text, /<a href="\/main-admin\/settings">&larr; Back to Settings Menu<\/a>/);
 });
 
 test('adding and deleting an FAQ works through the new /main-admin/faq routes', async () => {

@@ -56,7 +56,10 @@ test('Main Admin Settings: Admins tab', async (t) => {
   await t.test('the tab is offered and starts empty', async () => {
     const res = await request(app).get('/main-admin/admins').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, />Admins<\/a>/);
+    // A real request: "every time you click on a subpage 4 tabs pop up
+    // still on each page. There should only be a back link with arrow
+    // that says back to settings menu." Replaced the old 4-tab strip.
+    assert.match(res.text, /<a href="\/main-admin\/settings">&larr; Back to Settings Menu<\/a>/);
     assert.match(res.text, /No admin positions added yet\./);
   });
 
@@ -81,7 +84,7 @@ test('Main Admin Settings: Admins tab', async (t) => {
   // left out.
   await t.test('the Admin Positions table is wrapped in a horizontally-scrollable container, not left to overflow the page', async () => {
     const res = await request(app).get('/main-admin/admins').set('Cookie', cookie);
-    assert.match(res.text, /<div class="roster-scroll">\s*<table class="roster-table">/);
+    assert.match(res.text, /<div class="roster-scroll">\s*<table class="roster-table condensed-table admins-table">/);
   });
 
   await t.test('the new position shows up in the (Co-op Admin) member edit form dropdown', async () => {

@@ -45,11 +45,20 @@ test('GET /main-admin/settings renders a card for every settings-area destinatio
   assert.equal(res.status, 200);
   assert.match(res.text, /<h1>Settings<\/h1>/);
 
-  assert.match(res.text, /href="\/main-admin\/roles"[^]*?Roles &amp; Permissions/);
+  // A real request: "roles and permissions should be called portal
+  // permissions."
+  assert.match(res.text, /href="\/main-admin\/roles"[^]*?Portal Permissions/);
   assert.match(res.text, /href="\/main-admin\/admins"[^]*?Admins/);
   assert.match(res.text, /href="\/main-admin\/website"[^]*?Website/);
   assert.match(res.text, /href="\/main-admin\/faq"[^]*?FAQ/);
   assert.match(res.text, /href="\/main-admin\/quick-links"[^]*?Quick Links/);
   assert.match(res.text, /href="\/main-admin\/audit-log"[^]*?Audit Log/);
-  assert.match(res.text, /href="\/admin"[^]*?Co-op Admin Portal/);
+
+  // A real request: "co-op admin portal link should not be a tab card
+  // under main admin gear settings." (the portal-switcher's own,
+  // unrelated "Co-op Admin Portal" link elsewhere in the nav shell is
+  // untouched - this only checks the settings hub's own card grid.)
+  const gridMatch = /<div class="team-card-grid">([\s\S]*?)<\/div>\s*<\/main>/.exec(res.text);
+  assert.ok(gridMatch, 'expected the settings hub card grid');
+  assert.doesNotMatch(gridMatch[1], /Co-op Admin Portal/);
 });

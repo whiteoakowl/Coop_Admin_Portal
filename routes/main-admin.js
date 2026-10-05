@@ -273,7 +273,7 @@ router.get('/roles', requirePortalPermission('manage_roles'), async (req, res) =
   const grants = await db.prepare('SELECT role_id, permission_id FROM role_permissions').all();
   const grantedKey = new Set(grants.map((g) => `${g.role_id}:${g.permission_id}`));
 
-  res.render('main-admin-roles', { title: 'Roles & Permissions', roles, permissions, grantedKey: [...grantedKey], notice: req.query.notice || null });
+  res.render('main-admin-roles', { title: 'Portal Permissions', roles, permissions, grantedKey: [...grantedKey], notice: req.query.notice || null });
 });
 
 router.post('/roles/:id/permissions', requirePortalPermission('manage_roles'), async (req, res) => {
@@ -324,22 +324,45 @@ router.post('/website/announcements/:id/delete', requirePortalPermission('manage
 // tab.") ---
 
 router.get('/faq', requirePortalPermission('manage_website'), async (req, res) => {
-  const faqs = await db.prepare('SELECT * FROM faqs ORDER BY position, id').all();
-  res.render('main-admin-faq', { title: 'FAQ', faqs, notice: req.query.notice || null });
+  const faqs = await db.prepare('SELECT f.*, c.name AS "categoryName" FROM faqs f LEFT JOIN faq_categories c ON c.id = f.category_id ORDER BY f.position, f.id').all();
+  const categories = await db.prepare('SELECT * FROM faq_categories ORDER BY name').all();
+  res.render('main-admin-faq', { title: 'FAQ', faqs, categories, notice: req.query.notice || null });
 });
 
 router.post('/faq/add', requirePortalPermission('manage_website'), async (req, res) => {
   const question = (req.body.question || '').trim();
   const answer = (req.body.answer || '').trim();
   if (!question || !answer) return res.redirect('/main-admin/faq?notice=' + encodeURIComponent('Question and answer are required.'));
+  const categoryId = req.body.categoryId ? parseInt(req.body.categoryId, 10) : null;
   const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM faqs').get()).p) + 1;
-  await db.prepare('INSERT INTO faqs (question, answer, position) VALUES (?, ?, ?)').run(question, answer, position);
+  await db.prepare('INSERT INTO faqs (question, answer, position, category_id) VALUES (?, ?, ?, ?)').run(question, answer, position, categoryId);
   res.redirect('/main-admin/faq?notice=' + encodeURIComponent('FAQ added.'));
 });
 
 router.post('/faq/:id/delete', requirePortalPermission('manage_website'), async (req, res) => {
   await db.prepare('DELETE FROM faqs WHERE id = ?').run(req.params.id);
   res.redirect('/main-admin/faq?notice=' + encodeURIComponent('FAQ removed.'));
+});
+
+// "Add/Edit Category" popup - same shape as the Shop's own
+// POST /store/categories/bulk-save (routes/admin-store.js): one submit
+// renames every changed row (categoryId[i]/categoryName[i] parallel
+// arrays) and, if filled in, also creates the new category.
+router.post('/faq/categories/bulk-save', requirePortalPermission('manage_website'), async (req, res) => {
+  const ids = [].concat(req.body.categoryId || []);
+  const names = [].concat(req.body.categoryName || []);
+  for (let i = 0; i < ids.length; i++) {
+    const name = (names[i] || '').trim();
+    if (name) await db.prepare('UPDATE faq_categories SET name = ? WHERE id = ?').run(name, ids[i]);
+  }
+  const newName = (req.body.newCategoryName || '').trim();
+  if (newName) await db.prepare('INSERT INTO faq_categories (name) VALUES (?)').run(newName);
+  res.redirect('/main-admin/faq?notice=' + encodeURIComponent('Categories saved.'));
+});
+
+router.post('/faq/categories/:id/delete', requirePortalPermission('manage_website'), async (req, res) => {
+  await db.prepare('DELETE FROM faq_categories WHERE id = ?').run(req.params.id);
+  res.redirect('/main-admin/faq?notice=' + encodeURIComponent('Category removed.'));
 });
 
 // --- Academics: diplomas + transcripts (utils/academics.js) ---

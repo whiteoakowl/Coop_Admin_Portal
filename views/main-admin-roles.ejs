@@ -10,26 +10,35 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <%- include('partials/main-admin-settings-tabs', { activeSettingsTab: 'roles' }) %>
-    <h1>Roles &amp; Permissions</h1>
-    <p class="hint">Each role grants access to its own portal, plus whichever capabilities are checked below. Main Admin's own permissions are locked to everything - it's the platform's control center.</p>
+    <%# A real request: "roles and permissions should be called portal
+        permissions." %>
+    <h1>Portal Permissions</h1>
+    <p class="hint">View what each portal can access. Main Admin's own permissions are locked to everything - it's the platform's control center.</p>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <div class="main-admin-role-list">
       <% roles.forEach(function(role) { %>
-        <section class="portal-dashboard-card">
+        <section class="portal-dashboard-card main-admin-portal-permissions-card">
+          <%# A real request: "each portal card should have a centered
+              title, portal key listed stacked underneath in next row." %>
+          <h2><%= role.label %></h2>
+          <p class="hint">portal key: <%= role.key %></p>
           <% if (role.key === 'main_admin') { %>
-            <h2><%= role.label %> <span class="hint">&middot; portal key: <%= role.key %></span></h2>
             <p class="hint">Main Admin always has every permission.</p>
           <% } else { %>
-            <h2>
-              <button type="button" class="member-name-link" onclick="document.getElementById('role-permissions-dialog-<%= role.id %>').showModal()"><%= role.label %></button>
-              <span class="hint">&middot; portal key: <%= role.key %></span>
-            </h2>
+            <%# A real request: "when you click it shows all of the pages
+                but it says view, not manage. Portals will not have
+                management controls. Only admins." Still the exact same
+                editable checkbox grid + Save (only Main Admin can even
+                reach this page at all, via the manage_roles permission
+                gate) - just worded as viewing/checking which pages a
+                portal can reach rather than "managing permissions". %>
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('role-permissions-dialog-<%= role.id %>').showModal()">View</button>
 
             <dialog id="role-permissions-dialog-<%= role.id %>" class="member-picker-dialog role-permissions-dialog">
               <form method="POST" action="/main-admin/roles/<%= role.id %>/permissions">
-                <h3><%= role.label %> Permissions</h3>
+                <h3>View <%= role.label %>'s Pages</h3>
                 <div class="permission-checkbox-grid">
                   <% permissions.forEach(function(perm) { %>
                     <label class="checkbox-option" title="<%= perm.description || '' %>">

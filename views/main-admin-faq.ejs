@@ -20,12 +20,28 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <section class="portal-dashboard-card portal-dashboard-card-wide">
+      <%# A real request: "faq, question answer and choose category.
+          Button with popup for add/edit category." Same Add/Edit
+          Category popup shape as the Shop's own (views/admin-store-
+          list.ejs) - categoryId here is optional, never required, same
+          as a Shop product can stay uncategorized. %>
+      <div class="roster-btn-row no-print">
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-faq-category-dialog').showModal()">Add/Edit Category</button>
+      </div>
       <form method="POST" action="/main-admin/faq/add" class="member-form-grid">
         <label class="member-form-full">Question
           <input type="text" name="question" required />
         </label>
         <label class="member-form-full">Answer
           <textarea name="answer" rows="2" required></textarea>
+        </label>
+        <label class="member-form-full">Category
+          <select name="categoryId">
+            <option value="">No category</option>
+            <% categories.forEach(function(c) { %>
+              <option value="<%= c.id %>"><%= c.name %></option>
+            <% }); %>
+          </select>
         </label>
         <div class="member-form-full">
           <button type="submit" class="roster-action-btn">Add FAQ</button>
@@ -37,7 +53,7 @@
         <div class="site-faq-list">
           <% faqs.forEach(function(faq) { %>
             <details class="site-faq-item">
-              <summary><%= faq.question %></summary>
+              <summary><%= faq.question %><% if (faq.categoryName) { %> <span class="badge-pill"><%= faq.categoryName %></span><% } %></summary>
               <p><%= faq.answer %></p>
               <form method="POST" action="/main-admin/faq/<%= faq.id %>/delete" data-confirm="Delete this FAQ?">
                 <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
@@ -47,6 +63,35 @@
         </div>
       <% } %>
     </section>
+
+    <dialog id="add-faq-category-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/faq/categories/bulk-save">
+        <h3>Add/Edit Category</h3>
+        <% if (categories.length === 0) { %>
+          <p class="hint">No categories yet &mdash; add one below.</p>
+        <% } else { %>
+          <div class="store-category-list">
+            <% categories.forEach(function(c) { %>
+              <div class="store-category-row">
+                <input type="hidden" name="categoryId" value="<%= c.id %>" />
+                <input type="text" name="categoryName" value="<%= c.name %>" required />
+                <button type="submit" form="delete-faq-category-<%= c.id %>-form" class="icon-btn icon-btn-danger" aria-label="Delete <%= c.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+        <label for="add-faq-category-name">New Category
+          <input id="add-faq-category-name" type="text" name="newCategoryName" placeholder="e.g. Scheduling" />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </form>
+      <% categories.forEach(function(c) { %>
+        <form method="POST" action="/main-admin/faq/categories/<%= c.id %>/delete" id="delete-faq-category-<%= c.id %>-form" data-confirm="Delete category &quot;<%= c.name %>&quot;? Its FAQs become uncategorized."></form>
+      <% }); %>
+    </dialog>
   </main>
 </body>
 </html>
