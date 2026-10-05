@@ -5,3 +5,4 @@ data/
 public/uploads/
 public/uploads-restore-pending/
 private-uploads/
+scripts/backfill-coop-sections-fall2026.js
