@@ -91,13 +91,15 @@ test('Settings tab renders the new yes/no question list, grade/age locks, and se
 
   // A later real request: "make two bold text titled sections for the
   // check boxes... Close signups check box should be by itself above
-  // registration settings." Close Event is its own lone checkbox-group;
-  // Registration Settings and General Settings are the two bold-titled
-  // (.roster-checkbox-label) sections after it.
+  // registration settings." Close Event and (a still later request) Is
+  // this a public event? share that same standalone lead-in group, ahead
+  // of the two bold-titled (.roster-checkbox-label) sections after it.
   const closeGroupMatch = /checkbox-group checkbox-group-stack">([\s\S]*?)<\/div>\s*<div class="member-form-full">\s*<span class="roster-checkbox-label">Registration Settings/.exec(page.text);
   assert.ok(closeGroupMatch, 'expected a standalone checkbox-group ending right before the Registration Settings heading');
   assert.match(closeGroupMatch[1], /> Close event\?/);
-  assert.doesNotMatch(closeGroupMatch[1], /Is this a public event/, 'Close Event should be alone, not grouped with the others');
+  // A real request: "is this a public event check box should be at the
+  // top next to close event."
+  assert.match(closeGroupMatch[1], /<input type="checkbox" name="isPublicEvent" value="1"[^>]*\/> Is this a public event\?/);
 
   const regGroupMatch = /Registration Settings<\/span>\s*<div class="checkbox-group checkbox-group-stack">([\s\S]*?)<\/div>/.exec(page.text);
   assert.ok(regGroupMatch, 'expected the Registration Settings checkbox-group');
@@ -108,7 +110,9 @@ test('Settings tab renders the new yes/no question list, grade/age locks, and se
     'Allow registrants to view a list of others who have signed up',
     'Allow registrants to "Sign Up For" on behalf of other families in your group',
     'Allow children access to the signup page?',
-    'Allow registration on behalf of people outside your group',
+    // A real request: "all registration on behalf of people outside the
+    // group should say, allow non members guests to register."
+    'Allow non-members (guests) to register',
     'Allow waiting list signups (only applicable when Max Allowed is reached)',
   ].forEach((question) => {
     const pattern = question.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -126,11 +130,12 @@ test('Settings tab renders the new yes/no question list, grade/age locks, and se
   const generalGroupMatch = /General Settings<\/span>\s*<div class="checkbox-group checkbox-group-stack">([\s\S]*?)<\/div>/.exec(page.text);
   assert.ok(generalGroupMatch, 'expected the General Settings checkbox-group');
   const generalGroup = generalGroupMatch[1];
-  ['Is this a public event?', 'Allow refunds when a member cancels their registration?', 'Allow registration cancellations?'].forEach((question) => {
+  // "Is this a public event?" moved up to the standalone Close Event
+  // group (checked above), so it's no longer here.
+  ['Allow refunds when a member cancels their registration?', 'Allow registration cancellations?'].forEach((question) => {
     assert.match(generalGroup, new RegExp(question.replace(/[?]/g, '\\?')), `expected "${question}" in the General Settings checkbox-group`);
   });
-  // Each question is checkbox-first, text after (checkbox on the left).
-  assert.match(generalGroup, /<input type="checkbox" name="isPublicEvent" value="1"[^>]*\/> Is this a public event\?/);
+  assert.doesNotMatch(generalGroup, /Is this a public event/);
   assert.doesNotMatch(page.text, /Who Can Register/, 'the old standalone section should be gone');
 
   // A real request: "under individual event settings, there should be a
@@ -148,7 +153,18 @@ test('Settings tab renders the new yes/no question list, grade/age locks, and se
   assert.match(page.text, /name="ageGroupRestriction" value="100"/);
   assert.match(page.text, /> Lock registration to section</);
   assert.match(page.text, /> Lock registration to only be viewable to one section</);
-  assert.match(page.text, new RegExp(`<option value="${section.id}"[^>]*>Redesign Section</option>`));
+  // A real request: "lock registration to section should look just like
+  // the lock by age feature. Same dropdown menu with check boxes" - the
+  // old plain <select>/<option> is gone, replaced by the same checkbox-
+  // dropdown widget Lock by Age/Grade already use (still single-valued
+  // underneath - singleSelect: true on the shared partial).
+  assert.doesNotMatch(page.text, /<option value="[^"]*">Redesign Section<\/option>/);
+  assert.match(page.text, new RegExp(`name="registrationSectionId" value="${section.id}"[^>]*/>\\s*Redesign Section`));
+  assert.match(page.text, new RegExp(`name="visibilitySectionId" value="${section.id}"[^>]*/>\\s*Redesign Section`));
+  // The old broad "Sections" block (giant checkbox pills + its own bold
+  // title above them) is gone entirely.
+  assert.doesNotMatch(page.text, /name="sectionIds"/);
+  assert.doesNotMatch(page.text, /restricts BOTH viewing and registering/);
 });
 
 test('saving Settings: isPublicEvent controls visibility (moved from Details), and the new booleans persist', async () => {

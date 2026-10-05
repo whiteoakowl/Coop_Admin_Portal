@@ -861,9 +861,12 @@
       // doesn't exist yet either).
       %>
       <div class="manage-section">
-        <form method="POST" action="/main-admin/events/<%= event.id %>/permissions" class="member-form-grid">
+        <form method="POST" action="/main-admin/events/<%= event.id %>/permissions" class="member-form-grid event-settings-form">
+          <%# A real request: "is this a public event check box should be
+              at the top next to close event." %>
           <div class="member-form-full checkbox-group checkbox-group-stack">
             <label class="checkbox-option"><input type="checkbox" name="isClosed" value="1" <%= event.is_closed ? 'checked' : '' %> /> Close event?</label>
+            <label class="checkbox-option"><input type="checkbox" name="isPublicEvent" value="1" <%= event.visibility === 'public' ? 'checked' : '' %> /> Is this a public event?</label>
           </div>
 
           <div class="member-form-full">
@@ -879,7 +882,7 @@
               <label class="checkbox-option"><input type="checkbox" name="allowSignupForOthersInGroup" value="1" <%= event.allow_signup_for_others_in_group ? 'checked' : '' %> /> Allow registrants to "Sign Up For" on behalf of other families in your group</label>
               <input type="hidden" name="allowChildRegister" value="off" />
               <label class="checkbox-option"><input type="checkbox" name="allowChildRegister" value="1" <%= event.allow_child_register ? 'checked' : '' %> /> Allow children access to the signup page?</label>
-              <label class="checkbox-option"><input type="checkbox" name="allowGuestRegister" value="1" <%= event.allow_guest_register ? 'checked' : '' %> /> Allow registration on behalf of people outside your group</label>
+              <label class="checkbox-option"><input type="checkbox" name="allowGuestRegister" value="1" <%= event.allow_guest_register ? 'checked' : '' %> /> Allow non-members (guests) to register</label>
               <input type="hidden" name="allowWaitlistSignups" value="off" />
               <label class="checkbox-option"><input type="checkbox" name="allowWaitlistSignups" value="1" <%= event.allow_waitlist_signups ? 'checked' : '' %> /> Allow waiting list signups (only applicable when Max Allowed is reached)</label>
             </div>
@@ -903,13 +906,17 @@
               var closesDate = event.registration_closes_at ? event.registration_closes_at.slice(0, 10) : '';
               var closesTime = event.registration_closes_at ? event.registration_closes_at.slice(11, 16) : '';
             %>
-            <%- include('partials/date-range-picker', {
-              startGroup: 'regOpens', endGroup: 'regCloses',
-              startDateLabel: 'Registration Opens Date', endDateLabel: 'Registration Closes Date',
-              startTimeLabel: 'Registration Opens Time', endTimeLabel: 'Registration Closes Time',
-              startDate: opensDate, startTime: opensTime, endDate: closesDate, endTime: closesTime,
-              startFieldName: 'registrationOpensAt', endFieldName: 'registrationClosesAt',
-            }) %>
+            <%# A real request: "registration dates and times should be
+                modern font settings." %>
+            <div class="registration-dates-modern">
+              <%- include('partials/date-range-picker', {
+                startGroup: 'regOpens', endGroup: 'regCloses',
+                startDateLabel: 'Registration Opens Date', endDateLabel: 'Registration Closes Date',
+                startTimeLabel: 'Registration Opens Time', endTimeLabel: 'Registration Closes Time',
+                startDate: opensDate, startTime: opensTime, endDate: closesDate, endTime: closesTime,
+                startFieldName: 'registrationOpensAt', endFieldName: 'registrationClosesAt',
+              }) %>
+            </div>
             <label>Capacity <span class="hint">(blank = no limit)</span>
               <input type="number" name="capacityValue" min="1" value="<%= event.family_capacity ?? event.capacity ?? '' %>" placeholder="No limit" />
             </label>
@@ -924,10 +931,6 @@
           <div class="member-form-full">
             <span class="roster-checkbox-label">General Settings</span>
             <div class="checkbox-group checkbox-group-stack">
-              <%# "Is this a public event?" moves here from Details' own
-                  Visibility dropdown (dead code - that route never read
-                  it, so it was removed rather than duplicated). %>
-              <label class="checkbox-option"><input type="checkbox" name="isPublicEvent" value="1" <%= event.visibility === 'public' ? 'checked' : '' %> /> Is this a public event?</label>
               <label class="checkbox-option"><input type="checkbox" name="allowRefundOnCancel" value="1" <%= event.allow_refund_on_cancel ? 'checked' : '' %> /> Allow refunds when a member cancels their registration?</label>
               <input type="hidden" name="allowRegistrationCancellations" value="off" />
               <label class="checkbox-option"><input type="checkbox" name="allowRegistrationCancellations" value="1" <%= event.allow_registration_cancellations ? 'checked' : '' %> /> Allow registration cancellations?</label>
@@ -956,40 +959,47 @@
             }) %>
           </div>
 
+          <%# A real request: "sections with the giant check boxes and
+              titles above that needs to be deleted" - the old broad
+              multi-section restriction block (checked a pile of grade-
+              pill-styled boxes, restricting both viewing AND registering
+              at once) is gone. The two narrower single-section gates
+              below cover that same need per-purpose instead. An event
+              that already had this old restriction keeps it enforced
+              (utils/events.js's eventVisibleToFamily/registerForEvent
+              still read it) - there's just no UI left to set a NEW one,
+              so routes/admin-events.js's own Settings save no longer
+              touches event_sections at all (never silently clearing a
+              still-enforced old restriction just because this form has
+              no field for it any more). %>
           <% if (sections.length) { %>
-            <div class="member-form-full">
-              <span class="roster-checkbox-label">Sections <span class="hint">(leave all unchecked to allow every section - restricts BOTH viewing and registering)</span></span>
-              <div class="grade-pill-grid">
-                <% sections.forEach(function(s) { %>
-                  <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= event.sectionIds.includes(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
-                <% }); %>
-              </div>
-            </div>
-
-            <%# A real request: "checkbox lock registration to section,
-                drop down of sections" and "lock registration to only be
-                viewable to one section check box and dropdown" - two
-                narrower single-section gates alongside the multi-section
-                restriction above (utils/events.js's registerForEvent/
-                eventVisibleToFamily enforce both). %>
+            <%# A real request: "lock registration to section should look
+                just like the lock by age feature. Same dropdown menu
+                with check boxes." Still a single section underneath
+                (singleSelect: true keeps it that way even though the
+                widget looks multi-select, same as Lock by Age/Grade
+                above) - routes/admin-events.js takes whichever one
+                checkbox comes through. %>
             <div class="member-form-full">
               <label class="checkbox-option"><input type="checkbox" name="lockRegistrationToSection" value="1" <%= event.lock_registration_to_section ? 'checked' : '' %> /> Lock registration to section</label>
-              <select name="registrationSectionId">
-                <option value="">None</option>
-                <% sections.forEach(function(s) { %>
-                  <option value="<%= s.id %>" <%= event.registration_section_id === s.id ? 'selected' : '' %>><%= s.name %></option>
-                <% }); %>
-              </select>
+              <%- include('partials/multi-select-checkbox', {
+                name: 'registrationSectionId',
+                options: sections.map(function(s) { return { value: s.id, label: s.name }; }),
+                selected: event.registration_section_id ? [String(event.registration_section_id)] : [],
+                placeholder: 'No section',
+                singleSelect: true,
+              }) %>
             </div>
 
             <div class="member-form-full">
               <label class="checkbox-option"><input type="checkbox" name="lockVisibilityToSection" value="1" <%= event.lock_visibility_to_section ? 'checked' : '' %> /> Lock registration to only be viewable to one section</label>
-              <select name="visibilitySectionId">
-                <option value="">None</option>
-                <% sections.forEach(function(s) { %>
-                  <option value="<%= s.id %>" <%= event.visibility_section_id === s.id ? 'selected' : '' %>><%= s.name %></option>
-                <% }); %>
-              </select>
+              <%- include('partials/multi-select-checkbox', {
+                name: 'visibilitySectionId',
+                options: sections.map(function(s) { return { value: s.id, label: s.name }; }),
+                selected: event.visibility_section_id ? [String(event.visibility_section_id)] : [],
+                placeholder: 'No section',
+                singleSelect: true,
+              }) %>
             </div>
           <% } %>
 

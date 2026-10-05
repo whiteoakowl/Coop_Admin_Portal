@@ -1419,6 +1419,28 @@ body.public-page .roster-empty {
    one column at every width. */
 .checkbox-group-stack { flex-direction: column; align-items: flex-start; }
 
+/* Event editing's own Settings tab (views/admin-events-builder.ejs) - a
+   real request: "there should be adequate space between all rows and
+   features." Scoped to this one form (not .checkbox-group-stack/
+   .member-form-grid themselves, which plenty of other, already-fine
+   pages also use) so only this tab's own rows/sections get the extra
+   breathing room. */
+.event-settings-form.member-form-grid { gap: 1.75rem 1.5rem; }
+.event-settings-form .checkbox-group-stack { gap: 0.9rem; }
+
+/* Same request, "registration dates and times should be modern font
+   settings" - the Registration Opens/Closes date/time fields get the
+   app's full (non-compact) control size instead of the smaller size
+   every other field on this already-dense tab uses, so they read as a
+   clear, deliberate control rather than blending into the surrounding
+   checkboxes. */
+.registration-dates-modern input[type="date"],
+.registration-dates-modern select {
+  font-size: var(--control-font-size);
+  font-weight: 500;
+  padding: var(--control-padding);
+}
+
 /* A real request: "at the bottom where there are check boxes for who to
    send the announcement to, it should be in a clean box with check boxes
    in a clean column and text all starting in the same column." Unlike

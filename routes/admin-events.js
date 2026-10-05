@@ -16,7 +16,7 @@ const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const { requirePortalPermission } = require('../middleware/portalAuth');
 const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, generateKey } = require('../utils/storage');
-const { formatFriendlyTimestamp } = require('../utils/dates');
+const { formatFriendlyTimestamp, formatFriendlyDateAndTime } = require('../utils/dates');
 const db = require('../db');
 const events = require('../utils/events');
 const { activeParentOptionsWithEmail } = require('../utils/members');
@@ -94,6 +94,16 @@ function capacityFieldsFromBody(body) {
 function selectionCountFromBody(value) {
   const n = parseInt(value, 10);
   return Number.isFinite(n) && n >= 1 && n <= 50 ? n : null;
+}
+
+// "Lock registration/visibility to section" - rendered as a checkbox-
+// dropdown now (views/partials/multi-select-checkbox.ejs, singleSelect:
+// true), which still only ever submits one real value in a JS-enabled
+// browser, but the field itself can legally arrive as an array (several
+// same-named checkboxes). Takes the first one defensively either way.
+function firstSectionId(value) {
+  const first = [].concat(value || [])[0];
+  return first ? parseInt(first, 10) : null;
 }
 
 // Shared by the Create/Edit forms and the member-submission approval flow
@@ -796,9 +806,14 @@ router.post('/:id/permissions', async (req, res) => {
     lockRegistrationToAge: req.body.lockRegistrationToAge === '1',
     ageGroupRestriction: [].concat(req.body.ageGroupRestriction || []).join(', '),
     lockRegistrationToSection: req.body.lockRegistrationToSection === '1',
-    registrationSectionId: req.body.registrationSectionId ? parseInt(req.body.registrationSectionId, 10) : null,
+    // Rendered as a checkbox-dropdown now (views/partials/multi-select-
+    // checkbox.ejs, singleSelect: true) rather than a plain <select> -
+    // its own onchange keeps only one box checked in a JS-enabled
+    // browser, but the body is still read defensively as "first value
+    // wins" in case more than one somehow comes through.
+    registrationSectionId: firstSectionId(req.body.registrationSectionId),
     lockVisibilityToSection: req.body.lockVisibilityToSection === '1',
-    visibilitySectionId: req.body.visibilitySectionId ? parseInt(req.body.visibilitySectionId, 10) : null,
+    visibilitySectionId: firstSectionId(req.body.visibilitySectionId),
     // A real request: "allow waiting list signups" defaults to checked
     // (on) - same hidden-fallback-plus-!==-'off' pattern as
     // allowRegistrationCancellations above, since a checked box only adds
@@ -807,7 +822,15 @@ router.post('/:id/permissions', async (req, res) => {
     allowWaitlistSignups: req.body.allowWaitlistSignups !== 'off',
     allowSignupForOthersInGroup: req.body.allowSignupForOthersInGroup === '1',
   });
-  await events.setEventSections(id, req.body.sectionIds);
+  // A real request: "sections with the giant check boxes and titles
+  // above that needs to be deleted" - this form no longer has a
+  // sectionIds field at all, so this never calls setEventSections() any
+  // more either; doing so unconditionally on every Settings save would
+  // otherwise silently WIPE an event's existing broad-section
+  // restriction (an empty/absent sectionIds reads as "clear it") despite
+  // the admin never having touched that setting. An event that already
+  // had one keeps it enforced (utils/events.js) - there's just no UI
+  // left to set a new one or change it.
   res.redirect(`/main-admin/events/${id}/builder?tab=settings&notice=` + encodeURIComponent('Settings saved.'));
 });
 
@@ -1101,6 +1124,28 @@ router.post('/:id/extra-fields/:fieldId/delete', async (req, res) => {
 // registered." Guests aren't tied to a family or a parent/student type,
 // so (same as the old flat totals.parents/students, which only ever
 // counted group.members too) they don't factor into these breakdowns.
+// A real request: "date and time should be August 2, 2026, 9:54pm" -
+// the Registrations table's own Registered/Checked In/Checked Out
+// columns were showing the raw stored "YYYY-MM-DD HH:MM:SS" string.
+// formatFriendlyDateAndTime already splits a timestamp into these exact
+// two Eastern-zoned pieces (utils/dates.js) - comma-joining them here
+// matches the requested punctuation exactly (plain formatFriendlyTimestamp
+// joins with a space, no comma).
+function friendlyDateTime(sqlTimestamp) {
+  if (!sqlTimestamp) return null;
+  const { dateLabel, timeLabel } = formatFriendlyDateAndTime(sqlTimestamp);
+  return `${dateLabel}, ${timeLabel}`;
+}
+
+function withFriendlyTimestamps(row) {
+  return {
+    ...row,
+    createdAtLabel: friendlyDateTime(row.created_at),
+    checkedInAtLabel: friendlyDateTime(row.checked_in_at),
+    checkedOutAtLabel: friendlyDateTime(row.checked_out_at),
+  };
+}
+
 function registrationTotals(familyGroups) {
   const totals = {
     registered: { family: 0, student: 0, parent: 0 },
@@ -1156,7 +1201,11 @@ router.get('/:id/registrations', async (req, res) => {
   // up for the event themselves").
   const event = await events.getEventWithDetails(req.params.id);
   if (!event) return res.status(404).render('404', { title: 'Not Found' });
-  const familyGroups = await events.familyGroupedRegistrationsForEvent(req.params.id);
+  const familyGroups = (await events.familyGroupedRegistrationsForEvent(req.params.id)).map((group) => ({
+    ...group,
+    members: group.members.map(withFriendlyTimestamps),
+    guests: group.guests.map(withFriendlyTimestamps),
+  }));
   const volunteerSignupsByMember = event.volunteers_enabled ? await events.volunteerSignupsByMemberForEvent(req.params.id) : new Map();
   const eligibleMembers = await events.eligibleMembersForRegistration(req.params.id);
   const { volunteerLists: attachedVolunteerLists, signUpLists: attachedSignUpLists } = await attachedListsForEvent(req.params.id);

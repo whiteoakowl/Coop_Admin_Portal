@@ -23,6 +23,14 @@
                    forEach(el => el.disabled = false)` on Edit, since
                    these are still plain <input type="checkbox"> elements
                    underneath)
+     singleSelect - a real request: "lock registration to section should
+                   look just like the lock by age feature. Same dropdown
+                   menu with check boxes" - for a value that's still
+                   single-valued underneath (e.g. one locked section id),
+                   checking a box here un-checks every other box in this
+                   same panel, so it still LOOKS like this widget while
+                   only ever submitting one value. The route reading it
+                   back stays defensive either way (first value wins).
 */
 var msOptions = options || [];
 var msSelected = selected || [];
@@ -31,6 +39,9 @@ var msSelected = selected || [];
 // local no include() call actually passed, unlike a plain JS object
 // property access, so every other caller needs this typeof guard.
 var msDisabled = (typeof disabled !== 'undefined' && disabled) ? 'disabled' : '';
+var msSingleSelect = (typeof singleSelect !== 'undefined' && singleSelect)
+  ? 'onchange="if (this.checked) { this.closest(\'[data-multi-select-panel]\').querySelectorAll(\'input[type=checkbox]\').forEach(function(cb) { if (cb !== this) cb.checked = false; }, this); }"'
+  : '';
 %>
 <div class="multi-select-checkbox" data-multi-select data-multi-select-placeholder="<%= placeholder || 'Select…' %>">
   <button type="button" class="multi-select-trigger" aria-expanded="false">
@@ -76,7 +87,7 @@ var msDisabled = (typeof disabled !== 'undefined' && disabled) ? 'disabled' : ''
   <div class="multi-select-panel" data-multi-select-panel hidden>
     <% msOptions.forEach(function(o) { %>
       <label class="checkbox-option">
-        <input type="checkbox" name="<%= name %>" value="<%= o.value %>" <%= msSelected.includes(String(o.value)) ? 'checked' : '' %> <%= msDisabled %> />
+        <input type="checkbox" name="<%= name %>" value="<%= o.value %>" <%= msSelected.includes(String(o.value)) ? 'checked' : '' %> <%= msDisabled %> <%- msSingleSelect %> />
         <%= o.label %>
       </label>
     <% }); %>

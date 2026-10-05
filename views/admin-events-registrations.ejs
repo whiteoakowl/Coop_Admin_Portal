@@ -108,7 +108,7 @@
         <span class="legend-item"><span class="cell-tag cell-absent">A</span> Absent</span>
       </div>
       <div class="roster-scroll">
-        <table class="roster-table members-table condensed-table">
+        <table class="roster-table members-table condensed-table registrations-table">
           <thead>
             <tr>
               <%# A real request: "roster will show primary member name
@@ -121,15 +121,23 @@
                   data behind it in this app yet (signup lists are a
                   separate, not-yet-built feature; there's no per-event
                   custom-question feature at all), so there is nothing
-                  "applicable" to show in either one for any event today. %>
+                  "applicable" to show in either one for any event today.
+
+                  A later real request: "column titles should be two
+                  rows to condense." Each multi-word header gets an
+                  explicit <br> instead of relying on natural wrapping
+                  (which would only kick in once a column is already
+                  narrow, defeating the point) - .registrations-table th
+                  below allows that wrap and gives each header a tighter
+                  max-width so the column itself shrinks to match. %>
               <th class="roster-name-col">Name</th>
               <th>Status</th>
               <th>Paid</th>
               <th>Registered</th>
               <th>P/A/L</th>
-              <th>Checked In</th>
-              <th>Checked Out</th>
-              <% if (event.volunteers_enabled) { %><th>Volunteer Signup</th><% } %>
+              <th>Checked<br>In</th>
+              <th>Checked<br>Out</th>
+              <% if (event.volunteers_enabled) { %><th>Volunteer<br>Signup</th><% } %>
               <th></th>
             </tr>
           </thead>
@@ -165,7 +173,7 @@
                     <% } %>
                   </td>
                   <td><%= price || '—' %></td>
-                  <td><%= r.created_at %></td>
+                  <td><%= r.createdAtLabel %></td>
                   <td>
                     <select class="roster-cell-select roster-cell-select-<%= r.attendance_status || 'blank' %>" data-status-endpoint="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/status" aria-label="P/A/L for <%= r.memberName %>">
                       <option value="" <%= !r.attendance_status ? 'selected' : '' %>>—</option>
@@ -174,8 +182,8 @@
                       <option value="absent" <%= r.attendance_status === 'absent' ? 'selected' : '' %>>A</option>
                     </select>
                   </td>
-                  <td><%= r.checked_in_at || '—' %></td>
-                  <td><%= r.checked_out_at || '—' %></td>
+                  <td><%= r.checkedInAtLabel || '—' %></td>
+                  <td><%= r.checkedOutAtLabel || '—' %></td>
                   <% if (event.volunteers_enabled) { %>
                     <td><%= (volunteerSignupsByMember.get(r.member_id) || []).join(', ') || '—' %></td>
                   <% } %>
@@ -191,9 +199,17 @@
                       this row (or removes it) in place instead of a full
                       page reload. %>
                   <td>
-                    <div class="roster-btn-row">
+                    <%# A real request: "cancel buttons the text should
+                        fit properly in the box. and the button should
+                        sit next to the trash button." roster-action-btn-
+                        fit drops the base .roster-action-btn's min-width:
+                        5.5rem/flex:1 0 auto (sized for a wide toolbar row),
+                        which was stretching this button well past its own
+                        "Cancel" text and crowding out the trash icon
+                        beside it. %>
+                    <div class="roster-btn-row roster-btn-row-nowrap">
                       <% if (r.status !== 'cancelled') { %>
-                        <button type="button" class="roster-action-btn roster-action-btn-small js-registration-cancel" data-cancel-endpoint="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/cancel" data-member-name="<%= r.memberName %>">Cancel</button>
+                        <button type="button" class="roster-action-btn roster-action-btn-small roster-action-btn-fit js-registration-cancel" data-cancel-endpoint="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/cancel" data-member-name="<%= r.memberName %>">Cancel</button>
                       <% } %>
                       <button type="button" class="icon-btn icon-btn-danger js-registration-delete" data-delete-endpoint="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/delete" data-member-name="<%= r.memberName %>" aria-label="Delete registration for <%= r.memberName %>" title="Delete Registration"><svg class="icon"><use href="#icon-trash"/></svg></button>
                     </div>
@@ -217,7 +233,7 @@
                     <% } %>
                   </td>
                   <td><%= priceFor(g.status, isFirst) || '—' %></td>
-                  <td><%= g.created_at %></td>
+                  <td><%= g.createdAtLabel %></td>
                   <td>
                     <select class="roster-cell-select roster-cell-select-<%= g.attendance_status || 'blank' %>" data-status-endpoint="/main-admin/events/<%= event.id %>/guests/<%= g.id %>/status" aria-label="P/A/L for <%= g.guest_name %>">
                       <option value="" <%= !g.attendance_status ? 'selected' : '' %>>—</option>
@@ -226,8 +242,8 @@
                       <option value="absent" <%= g.attendance_status === 'absent' ? 'selected' : '' %>>A</option>
                     </select>
                   </td>
-                  <td><%= g.checked_in_at || '—' %></td>
-                  <td><%= g.checked_out_at || '—' %></td>
+                  <td><%= g.checkedInAtLabel || '—' %></td>
+                  <td><%= g.checkedOutAtLabel || '—' %></td>
                   <% if (event.volunteers_enabled) { %><td>—</td><% } %>
                   <td></td>
                 </tr>

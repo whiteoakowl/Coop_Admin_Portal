@@ -228,7 +228,7 @@ test('roster: Volunteer Signup column only appears when the event has volunteeri
   await db.prepare("INSERT INTO event_registrations (event_id, member_id, status) VALUES (?, ?, 'confirmed')").run(eventId, family.parentId);
 
   const noVolunteering = await request(app).get(`/main-admin/events/${eventId}/registrations`).set('Cookie', admin.cookie);
-  assert.doesNotMatch(noVolunteering.text, /Volunteer Signup/);
+  assert.doesNotMatch(noVolunteering.text, /Volunteer<br>Signup/);
 
   await request(app)
     .post(`/main-admin/events/${eventId}/volunteers-settings`)
@@ -245,7 +245,7 @@ test('roster: Volunteer Signup column only appears when the event has volunteeri
   await db.prepare('INSERT INTO event_volunteer_signups (volunteer_role_id, member_id) VALUES (?, ?)').run(role.id, family.parentId);
 
   const withVolunteering = await request(app).get(`/main-admin/events/${eventId}/registrations`).set('Cookie', admin.cookie);
-  assert.match(withVolunteering.text, /Volunteer Signup/);
+  assert.match(withVolunteering.text, /Volunteer<br>Signup/);
   assert.match(withVolunteering.text, /Setup Crew/);
 });
 
