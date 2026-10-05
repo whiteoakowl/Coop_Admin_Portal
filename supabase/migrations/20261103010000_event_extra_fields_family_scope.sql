@@ -1,0 +1,12 @@
+-- A real request: "event editing resources and fields. Requires for
+-- each member or family. If required for family is selected only the
+-- parent will be asked to choose or fill out those extra fields. If for
+-- each member is selected then it will ask that for each member." Every
+-- Extra Field used to be asked identically of whoever was registering
+-- (parent or child, same question every time) - this adds who the field
+-- actually applies to, independent of whether it's required: 'each_member'
+-- (today's behavior, the default) asks it of every registering member;
+-- 'family' asks it only when the registering member is a parent/admin
+-- (utils/events.js's own member-type check, same "admins count as
+-- parents" convention Orientation already uses), never a student.
+alter table event_extra_fields add column if not exists scope text not null default 'each_member' check (scope in ('each_member', 'family'));

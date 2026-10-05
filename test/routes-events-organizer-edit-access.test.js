@@ -161,6 +161,20 @@ test('an organizer-parent can save Details (title) but is rejected saving Financ
   assert.equal(saveFinance.status, 403);
   const eventAfter = await db.prepare('SELECT payment_instructions_text FROM events WHERE id = ?').get(eventId);
   assert.notEqual(eventAfter.payment_instructions_text, 'Hacked');
+
+  // A real request gave the ticket-type row its own Edit dialog
+  // (Save/Close/Delete) - still a Finance-tab action, so still frozen
+  // for an organizer-parent the same way adding/deleting one already was.
+  await db.prepare('INSERT INTO event_ticket_types (event_id, title, price_cents, price_per, position) VALUES (?, ?, ?, ?, 0)').run(eventId, 'Adult', 1000, 'person');
+  const ticket = await db.prepare("SELECT id FROM event_ticket_types WHERE event_id = ? AND title = 'Adult'").get(eventId);
+  const saveTicket = await request(app)
+    .post(`/main-admin/events/${eventId}/ticket-types/${ticket.id}/update`)
+    .set('Cookie', organizer.cookie)
+    .type('form')
+    .send({ title: 'Hacked', priceDollars: '1.00', _csrf: organizerCsrf });
+  assert.equal(saveTicket.status, 403);
+  const ticketAfter = await db.prepare('SELECT title FROM event_ticket_types WHERE id = ?').get(ticket.id);
+  assert.equal(ticketAfter.title, 'Adult');
 });
 
 test('an organizer-parent is rejected publishing, cancelling, or deleting the event', async () => {

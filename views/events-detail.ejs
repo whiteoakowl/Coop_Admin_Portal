@@ -230,7 +230,7 @@
                   var isRegistered = registeredMemberIds.indexOf(m.id) !== -1;
                   var isEligible = eligibleForRegistration.has(m.id);
                 %>
-                  <div class="event-register-member-row<%= isEligible ? '' : ' event-register-member-row-ineligible' %>" data-member-id="<%= m.id %>" data-member-name="<%= m.name %>" data-registered="<%= isRegistered ? '1' : '0' %>">
+                  <div class="event-register-member-row<%= isEligible ? '' : ' event-register-member-row-ineligible' %>" data-member-id="<%= m.id %>" data-member-name="<%= m.name %>" data-member-type="<%= m.member_type %>" data-registered="<%= isRegistered ? '1' : '0' %>">
                     <span class="event-register-member-info">
                       <%# A real request: a registered member also gets a
                           checkbox now (not just an unregistered one), so
@@ -339,8 +339,18 @@
                             rather than one static copy per member, since
                             the queue's own membership is only known at
                             click time. %>
+                        <%# A real request: "requires for each member or
+                            family. If required for family is selected
+                            only the parent will be asked... if for each
+                            member is selected then it will ask that for
+                            each member." Every field is rendered once in
+                            this shared, reused dialog regardless of
+                            scope - a family-scoped one's own data-field-
+                            scope="family" is what lets public/js/events-
+                            detail-register.js's own applyFieldScopeFor
+                            hide it again for a non-parent queued member. %>
                         <% (event.extraFields || []).forEach(function(field) { %>
-                          <label class="member-form-full"><%= field.label %><% if (field.required) { %> *<% } %>
+                          <label class="member-form-full" <% if (field.scope === 'family') { %>data-field-scope="family"<% } %>><%= field.label %><% if (field.required) { %> *<% } %>
                             <% if (field.field_type === 'textarea') { %>
                               <textarea name="answers[f<%= field.id %>]" rows="2" <%= field.required ? 'required' : '' %>></textarea>
                             <% } else if (field.field_type === 'select') { %>

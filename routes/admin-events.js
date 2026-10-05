@@ -55,7 +55,7 @@ const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/s
 // (also mirrored onto res.locals for the views) tells the templates to
 // swap the Main Admin nav chrome for the requester's own portal nav, hide
 // the admin-only toolbar actions, and freeze the Finance tab's fields.
-const ORGANIZER_RESTRICTED_PATH = /^\/\d+\/(finance|ticket-types(\/\d+\/delete)?|status|delete|decide|quick-edit)$/;
+const ORGANIZER_RESTRICTED_PATH = /^\/\d+\/(finance|ticket-types(\/\d+\/(delete|update))?|status|delete|decide|quick-edit)$/;
 async function requireMainAdminOrEventOrganizer(req, res, next) {
   if (!req.portalAccount) return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
   const isMainAdmin = req.portalRoles.some((r) => r.key === 'main_admin') && req.portalPermissions.has('manage_events');
@@ -739,6 +739,19 @@ router.post('/:id/ticket-types', async (req, res) => {
   res.redirect(`/main-admin/events/${req.params.id}/builder?tab=finance&notice=` + encodeURIComponent('Ticket type added.'));
 });
 
+// A real request: "click on the ticket to edit and save, close or
+// delete. Remove trashcan from ticket list. You can only delete in the
+// edit popup window." - the row itself is now a plain clickable trigger
+// for this ticket's own edit dialog (views/admin-events-builder.ejs),
+// with Save/Close/Delete all living inside it.
+router.post('/:id/ticket-types/:ticketId/update', async (req, res) => {
+  const title = (req.body.title || '').trim();
+  const priceCents = req.body.priceDollars ? Math.round(parseFloat(req.body.priceDollars) * 100) : 0;
+  if (!title) return res.redirect(`/main-admin/events/${req.params.id}/builder?tab=finance&error=` + encodeURIComponent('Ticket title is required.'));
+  await events.updateTicketType(req.params.ticketId, title, priceCents, req.body.pricePer, req.body.includesPhysicalTicket === '1');
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=finance&notice=` + encodeURIComponent('Ticket type saved.'));
+});
+
 router.post('/:id/ticket-types/:ticketId/delete', async (req, res) => {
   await events.deleteTicketType(req.params.ticketId);
   res.redirect(`/main-admin/events/${req.params.id}/builder?tab=finance&notice=` + encodeURIComponent('Ticket type removed.'));
@@ -939,6 +952,15 @@ router.post('/:id/volunteer-roles/:roleId/delete', async (req, res) => {
   res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=volunteers&notice=` + encodeURIComponent('Volunteer role removed.'));
 });
 
+// A real request: "click on the item to edit... clear the member signed
+// up." Lets an admin un-assign one signed-up member from this role
+// (opening the slot back up) from the role's own edit dialog, without
+// deleting the role itself.
+router.post('/:id/volunteer-roles/:roleId/signups/:memberId/clear', async (req, res) => {
+  await events.cancelVolunteerSignup(req.params.roleId, req.params.memberId);
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=volunteers&notice=` + encodeURIComponent('Signup cleared.'));
+});
+
 // --- Donation items ---
 
 router.post('/:id/donation-items', async (req, res) => {
@@ -966,6 +988,12 @@ router.post('/:id/donation-items/:itemId/update', async (req, res) => {
 router.post('/:id/donation-items/:itemId/delete', async (req, res) => {
   await events.deleteDonationItem(req.params.itemId);
   res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=donations&notice=` + encodeURIComponent('Donation item removed.'));
+});
+
+// Same "clear the member signed up" feature as volunteer roles above.
+router.post('/:id/donation-items/:itemId/claims/:claimId/clear', async (req, res) => {
+  await events.adminClearDonationClaim(req.params.claimId);
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=donations&notice=` + encodeURIComponent('Claim cleared.'));
 });
 
 // --- Food items - a real request: "on the volunteer, donations and food
@@ -1000,6 +1028,12 @@ router.post('/:id/food-items/:itemId/delete', async (req, res) => {
   res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=food&notice=` + encodeURIComponent('Food item removed.'));
 });
 
+// Same "clear the member signed up" feature as volunteer roles above.
+router.post('/:id/food-items/:itemId/claims/:claimId/clear', async (req, res) => {
+  await events.adminClearFoodClaim(req.params.claimId);
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=food&notice=` + encodeURIComponent('Claim cleared.'));
+});
+
 // --- Extra Fields (Volunteers tab's "Extra Fields" pill) - a real
 // request: "extra fields is where you can add extra form type questions
 // for people signing up for an event." ---
@@ -1015,8 +1049,29 @@ router.post('/:id/extra-fields', async (req, res) => {
     fieldType,
     options: fieldType === 'select' ? (req.body.options || '').trim() : null,
     required: req.body.required === '1',
+    scope: req.body.scope,
   });
   res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=extraFields&notice=` + encodeURIComponent('Extra field added.'));
+});
+
+// A real request: "event editing resources and fields. Requires for
+// each member or family" - the row itself opens this field's own edit
+// dialog now (same Save/Close/Delete shape as Ticket Types above)
+// instead of only ever being addable/deletable.
+router.post('/:id/extra-fields/:fieldId/update', async (req, res) => {
+  const label = (req.body.label || '').trim();
+  const fieldType = req.body.fieldType;
+  if (!label || !events.EXTRA_FIELD_TYPES.includes(fieldType)) {
+    return res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=extraFields&error=` + encodeURIComponent('Label and a valid field type are required.'));
+  }
+  await events.updateExtraField(req.params.fieldId, {
+    label,
+    fieldType,
+    options: fieldType === 'select' ? (req.body.options || '').trim() : null,
+    required: req.body.required === '1',
+    scope: req.body.scope,
+  });
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=extraFields&notice=` + encodeURIComponent('Extra field saved.'));
 });
 
 router.post('/:id/extra-fields/:fieldId/delete', async (req, res) => {
@@ -1127,24 +1182,34 @@ router.get('/:id/registrations', async (req, res) => {
 // event it will also ask for those selections." A later real request:
 // "popup should show all the same questions, volunteer signups and
 // tickets questions as if the member is signing up for the event
-// themselves" - answers[] parsed the exact same way routes/events.js's
-// own /:id/register does (the "f" prefix keeps qs from reading a
-// purely-numeric bracket key as an array index), and ticketTypeId read
-// the same way too, both now threaded through adminAddRegistrations.
+// themselves" - and a further one made that literal: each selected
+// member gets their OWN ticket choice and their OWN each_member-scoped
+// extra-field answers, exactly as if that member were signing up
+// themselves one at a time, instead of one shared ticket/answer set
+// stamped onto everyone selected. members[m<id>][...] (the "m"/"f"
+// prefixes keep qs from reading a purely-numeric bracket key as an ARRAY
+// index instead of an object key, same trick routes/events.js's own
+// /:id/register already uses for answers[f<fieldId>]).
 router.post('/:id/registrations/add', async (req, res) => {
   const eventId = req.params.id;
-  const memberIds = [].concat(req.body.memberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
-  if (memberIds.length === 0) {
+  const rawMembers = req.body.members || {};
+  const membersData = [];
+  for (const [key, value] of Object.entries(rawMembers)) {
+    const match = /^m(\d+)$/.exec(key);
+    if (!match) continue;
+    const memberId = parseInt(match[1], 10);
+    const rawAnswers = (value && value.answers) || {};
+    const answers = {};
+    for (const [answerKey, answerValue] of Object.entries(rawAnswers)) {
+      const answerMatch = /^f(\d+)$/.exec(answerKey);
+      if (answerMatch) answers[answerMatch[1]] = answerValue;
+    }
+    membersData.push({ memberId, answers, ticketTypeId: value.ticketTypeId ? parseInt(value.ticketTypeId, 10) : null });
+  }
+  if (membersData.length === 0) {
     return res.redirect(`/main-admin/events/${eventId}/registrations?error=` + encodeURIComponent('Choose at least one member.'));
   }
-  const rawAnswers = req.body.answers || {};
-  const answers = {};
-  for (const [key, value] of Object.entries(rawAnswers)) {
-    const match = /^f(\d+)$/.exec(key);
-    if (match) answers[match[1]] = value;
-  }
-  const ticketTypeId = req.body.ticketTypeId ? parseInt(req.body.ticketTypeId, 10) : null;
-  const results = await events.adminAddRegistrations(eventId, memberIds, req.portalAccount.id, answers, ticketTypeId);
+  const results = await events.adminAddRegistrations(eventId, membersData, req.portalAccount.id);
   const confirmed = results.filter((r) => r.ok).length;
   const failed = results.filter((r) => !r.ok);
 
@@ -1155,7 +1220,7 @@ router.post('/:id/registrations/add', async (req, res) => {
   const shiftId = req.body.volunteerShiftId ? parseInt(req.body.volunteerShiftId, 10) : null;
   const itemId = req.body.signupItemId ? parseInt(req.body.signupItemId, 10) : null;
   if (shiftId || itemId) {
-    for (const memberId of memberIds) {
+    for (const { memberId } of membersData) {
       if (shiftId) await signUpForShift(shiftId, memberId, req.portalAccount.id);
       if (itemId) await claimSignUpItem(itemId, memberId, 1, req.portalAccount.id);
     }

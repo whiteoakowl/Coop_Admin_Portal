@@ -250,94 +250,112 @@
     var registrationFamilyNames = Array.from(new Set(eligibleMembers.filter(function(m) { return m.familyName; }).map(function(m) { return m.familyName; }))).sort(function(a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); });
     %>
     <dialog id="add-registration-dialog" class="member-picker-dialog">
-      <form method="POST" action="/main-admin/events/<%= event.id %>/registrations/add">
+      <form method="POST" action="/main-admin/events/<%= event.id %>/registrations/add" id="add-registration-form">
         <h3>Add Registration</h3>
         <% if (eligibleMembers.length === 0) { %>
           <p class="hint">Everyone active is already registered for this event.</p>
         <% } else { %>
-          <label>Filter by Family
-            <select id="add-registration-family-filter">
-              <option value="">All Families</option>
-              <% registrationFamilyNames.forEach(function(name) { %>
-                <option value="<%= name %>"><%= name %></option>
-              <% }); %>
-            </select>
-          </label>
-          <div class="member-picker-list" id="add-registration-member-list">
-            <% eligibleMembers.forEach(function(m) { %>
-              <label class="member-picker-row" data-family="<%= m.familyName || '' %>">
-                <input type="checkbox" name="memberIds" value="<%= m.id %>" />
-                <span><%= m.name %><% if (m.familyName) { %> <span class="hint">(<%= m.familyName %>)</span><% } %></span>
-              </label>
-            <% }); %>
-          </div>
-
-          <%# A real request: "popup should show all the same questions,
-              volunteer signups and tickets questions as if the member is
-              signing up for the event themselves." Same Ticket dropdown
-              and Extra Field inputs events-detail.ejs's own per-member
-              self-service form already asks - one shared answer set here
-              (applies to everyone selected above), same simplification
-              the volunteer/signup-list selects below already make. %>
-          <% if (event.ticketTypes && event.ticketTypes.length) { %>
-            <label>Ticket <span class="hint">(applies to everyone selected above)</span>
-              <select name="ticketTypeId" required>
-                <option value="">Select a ticket</option>
-                <% event.ticketTypes.forEach(function(t) { %>
-                  <option value="<%= t.id %>"><%= t.title %> &ndash; $<%= (t.price_cents / 100).toFixed(2) %> / <%= t.price_per %></option>
+          <%# A real request: "after selecting the family and then the
+              members of that family signing up, the popup window will
+              then go through all of the signup, extra question and
+              tickets choices for that event as if the actual member is
+              signing up." Step 1 (pick members) is unchanged; Continue
+              builds Step 2 below (public/js/admin-event-add-registration.js)
+              with each selected member's OWN ticket choice and OWN
+              each_member-scoped answers - a family-scoped field only
+              ever gets cloned into whichever selected member actually
+              IS a parent/admin, same scope rule the public registration
+              form enforces (utils/events.js's own extraFieldsForMemberType). %>
+          <div id="add-registration-step-pick">
+            <label>Filter by Family
+              <select id="add-registration-family-filter">
+                <option value="">All Families</option>
+                <% registrationFamilyNames.forEach(function(name) { %>
+                  <option value="<%= name %>"><%= name %></option>
                 <% }); %>
               </select>
             </label>
-          <% } %>
-          <% if (event.extraFields && event.extraFields.length) { %>
-            <% event.extraFields.forEach(function(field) { %>
-              <label><%= field.label %><% if (field.required) { %> *<% } %> <span class="hint">(applies to everyone selected above)</span>
+            <div class="member-picker-list" id="add-registration-member-list">
+              <% eligibleMembers.forEach(function(m) { %>
+                <label class="member-picker-row" data-family="<%= m.familyName || '' %>">
+                  <input type="checkbox" name="pickedMemberIds" value="<%= m.id %>" data-member-name="<%= m.name %>" data-member-type="<%= m.memberType %>" />
+                  <span><%= m.name %><% if (m.familyName) { %> <span class="hint">(<%= m.familyName %>)</span><% } %></span>
+                </label>
+              <% }); %>
+            </div>
+          </div>
+
+          <div id="add-registration-step-details" hidden>
+            <div id="add-registration-member-details"></div>
+            <% if (attachedVolunteerLists.length) { %>
+              <% attachedVolunteerLists.forEach(function(list) { %>
+                <label><%= list.title %> Shift <span class="hint">(optional - applies to everyone selected above)</span>
+                  <select name="volunteerShiftId">
+                    <option value="">None</option>
+                    <% list.shifts.forEach(function(s) { %>
+                      <option value="<%= s.id %>"><%= s.job_name %><% if (s.shift_date) { %> - <%= s.shift_date %><% } %> (<%= s.signups.length %>/<%= s.slots_needed %>)</option>
+                    <% }); %>
+                  </select>
+                </label>
+              <% }); %>
+            <% } %>
+            <% if (attachedSignUpLists.length) { %>
+              <% attachedSignUpLists.forEach(function(list) { %>
+                <label><%= list.title %> Item <span class="hint">(optional - one each, applies to everyone selected above)</span>
+                  <select name="signupItemId">
+                    <option value="">None</option>
+                    <% list.items.forEach(function(item) { %>
+                      <option value="<%= item.id %>"><%= item.item_name %> (<%= item.quantityClaimed %>/<%= item.quantity_needed %>)</option>
+                    <% }); %>
+                  </select>
+                </label>
+              <% }); %>
+            <% } %>
+          </div>
+
+          <%# Cloned once per selected member by public/js/admin-event-
+              add-registration.js when Continue is clicked - never
+              submitted itself (a bare <template>'s content isn't part
+              of the form). %>
+          <template id="add-registration-ticket-template">
+            <% if (event.ticketTypes && event.ticketTypes.length) { %>
+              <label class="member-form-full">Ticket
+                <select data-ticket-input required>
+                  <option value="">Select a ticket</option>
+                  <% event.ticketTypes.forEach(function(t) { %>
+                    <option value="<%= t.id %>"><%= t.title %> &ndash; $<%= (t.price_cents / 100).toFixed(2) %> / <%= t.price_per %></option>
+                  <% }); %>
+                </select>
+              </label>
+            <% } %>
+          </template>
+          <template id="add-registration-fields-template">
+            <% (event.extraFields || []).forEach(function(field) { %>
+              <label class="member-form-full" data-field-id="<%= field.id %>" data-field-scope="<%= field.scope %>"><%= field.label %><% if (field.required) { %> *<% } %>
                 <% if (field.field_type === 'textarea') { %>
-                  <textarea name="answers[f<%= field.id %>]" rows="2" <%= field.required ? 'required' : '' %>></textarea>
+                  <textarea data-answer-input rows="2" <%= field.required ? 'required' : '' %>></textarea>
                 <% } else if (field.field_type === 'select') { %>
-                  <select name="answers[f<%= field.id %>]" <%= field.required ? 'required' : '' %>>
+                  <select data-answer-input <%= field.required ? 'required' : '' %>>
                     <option value="">Select one</option>
                     <% (field.options || '').split('\n').filter(Boolean).forEach(function(opt) { %>
                       <option value="<%= opt %>"><%= opt %></option>
                     <% }); %>
                   </select>
                 <% } else if (field.field_type === 'checkbox') { %>
-                  <input type="checkbox" name="answers[f<%= field.id %>]" value="Yes" <%= field.required ? 'required' : '' %> />
+                  <input type="checkbox" data-answer-input value="Yes" <%= field.required ? 'required' : '' %> />
                 <% } else { %>
-                  <input type="text" name="answers[f<%= field.id %>]" <%= field.required ? 'required' : '' %> />
+                  <input type="text" data-answer-input <%= field.required ? 'required' : '' %> />
                 <% } %>
               </label>
             <% }); %>
-          <% } %>
-          <% if (attachedVolunteerLists.length) { %>
-            <% attachedVolunteerLists.forEach(function(list) { %>
-              <label><%= list.title %> Shift <span class="hint">(optional - applies to everyone selected above)</span>
-                <select name="volunteerShiftId">
-                  <option value="">None</option>
-                  <% list.shifts.forEach(function(s) { %>
-                    <option value="<%= s.id %>"><%= s.job_name %><% if (s.shift_date) { %> - <%= s.shift_date %><% } %> (<%= s.signups.length %>/<%= s.slots_needed %>)</option>
-                  <% }); %>
-                </select>
-              </label>
-            <% }); %>
-          <% } %>
-          <% if (attachedSignUpLists.length) { %>
-            <% attachedSignUpLists.forEach(function(list) { %>
-              <label><%= list.title %> Item <span class="hint">(optional - one each, applies to everyone selected above)</span>
-                <select name="signupItemId">
-                  <option value="">None</option>
-                  <% list.items.forEach(function(item) { %>
-                    <option value="<%= item.id %>"><%= item.item_name %> (<%= item.quantityClaimed %>/<%= item.quantity_needed %>)</option>
-                  <% }); %>
-                </select>
-              </label>
-            <% }); %>
-          <% } %>
+          </template>
         <% } %>
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
           <% if (eligibleMembers.length > 0) { %>
-            <button type="submit" class="primary-btn">Save</button>
+            <button type="button" class="btn-secondary" id="add-registration-back-btn" hidden>Back</button>
+            <button type="button" class="primary-btn" id="add-registration-continue-btn">Continue</button>
+            <button type="submit" class="primary-btn" id="add-registration-save-btn" hidden>Save</button>
           <% } %>
         </div>
       </form>
@@ -357,19 +375,8 @@
       </form>
     </dialog>
   </main>
+  <script src="/js/admin-event-add-registration.js"></script>
   <script>
-    // "filter for family name in ABC order" - a plain show/hide over the
-    // already-alphabetical checkbox list above, not a server round trip.
-    (function () {
-      var select = document.getElementById('add-registration-family-filter');
-      if (!select) return;
-      select.addEventListener('change', function () {
-        document.querySelectorAll('#add-registration-member-list .member-picker-row').forEach(function (row) {
-          row.hidden = select.value !== '' && row.dataset.family !== select.value;
-        });
-      });
-    })();
-
     // P/A/L roster grid (item 11) - each select auto-saves on change, same
     // "no separate Edit/Save step" pattern public/js/attendance-grid.js
     // uses for class attendance, but posting a plain `status` field to

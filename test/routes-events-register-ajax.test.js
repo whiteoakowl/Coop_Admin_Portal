@@ -292,7 +292,7 @@ test('plain event: a registered member\'s row says "Unregister" (not "Registered
   const page = await request(app).get(`/events/${eventId}`).set('Cookie', parent.cookie);
   assert.match(
     page.text,
-    /class="event-register-member-row" data-member-id="\d+" data-member-name="[^"]*" data-registered="1">\s*<span class="event-register-member-info">\s*<input type="checkbox" class="event-register-member-checkbox"/,
+    /class="event-register-member-row" data-member-id="\d+" data-member-name="[^"]*" data-member-type="[^"]*" data-registered="1">\s*<span class="event-register-member-info">\s*<input type="checkbox" class="event-register-member-checkbox"/,
     'a registered member still gets a checkbox (for bulk unregister) and is flagged data-registered="1"'
   );
   assert.match(page.text, />Unregister</);

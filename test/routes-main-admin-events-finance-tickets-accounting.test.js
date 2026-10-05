@@ -171,7 +171,10 @@ test('Ticket Types: add and delete, with a title, price, and its own person/fami
 
   page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
   assert.match(page.text, /Family Pass/);
-  assert.match(page.text, /\$25\.00 per family/);
+  // A real request: "all information should fit on one row in mobile" -
+  // the row's own label uses the terser "$25.00/family" instead of
+  // "$25.00 per family" to help it stay on one line.
+  assert.match(page.text, /\$25\.00\/family/);
 
   const ticket = await db.prepare("SELECT * FROM event_ticket_types WHERE event_id = ? AND title = 'Family Pass'").get(eventId);
   assert.ok(ticket);
@@ -190,6 +193,62 @@ test('Ticket Types: add and delete, with a title, price, and its own person/fami
 
   page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
   assert.match(page.text, /No ticket types yet/);
+});
+
+// A real request: "add a ticket type the chart below that shows
+// tickets... click on the ticket to edit and save, close or delete.
+// Remove trashcan from ticket list. You can only delete in the edit
+// popup window."
+test('Ticket Types: the row has no trash icon any more - edit, save, and delete all happen through the ticket\'s own edit dialog', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+
+  let csrf = extractCsrf((await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie)).text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/ticket-types`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Adult', priceDollars: '10.00', _csrf: csrf });
+  const ticket = await db.prepare("SELECT * FROM event_ticket_types WHERE event_id = ? AND title = 'Adult'").get(eventId);
+
+  let page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  // The row itself is a plain button that opens the edit dialog - no
+  // per-row delete form/trash icon any more.
+  assert.match(page.text, new RegExp(`class="training-lesson-row ticket-type-row"\\s*onclick="document.getElementById\\('edit-ticket-type-dialog-${ticket.id}'\\).showModal\\(\\)"`));
+  assert.doesNotMatch(page.text, new RegExp(`ticket-types/${ticket.id}/delete" class="inline-block-form"`));
+  // The edit dialog itself exists, pre-filled, with Save/Close/Delete.
+  assert.match(page.text, new RegExp(`<dialog id="edit-ticket-type-dialog-${ticket.id}"`));
+  assert.match(page.text, /<input type="text" name="title" value="Adult"/);
+  assert.match(page.text, />Delete Ticket Type</);
+  assert.match(page.text, />Close</);
+  assert.match(page.text, />Save</);
+
+  csrf = extractCsrf(page.text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/ticket-types/${ticket.id}/update`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Adult (Updated)', priceDollars: '12.50', pricePer: 'family', includesPhysicalTicket: '1', _csrf: csrf });
+
+  const updated = await db.prepare('SELECT * FROM event_ticket_types WHERE id = ?').get(ticket.id);
+  assert.equal(updated.title, 'Adult (Updated)');
+  assert.equal(updated.price_cents, 1250);
+  assert.equal(updated.price_per, 'family');
+  assert.equal(Number(updated.includes_physical_ticket), 1);
+
+  page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  assert.match(page.text, /\$12\.50\/family/);
+
+  // The ticket-level delete route is still reachable - just from the
+  // dialog's own Delete Ticket Type button, not a row-level trash icon.
+  csrf = extractCsrf(page.text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/ticket-types/${ticket.id}/delete`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: csrf });
+  const afterDelete = await db.prepare('SELECT * FROM event_ticket_types WHERE id = ?').get(ticket.id);
+  assert.equal(afterDelete, undefined);
 });
 
 test('Ticket Types: a ticket with no pricePer submitted defaults to person', async () => {

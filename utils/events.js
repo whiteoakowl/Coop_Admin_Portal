@@ -325,6 +325,16 @@ async function addTicketType(eventId, title, priceCents, pricePer, includesPhysi
     .run(eventId, title, priceCents, pricePer === 'family' ? 'family' : 'person', position, includesPhysicalTicket ? true : false);
 }
 
+// A real request: "click on the ticket to edit and save, close or
+// delete" - the row itself used to only offer Add/Delete, no way to
+// change a ticket's own title/price/per/physical-ticket flag once
+// created.
+async function updateTicketType(id, title, priceCents, pricePer, includesPhysicalTicket) {
+  await db
+    .prepare('UPDATE event_ticket_types SET title = ?, price_cents = ?, price_per = ?, includes_physical_ticket = ? WHERE id = ?')
+    .run(title, priceCents, pricePer === 'family' ? 'family' : 'person', includesPhysicalTicket ? true : false, id);
+}
+
 async function deleteTicketType(id) {
   await db.prepare('DELETE FROM event_ticket_types WHERE id = ?').run(id);
 }
@@ -362,15 +372,42 @@ async function deleteAccountingCategory(id) {
 // questions tied to this one event's own signup".
 const EXTRA_FIELD_TYPES = ['text', 'textarea', 'select', 'checkbox'];
 
-async function addExtraField(eventId, { label, fieldType, options, required }) {
+// A real request: "event editing resources and fields. Requires for
+// each member or family. If required for family is selected only the
+// parent will be asked to choose or fill out those extra fields. If for
+// each member is selected then it will ask that for each member." scope
+// is independent of required - an optional field can still be family- or
+// each-member-scoped, it just never blocks registration either way (see
+// requiredExtraFieldsUnanswered below).
+async function addExtraField(eventId, { label, fieldType, options, required, scope }) {
   const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM event_extra_fields WHERE event_id = ?').get(eventId)).p) + 1;
   await db
-    .prepare('INSERT INTO event_extra_fields (event_id, label, field_type, options, required, position) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(eventId, label, fieldType, options || null, required ? 1 : 0, position);
+    .prepare('INSERT INTO event_extra_fields (event_id, label, field_type, options, required, position, scope) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(eventId, label, fieldType, options || null, required ? 1 : 0, position, scope === 'family' ? 'family' : 'each_member');
+}
+
+async function updateExtraField(id, { label, fieldType, options, required, scope }) {
+  await db
+    .prepare('UPDATE event_extra_fields SET label = ?, field_type = ?, options = ?, required = ?, scope = ? WHERE id = ?')
+    .run(label, fieldType, options || null, required ? 1 : 0, scope === 'family' ? 'family' : 'each_member', id);
 }
 
 async function deleteExtraField(id) {
   await db.prepare('DELETE FROM event_extra_fields WHERE id = ?').run(id);
+}
+
+// Which of an event's own Extra Fields actually apply to THIS member
+// registering - an 'each_member' field applies to everyone; a 'family'
+// field only applies when the registering member is a parent/admin (the
+// same "admins count as parents" convention utils/orientation.js's own
+// header comment already documents), never a student. Shared by the
+// public self-service registration form (views/events-detail.ejs) and
+// the Main Admin "Add a Member" popup (routes/admin-events.js's own
+// adminAddRegistrations) so both ask exactly the same questions of
+// exactly the same people.
+function extraFieldsForMemberType(extraFields, memberType) {
+  const isParent = memberType === 'parent' || memberType === 'admin';
+  return extraFields.filter((f) => f.scope !== 'family' || isParent);
 }
 
 function eventFields(data) {
@@ -902,7 +939,7 @@ async function importRegistrationsFromRows(eventId, rows, accountId) {
     }
     found.push({ rowNum, memberId: member.id });
   }
-  const results = found.length ? await adminAddRegistrations(eventId, found.map((f) => f.memberId), accountId) : [];
+  const results = found.length ? await adminAddRegistrations(eventId, found.map((f) => ({ memberId: f.memberId })), accountId) : [];
   let imported = 0;
   results.forEach((r, i) => {
     if (r.ok) imported += 1;
@@ -1150,7 +1187,7 @@ async function registerForEvent({ eventId, memberId, accountId, family, answers 
     }
   }
 
-  const extraFields = await db.prepare('SELECT * FROM event_extra_fields WHERE event_id = ?').all(eventId);
+  const extraFields = extraFieldsForMemberType(await db.prepare('SELECT * FROM event_extra_fields WHERE event_id = ?').all(eventId), member.member_type);
   for (const field of extraFields) {
     if (field.required && !(answers[field.id] || '').trim()) {
       return { ok: false, error: `"${field.label}" is required to register.` };
@@ -1205,11 +1242,21 @@ async function registerForEvent({ eventId, memberId, accountId, family, answers 
 // simplification its own volunteerShiftId/signupItemId already made -
 // see routes/admin-events.js's own comment), rather than a separate
 // per-member form the way self-service registration gets one.
-async function adminAddRegistrations(eventId, memberIds, accountId, answers = {}, ticketTypeId = null) {
+// A real request: "the popup window will then go through all of the
+// signup, extra question and tickets choices for that event as if the
+// actual member is signing up" - `membersData` is one entry per selected
+// member ({ memberId, answers, ticketTypeId }), not one shared answer
+// set/ticket applied to everyone the way this used to work, so each
+// member's own ticket choice and each_member-scoped answers can differ
+// (a family-scoped field's own answer naturally only ever comes from
+// whichever selected member actually IS the parent - routes/admin-
+// events.js's own view only renders that field for a parent/admin in the
+// first place, same extraFieldsForMemberType rule self-service uses).
+async function adminAddRegistrations(eventId, membersData, accountId) {
   const event = await getEvent(eventId);
-  if (!event) return memberIds.map(() => ({ ok: false, error: 'That event no longer exists.' }));
+  if (!event) return membersData.map(() => ({ ok: false, error: 'That event no longer exists.' }));
   const results = [];
-  for (const memberId of memberIds) {
+  for (const { memberId, answers = {}, ticketTypeId = null } of membersData) {
     const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(memberId);
     if (!member) {
       results.push({ ok: false, error: 'That member no longer exists.' });
@@ -1591,6 +1638,15 @@ async function cancelDonationClaim(claimId, memberId) {
   await db.prepare('DELETE FROM event_donation_claims WHERE id = ? AND member_id = ?').run(claimId, memberId);
 }
 
+// Admin-initiated, unlike cancelDonationClaim above - the admin builder's
+// own edit dialog already knows exactly which claim row it's clearing
+// (it rendered the claim's own id), so there's no self-service ownership
+// check to make here the way there is for a member cancelling their own
+// claim.
+async function adminClearDonationClaim(claimId) {
+  await db.prepare('DELETE FROM event_donation_claims WHERE id = ?').run(claimId);
+}
+
 // --- Food items - a real request: "on the volunteer, donations and food
 // pages. there will be a check box for, do you want to include this
 // section? then a dropdown menu of numbers 1-50..." Food is a brand new
@@ -1632,6 +1688,11 @@ async function claimFoodItem(itemId, memberId, quantity, accountId) {
 
 async function cancelFoodClaim(claimId, memberId) {
   await db.prepare('DELETE FROM event_food_claims WHERE id = ? AND member_id = ?').run(claimId, memberId);
+}
+
+// Admin-initiated - see adminClearDonationClaim's own comment above.
+async function adminClearFoodClaim(claimId) {
+  await db.prepare('DELETE FROM event_food_claims WHERE id = ?').run(claimId);
 }
 
 // --- CSV export/import (item 5) - a real request: "needs import and
@@ -1812,6 +1873,7 @@ module.exports = {
   updateCategory,
   deleteCategory,
   addTicketType,
+  updateTicketType,
   deleteTicketType,
   listAccountingCategories,
   createAccountingCategory,
@@ -1819,7 +1881,9 @@ module.exports = {
   deleteAccountingCategory,
   EXTRA_FIELD_TYPES,
   addExtraField,
+  updateExtraField,
   deleteExtraField,
+  extraFieldsForMemberType,
   listLocations,
   createLocation,
   updateLocation,
@@ -1866,9 +1930,11 @@ module.exports = {
   deleteDonationItem,
   claimDonationItem,
   cancelDonationClaim,
+  adminClearDonationClaim,
   addFoodItem,
   updateFoodItem,
   deleteFoodItem,
   claimFoodItem,
   cancelFoodClaim,
+  adminClearFoodClaim,
 };

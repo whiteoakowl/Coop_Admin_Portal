@@ -81,7 +81,7 @@
           </form>
         <% } %>
         <form method="POST" action="/main-admin/events/<%= event.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= event.title %>&quot;? This cannot be undone.">
-          <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete Event" title="Delete Event"><svg class="icon"><use href="#icon-trash"/></svg></button>
+          <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete Event</button>
         </form>
         <% } %>
       </div>
@@ -382,22 +382,61 @@
 
           <div class="training-lesson-list">
             <% event.ticketTypes.forEach(function(t) { %>
-              <div class="training-lesson-row">
-                <div class="training-lesson-row-main">
+              <%# A real request: "add a ticket type the chart below that
+                  shows tickets. All information should fit on one row in
+                  mobile. Click on the ticket to edit and save, close or
+                  delete. Remove trashcan from ticket list. You can only
+                  delete in the edit popup window." The whole row is now a
+                  plain button opening this ticket's own edit dialog below
+                  - no per-row trash icon any more, and title/price/per/
+                  physical-ticket are one single-line, truncating string
+                  (.ticket-type-row-label, public/css/styles.css) instead
+                  of the generic two-line .training-lesson-info stack, so
+                  it never wraps to a second line even on a narrow phone. %>
+              <button
+                type="button"
+                class="training-lesson-row ticket-type-row"
+                onclick="document.getElementById('edit-ticket-type-dialog-<%= t.id %>').showModal()"
+                <%= financeDisabled %>
+              >
+                <span class="training-lesson-row-main">
                   <svg class="icon"><use href="#icon-badge"/></svg>
-                  <div class="training-lesson-info">
-                    <strong><%= t.title %></strong>
-                    <span class="hint">$<%= (t.price_cents / 100).toFixed(2) %> per <%= t.price_per %><% if (t.includes_physical_ticket) { %> &middot; Physical ticket<% } %></span>
+                  <span class="ticket-type-row-label">
+                    <strong><%= t.title %></strong> &middot; $<%= (t.price_cents / 100).toFixed(2) %>/<%= t.price_per %><% if (t.includes_physical_ticket) { %> &middot; Physical ticket<% } %>
+                  </span>
+                </span>
+              </button>
+
+              <dialog id="edit-ticket-type-dialog-<%= t.id %>" class="member-picker-dialog">
+                <form method="POST" action="/main-admin/events/<%= event.id %>/ticket-types/<%= t.id %>/update">
+                  <h3>Edit Ticket Type</h3>
+                  <label>Title
+                    <input type="text" name="title" value="<%= t.title %>" placeholder="e.g. Adult, Child, VIP" required />
+                  </label>
+                  <label>Price ($)
+                    <input type="number" name="priceDollars" min="0" step="0.01" value="<%= (t.price_cents / 100).toFixed(2) %>" required />
+                  </label>
+                  <label>Charged per
+                    <select name="pricePer">
+                      <option value="person" <%= t.price_per === 'person' ? 'selected' : '' %>>Person</option>
+                      <option value="family" <%= t.price_per === 'family' ? 'selected' : '' %>>Family</option>
+                    </select>
+                  </label>
+                  <label class="checkbox-option">
+                    <input type="checkbox" name="includesPhysicalTicket" value="1" <%= t.includes_physical_ticket ? 'checked' : '' %> />
+                    Include physical ticket
+                  </label>
+                  <div class="notes-dialog-actions">
+                    <button
+                      type="button"
+                      class="link-btn link-btn-danger"
+                      onclick="window.confirmAction({ message: 'Remove this ticket type? This cannot be undone.', yesLabel: 'Yes, Delete' }).then(ok => { if (ok) { this.form.action = '/main-admin/events/<%= event.id %>/ticket-types/<%= t.id %>/delete'; this.form.submit(); } })"
+                    >Delete Ticket Type</button>
+                    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+                    <button type="submit" class="primary-btn">Save</button>
                   </div>
-                  <% if (!organizerView) { %>
-                  <div class="training-lesson-actions">
-                    <form method="POST" action="/main-admin/events/<%= event.id %>/ticket-types/<%= t.id %>/delete" class="inline-block-form" data-confirm="Remove ticket type &quot;<%= t.title %>&quot;?">
-                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= t.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                    </form>
-                  </div>
-                  <% } %>
-                </div>
-              </div>
+                </form>
+              </dialog>
             <% }); %>
           </div>
         </div>
@@ -496,27 +535,77 @@
 
           <div class="training-lesson-list">
             <% event.volunteerRoles.forEach(function(role) { %>
-              <div class="training-lesson-row">
-                <div class="training-lesson-row-main">
+              <%# Same click-the-row-to-edit shape as Ticket Types/Extra
+                  Fields - a real request: "click on each item created in
+                  these sections to edit, include trash button, clear the
+                  member signed up, edit number required or description."
+                  No per-row trash icon any more - Save/Close/Delete all
+                  live in this role's own edit dialog below.
+                  .ticket-type-row-label keeps name/count/time/members all
+                  on one truncating line even on a narrow phone, same as
+                  Ticket Types - a real request: "view of all signup
+                  options on their individual edit pages in mobile should
+                  be on the same row. Item name, 1/1 filled, time (if
+                  there is one), member name signed up." %>
+              <button type="button" class="training-lesson-row ticket-type-row" onclick="document.getElementById('edit-role-dialog-<%= role.id %>').showModal()">
+                <span class="training-lesson-row-main">
                   <svg class="icon"><use href="#icon-users"/></svg>
-                  <div class="training-lesson-info">
-                    <strong><%= role.role_name %></strong>
-                    <span class="hint">
-                      <%= role.filled %>/<%= role.slots_needed %> filled
-                      <% if (role.time_label) { %> &middot; <%= role.time_label %><% } %>
-                      <% if (role.location) { %> &middot; <%= role.location %><% } %>
-                    </span>
-                    <% if (role.signups.length) { %>
-                      <span class="hint"><%= role.signups.map(function(s) { return s.memberName; }).join(', ') %></span>
-                    <% } %>
+                  <span class="ticket-type-row-label">
+                    <strong><%= role.role_name %></strong> &middot; <%= role.filled %>/<%= role.slots_needed %> filled
+                    <% if (role.time_label) { %> &middot; <%= role.time_label %><% } %>
+                    <% if (role.signups.length) { %> &middot; <%= role.signups.map(function(s) { return s.memberName; }).join(', ') %><% } %>
+                  </span>
+                </span>
+              </button>
+
+              <dialog id="edit-role-dialog-<%= role.id %>" class="member-picker-dialog">
+                <form method="POST" action="/main-admin/events/<%= event.id %>/volunteer-roles/<%= role.id %>/update">
+                  <h3>Edit Volunteer Role</h3>
+                  <label>Role Name
+                    <input type="text" name="roleName" value="<%= role.role_name %>" required />
+                  </label>
+                  <label>Slots Needed
+                    <input type="number" name="slotsNeeded" min="1" value="<%= role.slots_needed %>" required />
+                  </label>
+                  <label>Time
+                    <input type="text" name="timeLabel" value="<%= role.time_label || '' %>" placeholder="e.g. 8:00-9:00am" />
+                  </label>
+                  <label>Location
+                    <input type="text" name="location" value="<%= role.location || '' %>" />
+                  </label>
+                  <label>Description
+                    <textarea name="description" rows="2"><%= role.description || '' %></textarea>
+                  </label>
+                  <% if (role.signups.length) { %>
+                    <div class="member-form-full">
+                      <span class="class-form-field-label">Signed up</span>
+                      <div class="training-quiz-question-list">
+                        <% role.signups.forEach(function(s) { %>
+                          <div class="training-quiz-question-row">
+                            <span><%= s.memberName %></span>
+                            <span class="training-quiz-question-actions">
+                              <button
+                                type="button"
+                                class="link-btn link-btn-danger"
+                                onclick="window.confirmAction({ message: 'Clear <%= s.memberName %> from this role?', yesLabel: 'Yes, Clear' }).then(ok => { if (ok) { this.form.action = '/main-admin/events/<%= event.id %>/volunteer-roles/<%= role.id %>/signups/<%= s.member_id %>/clear'; this.form.submit(); } })"
+                              >Clear</button>
+                            </span>
+                          </div>
+                        <% }); %>
+                      </div>
+                    </div>
+                  <% } %>
+                  <div class="notes-dialog-actions">
+                    <button
+                      type="button"
+                      class="link-btn link-btn-danger"
+                      onclick="window.confirmAction({ message: 'Remove this volunteer role? This cannot be undone.', yesLabel: 'Yes, Delete' }).then(ok => { if (ok) { this.form.action = '/main-admin/events/<%= event.id %>/volunteer-roles/<%= role.id %>/delete'; this.form.submit(); } })"
+                    >Delete Volunteer Role</button>
+                    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+                    <button type="submit" class="primary-btn">Save</button>
                   </div>
-                  <div class="training-lesson-actions">
-                    <form method="POST" action="/main-admin/events/<%= event.id %>/volunteer-roles/<%= role.id %>/delete" class="inline-block-form" data-confirm="Remove volunteer role &quot;<%= role.role_name %>&quot;?">
-                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= role.role_name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                    </form>
-                  </div>
-                </div>
-              </div>
+                </form>
+              </dialog>
             <% }); %>
           </div>
         </div>
@@ -533,26 +622,62 @@
 
           <div class="training-lesson-list">
             <% event.donationItems.forEach(function(item) { %>
-              <div class="training-lesson-row">
-                <div class="training-lesson-row-main">
+              <button type="button" class="training-lesson-row ticket-type-row" onclick="document.getElementById('edit-item-dialog-<%= item.id %>').showModal()">
+                <span class="training-lesson-row-main">
                   <svg class="icon"><use href="#icon-badge"/></svg>
-                  <div class="training-lesson-info">
-                    <strong><%= item.item_name %></strong>
-                    <span class="hint">
-                      <%= item.quantityClaimed %>/<%= item.quantity_needed %> claimed
-                      <% if (item.deadline) { %> &middot; needed by <%= item.deadline %><% } %>
-                    </span>
-                    <% if (item.claims.length) { %>
-                      <span class="hint"><%= item.claims.map(function(c) { return c.memberName + ' (' + c.quantity_claimed + ')'; }).join(', ') %></span>
-                    <% } %>
+                  <span class="ticket-type-row-label">
+                    <strong><%= item.item_name %></strong> &middot; <%= item.quantityClaimed %>/<%= item.quantity_needed %> claimed
+                    <% if (item.deadline) { %> &middot; needed by <%= item.deadline %><% } %>
+                    <% if (item.claims.length) { %> &middot; <%= item.claims.map(function(c) { return c.memberName; }).join(', ') %><% } %>
+                  </span>
+                </span>
+              </button>
+
+              <dialog id="edit-item-dialog-<%= item.id %>" class="member-picker-dialog">
+                <form method="POST" action="/main-admin/events/<%= event.id %>/donation-items/<%= item.id %>/update">
+                  <h3>Edit Donation Item</h3>
+                  <label>Item Name
+                    <input type="text" name="itemName" value="<%= item.item_name %>" required />
+                  </label>
+                  <label>Quantity Needed
+                    <input type="number" name="quantityNeeded" min="1" value="<%= item.quantity_needed %>" required />
+                  </label>
+                  <label>Needed By
+                    <input type="date" name="deadline" value="<%= item.deadline || '' %>" />
+                  </label>
+                  <label>Notes
+                    <textarea name="notes" rows="2"><%= item.notes || '' %></textarea>
+                  </label>
+                  <% if (item.claims.length) { %>
+                    <div class="member-form-full">
+                      <span class="class-form-field-label">Claimed</span>
+                      <div class="training-quiz-question-list">
+                        <% item.claims.forEach(function(c) { %>
+                          <div class="training-quiz-question-row">
+                            <span><%= c.memberName %> (<%= c.quantity_claimed %>)</span>
+                            <span class="training-quiz-question-actions">
+                              <button
+                                type="button"
+                                class="link-btn link-btn-danger"
+                                onclick="window.confirmAction({ message: 'Clear <%= c.memberName %>&#39;s claim?', yesLabel: 'Yes, Clear' }).then(ok => { if (ok) { this.form.action = '/main-admin/events/<%= event.id %>/donation-items/<%= item.id %>/claims/<%= c.id %>/clear'; this.form.submit(); } })"
+                              >Clear</button>
+                            </span>
+                          </div>
+                        <% }); %>
+                      </div>
+                    </div>
+                  <% } %>
+                  <div class="notes-dialog-actions">
+                    <button
+                      type="button"
+                      class="link-btn link-btn-danger"
+                      onclick="window.confirmAction({ message: 'Remove this donation item? This cannot be undone.', yesLabel: 'Yes, Delete' }).then(ok => { if (ok) { this.form.action = '/main-admin/events/<%= event.id %>/donation-items/<%= item.id %>/delete'; this.form.submit(); } })"
+                    >Delete Donation Item</button>
+                    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+                    <button type="submit" class="primary-btn">Save</button>
                   </div>
-                  <div class="training-lesson-actions">
-                    <form method="POST" action="/main-admin/events/<%= event.id %>/donation-items/<%= item.id %>/delete" class="inline-block-form" data-confirm="Remove donation item &quot;<%= item.item_name %>&quot;?">
-                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= item.item_name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                    </form>
-                  </div>
-                </div>
-              </div>
+                </form>
+              </dialog>
             <% }); %>
           </div>
         </div>
@@ -569,26 +694,62 @@
 
           <div class="training-lesson-list">
             <% event.foodItems.forEach(function(item) { %>
-              <div class="training-lesson-row">
-                <div class="training-lesson-row-main">
+              <button type="button" class="training-lesson-row ticket-type-row" onclick="document.getElementById('edit-food-item-dialog-<%= item.id %>').showModal()">
+                <span class="training-lesson-row-main">
                   <svg class="icon"><use href="#icon-badge"/></svg>
-                  <div class="training-lesson-info">
-                    <strong><%= item.item_name %></strong>
-                    <span class="hint">
-                      <%= item.quantityClaimed %>/<%= item.quantity_needed %> claimed
-                      <% if (item.deadline) { %> &middot; needed by <%= item.deadline %><% } %>
-                    </span>
-                    <% if (item.claims.length) { %>
-                      <span class="hint"><%= item.claims.map(function(c) { return c.memberName + ' (' + c.quantity_claimed + ')'; }).join(', ') %></span>
-                    <% } %>
+                  <span class="ticket-type-row-label">
+                    <strong><%= item.item_name %></strong> &middot; <%= item.quantityClaimed %>/<%= item.quantity_needed %> claimed
+                    <% if (item.deadline) { %> &middot; needed by <%= item.deadline %><% } %>
+                    <% if (item.claims.length) { %> &middot; <%= item.claims.map(function(c) { return c.memberName; }).join(', ') %><% } %>
+                  </span>
+                </span>
+              </button>
+
+              <dialog id="edit-food-item-dialog-<%= item.id %>" class="member-picker-dialog">
+                <form method="POST" action="/main-admin/events/<%= event.id %>/food-items/<%= item.id %>/update">
+                  <h3>Edit Food Item</h3>
+                  <label>Item Name
+                    <input type="text" name="itemName" value="<%= item.item_name %>" required />
+                  </label>
+                  <label>Quantity Needed
+                    <input type="number" name="quantityNeeded" min="1" value="<%= item.quantity_needed %>" required />
+                  </label>
+                  <label>Needed By
+                    <input type="date" name="deadline" value="<%= item.deadline || '' %>" />
+                  </label>
+                  <label>Notes
+                    <textarea name="notes" rows="2"><%= item.notes || '' %></textarea>
+                  </label>
+                  <% if (item.claims.length) { %>
+                    <div class="member-form-full">
+                      <span class="class-form-field-label">Claimed</span>
+                      <div class="training-quiz-question-list">
+                        <% item.claims.forEach(function(c) { %>
+                          <div class="training-quiz-question-row">
+                            <span><%= c.memberName %> (<%= c.quantity_claimed %>)</span>
+                            <span class="training-quiz-question-actions">
+                              <button
+                                type="button"
+                                class="link-btn link-btn-danger"
+                                onclick="window.confirmAction({ message: 'Clear <%= c.memberName %>&#39;s claim?', yesLabel: 'Yes, Clear' }).then(ok => { if (ok) { this.form.action = '/main-admin/events/<%= event.id %>/food-items/<%= item.id %>/claims/<%= c.id %>/clear'; this.form.submit(); } })"
+                              >Clear</button>
+                            </span>
+                          </div>
+                        <% }); %>
+                      </div>
+                    </div>
+                  <% } %>
+                  <div class="notes-dialog-actions">
+                    <button
+                      type="button"
+                      class="link-btn link-btn-danger"
+                      onclick="window.confirmAction({ message: 'Remove this food item? This cannot be undone.', yesLabel: 'Yes, Delete' }).then(ok => { if (ok) { this.form.action = '/main-admin/events/<%= event.id %>/food-items/<%= item.id %>/delete'; this.form.submit(); } })"
+                    >Delete Food Item</button>
+                    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+                    <button type="submit" class="primary-btn">Save</button>
                   </div>
-                  <div class="training-lesson-actions">
-                    <form method="POST" action="/main-admin/events/<%= event.id %>/food-items/<%= item.id %>/delete" class="inline-block-form" data-confirm="Remove food item &quot;<%= item.item_name %>&quot;?">
-                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= item.item_name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                    </form>
-                  </div>
-                </div>
-              </div>
+                </form>
+              </dialog>
             <% }); %>
           </div>
         </div>
@@ -613,23 +774,61 @@
 
           <div class="training-lesson-list">
             <% event.extraFields.forEach(function(field) { %>
-              <div class="training-lesson-row">
-                <div class="training-lesson-row-main">
+              <%# Same click-the-row-to-edit shape as Ticket Types above -
+                  no per-row trash icon, Save/Close/Delete all live in
+                  this field's own edit dialog. %>
+              <button type="button" class="training-lesson-row ticket-type-row" onclick="document.getElementById('edit-extra-field-dialog-<%= field.id %>').showModal()">
+                <span class="training-lesson-row-main">
                   <svg class="icon"><use href="#icon-badge"/></svg>
-                  <div class="training-lesson-info">
-                    <strong><%= field.label %></strong>
-                    <span class="hint">
-                      <%= field.field_type %><% if (field.required) { %> &middot; required<% } %>
-                      <% if (field.field_type === 'select' && field.options) { %> &middot; <%= field.options.split('\n').join(', ') %><% } %>
-                    </span>
+                  <span class="ticket-type-row-label">
+                    <strong><%= field.label %></strong> &middot; <%= field.field_type %><% if (field.required) { %> &middot; required<% } %> &middot; <%= field.scope === 'family' ? 'family' : 'each member' %>
+                    <% if (field.field_type === 'select' && field.options) { %> &middot; <%= field.options.split('\n').join(', ') %><% } %>
+                  </span>
+                </span>
+              </button>
+
+              <dialog id="edit-extra-field-dialog-<%= field.id %>" class="member-picker-dialog">
+                <form method="POST" action="/main-admin/events/<%= event.id %>/extra-fields/<%= field.id %>/update">
+                  <h3>Edit Extra Field</h3>
+                  <label>Question / Label
+                    <input type="text" name="label" value="<%= field.label %>" placeholder="e.g. T-shirt size" required />
+                  </label>
+                  <label>Field Type
+                    <select name="fieldType" onchange="document.getElementById('edit-extra-field-options-row-<%= field.id %>').style.display = this.value === 'select' ? '' : 'none'">
+                      <% extraFieldTypes.forEach(function(t) { %>
+                        <option value="<%= t %>" <%= field.field_type === t ? 'selected' : '' %>><%= t.charAt(0).toUpperCase() + t.slice(1) %></option>
+                      <% }); %>
+                    </select>
+                  </label>
+                  <label id="edit-extra-field-options-row-<%= field.id %>" style="<%= field.field_type === 'select' ? '' : 'display: none;' %>">Choices <span class="hint">(one per line)</span>
+                    <textarea name="options" rows="3" placeholder="Small&#10;Medium&#10;Large"><%= field.options || '' %></textarea>
+                  </label>
+                  <label class="checkbox-option">
+                    <input type="checkbox" name="required" value="1" <%= field.required ? 'checked' : '' %> />
+                    Required to register
+                  </label>
+                  <%# A real request: "requires for each member or family.
+                      If required for family is selected only the parent
+                      will be asked to choose or fill out those extra
+                      fields. If for each member is selected then it will
+                      ask that for each member." %>
+                  <label>Ask this of
+                    <select name="scope">
+                      <option value="each_member" <%= field.scope !== 'family' ? 'selected' : '' %>>Each member registering</option>
+                      <option value="family" <%= field.scope === 'family' ? 'selected' : '' %>>Only the parent (once per family)</option>
+                    </select>
+                  </label>
+                  <div class="notes-dialog-actions">
+                    <button
+                      type="button"
+                      class="link-btn link-btn-danger"
+                      onclick="window.confirmAction({ message: 'Remove this extra field? This cannot be undone.', yesLabel: 'Yes, Delete' }).then(ok => { if (ok) { this.form.action = '/main-admin/events/<%= event.id %>/extra-fields/<%= field.id %>/delete'; this.form.submit(); } })"
+                    >Delete Extra Field</button>
+                    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+                    <button type="submit" class="primary-btn">Save</button>
                   </div>
-                  <div class="training-lesson-actions">
-                    <form method="POST" action="/main-admin/events/<%= event.id %>/extra-fields/<%= field.id %>/delete" class="inline-block-form" data-confirm="Remove extra field &quot;<%= field.label %>&quot;?">
-                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= field.label %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                    </form>
-                  </div>
-                </div>
-              </div>
+                </form>
+              </dialog>
             <% }); %>
           </div>
         </div>
@@ -919,6 +1118,12 @@
         <label class="checkbox-option">
           <input type="checkbox" name="required" value="1" />
           Required to register
+        </label>
+        <label>Ask this of
+          <select name="scope">
+            <option value="each_member">Each member registering</option>
+            <option value="family">Only the parent (once per family)</option>
+          </select>
         </label>
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>

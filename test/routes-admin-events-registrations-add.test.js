@@ -59,6 +59,30 @@ async function createEvent(admin, overrides = {}) {
   return eventId;
 }
 
+// The Add Registration popup now submits one members[m<id>][...] entry
+// per selected member (a real request made this literal: "as if the
+// actual member is signing up" - their own ticket/answers, not one
+// shared set stamped onto everyone) instead of a flat memberIds[]/
+// ticketTypeId/answers[] shared across the whole batch. memberOptions is
+// `{ [memberId]: { ticketTypeId, answers: { [fieldId]: value } } }`.
+function membersBody(memberIds, memberOptions = {}) {
+  const members = {};
+  for (const id of memberIds) {
+    const opts = memberOptions[id] || {};
+    // form-urlencoded serialization drops a key whose value is an empty
+    // object ({}) entirely - always including ticketTypeId (even blank)
+    // guarantees members[m<id>] actually reaches the server as a key.
+    members[`m${id}`] = { ticketTypeId: opts.ticketTypeId ? String(opts.ticketTypeId) : '' };
+    if (opts.answers) {
+      members[`m${id}`].answers = {};
+      for (const [fieldId, value] of Object.entries(opts.answers)) {
+        members[`m${id}`].answers[`f${fieldId}`] = value;
+      }
+    }
+  }
+  return { members };
+}
+
 async function makeFamily(label) {
   const familyId = (await db.prepare('INSERT INTO families (name) VALUES (?)').run(`${label} Family`)).lastInsertRowid;
   const parentInfo = await db
@@ -84,7 +108,7 @@ test('Add Registration popup lists eligible members sorted by family, filterable
   const filterSection = /id="add-registration-family-filter">([\s\S]*?)<\/select>/.exec(page.text)[1];
   assert.ok(filterSection.indexOf('Alpha Family') < filterSection.indexOf('Zeta Family'), 'family filter options should be A-Z');
   // The checkbox list itself should also list Alpha's members before Zeta's.
-  const listSection = /id="add-registration-member-list">([\s\S]*?)<\/div>\s*(?:<label>|<div class="notes-dialog-actions">)/.exec(page.text)[1];
+  const listSection = /id="add-registration-member-list">([\s\S]*?)id="add-registration-step-details"/.exec(page.text)[1];
   assert.ok(listSection.indexOf('Alpha Parent') < listSection.indexOf('Zeta Parent'), 'member checkbox list should sort by family A-Z');
 
   const csrf = extractCsrf(page.text);
@@ -92,7 +116,7 @@ test('Add Registration popup lists eligible members sorted by family, filterable
     .post(`/main-admin/events/${eventId}/registrations/add`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ memberIds: [String(zeta.parentId), String(alpha.studentId)], _csrf: csrf });
+    .send({ ...membersBody([zeta.parentId, alpha.studentId]), _csrf: csrf });
   assert.match(saveRes.headers.location, new RegExp(`/main-admin/events/${eventId}/registrations`));
 
   const registered = await db.prepare("SELECT member_id FROM event_registrations WHERE event_id = ? AND status != 'cancelled'").all(eventId);
@@ -110,7 +134,7 @@ test('Registrations totals header: families, parents, students, cancelled, check
     .post(`/main-admin/events/${eventId}/registrations/add`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ memberIds: [String(family.parentId), String(family.studentId)], _csrf: csrf });
+    .send({ ...membersBody([family.parentId, family.studentId]), _csrf: csrf });
 
   const reg = await db.prepare('SELECT id FROM event_registrations WHERE event_id = ? AND member_id = ?').get(eventId, family.parentId);
   csrf = await (async () => extractCsrf((await request(app).get(`/main-admin/events/${eventId}/registrations`).set('Cookie', admin.cookie)).text))();
@@ -170,7 +194,7 @@ test('Print, Export, and Import buttons/routes exist and work', async () => {
     .post(`/main-admin/events/${eventId}/registrations/add`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ memberIds: [String(family.parentId)], _csrf: csrf });
+    .send({ ...membersBody([family.parentId]), _csrf: csrf });
 
   const page = await request(app).get(`/main-admin/events/${eventId}/registrations`).set('Cookie', admin.cookie);
   assert.match(page.text, new RegExp(`href="/main-admin/events/${eventId}/registrations/print"`));
@@ -230,7 +254,7 @@ test('Add Registration popup offers an attached Volunteer List shift and Sign-Up
     .post(`/main-admin/events/${eventId}/registrations/add`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ memberIds: [String(family.parentId)], volunteerShiftId: String(shift.id), _csrf: csrf });
+    .send({ ...membersBody([family.parentId]), volunteerShiftId: String(shift.id), _csrf: csrf });
 
   const signup = await db.prepare('SELECT * FROM volunteer_signup_list_signups WHERE shift_id = ? AND member_id = ?').get(shift.id, family.parentId);
   assert.ok(signup, 'the selected member should be signed up for the shift chosen in the popup');
@@ -261,21 +285,98 @@ test('Add Registration popup offers the same Ticket and Extra Field questions se
   const extraField = await db.prepare("SELECT id FROM event_extra_fields WHERE event_id = ? AND label = 'T-Shirt Size'").get(eventId);
 
   const page = await request(app).get(`/main-admin/events/${eventId}/registrations`).set('Cookie', admin.cookie);
-  assert.match(page.text, /name="ticketTypeId"/);
+  // The ticket/field markup is templated now (public/js/admin-event-add-
+  // registration.js clones it once per selected member on Continue), not
+  // rendered with a live name="..." already on the page.
+  assert.match(page.text, /id="add-registration-ticket-template"/);
   assert.match(page.text, /General Admission/);
   assert.match(page.text, /T-Shirt Size/);
-  assert.match(page.text, new RegExp(`name="answers\\[f${extraField.id}\\]"`));
+  assert.match(page.text, new RegExp(`data-field-id="${extraField.id}"`));
 
   csrf = extractCsrf(page.text);
   await request(app)
     .post(`/main-admin/events/${eventId}/registrations/add`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ memberIds: [String(family.parentId)], ticketTypeId: String(ticketType.id), [`answers[f${extraField.id}]`]: 'Large', _csrf: csrf });
+    .send({ ...membersBody([family.parentId], { [family.parentId]: { ticketTypeId: ticketType.id, answers: { [extraField.id]: 'Large' } } }), _csrf: csrf });
 
   const registration = await db.prepare('SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ?').get(eventId, family.parentId);
   assert.ok(registration);
   assert.equal(registration.ticket_type_id, ticketType.id);
   const answer = await db.prepare('SELECT value FROM event_registration_answers WHERE registration_id = ? AND extra_field_id = ?').get(registration.id, extraField.id);
   assert.equal(answer.value, 'Large');
+});
+
+// A real request made this literal: "after selecting the family and
+// then the members of that family signing up, the popup window will
+// then go through all of the signup, extra question and tickets choices
+// for that event as if the actual member is signing up" - each selected
+// member now gets their OWN ticket choice and their OWN each-member
+// answer in a single Add Registration submission, not one shared set
+// stamped onto the whole batch.
+test('Add Registration: two members in the same submission each get their own distinct ticket and extra-field answer', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  const family = await makeFamily('PerMember');
+
+  let csrf = extractCsrf((await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie)).text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/ticket-types`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Adult', priceDollars: '10.00', _csrf: csrf });
+  await request(app)
+    .post(`/main-admin/events/${eventId}/ticket-types`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Child', priceDollars: '5.00', _csrf: csrf });
+  const adultTicket = await db.prepare("SELECT id FROM event_ticket_types WHERE event_id = ? AND title = 'Adult'").get(eventId);
+  const childTicket = await db.prepare("SELECT id FROM event_ticket_types WHERE event_id = ? AND title = 'Child'").get(eventId);
+
+  csrf = extractCsrf((await request(app).get(`/main-admin/events/${eventId}/builder?tab=volunteers&section=extraFields`).set('Cookie', admin.cookie)).text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/extra-fields`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ label: 'T-Shirt Size', fieldType: 'text', scope: 'each_member', _csrf: csrf });
+  const shirtField = await db.prepare("SELECT id FROM event_extra_fields WHERE event_id = ? AND label = 'T-Shirt Size'").get(eventId);
+
+  csrf = extractCsrf((await request(app).get(`/main-admin/events/${eventId}/registrations`).set('Cookie', admin.cookie)).text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/registrations/add`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({
+      ...membersBody([family.parentId, family.studentId], {
+        [family.parentId]: { ticketTypeId: adultTicket.id, answers: { [shirtField.id]: 'Large' } },
+        [family.studentId]: { ticketTypeId: childTicket.id, answers: { [shirtField.id]: 'Small' } },
+      }),
+      _csrf: csrf,
+    });
+
+  const parentReg = await db.prepare('SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ?').get(eventId, family.parentId);
+  const studentReg = await db.prepare('SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ?').get(eventId, family.studentId);
+  assert.equal(parentReg.ticket_type_id, adultTicket.id);
+  assert.equal(studentReg.ticket_type_id, childTicket.id);
+
+  const parentAnswer = await db.prepare('SELECT value FROM event_registration_answers WHERE registration_id = ? AND extra_field_id = ?').get(parentReg.id, shirtField.id);
+  const studentAnswer = await db.prepare('SELECT value FROM event_registration_answers WHERE registration_id = ? AND extra_field_id = ?').get(studentReg.id, shirtField.id);
+  assert.equal(parentAnswer.value, 'Large');
+  assert.equal(studentAnswer.value, 'Small');
+});
+
+test('Add Registration popup: a family-scoped extra field is only rendered in the template once (not duplicated per ticket), and a per-member block only shows it for a parent/admin type member', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+
+  const csrf = extractCsrf((await request(app).get(`/main-admin/events/${eventId}/builder?tab=volunteers&section=extraFields`).set('Cookie', admin.cookie)).text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/extra-fields`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ label: 'Family Photo Consent', fieldType: 'checkbox', scope: 'family', _csrf: csrf });
+  const field = await db.prepare("SELECT id FROM event_extra_fields WHERE event_id = ? AND label = 'Family Photo Consent'").get(eventId);
+
+  const page = await request(app).get(`/main-admin/events/${eventId}/registrations`).set('Cookie', admin.cookie);
+  assert.match(page.text, new RegExp(`data-field-id="${field.id}" data-field-scope="family"`));
 });

@@ -276,10 +276,28 @@
     return data;
   }
 
+  // A real request: "requires for each member or family. If required
+  // for family is selected only the parent will be asked to choose or
+  // fill out those extra fields." Each field's own wrapping <label>
+  // carries data-field-scope="family" when it's family-scoped (see
+  // views/events-detail.ejs); hiding it for anyone who isn't a parent/
+  // admin also exempts it from constraint validation entirely (a hidden
+  // element is "barred from constraint validation" per spec - the Next
+  // button's own reportValidity() call below already relies on the same
+  // rule for the rest of this step).
+  function applyFieldScopeFor(memberType) {
+    if (!detailsStep) return;
+    const isParent = memberType === 'parent' || memberType === 'admin';
+    detailsStep.querySelectorAll('[data-field-scope="family"]').forEach((el) => {
+      el.hidden = !isParent;
+    });
+  }
+
   function showDetailsFor(index) {
     const member = queue[index];
     if (memberNameEl) memberNameEl.textContent = member.name;
     resetDetailsFields();
+    applyFieldScopeFor(member.type);
     showStep('details');
   }
 
@@ -421,7 +439,7 @@
     const registerBtn = e.target.closest('.js-event-register-btn');
     if (registerBtn) {
       const row = registerBtn.closest('.event-register-member-row');
-      startWizard([{ id: row.dataset.memberId, name: row.dataset.memberName }]);
+      startWizard([{ id: row.dataset.memberId, name: row.dataset.memberName, type: row.dataset.memberType }]);
       return;
     }
     const unregisterBtn = e.target.closest('.js-event-unregister-btn');
@@ -460,7 +478,7 @@
       const members = checkboxes
         .map((cb) => cb.closest('.event-register-member-row'))
         .filter((row) => row.dataset.registered !== '1')
-        .map((row) => ({ id: row.dataset.memberId, name: row.dataset.memberName }));
+        .map((row) => ({ id: row.dataset.memberId, name: row.dataset.memberName, type: row.dataset.memberType }));
       if (members.length) startWizard(members);
     });
   }
