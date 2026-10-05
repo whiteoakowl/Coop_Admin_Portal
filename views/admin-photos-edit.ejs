@@ -37,12 +37,46 @@
             <option value="public" <%= album.visibility === 'public' ? 'selected' : '' %>>Public</option>
           </select>
         </label>
+        <%# A real request: "add a check box permission for members can
+            add photos. If that box is not checked than the album will
+            be view only on parent and student portals." %>
+        <label class="checkbox-option member-form-full">
+          <input type="checkbox" name="allowMemberUploads" value="1" <%= album.allow_member_uploads ? 'checked' : '' %> />
+          Members can add photos
+        </label>
         <div class="member-form-full">
-          <button type="submit" class="primary-btn">Save</button>
+          <%# A real request: "delete albums button should be clean next
+              to save. Archive button added next to it in the same
+              row." Same roster-btn-row-nowrap fit-to-content fix used
+              elsewhere in this app, so Save/Archive/Delete each size to
+              their own text instead of stretching evenly. %>
+          <div class="roster-btn-row roster-btn-row-nowrap">
+            <button type="submit" class="primary-btn">Save</button>
+            <button type="submit" form="archive-album-form" class="roster-action-btn">Archive</button>
+            <button type="submit" form="delete-album-form" class="roster-action-btn roster-action-btn-danger">Delete</button>
+          </div>
         </div>
       </form>
-      <form method="POST" action="/main-admin/photos/<%= album.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= album.title %>&quot; and all its photos? This cannot be undone.">
-        <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete Album</button>
+      <form method="POST" id="archive-album-form" action="/main-admin/photos/<%= album.id %>/archive" data-confirm="Archive &quot;<%= album.title %>&quot;? Members will no longer be able to view or add to it."></form>
+      <form method="POST" id="delete-album-form" action="/main-admin/photos/<%= album.id %>/delete" data-confirm="Delete &quot;<%= album.title %>&quot; and all its photos? This cannot be undone."></form>
+    </div>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Cover Photo</h2></div>
+      <%# A real request: "allow to upload a cover photo when editing.
+          Make sure it save properly." A direct upload instead of the
+          roundabout "add it to the gallery below, then Set as Cover"
+          flow. %>
+      <% if (album.cover_image_key) { %>
+        <img src="/photos/<%= album.id %>/cover" alt="" style="width: 160px; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius); margin-bottom: 0.75rem;" />
+      <% } %>
+      <form method="POST" action="/main-admin/photos/<%= album.id %>/cover" enctype="multipart/form-data" class="member-form-grid">
+        <label class="member-form-full">Cover Image
+          <input type="file" name="coverImage" accept="image/*" required />
+        </label>
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Upload Cover Photo</button>
+        </div>
       </form>
     </div>
 

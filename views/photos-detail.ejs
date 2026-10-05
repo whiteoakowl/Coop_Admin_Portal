@@ -54,8 +54,11 @@
         <%# A real request: "admins can create albums that members can
             upload to. members can't upload albums." No create-album
             form anywhere on this member-facing side - only an existing
-            album's own upload, and only once signed in. %>
-        <% if (typeof portalAccount !== 'undefined' && portalAccount) { %>
+            album's own upload, and only once signed in. A later real
+            request: "add a check box permission for members can add
+            photos. If that box is not checked than the album will be
+            view only on parent and student portals." %>
+        <% if (typeof portalAccount !== 'undefined' && portalAccount && album.allow_member_uploads) { %>
           <form method="POST" action="/photos/<%= album.id %>/upload" enctype="multipart/form-data" class="member-form-grid">
             <label class="member-form-full">Add Photos
               <input type="file" name="images" accept="image/*" multiple required />

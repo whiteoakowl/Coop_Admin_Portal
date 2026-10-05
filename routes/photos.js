@@ -97,9 +97,15 @@ router.get('/:albumId/image/:photoId', async (req, res) => {
 // or signed-in) still applies - a member has to be able to SEE an album
 // before they can add to it, same rule the album's own detail page
 // already enforces.
+// A real request: "add a check box permission for members can add
+// photos. If that box is not checked than the album will be view only
+// on parent and student portals." allow_member_uploads is off by
+// default - canView passing just means the member can see the album,
+// not that they can add to it.
 router.post('/:id/upload', requirePortalAuth, upload.array('images', 20), async (req, res) => {
   const album = await photos.getAlbum(req.params.id);
   if (!(await canView(req, album))) return res.status(404).render('404', { title: 'Not Found' });
+  if (!album.allow_member_uploads) return res.status(404).render('404', { title: 'Not Found' });
   if (!req.files || !req.files.length) return res.redirect(`/photos/${album.id}?error=` + encodeURIComponent('Please choose at least one image.'));
 
   let firstKey = null;

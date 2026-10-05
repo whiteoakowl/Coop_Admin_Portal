@@ -7251,6 +7251,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    stacked lines (text, hint, control). */
 .dialog-label-stack label { display: flex; flex-direction: column; gap: 0.35rem; }
 .dialog-label-stack select { margin-top: 0; }
+/* .checkbox-option is also a <label> - without this, the rule above
+   would flip its own row layout (checkbox beside its text) into a
+   column (checkbox above text), same as the stray-nested-form bug
+   class elsewhere in this file: a shared ancestor selector reaching
+   into a child component that already owns its own, different layout.
+   Two classes beats one class + one type, so this wins back the row. */
+.dialog-label-stack .checkbox-option { flex-direction: row; align-items: center; }
 
 /* ---------- Class Schedule (admin grid + print) ---------- */
 

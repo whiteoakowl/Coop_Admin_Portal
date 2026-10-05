@@ -152,6 +152,106 @@ test('a new album defaults to members-only, not public', async () => {
   assert.equal(album.visibility, 'members');
 });
 
+// A real request: "add a check box permission for members can add
+// photos. If that box is not checked than the album will be view only
+// on parent and student portals."
+test('a new album defaults to allow_member_uploads off, and a member cannot upload until it is turned on', async () => {
+  const admin = await loginAsMainAdmin();
+  const albumId = await createAlbum(admin, 'members');
+  const album = await db.prepare('SELECT * FROM photo_albums WHERE id = ?').get(albumId);
+  assert.equal(album.allow_member_uploads, 0, 'off by default');
+
+  const member = await createParentAccount();
+  const deniedUpload = await request(app)
+    .post(`/photos/${albumId}/upload?_csrf=${encodeURIComponent(member.csrfToken)}`)
+    .set('Cookie', member.cookie)
+    .attach('images', Buffer.from('fake jpeg bytes'), { filename: 'test.jpg', contentType: 'image/jpeg' });
+  assert.equal(deniedUpload.status, 404);
+
+  const albumPage = await request(app).get(`/photos/${albumId}`).set('Cookie', member.cookie);
+  assert.doesNotMatch(albumPage.text, /enctype="multipart\/form-data"/, 'no upload form should render when uploads are off');
+
+  await request(app)
+    .post(`/main-admin/photos/${albumId}`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Members Can Upload Album', visibility: 'members', allowMemberUploads: '1', _csrf: admin.csrfToken });
+
+  const allowedUpload = await request(app)
+    .post(`/photos/${albumId}/upload?_csrf=${encodeURIComponent(member.csrfToken)}`)
+    .set('Cookie', member.cookie)
+    .attach('images', Buffer.from('fake jpeg bytes'), { filename: 'test.jpg', contentType: 'image/jpeg' });
+  assert.equal(allowedUpload.status, 302);
+  assert.match(allowedUpload.headers.location, /notice=/);
+});
+
+// A real request: "allow to upload a cover photo when editing. Make
+// sure it save properly."
+test('uploading a cover photo directly sets the album cover without requiring a gallery photo first', async () => {
+  const admin = await loginAsMainAdmin();
+  const albumId = await createAlbum(admin, 'members');
+  let album = await db.prepare('SELECT * FROM photo_albums WHERE id = ?').get(albumId);
+  assert.equal(album.cover_image_key, null);
+
+  const res = await request(app)
+    .post(`/main-admin/photos/${albumId}/cover?_csrf=${encodeURIComponent(admin.csrfToken)}`)
+    .set('Cookie', admin.cookie)
+    .attach('coverImage', Buffer.from('fake jpeg bytes'), { filename: 'cover.jpg', contentType: 'image/jpeg' });
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /notice=/);
+
+  album = await db.prepare('SELECT * FROM photo_albums WHERE id = ?').get(albumId);
+  assert.ok(album.cover_image_key, 'the album should have a cover_image_key now');
+  assert.equal((await db.prepare('SELECT COUNT(*) AS c FROM photo_album_photos WHERE album_id = ?').get(albumId)).c, 0, 'no gallery photo row should have been created');
+
+  const coverView = await request(app).get(`/photos/${albumId}/cover`).set('Cookie', admin.cookie);
+  assert.equal(coverView.status, 200);
+});
+
+// A real request: "add archive subpage under photos tab."
+test('Archive/Restore moves an album between the Photos and Archive tabs, hiding it from members while archived', async () => {
+  const admin = await loginAsMainAdmin();
+  const albumId = await createAlbum(admin, 'members');
+
+  const photosTab = await request(app).get('/main-admin/photos').set('Cookie', admin.cookie);
+  assert.match(photosTab.text, new RegExp(`/main-admin/photos/${albumId}/edit`));
+
+  await request(app).post(`/main-admin/photos/${albumId}/archive`).set('Cookie', admin.cookie).type('form').send({ _csrf: admin.csrfToken });
+  const archived = await db.prepare('SELECT status FROM photo_albums WHERE id = ?').get(albumId);
+  assert.equal(archived.status, 'archived');
+
+  const photosTabAfter = await request(app).get('/main-admin/photos').set('Cookie', admin.cookie);
+  assert.doesNotMatch(photosTabAfter.text, new RegExp(`/main-admin/photos/${albumId}/edit`));
+
+  const archiveTab = await request(app).get('/main-admin/photos?tab=archive').set('Cookie', admin.cookie);
+  assert.match(archiveTab.text, new RegExp(`/main-admin/photos/${albumId}/edit`));
+  assert.match(archiveTab.text, /Restore/);
+
+  const member = await createParentAccount();
+  const memberListing = await request(app).get('/photos').set('Cookie', member.cookie);
+  assert.doesNotMatch(memberListing.text, new RegExp(`/photos/${albumId}`), 'an archived album should not appear in the member-facing listing');
+
+  await request(app).post(`/main-admin/photos/${albumId}/unarchive`).set('Cookie', admin.cookie).type('form').send({ _csrf: admin.csrfToken });
+  const restored = await db.prepare('SELECT status FROM photo_albums WHERE id = ?').get(albumId);
+  assert.equal(restored.status, 'active');
+
+  const photosTabRestored = await request(app).get('/main-admin/photos').set('Cookie', admin.cookie);
+  assert.match(photosTabRestored.text, new RegExp(`/main-admin/photos/${albumId}/edit`));
+});
+
+// A real request: "edit albums button should fit properly... delete
+// albums button should be clean next to save. Archive button added
+// next to it in the same row."
+test('album edit page: Save/Archive/Delete sit in one row, each sized to its own text', async () => {
+  const admin = await loginAsMainAdmin();
+  const albumId = await createAlbum(admin, 'members');
+  const page = await request(app).get(`/main-admin/photos/${albumId}/edit`).set('Cookie', admin.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /class="roster-btn-row roster-btn-row-nowrap"/);
+  assert.match(page.text, /<button type="submit" form="archive-album-form" class="roster-action-btn">Archive<\/button>/);
+  assert.match(page.text, /<button type="submit" form="delete-album-form" class="roster-action-btn roster-action-btn-danger">Delete<\/button>/);
+});
+
 test('a draft publication 404s even by direct URL; publishing makes it visible', async () => {
   const admin = await loginAsMainAdmin();
   const createRes = await request(app).post('/main-admin/publications').set('Cookie', admin.cookie).type('form').send({ title: 'Season Update', _csrf: admin.csrfToken });

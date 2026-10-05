@@ -36,16 +36,22 @@ if (!storageClient && !fs.existsSync(PHOTOS_DIR)) {
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_IMAGE_BYTES }, fileFilter: imageFileFilter });
 
+const PHOTOS_TABS = ['photos', 'archive'];
+
 router.get('/', async (req, res) => {
-  const albums = await photos.listAlbums();
-  const pendingPhotos = await photos.listPendingPhotos();
-  res.render('admin-photos-list', { title: 'Photos', albums, pendingPhotos, notice: req.query.notice || null });
+  const activeTab = PHOTOS_TABS.includes(req.query.tab) ? req.query.tab : 'photos';
+  const albums = await photos.listAlbums({ status: activeTab === 'archive' ? 'archived' : 'active' });
+  const pendingPhotos = activeTab === 'photos' ? await photos.listPendingPhotos() : [];
+  res.render('admin-photos-list', { title: 'Photos', activeTab, albums, pendingPhotos, notice: req.query.notice || null });
 });
 
 router.post('/', async (req, res) => {
   const title = (req.body.title || '').trim();
   if (!title) return res.redirect('/main-admin/photos?notice=' + encodeURIComponent('A title is required.'));
-  const id = await photos.createAlbum({ title, description: (req.body.description || '').trim(), visibility: req.body.visibility }, req.portalAccount.id);
+  const id = await photos.createAlbum(
+    { title, description: (req.body.description || '').trim(), visibility: req.body.visibility, allowMemberUploads: req.body.allowMemberUploads === '1' },
+    req.portalAccount.id
+  );
   res.redirect(`/main-admin/photos/${id}/edit`);
 });
 
@@ -61,8 +67,25 @@ router.post('/:id', async (req, res) => {
   const id = req.params.id;
   const title = (req.body.title || '').trim();
   if (!title) return res.redirect(`/main-admin/photos/${id}/edit?error=` + encodeURIComponent('A title is required.'));
-  await photos.updateAlbum(id, { title, description: (req.body.description || '').trim(), visibility: req.body.visibility });
+  await photos.updateAlbum(id, {
+    title,
+    description: (req.body.description || '').trim(),
+    visibility: req.body.visibility,
+    allowMemberUploads: req.body.allowMemberUploads === '1',
+  });
   res.redirect(`/main-admin/photos/${id}/edit?notice=` + encodeURIComponent('Saved.'));
+});
+
+// "Archive button added next to it in the same row. Add archive
+// subpage under photos tab."
+router.post('/:id/archive', async (req, res) => {
+  await photos.archiveAlbum(req.params.id);
+  res.redirect('/main-admin/photos?notice=' + encodeURIComponent('Album archived.'));
+});
+
+router.post('/:id/unarchive', async (req, res) => {
+  await photos.unarchiveAlbum(req.params.id);
+  res.redirect('/main-admin/photos?tab=archive&notice=' + encodeURIComponent('Album restored.'));
 });
 
 router.post('/:id/delete', async (req, res) => {
@@ -106,6 +129,26 @@ router.post('/:id/photos/:photoId/cover', async (req, res) => {
   const photo = await photos.getPhoto(req.params.photoId);
   if (photo) await photos.setCoverImage(req.params.id, photo.image_key);
   res.redirect(`/main-admin/photos/${req.params.id}/edit?notice=` + encodeURIComponent('Cover photo set.'));
+});
+
+// A real request: "allow to upload a cover photo when editing" - a
+// direct upload instead of the roundabout "add it to the gallery, then
+// Set as Cover" flow above. Doesn't delete the album's previous
+// cover_image_key file - that key may still be shared with a live
+// gallery photo (set via the button above), so deleting it here could
+// destroy a photo that's still in the gallery.
+router.post('/:id/cover', upload.single('coverImage'), async (req, res) => {
+  const albumId = req.params.id;
+  if (!req.file) return res.redirect(`/main-admin/photos/${albumId}/edit?error=` + encodeURIComponent('Please choose an image file.'));
+  let key;
+  if (storageClient) {
+    key = await uploadFile(storageClient, PHOTOS_BUCKET, req.file.buffer, req.file.originalname, req.file.mimetype);
+  } else {
+    key = generateKey(req.file.originalname);
+    fs.writeFileSync(path.join(PHOTOS_DIR, key), req.file.buffer);
+  }
+  await photos.setCoverImage(albumId, key);
+  res.redirect(`/main-admin/photos/${albumId}/edit?notice=` + encodeURIComponent('Cover photo updated.'));
 });
 
 router.post('/:id/photos/:photoId/decide', async (req, res) => {

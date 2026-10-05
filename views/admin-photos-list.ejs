@@ -10,9 +10,16 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
-      <h1>Photos</h1>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('new-album-dialog').showModal()">+ New Album</button>
+      <h1><%= activeTab === 'archive' ? 'Archive' : 'Photos' %></h1>
+      <% if (activeTab === 'photos') { %>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('new-album-dialog').showModal()">+ New Album</button>
+      <% } %>
     </div>
+
+    <%# "Add archive subpage under photos tab" - Photos/Archive now live
+        as subpages under the orange bar's own Photos item (views/
+        partials/portal-nav.ejs), same pattern as every other tabbed
+        section. %>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
@@ -47,7 +54,7 @@
     <% } %>
 
     <% if (albums.length === 0) { %>
-      <p class="roster-empty">No albums yet &mdash; create one above.</p>
+      <p class="roster-empty"><%= activeTab === 'archive' ? 'Nothing archived.' : 'No albums yet — create one above.' %></p>
     <% } %>
 
     <div class="team-card-grid">
@@ -59,13 +66,18 @@
             <% if (a.description) { %><p class="hint"><%= a.description %></p><% } %>
             <div class="roster-btn-row">
               <a class="roster-action-btn" href="/main-admin/photos/<%= a.id %>/edit">Manage</a>
+              <% if (activeTab === 'archive') { %>
+                <form method="POST" action="/main-admin/photos/<%= a.id %>/unarchive" class="inline-block-form">
+                  <button type="submit" class="roster-action-btn">Restore</button>
+                </form>
+              <% } %>
             </div>
           </div>
         </div>
       <% }); %>
     </div>
 
-    <dialog id="new-album-dialog" class="member-picker-dialog">
+    <dialog id="new-album-dialog" class="member-picker-dialog dialog-label-stack">
       <form method="POST" action="/main-admin/photos">
         <h3>New Album</h3>
         <label>Title
@@ -81,6 +93,13 @@
           </select>
         </label>
         <p class="hint">Members Only is the safer default - a photo with children in it should stay members-only unless there's a specific reason to make an album public.</p>
+        <%# A real request: "add a check box permission for members can
+            add photos. If that box is not checked than the album will
+            be view only on parent and student portals." %>
+        <label class="checkbox-option">
+          <input type="checkbox" name="allowMemberUploads" value="1" />
+          Members can add photos
+        </label>
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
           <button type="submit" class="primary-btn">Create</button>

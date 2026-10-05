@@ -100,7 +100,10 @@ const MAIN_ADMIN_NAV_LINKS = [
     { href: '/main-admin/name-tags?tab=print', label: 'Print' },
     { href: '/main-admin/name-tags?tab=requests', label: 'Requests' },
   ] },
-  { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
+  { href: '/main-admin/photos', icon: 'image', label: 'Photos', subpages: [
+    { href: '/main-admin/photos', label: 'Photos' },
+    { href: '/main-admin/photos?tab=archive', label: 'Archive' },
+  ] },
   { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links', subpages: [
     { href: '/main-admin/resource-links', label: 'Resources' },
     { href: '/main-admin/resource-links?tab=approvals', label: 'Approvals' },
