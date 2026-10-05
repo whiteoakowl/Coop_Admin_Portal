@@ -13,7 +13,7 @@
         <p class="print-header-sub">Schedule</p>
       </div>
     </div>
-    <h1><%= tab === 'settings' ? 'Co-op Class Settings' : 'Schedules' %></h1>
+    <h1><%= tab === 'settings' ? 'Co-op Class Settings' : tab === 'members' ? 'Member Schedules' : 'Class Schedules' %></h1>
 
     <%# Class Schedules/Member Schedules/Settings now live as subpages
         under the orange bar's own Schedules item (views/partials/admin-

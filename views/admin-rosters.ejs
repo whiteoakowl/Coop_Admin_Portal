@@ -25,7 +25,7 @@
         attendance" - playgroundList/playgroundLog both span both days
         too (same reasoning), but are their own distinct page, not just
         "Attendance" generically. %>
-    <h1><%= view === 'grid' ? `${dayLabel} Attendance` : (view === 'playgroundList' || view === 'playgroundLog') ? 'Playground Attendance' : 'Attendance' %></h1>
+    <h1><%= view === 'grid' ? `${dayLabel} Attendance` : (view === 'playgroundList' || view === 'playgroundLog') ? 'Playground Attendance' : view === 'classList' ? 'Class Rosters' : 'Attendance' %></h1>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

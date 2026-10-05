@@ -10,7 +10,7 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
-      <h1>Chat</h1>
+      <h1><%= activeTab === 'archive' ? 'Archive' : 'Chat Groups' %></h1>
       <% if (activeTab === 'new') { %>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Chat Group</button>
       <% } %>

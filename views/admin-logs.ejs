@@ -14,7 +14,7 @@
         <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Co-op Check-In/Out Log' : tab === 'classcheckinout' ? 'Class Check-In/Out Log' : tab === 'classrisk' ? 'Class Cancellation Risk' : tab === 'substitutes' ? 'Substitutes Needed' : tab === 'allergies' ? 'Allergies/Medical Log' : tab === 'classregistration' ? 'Class Registration Log' : 'Name Tag Requests' %></p>
       </div>
     </div>
-    <h1>Logs</h1>
+    <h1><%= title %></h1>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

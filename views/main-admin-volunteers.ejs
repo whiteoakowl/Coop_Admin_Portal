@@ -9,7 +9,7 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Volunteers</h1>
+    <h1><%= activeTab === 'signup-lists' ? 'Sign-Up Lists' : activeTab === 'volunteer-lists' ? 'Volunteer Lists' : 'Committees' %></h1>
 
     <%# A real request: "instead of the tabs on each page, make them
         subpages under each menu tab" (desktop, see views/partials/

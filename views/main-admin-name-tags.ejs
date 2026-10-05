@@ -8,7 +8,7 @@
     portalTitle: 'Main Admin',
   }) %>
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Name Tags</h1>
+    <h1><%= tab === 'print' ? 'Print' : tab === 'requests' ? 'Requests' : 'Design' %></h1>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

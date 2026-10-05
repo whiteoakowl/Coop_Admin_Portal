@@ -72,7 +72,7 @@
   <main id="main-content" tabindex="-1"<% if (usesPortalNavShell) { %> class="admin-main"<% } %>>
     <section class="site-section">
       <div class="site-section-inner">
-        <h1><%= effectivePortal === 'parent' ? 'Event Calendar' : 'Events' %></h1>
+        <h1><%= effectivePortal === 'parent' ? 'Event Calendar' : effectivePortal === 'student' ? 'Calendar' : 'Events' %></h1>
 
         <div class="roster-toolbar no-print">
           <div class="roster-btn-row">

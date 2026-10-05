@@ -10,7 +10,7 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
-      <h1>Business Directory</h1>
+      <h1><%= activeTab === 'requests' ? 'Requests' : activeTab === 'archive' ? 'Archive' : 'Directory' %></h1>
       <% if (activeTab === 'directory') { %>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
       <% } %>

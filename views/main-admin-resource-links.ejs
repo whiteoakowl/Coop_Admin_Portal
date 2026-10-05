@@ -10,7 +10,7 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="roster-toolbar">
-      <h1>Resource Links</h1>
+      <h1><%= activeTab === 'approvals' ? 'Approvals' : 'Resources' %></h1>
       <% if (activeTab === 'resources') { %>
         <div class="roster-btn-row">
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">+ Add/Edit Category</button>

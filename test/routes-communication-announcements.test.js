@@ -69,7 +69,7 @@ test('Main Admin Communication page: 4 tabs, checkbox recipients (not a roleKey 
   const { cookie } = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/announcements').set('Cookie', cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /<h1>Communication<\/h1>/);
+  assert.match(page.text, /<h1>Announcements<\/h1>/);
   assert.match(page.text, /href="\/main-admin\/announcements">Announcements</);
   assert.match(page.text, /href="\/main-admin\/announcements\/email">Email</);
   assert.match(page.text, /href="\/main-admin\/announcements\/text">Text</);
@@ -144,7 +144,7 @@ test('Co-op Admin Communication page: 3 tabs (no Newsletter), checkbox recipient
 
   const page = await request(app).get('/admin/announcements').set('Cookie', cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /<h1>Communication<\/h1>/);
+  assert.match(page.text, /<h1>Announcements<\/h1>/);
   assert.match(page.text, /href="\/admin\/announcements\/email">Email</);
   assert.match(page.text, /href="\/admin\/announcements\/text">Text</);
   assert.doesNotMatch(page.text, /Newsletter/);

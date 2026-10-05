@@ -10,7 +10,7 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="roster-toolbar">
-      <h1>Babysitter Directory</h1>
+      <h1><%= activeTab === 'approvals' ? 'Approvals' : activeTab === 'settings' ? 'Settings' : 'Babysitter' %></h1>
       <% if (activeTab === 'directory') { %>
         <div class="roster-btn-row">
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-babysitter-dialog').showModal()">+ Add Babysitter Profile</button>

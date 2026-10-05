@@ -10,7 +10,7 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
-      <h1>Shop</h1>
+      <h1><%= activeTab === 'orders' ? 'Orders' : activeTab === 'archived' ? 'Archived' : activeTab === 'analytics' ? 'Analytics' : activeTab === 'settings' ? 'Settings' : 'Products' %></h1>
       <% if (activeTab === 'products') { %>
         <div class="roster-btn-row">
           <%# A real request: "add button that says view member store.

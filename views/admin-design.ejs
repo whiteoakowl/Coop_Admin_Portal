@@ -6,7 +6,7 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Design / Print</h1>
+    <h1><%= tab === 'print' ? 'Print' : tab === 'requests' ? 'Requests' : 'Design' %></h1>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

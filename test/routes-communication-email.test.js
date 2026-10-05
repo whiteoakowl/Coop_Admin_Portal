@@ -176,7 +176,7 @@ test('Co-op Admin Email tab: same filter/select-all/compose wiring, reached at /
 
   const page = await request(app).get('/admin/announcements/email').set('Cookie', cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /<h1>Communication<\/h1>/);
+  assert.match(page.text, /<h1>Email<\/h1>/);
   assert.match(page.text, new RegExp(`value="${accountId}" data-email-checkbox`));
 
   const sendRes = await request(app)
