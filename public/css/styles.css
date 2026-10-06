@@ -10422,6 +10422,18 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
    instead of none at all. */
 @media (max-width: 640px) {
   .event-attendance-table th, .event-attendance-table td { padding: 0.5rem 0.5rem; font-size: 0.8rem; }
+  /* A real bug report: "shrink table to view full table in mobile
+     view" - the above font/padding shrink alone still left a long event
+     title and the full "October 15, 2026 2:00pm" date format wide
+     enough to push Registered and the Attendance button off past the
+     viewport edge, needing a sideways scroll to reach them (confirmed
+     live via Playwright, same shape as the Committees table's own real
+     bug report). Capping and wrapping Title/Starts frees up enough room
+     for the whole row to fit; the Attendance button's own padding/font
+     shrink further than the table-wide rule above. */
+  .event-attendance-table .roster-name-col { max-width: 6rem; white-space: normal; }
+  .event-attendance-table td:nth-child(2) { max-width: 4.5rem; white-space: normal; }
+  .event-attendance-table .roster-action-btn { padding: 0.35rem 0.5rem; font-size: 0.72rem; min-width: 0; }
 }
 
 /* A real request (superseded by the one below, kept for history): "prev/
