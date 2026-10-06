@@ -220,4 +220,53 @@
       </div>
     <% } %>
   </div>
+
+  <%# A real request: a parent viewing a class that still needs a
+      teacher/assistant should be able to register THEMSELVES for it
+      right here - previously only possible via the separate Teacher
+      Portal, which required the account to already have a 'teacher'
+      portal role. Same POST /parent/classes/:id/join route (and
+      joinClassAsStaff) Teacher Portal's own "Sign Up to Teach" page
+      posts to, so slots/registration-window rules can't drift between
+      the two. %>
+  <% if (cls.registration_open) { %>
+    <div class="class-view-register-box">
+      <h4><svg class="icon"><use href="#icon-user"/></svg> Register as Teacher/Assistant</h4>
+      <% if (myStaffRole) { %>
+        <p class="hint">You're signed up as <%= myStaffRole === 'assistant' ? 'an Assistant' : 'a Teacher' %> for this class.</p>
+      <% } else {
+        var teacherOpen = cls.teacher_slots == null || teacherCount < cls.teacher_slots;
+        var assistantOpen = cls.assistant_slots == null || assistantCount < cls.assistant_slots;
+      %>
+        <% if (!teacherOpen && !assistantOpen) { %>
+          <p class="hint">Both roles are already filled for this class.</p>
+        <% } else { %>
+          <div class="actions-btn-row">
+            <% if (teacherOpen) { %>
+              <% if (teacherWindowOpen) { %>
+                <form method="POST" action="/parent/classes/<%= cls.id %>/join" class="inline-block-form">
+                  <input type="hidden" name="role" value="teacher" />
+                  <input type="hidden" name="day" value="<%= day %>" />
+                  <button type="submit" class="roster-action-btn">Register as Teacher</button>
+                </form>
+              <% } else { %>
+                <span class="hint">Teacher registration window not open yet</span>
+              <% } %>
+            <% } %>
+            <% if (assistantOpen) { %>
+              <% if (assistantWindowOpen) { %>
+                <form method="POST" action="/parent/classes/<%= cls.id %>/join" class="inline-block-form">
+                  <input type="hidden" name="role" value="assistant" />
+                  <input type="hidden" name="day" value="<%= day %>" />
+                  <button type="submit" class="btn-secondary">Register as Assistant</button>
+                </form>
+              <% } else { %>
+                <span class="hint">Assistant registration window not open yet</span>
+              <% } %>
+            <% } %>
+          </div>
+        <% } %>
+      <% } %>
+    </div>
+  <% } %>
 </div>

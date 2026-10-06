@@ -55,7 +55,7 @@ const {
 } = require('../utils/academics');
 const notifications = require('../utils/notifications');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('../utils/sections');
-const { registerForClass, unregisterFromClass } = require('../utils/classRegistration');
+const { registerForClass, unregisterFromClass, joinClassAsStaff } = require('../utils/classRegistration');
 const events = require('../utils/events');
 const babysitters = require('../utils/babysitters');
 const { imageFileFilter } = require('../utils/uploads');
@@ -327,6 +327,7 @@ router.get('/classes/:id/fragment', async (req, res) => {
 
   const enrolledCount = Number((await db.prepare('SELECT COUNT(*) AS c FROM class_enrollments WHERE class_id = ?').get(classId)).c);
   const staff = cls.staff || [];
+  const teacherCount = staff.filter((s) => s.role === 'teacher').length;
   const assistantCount = staff.filter((s) => s.role === 'assistant').length;
   // A real request: the class card should show how many students/
   // assistants can sign up and how many of each already have, plus the
@@ -334,6 +335,18 @@ router.get('/classes/:id/fragment', async (req, res) => {
   // students alone, and not scoped to the signed-in family the way
   // waitlistPositionByStudentId below already is.
   const waitlistCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM class_registrations WHERE class_id = ? AND status = 'waitlisted'").get(classId)).c);
+
+  // A real request: a parent looking at a class that still needs a
+  // teacher/assistant should be able to register THEMSELVES for it right
+  // here, not need the separate 'teacher' portal role Teacher Portal's
+  // own "Sign Up to Teach" page requires - see POST /classes/:id/join
+  // below and utils/classRegistration.js's own joinClassAsStaff, shared
+  // with that page. myStaffRole is this account's own member row, not a
+  // child's, same distinction registerForClass's studentId vs this
+  // route's member draws.
+  const member = await memberForAccount(req.portalAccount.id);
+  const myStaffRole = member ? (staff.find((s) => s.id === member.id) || {}).role || null : null;
+  const classScheduleId = await classScheduleIdForClass(cls);
 
   res.render('parent-class-fragment', {
     cls,
@@ -344,6 +357,7 @@ router.get('/classes/:id/fragment', async (req, res) => {
     teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
     assistantNames: staff.filter((s) => s.role === 'assistant').map((s) => s.name),
     enrolledCount,
+    teacherCount,
     assistantCount,
     waitlistCount,
     seatsLeft: cls.capacity == null ? null : Math.max(0, cls.capacity - enrolledCount),
@@ -352,8 +366,21 @@ router.get('/classes/:id/fragment', async (req, res) => {
     hasChildren: children.length > 0,
     enrolledIds: [...enrolledIds],
     waitlistPositionByStudentId,
-    windowOpen: await isRegistrationOpenForAccount(req.portalRoles, { classScheduleId: await classScheduleIdForClass(cls), sectionIds: restriction, actionType: 'parent_register_student' }),
+    windowOpen: await isRegistrationOpenForAccount(req.portalRoles, { classScheduleId, sectionIds: restriction, actionType: 'parent_register_student' }),
+    myStaffRole,
+    teacherWindowOpen: await isRegistrationOpenForAccount(req.portalRoles, { classScheduleId, sectionIds: restriction, actionType: 'parent_teacher' }),
+    assistantWindowOpen: await isRegistrationOpenForAccount(req.portalRoles, { classScheduleId, sectionIds: restriction, actionType: 'parent_assistant' }),
   });
+});
+
+router.post('/classes/:id/join', async (req, res) => {
+  const classId = parseInt(req.params.id, 10);
+  const role = req.body.role === 'assistant' ? 'assistant' : 'teacher';
+  const back = classesBackUrl(req.body.day);
+  const member = await memberForAccount(req.portalAccount.id);
+  const result = await joinClassAsStaff({ classId, member, accountId: req.portalAccount.id, portalRoles: req.portalRoles, role });
+  if (!result.ok) return res.redirect(back + 'error=' + encodeURIComponent(result.error));
+  res.redirect(back + 'notice=' + encodeURIComponent(result.notice));
 });
 
 router.post('/classes/:id/register', async (req, res) => {

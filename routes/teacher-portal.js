@@ -11,8 +11,8 @@ const path = require('path');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
-const { allClassesList, removeStaff, classScheduleIdForClass } = require('../utils/classSchedule');
-const { createCharge } = require('../utils/payments');
+const { allClassesList, removeStaff } = require('../utils/classSchedule');
+const { joinClassAsStaff } = require('../utils/classRegistration');
 const {
   assignmentsForClass,
   getAssignment,
@@ -36,8 +36,6 @@ const { formatDateLabel, formatFriendlyTimestamp, todayISO, formatDateLong } = r
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const { byLastName } = require('../utils/members');
 const { buildRosterGridData } = require('../utils/rosterGrid');
-const { classSectionIds } = require('../utils/sections');
-const { isRegistrationOpenForAccount } = require('../utils/registrationWindows');
 const notifications = require('../utils/notifications');
 
 router.use(requirePortalAuth, requirePortal('teacher'));
@@ -97,30 +95,6 @@ router.get('/classes', async (req, res) => {
   res.render('teacher-classes', { title: 'My Classes', classes });
 });
 
-// Self-signup as a teacher or assistant on a class - a real request:
-// "teachers and class assistants will be able to register" for a class
-// themselves, capped by that class's own teacher_slots/assistant_slots
-// (null means unlimited). Writes directly to class_staff, the EXISTING
-// teacher/assistant model routes/admin-schedule.js already uses for
-// admin-assigned staff - self-signup and admin-assignment are the same
-// table, just two different ways a row gets added.
-//
-// Gated by the class's own registration_open (Class Details' own Close
-// Registration checkbox) and Co-op Class Settings' global Enable Parent/
-// Volunteer Registration switch - the old per-class allow_teacher_register
-// column was removed outright (a real request: "we can schedule members
-// to register through the timed settings now - delete completely"),
-// Registration Schedule's own role-scoped windows (isRegistrationOpenForAccount
-// below) cover the "who/when" this used to gate ad hoc.
-async function staffCountsForClass(classId) {
-  const rows = await db.prepare('SELECT role, COUNT(*) AS c FROM class_staff WHERE class_id = ? GROUP BY role').all(classId);
-  const counts = { teacher: 0, assistant: 0 };
-  rows.forEach((r) => {
-    counts[r.role] = Number(r.c);
-  });
-  return counts;
-}
-
 // Batch version for the "Sign Up to Teach" browse page below - that page
 // used to call staffCountsForClass once per open class in a loop, a real
 // N+1 (one query per class shown, every time a teacher browses open
@@ -159,50 +133,22 @@ router.get('/browse-classes', async (req, res) => {
   });
 });
 
+// Self-signup as a teacher or assistant on a class - a real request:
+// "teachers and class assistants will be able to register" for a class
+// themselves. The actual logic (joinClassAsStaff) is shared with Parent
+// Portal's own class view, which got this same self-signup capability
+// later (a real request: a parent viewing a class that still needs an
+// assistant should be able to register themselves right there, not need
+// this separate 'teacher' portal role) - see utils/classRegistration.js's
+// own header comment on that function.
 router.post('/classes/:id/join', async (req, res) => {
   const classId = parseInt(req.params.id, 10);
   const role = req.body.role === 'assistant' ? 'assistant' : 'teacher';
   const back = '/teacher/browse-classes';
   const member = await memberForAccount(req.portalAccount.id);
-  if (!member) return res.redirect(back + '?error=' + encodeURIComponent('No profile found for your account.'));
-
-  const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
-  if (!cls || !cls.registration_open) {
-    return res.redirect(back + '?error=' + encodeURIComponent('Self-signup is not open for that class.'));
-  }
-  // No date/time enforcement existed here at all before Registration
-  // Schedule (a real request) - Parent/Student Portal registration
-  // already gated on this same isRegistrationOpenForAccount check.
-  const restriction = await classSectionIds(classId);
-  const actionType = role === 'assistant' ? 'parent_assistant' : 'parent_teacher';
-  if (!(await isRegistrationOpenForAccount(req.portalRoles, { classScheduleId: await classScheduleIdForClass(cls), sectionIds: restriction, actionType }))) {
-    return res.redirect(back + '?error=' + encodeURIComponent('Registration is not open for your account yet.'));
-  }
-  const already = await db.prepare('SELECT 1 FROM class_staff WHERE class_id = ? AND member_id = ?').get(classId, member.id);
-  if (already) return res.redirect(back + '?error=' + encodeURIComponent('You are already staffed on that class.'));
-
-  const counts = await staffCountsForClass(classId);
-  const slots = role === 'teacher' ? cls.teacher_slots : cls.assistant_slots;
-  if (slots != null && counts[role] >= slots) {
-    return res.redirect(back + '?error=' + encodeURIComponent(`That class already has its full ${slots} ${role}(s).`));
-  }
-
-  await db.prepare('INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, ?)').run(classId, member.id, role);
-
-  // A real request: a class priced 'students_and_staff' charges a
-  // teacher/assistant who signs up the same class fee students pay (e.g.
-  // to help cover the cost of supplies), not just the enrolled students -
-  // see utils/classRegistration.js's own chargeForConfirmedRegistration
-  // for the student-side equivalent this mirrors. Unpriced classes
-  // (price_cents null) and classes still priced 'students'-only never
-  // charge staff at all.
-  let notice = `Signed up as ${role} for "${cls.class_name}".`;
-  if (cls.price_per === 'students_and_staff' && cls.price_cents != null) {
-    const chargeId = await createCharge(member.id, req.portalAccount.id, 'class_registration', cls.id, `${cls.class_name} - class registration`, cls.price_cents);
-    await db.prepare('UPDATE class_staff SET charge_id = ? WHERE class_id = ? AND member_id = ?').run(chargeId, classId, member.id);
-    notice += ` A charge of $${(cls.price_cents / 100).toFixed(2)} has been added to your account.`;
-  }
-  res.redirect(back + '?notice=' + encodeURIComponent(notice));
+  const result = await joinClassAsStaff({ classId, member, accountId: req.portalAccount.id, portalRoles: req.portalRoles, role });
+  if (!result.ok) return res.redirect(back + '?error=' + encodeURIComponent(result.error));
+  res.redirect(back + '?notice=' + encodeURIComponent(result.notice));
 });
 
 router.post('/classes/:id/leave', async (req, res) => {

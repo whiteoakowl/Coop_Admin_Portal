@@ -62,6 +62,64 @@ async function chargeForConfirmedRegistration(tx, cls, student, accountId) {
   return createCharge(student.id, accountId, 'class_registration', cls.id, `${cls.class_name} - class registration`, cls.price_cents, tx);
 }
 
+async function staffCountsForClass(classId) {
+  const rows = await db.prepare('SELECT role, COUNT(*) AS c FROM class_staff WHERE class_id = ? GROUP BY role').all(classId);
+  const counts = { teacher: 0, assistant: 0 };
+  rows.forEach((r) => {
+    counts[r.role] = Number(r.c);
+  });
+  return counts;
+}
+
+// Self-signup as a class's teacher/assistant - originally Teacher
+// Portal's own "Sign Up to Teach" page only, now shared with Parent
+// Portal's own class view too (a real request: a parent looking at a
+// class that still needs an assistant should be able to register
+// themselves for it right there, without needing the separate 'teacher'
+// portal role Teacher Portal itself still requires) - both call this
+// exact same function so neither drifts from the other. Writes directly
+// to class_staff, the EXISTING teacher/assistant model admin-assigned
+// staff already uses - self-signup and admin-assignment are the same
+// table, just two different ways a row gets added. `member` is the
+// CALLER's own member record (never a child) - registering a child as
+// staff makes no sense, unlike registerForClass's studentId.
+// { ok: false, error } or { ok: true, notice }
+async function joinClassAsStaff({ classId, member, accountId, portalRoles, role }) {
+  if (!member) return { ok: false, error: 'No profile found for your account.' };
+  const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
+  if (!cls || !cls.registration_open) return { ok: false, error: 'Self-signup is not open for that class.' };
+
+  const restriction = await classSectionIds(classId);
+  const actionType = role === 'assistant' ? 'parent_assistant' : 'parent_teacher';
+  if (!(await isRegistrationOpenForAccount(portalRoles, { classScheduleId: await classScheduleIdForClass(cls), sectionIds: restriction, actionType }))) {
+    return { ok: false, error: 'Registration is not open for your account yet.' };
+  }
+  const already = await db.prepare('SELECT 1 FROM class_staff WHERE class_id = ? AND member_id = ?').get(classId, member.id);
+  if (already) return { ok: false, error: 'You are already staffed on that class.' };
+
+  const counts = await staffCountsForClass(classId);
+  const slots = role === 'teacher' ? cls.teacher_slots : cls.assistant_slots;
+  if (slots != null && counts[role] >= slots) {
+    return { ok: false, error: `That class already has its full ${slots} ${role}(s).` };
+  }
+
+  await db.prepare('INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, ?)').run(classId, member.id, role);
+
+  // A real request: a class priced 'students_and_staff' charges a
+  // teacher/assistant who signs up the same class fee students pay (e.g.
+  // to help cover the cost of supplies), not just the enrolled students -
+  // see chargeForConfirmedRegistration above for the student-side
+  // equivalent this mirrors. Unpriced classes (price_cents null) and
+  // classes still priced 'students'-only never charge staff at all.
+  let notice = `Signed up as ${role} for "${cls.class_name}".`;
+  if (cls.price_per === 'students_and_staff' && cls.price_cents != null) {
+    const chargeId = await createCharge(member.id, accountId, 'class_registration', cls.id, `${cls.class_name} - class registration`, cls.price_cents);
+    await db.prepare('UPDATE class_staff SET charge_id = ? WHERE class_id = ? AND member_id = ?').run(chargeId, classId, member.id);
+    notice += ` A charge of $${(cls.price_cents / 100).toFixed(2)} has been added to your account.`;
+  }
+  return { ok: true, notice };
+}
+
 // { ok: false, error } or { ok: true, notice, status, waitlistPosition }
 async function registerForClass({ classId, studentId, accountId, portalRoles, registrantType }) {
   const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
@@ -306,4 +364,4 @@ async function adminRemoveStudentFromClass(classId, studentId, adminAccountId) {
   }
 }
 
-module.exports = { registerForClass, unregisterFromClass, adminRemoveStudentFromClass };
+module.exports = { registerForClass, unregisterFromClass, adminRemoveStudentFromClass, joinClassAsStaff, staffCountsForClass };
