@@ -11325,8 +11325,18 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 /* A real request: "all classes should have a delete button and view
    class button on each row to the right" - replacing the old whole-card
    link (see this file's own class-dash-card comment above). */
-.class-dash-card-actions { display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0 1rem 0.85rem; }
-.class-dash-card-actions .roster-action-btn { flex: 0 0 auto; padding: 0.4rem 0.85rem; font-size: 0.82rem; }
+.class-dash-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; padding: 0 1rem 0.85rem; }
+/* A real bug report: "on mobile you can't see all the buttons on each
+   class card. They should all be on the card and fit to text." flex: 0 0
+   auto's own flex-basis: auto doesn't reliably size a plain button
+   (no explicit width) to its own text in this codebase - confirmed live
+   (the exact same bug already found and fixed twice this session, for
+   Class Details' Save/Duplicate row and the Parent Portal class-
+   registration row): View Class and Delete were both rendering at ~309px
+   wide, almost entirely overlapping each other and spilling off both
+   edges of the card. flex-basis: content (not the auto keyword) is what
+   actually sizes each button to its own text. */
+.class-dash-card-actions .roster-action-btn { flex-grow: 0; flex-shrink: 0; flex-basis: content; padding: 0.4rem 0.85rem; font-size: 0.82rem; }
 
 /* Mini gameplay mockups - small trusted HTML snippets from each catalog
    entry's own `preview` field (utils/gamesCatalog.js), built entirely

@@ -27,7 +27,7 @@
       <h3 class="class-dash-card-title"><%= c.class_name %></h3>
       <p class="class-dash-card-meta"><%= c.timeLabel %></p>
       <p class="class-dash-card-meta"><%= c.room || 'No room set' %></p>
-      <p class="class-dash-card-meta"><%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
+      <p class="class-dash-card-meta">Teacher: <%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
     </div>
   </div>
   <% if (selectedChild) { %>
