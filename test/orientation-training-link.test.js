@@ -142,14 +142,12 @@ test('Tour Check-In still checks the Tour column directly for a scanned-in membe
   const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'Tour Checkin Class', room: 'Room D' });
   await setEnrollment(classId, [studentId]);
 
-  const checkinPage = await request(app).get('/admin/orientation/tour-checkin').set('Cookie', admin.cookie);
-  const csrf = extractCsrf(checkinPage.text);
-
+  const parent = await db.prepare('SELECT barcode FROM members WHERE id = ?').get(primaryParentId);
   await request(app)
-    .post('/admin/orientation/tour-checkin')
+    .post('/admin/orientation/tour-checkin/scan')
     .set('Cookie', admin.cookie)
-    .type('form')
-    .send({ _csrf: csrf, members: String(primaryParentId) });
+    .set('X-CSRF-Token', admin.csrfToken)
+    .send({ barcode: parent.barcode, semesterId: '' });
 
   const row = await db.prepare('SELECT tour_complete FROM orientation_progress WHERE member_id = ?').get(primaryParentId);
   assert.ok(row);

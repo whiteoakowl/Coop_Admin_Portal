@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<%# A real request: "click check in button should have same card screen
+    as kiosk with mobile scan, barcode scan or enter ID button choices.
+    All three options should allow for continuous scan/entry with a
+    complete button for when ready to return to the tour check in or
+    open house check in screens." Same method-chooser markup/JS as
+    views/kiosk-class-checkin-scan.ejs (public/js/kiosk-camera-
+    scanner.js, kiosk-id-keypad.js, and kiosk-common.js's own
+    initKioskMethodChooser are all already generic, not kiosk-route-
+    specific) - including its own Complete button on every method panel -
+    but inside the normal Co-op Admin authenticated shell instead of the
+    bare PIN-gated public kiosk one, same combination views/admin-events-
+    checkin-scan.ejs already uses for Events check-in. %>
+<body class="admin-page" data-semester-id="<%= semesterId != null ? semesterId : '' %>" data-scan-post-url="<%= scanPostUrl %>" data-complete-url="<%= completeUrl %>">
+  <%- include('partials/admin-nav') %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="<%= completeUrl %>">&larr; Back to <%= heading %></a></p>
+    <h1><%= heading %></h1>
+
+    <div class="kiosk-panel">
+      <div class="kiosk-method-choice">
+        <p class="kiosk-instructions">How would you like to scan?</p>
+        <div class="kiosk-method-buttons">
+          <button type="button" class="kiosk-method-btn" data-method="mobile-scan">
+            <span class="landing-icon"><svg class="icon"><use href="#icon-camera"/></svg></span>
+            <span class="landing-label">Mobile Barcode Scan</span>
+          </button>
+          <button type="button" class="kiosk-method-btn kiosk-method-btn-scanner" data-method="scanner">
+            <span class="landing-icon"><svg class="icon"><use href="#icon-barcode"/></svg></span>
+            <span class="landing-label">Barcode Scan</span>
+          </button>
+          <button type="button" class="kiosk-method-btn kiosk-method-btn-manual" data-method="manual">
+            <span class="landing-icon"><svg class="icon"><use href="#icon-grid"/></svg></span>
+            <span class="landing-label">Manually Enter ID #</span>
+          </button>
+        </div>
+      </div>
+
+      <div data-method-panel="mobile-scan" hidden>
+        <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
+        <div class="kiosk-camera-frame"><video id="camera-video" autoplay playsinline muted></video></div>
+        <p id="camera-error" class="kiosk-camera-error" hidden></p>
+        <p class="kiosk-scan-now-text">Point the camera at a barcode</p>
+        <button type="button" class="kiosk-cancel-btn kiosk-complete-btn" data-complete>Complete</button>
+      </div>
+
+      <div data-method-panel="scanner" hidden>
+        <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
+        <p class="kiosk-scan-now-text">Scan barcode now</p>
+        <button type="button" class="kiosk-cancel-btn kiosk-complete-btn" data-complete>Complete</button>
+      </div>
+
+      <div data-method-panel="manual" hidden>
+        <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
+        <div id="id-keypad"></div>
+        <button type="button" id="manual-submit-btn" class="primary-btn">Submit</button>
+        <p class="hint">Or type a member's name below.</p>
+        <form id="name-form" class="class-scan-form" autocomplete="off">
+          <input
+            id="name-input"
+            class="class-scan-input"
+            type="text"
+            aria-label="Type a member's name"
+            placeholder="Type a member's name"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+          />
+          <button type="submit" class="primary-btn">Submit Name</button>
+        </form>
+        <button type="button" class="kiosk-cancel-btn kiosk-complete-btn" data-complete>Complete</button>
+      </div>
+
+      <div id="kiosk-result" hidden>
+        <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
+          <span class="kiosk-status-icon"></span>
+        </div>
+        <p id="kiosk-instructions" class="kiosk-instructions"></p>
+      </div>
+
+      <form id="scan-form" autocomplete="off">
+        <input
+          id="barcode-input"
+          name="barcode"
+          type="text"
+          aria-label="Scan a barcode"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+        />
+      </form>
+    </div>
+  </main>
+  <script src="/js/vendor/zxing.min.js"></script>
+  <script src="/js/kiosk-camera-scanner.js"></script>
+  <script src="/js/kiosk-common.js"></script>
+  <script src="/js/kiosk-id-keypad.js"></script>
+  <script src="/js/admin-orientation-checkin-scan.js"></script>
+</body>
+</html>

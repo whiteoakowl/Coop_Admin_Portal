@@ -172,34 +172,128 @@ test('Orientation toggle rejects an unknown field rather than interpolating it',
   assert.equal(badField.status, 400);
 });
 
-test('Tour Check-In subpage: purple Check In button, Copy Link, shows every registered member, and bulk check-in marks tour complete', async () => {
+test('Tour Check-In subpage: purple Check In link to the scan screen, Copy Link, and only Check In/Day columns', async () => {
   const admin = await loginAsAdmin();
   const monday = await createFamilyWithEnrolledStudent('monday', { parentName: 'Tour Monday Parent' });
-  const wednesday = await createFamilyWithEnrolledStudent('wednesday', { parentName: 'Tour Wednesday Parent' });
 
   const page = await request(app).get('/admin/orientation/tour-checkin').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /class="class-checkin-btn"/);
+  assert.match(page.text, /<a href="\/admin\/orientation\/tour-checkin\/scan[^"]*" class="class-checkin-btn">Check In<\/a>/);
   assert.match(page.text, /data-copy-link="[^"]*\/admin\/orientation\/tour-checkin"/);
   assert.match(page.text, /Tour Monday Parent/);
-  assert.match(page.text, /Tour Wednesday Parent/);
+  // A real request: "only 1 column for check in and one for day" - no
+  // more Select All/checkbox column, no separate Status column.
+  assert.match(page.text, /<th>Check In<\/th>\s*<th>Day<\/th>/);
+  assert.doesNotMatch(page.text, /data-select-all-for/);
+  void monday;
+});
 
-  const csrf = extractCsrf(page.text);
-  const checkin = await request(app)
-    .post('/admin/orientation/tour-checkin')
+// A real request: "click check in button should have same card screen as
+// kiosk with mobile scan, barcode scan or enter ID button choices. All
+// three options should allow for continuous scan/entry with a complete
+// button for when ready to return to the tour check in or open house
+// check in screens."
+test('Tour Check-In scan screen: method chooser, Complete buttons, and scanning a barcode marks tour complete', async () => {
+  const admin = await loginAsAdmin();
+  const monday = await createFamilyWithEnrolledStudent('monday', { parentName: 'Scan Tour Parent' });
+
+  const scanPage = await request(app).get('/admin/orientation/tour-checkin/scan').set('Cookie', admin.cookie);
+  assert.equal(scanPage.status, 200);
+  assert.match(scanPage.text, /data-method="mobile-scan"/);
+  assert.match(scanPage.text, /data-method="scanner"/);
+  assert.match(scanPage.text, /data-method="manual"/);
+  assert.match(scanPage.text, /data-complete-url="\/admin\/orientation\/tour-checkin/);
+  // Every one of the 3 method panels gets its own Complete button.
+  const completeButtonCount = (scanPage.text.match(/data-complete>Complete<\/button>/g) || []).length;
+  assert.equal(completeButtonCount, 3, 'mobile scan, barcode scan, and manual entry should each have their own Complete button');
+
+  const parent = await db.prepare('SELECT barcode FROM members WHERE id = ?').get(monday.parentId);
+  const scan = await request(app)
+    .post('/admin/orientation/tour-checkin/scan')
     .set('Cookie', admin.cookie)
-    .type('form')
-    .send({ _csrf: csrf, semesterId: '', members: [`${monday.parentId}`] });
-  assert.equal(checkin.status, 302);
-  assert.match(checkin.headers.location, /notice=Checked%20in%201%20member/);
+    .set('X-CSRF-Token', admin.csrfToken)
+    .send({ barcode: parent.barcode, semesterId: '' });
+  assert.equal(scan.status, 200);
+  assert.equal(scan.body.ok, true);
+  assert.match(scan.body.message, /Scan Tour Parent/);
 
   const row = await db.prepare('SELECT tour_complete FROM orientation_progress WHERE member_id = ?').get(monday.parentId);
   assert.equal(Number(row.tour_complete), 1);
-  const wednesdayRow = await db.prepare('SELECT id FROM orientation_progress WHERE member_id = ?').get(wednesday.parentId);
-  assert.equal(wednesdayRow, undefined, 'checking in the Monday family must not touch the Wednesday family');
 
-  const afterPage = await request(app).get('/admin/orientation/tour-checkin').set('Cookie', admin.cookie);
-  assert.match(afterPage.text, /Checked In/);
+  // Scanning the same barcode again reports already-checked-in rather
+  // than erroring or silently re-doing the same write.
+  const scanAgain = await request(app)
+    .post('/admin/orientation/tour-checkin/scan')
+    .set('Cookie', admin.cookie)
+    .set('X-CSRF-Token', admin.csrfToken)
+    .send({ barcode: parent.barcode, semesterId: '' });
+  assert.equal(scanAgain.body.ok, true);
+  assert.equal(scanAgain.body.alreadyChecked, true);
+});
+
+// A real bug class already fixed once for Training completions
+// (utils/orientation.js's own orientationObligationMemberId) - a scan
+// check-in must credit the same risk here: whichever family member
+// actually scans in, the green check has to land on the row Orientation
+// Tracking actually shows for that family (the Primary Parent), not a
+// separate row for whoever walked up to the scanner.
+test('Tour Check-In scan: a non-primary parent scanning in still checks the family\'s PRIMARY parent row', async () => {
+  const admin = await loginAsAdmin();
+  const family = await db.prepare('INSERT INTO families (name) VALUES (?) RETURNING id').get('Scan Obligation Family');
+  const primaryParentId = (
+    await db
+      .prepare("INSERT INTO members (name, barcode, member_type, family_id, is_primary_parent, active) VALUES (?, ?, 'parent', ?, 1, 1) RETURNING id")
+      .get('Scan Primary Parent', 'scan-primary-1', family.id)
+  ).id;
+  const secondParentId = (
+    await db
+      .prepare("INSERT INTO members (name, barcode, member_type, family_id, is_primary_parent, active) VALUES (?, ?, 'parent', ?, 0, 1) RETURNING id")
+      .get('Scan Second Parent', 'scan-second-1', family.id)
+  ).id;
+  const studentId = (
+    await db
+      .prepare("INSERT INTO members (name, barcode, member_type, family_id, active) VALUES (?, ?, 'student', ?, 1) RETURNING id")
+      .get('Scan Obligation Student', 'scan-student-1', family.id)
+  ).id;
+  const classId = (await db.prepare("INSERT INTO classes (class_name, day, hour_position) VALUES ('Scan Obligation Class', 'monday', 1) RETURNING id").get()).id;
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId, studentId);
+
+  const scan = await request(app)
+    .post('/admin/orientation/tour-checkin/scan')
+    .set('Cookie', admin.cookie)
+    .set('X-CSRF-Token', admin.csrfToken)
+    .send({ barcode: 'scan-second-1', semesterId: '' });
+  assert.equal(scan.body.ok, true);
+
+  const primaryRow = await db.prepare('SELECT tour_complete FROM orientation_progress WHERE member_id = ?').get(primaryParentId);
+  assert.ok(primaryRow, 'the primary parent should have the orientation_progress row');
+  assert.equal(Number(primaryRow.tour_complete), 1);
+  const secondRow = await db.prepare('SELECT * FROM orientation_progress WHERE member_id = ?').get(secondParentId);
+  assert.equal(secondRow, undefined, 'the member who actually scanned must not get their own separate row');
+});
+
+test('Tour Check-In scan rejects a barcode for someone not registered for classes this semester', async () => {
+  const admin = await loginAsAdmin();
+  await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Unregistered Scan Member', 'unregistered-scan-1', 'parent', 1)").run();
+
+  const scan = await request(app)
+    .post('/admin/orientation/tour-checkin/scan')
+    .set('Cookie', admin.cookie)
+    .set('X-CSRF-Token', admin.csrfToken)
+    .send({ barcode: 'unregistered-scan-1', semesterId: '' });
+  assert.equal(scan.body.ok, false);
+  assert.match(scan.body.message, /not registered for classes this semester/);
+});
+
+test('Tour Check-In scan: an unrecognized barcode reports Not recognized', async () => {
+  const admin = await loginAsAdmin();
+  const scan = await request(app)
+    .post('/admin/orientation/tour-checkin/scan')
+    .set('Cookie', admin.cookie)
+    .set('X-CSRF-Token', admin.csrfToken)
+    .send({ barcode: 'no-such-barcode-at-all', semesterId: '' });
+  assert.equal(scan.body.ok, false);
+  assert.match(scan.body.message, /Not recognized/);
 });
 
 // A real request: "orientation check in subpage and tour check in
@@ -277,7 +371,7 @@ test('Date Completed shows the latest completion date once every circle is check
 // check in should be linked to open house column" - the subpage keeps
 // its name but now checks in Open House instead of the removed Meet Up
 // field.
-test('Open House Check-In subpage marks open_house_complete, independently of the Tour Check-In page', async () => {
+test('Open House Check-In subpage scan marks open_house_complete, independently of the Tour Check-In page', async () => {
   const admin = await loginAsAdmin();
   const { parentId } = await createFamilyWithEnrolledStudent('monday', { parentName: 'Open House Checkin Parent' });
 
@@ -285,14 +379,17 @@ test('Open House Check-In subpage marks open_house_complete, independently of th
   assert.equal(page.status, 200);
   assert.match(page.text, /class="class-checkin-btn"/);
   assert.match(page.text, /data-copy-link="[^"]*\/admin\/orientation\/orientation-checkin"/);
-  const csrf = extractCsrf(page.text);
 
+  const scanPage = await request(app).get('/admin/orientation/orientation-checkin/scan').set('Cookie', admin.cookie);
+  assert.equal(scanPage.status, 200);
+
+  const parent = await db.prepare('SELECT barcode FROM members WHERE id = ?').get(parentId);
   const checkin = await request(app)
-    .post('/admin/orientation/orientation-checkin')
+    .post('/admin/orientation/orientation-checkin/scan')
     .set('Cookie', admin.cookie)
-    .type('form')
-    .send({ _csrf: csrf, semesterId: '', members: [`${parentId}`] });
-  assert.equal(checkin.status, 302);
+    .set('X-CSRF-Token', admin.csrfToken)
+    .send({ barcode: parent.barcode, semesterId: '' });
+  assert.equal(checkin.body.ok, true);
 
   const row = await db.prepare('SELECT open_house_complete, tour_complete FROM orientation_progress WHERE member_id = ?').get(parentId);
   assert.equal(Number(row.open_house_complete), 1);
@@ -343,6 +440,16 @@ test('Semester dropdown scopes the list to only classes assigned to that semeste
   const progressRow = await db.prepare('SELECT semester_id, tour_complete FROM orientation_progress WHERE member_id = ?').get(fallParent.id);
   assert.equal(progressRow.semester_id, fall.id);
   assert.equal(Number(progressRow.tour_complete), 1);
+
+  // A real request: "tour check in and open house check in should have
+  // semester dropdown switch like orientation tracking page" - same
+  // dropdown, same two semesters.
+  for (const url of ['/admin/orientation/tour-checkin', '/admin/orientation/orientation-checkin']) {
+    const checkinPage = await request(app).get(url).set('Cookie', admin.cookie);
+    assert.match(checkinPage.text, /id="orientation-checkin-semester-select"/, url);
+    assert.match(checkinPage.text, /Fall Orientation Semester/, url);
+    assert.match(checkinPage.text, /Spring Orientation Semester/, url);
+  }
 });
 
 // A real request: "Add button for orientation settings to Link training

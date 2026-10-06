@@ -8,63 +8,68 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <p class="subtitle no-print"><a href="/admin/orientation">&larr; Orientation Tracking</a></p>
     <h1><%= title %></h1>
-    <p class="hint">Everyone registered for classes this semester, in one list - check a name (or Select All), then Check In.</p>
+    <p class="hint">Everyone registered for classes this semester, in one list. Click Check In to scan or enter an ID.</p>
+
+    <%# A real request: "tour check in and open house check in should
+        have semester dropdown switch like orientation tracking page" -
+        same dropdown/markup as views/admin-orientation.ejs's own. %>
+    <% if (semesters.length > 0) { %>
+      <div class="category-filter no-print" style="margin-bottom: 1rem;">
+        <label for="orientation-checkin-semester-select">Semester</label>
+        <select id="orientation-checkin-semester-select" onchange="window.location.href = '<%= basePath %>?semesterId=' + this.value">
+          <option value="none" <%= semesterId == null ? 'selected' : '' %>>All Semesters</option>
+          <% semesters.forEach(function(s) { %>
+            <option value="<%= s.id %>" <%= semesterId === s.id ? 'selected' : '' %>><%= s.title %></option>
+          <% }); %>
+        </select>
+      </div>
+    <% } %>
 
     <div class="roster-toolbar no-print">
       <div class="roster-btn-row orientation-checkin-btn-row">
-        <%# .class-checkin-btn - the one deliberately-still-purple button
-            class in this app (see public/css/styles.css's own comment:
-            "make all other purple buttons blue. Only kiosk purple stays
-            and check in and out purple buttons stay"), same one the
-            actual Class Check-In kiosk uses. %>
-        <button type="submit" form="orientation-checkin-form" class="class-checkin-btn">Check In</button>
+        <%# A real request: "click check in button should have same card
+            screen as kiosk with mobile scan, barcode scan or enter ID
+            button choices" - now a plain link to the scan screen
+            (views/admin-orientation-checkin-scan.ejs) instead of
+            submitting a bulk-checkbox form; .class-checkin-btn is the
+            one deliberately-still-purple button class in this app (see
+            public/css/styles.css's own comment), same one the actual
+            Class Check-In kiosk uses. %>
+        <a href="<%= basePath %>/scan<%= semesterId != null ? '?semesterId=' + semesterId : '' %>" class="class-checkin-btn">Check In</a>
         <button type="button" class="roster-action-btn" data-copy-link="<%= linkUrl %>">Copy Link</button>
       </div>
     </div>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <form id="orientation-checkin-form" method="POST" action="<%= postUrl %>">
-      <input type="hidden" name="semesterId" value="<%= semesterId != null ? semesterId : '' %>" />
-      <% if (rows.length === 0) { %>
-        <p class="roster-empty">No one is registered for classes this semester yet.</p>
-      <% } else { %>
-        <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
-            <thead>
+    <% if (rows.length === 0) { %>
+      <p class="roster-empty">No one is registered for classes this semester yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr>
+              <th>Check In</th>
+              <th>Day</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(r) { %>
               <tr>
-                <th><input type="checkbox" data-select-all-for="orientation-checkin-form" aria-label="Select all" /></th>
-                <th>Member</th>
-                <th>Day</th>
-                <th>Status</th>
+                <td class="roster-name-col">
+                  <%= r.memberName %>
+                  <% if (r[field]) { %>
+                    <span class="status-badge status-badge-present">Checked In</span>
+                  <% } %>
+                </td>
+                <td><%= r.dayLabel %></td>
               </tr>
-            </thead>
-            <tbody>
-              <% rows.forEach(function(r) { %>
-                <tr>
-                  <td>
-                    <% if (!r[field]) { %>
-                      <input type="checkbox" name="members" value="<%= r.memberId %>" form="orientation-checkin-form" aria-label="Select <%= r.memberName %>" />
-                    <% } %>
-                  </td>
-                  <td class="roster-name-col"><%= r.memberName %></td>
-                  <td><%= r.dayLabel %></td>
-                  <td>
-                    <% if (r[field]) { %>
-                      <span class="status-badge status-badge-present">Checked In</span>
-                    <% } else { %>
-                      <span class="hint">Not yet</span>
-                    <% } %>
-                  </td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
-      <% } %>
-    </form>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
   </main>
-  <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/copy-link.js"></script>
 </body>
 </html>

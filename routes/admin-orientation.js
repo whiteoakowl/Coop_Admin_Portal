@@ -15,7 +15,8 @@ const express = require('express');
 const router = express.Router();
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const db = require('../db');
-const { FIELDS, LINKABLE_FIELDS, orientationRows, setOrientationField, defaultSemesterId, setOrientationLink, orientationTrainingLinks } = require('../utils/orientation');
+const { FIELDS, LINKABLE_FIELDS, orientationRows, setOrientationField, defaultSemesterId, setOrientationLink, orientationTrainingLinks, orientationObligationMemberId } = require('../utils/orientation');
+const { findMemberByBarcodeOrName } = require('../utils/memberLookup');
 
 // Shared by every page in this router - `?semesterId=` if given, else the
 // most recently created semester, else null (the fallback "every class
@@ -81,18 +82,23 @@ router.post('/orientation/settings', requireFullAdmin, async (req, res) => {
 });
 
 // Both check-in subpages share the exact same shape (see views/admin-
-// orientation-checkin.ejs): everyone from the main list, a purple "Check
-// In" bulk-action button up top, and a Copy Link button for this page's
-// own URL - only the field being checked in (tour vs openHouse) differs.
-function renderCheckinPage(field, title, postUrl) {
+// orientation-checkin.ejs): everyone from the main list (status-only, no
+// more bulk-select checkboxes - see handleScan below for why), a purple
+// "Check In" button up top that opens the scan screen, a semester
+// dropdown matching Orientation Tracking's own, and a Copy Link button
+// for this page's own URL - only the field being checked in (tour vs
+// openHouse) differs.
+function renderCheckinPage(field, title, basePath) {
   return async (req, res) => {
+    const semesters = await db.prepare('SELECT * FROM semesters ORDER BY id DESC').all();
     const semesterId = await resolveSemesterId(req);
     const rows = await orientationRows(semesterId);
     const query = req.query.semesterId ? `?semesterId=${encodeURIComponent(req.query.semesterId)}` : '';
     res.render('admin-orientation-checkin', {
       title,
       field,
-      postUrl,
+      basePath,
+      semesters,
       semesterId,
       linkUrl: `${req.protocol}://${req.get('host')}${req.baseUrl}${req.path}${query}`,
       rows,
@@ -101,26 +107,64 @@ function renderCheckinPage(field, title, postUrl) {
   };
 }
 
-function handleCheckin(field) {
+// A real request: "click check in button should have same card screen as
+// kiosk with mobile scan, barcode scan or enter ID button choices." Same
+// method-chooser markup/JS the Class Check-In kiosk and the Events scan
+// page already use (views/kiosk-class-checkin-scan.ejs, views/admin-
+// events-checkin-scan.ejs) - carries the semester the admin had selected
+// on the list page through as the scan target, and a Complete button
+// (same continuous-scan-then-exit pattern the kiosk version already has)
+// to return to that list afterward.
+function renderScanPage(heading, basePath) {
+  return async (req, res) => {
+    const semesterId = await resolveSemesterId(req);
+    const semesterQuery = semesterId != null ? `?semesterId=${semesterId}` : '';
+    res.render('admin-orientation-checkin-scan', {
+      title: `${heading} Scan`,
+      heading,
+      semesterId,
+      scanPostUrl: `${basePath}/scan`,
+      completeUrl: `${basePath}${semesterQuery}`,
+    });
+  };
+}
+
+// The scan endpoint behind the card screen's 3 entry methods. Resolves
+// whoever was scanned/typed through the exact same family-obligation
+// lookup a passed Training already uses (utils/orientation.js's own
+// orientationObligationMemberId) - it doesn't matter which family member
+// actually walks up and scans their own barcode, the checkmark always
+// lands on the same Primary Parent row the list above (and Orientation
+// Tracking itself) already shows for that family.
+function handleScan(field) {
   return async (req, res) => {
     const semesterId = req.body.semesterId ? parseInt(req.body.semesterId, 10) : null;
-    const selected = [].concat(req.body.members || []);
-    for (const memberId of selected) {
-      await setOrientationField(parseInt(memberId, 10), semesterId, field, true);
-    }
-    const back = req.body._backTo || `/admin/orientation/${field === 'tour' ? 'tour-checkin' : 'orientation-checkin'}`;
-    res.redirect(back + '?notice=' + encodeURIComponent(`Checked in ${selected.length} member${selected.length === 1 ? '' : 's'}.`));
+    const { member, ambiguous } = await findMemberByBarcodeOrName(req.body.barcode);
+    if (ambiguous) return res.json({ ok: false, message: 'More than one member has that name - please scan a barcode instead.' });
+    if (!member) return res.json({ ok: false, message: 'Not recognized.' });
+
+    const targetMemberId = await orientationObligationMemberId(member.id);
+    const rows = await orientationRows(semesterId);
+    const familyRow = rows.find((r) => r.memberId === targetMemberId);
+    if (!familyRow) return res.json({ ok: false, message: `${member.name} is not registered for classes this semester.` });
+
+    if (familyRow[field]) return res.json({ ok: true, alreadyChecked: true, message: `${member.name} is already checked in.` });
+
+    await setOrientationField(targetMemberId, semesterId, field, true);
+    res.json({ ok: true, message: `Welcome, ${member.name}!` });
   };
 }
 
 router.get('/orientation/tour-checkin', requireFullAdmin, renderCheckinPage('tour', 'Tour Check-In', '/admin/orientation/tour-checkin'));
-router.post('/orientation/tour-checkin', requireFullAdmin, handleCheckin('tour'));
+router.get('/orientation/tour-checkin/scan', requireFullAdmin, renderScanPage('Tour Check-In', '/admin/orientation/tour-checkin'));
+router.post('/orientation/tour-checkin/scan', requireFullAdmin, handleScan('tour'));
 
 // A real request: "Delete orientation Meet-up column", with "Orientation
 // check in should be linked to open house column" - this subpage used to
 // check in the (now-removed) Meet Up field; it now checks in Open House
 // instead, same as the main grid's own Open House circle.
 router.get('/orientation/orientation-checkin', requireFullAdmin, renderCheckinPage('openHouse', 'Open House Check-In', '/admin/orientation/orientation-checkin'));
-router.post('/orientation/orientation-checkin', requireFullAdmin, handleCheckin('openHouse'));
+router.get('/orientation/orientation-checkin/scan', requireFullAdmin, renderScanPage('Open House Check-In', '/admin/orientation/orientation-checkin'));
+router.post('/orientation/orientation-checkin/scan', requireFullAdmin, handleScan('openHouse'));
 
 module.exports = router;
