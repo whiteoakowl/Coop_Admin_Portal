@@ -7393,18 +7393,33 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    the NEXT card over in the neighboring table column. Wrapping drops the
    buttons to their own line, staying inside this card, instead. */
 .class-card-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
-/* overflow-wrap: normal (the default - no forced break-word here) is
-   deliberate: a real bug report on a narrow mobile column found titles
-   like "Brain Games and Logic" broken ONE CHARACTER PER LINE ("Brai" /
-   "n" / "Ga" / "mes" / ...) - break-word lets the browser split inside a
-   word whenever the column is too narrow for it, and at this card's
-   mobile width even short words didn't fit. Whole words wrapping at
-   their own natural spaces (or, worst case, one word overflowing its own
-   box - safely contained by .class-schedule-cell's own overflow: hidden
-   below, not bleeding into the neighbor) reads far better than
-   fragmented text - "all words should be formatted to be on the same
-   row." */
-.class-card-header h3 { margin: 0; font-size: 0.92rem; flex: 1; min-width: 0; }
+/* A real request: "make sure title shrink to fit in in class colored box/
+   card" - superseded the old unlimited-wrap approach (a real bug report
+   once found titles like "Brain Games and Logic" broken ONE CHARACTER PER
+   LINE on a narrow mobile column, fixed at the time by letting whole
+   words wrap at their own spaces instead of mid-word) with a 2-line clamp:
+   public/js/class-card-title-fit.js shrinks this h3's own font-size down
+   (never up) until it fits in 2 lines, so a long title reads smaller
+   instead of wrapping the card tall and uneven next to its neighbors - a
+   plain single-line + ellipsis was tried first and rejected: confirmed
+   live, the mobile grid's hour columns are only ~70px wide, so even a
+   short, ordinary title like "Verify Spacing Class" ellipsized down to
+   "Verify S..." almost immediately, losing most of the actual name. The
+   -webkit-line-clamp/-webkit-box pair is a de facto standard now (every
+   evergreen browser implements it despite the prefix), the only way to
+   cap a wrapping element at an exact line count with its own ellipsis
+   when it still doesn't fit. */
+.class-card-header h3 {
+  margin: 0;
+  font-size: 0.92rem;
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* Belt-and-suspenders for the same bug: even with the wrap fix above,
    nothing clips a card that somehow still renders wider than its cell
    (e.g. a single unbroken class name longer than the column) - the
