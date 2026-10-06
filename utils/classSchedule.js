@@ -568,7 +568,7 @@ async function updateClass(id, fields) {
   const before = await db.prepare('SELECT roster_id, day FROM classes WHERE id = ?').get(id);
   await db.prepare(
     `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, numeric_ages = ?, color = ?, start_time = ?, end_time = ?, start_date = ?, end_date = ?, capacity = ?, registration_open = ?, description = ?, supply_list = ?,
-       allow_parent_register = ?, allow_teacher_register = ?, allow_student_register = ?, teacher_slots = ?, assistant_slots = ?, min_capacity = ?, allow_cancel = ?, auto_refund_on_cancel = ?, price_cents = ?, price_per = ?, lock_by_grade = ?, lock_by_age = ?,
+       allow_parent_register = ?, allow_teacher_register = ?, allow_student_register = ?, teacher_slots = ?, assistant_slots = ?, min_capacity = ?, allow_cancel = ?, auto_refund_on_cancel = ?, price_cents = ?, price_per = ?, accounting_category_id = ?, lock_by_grade = ?, lock_by_age = ?,
        allow_parent_complete_lessons = ?, allow_parent_chat = ?
      WHERE id = ?`
   ).run(
@@ -597,6 +597,7 @@ async function updateClass(id, fields) {
     fields.autoRefundOnCancel ? 1 : 0,
     fields.priceCents || null,
     fields.pricePer === 'students_and_staff' ? 'students_and_staff' : 'students',
+    fields.accountingCategoryId || null,
     fields.lockByGrade === false ? 0 : 1,
     fields.lockByAge === false ? 0 : 1,
     fields.allowParentCompleteLessons ? 1 : 0,
@@ -655,6 +656,7 @@ async function bulkUpdateClasses(ids, patch) {
       autoRefundOnCancel: !!cls.auto_refund_on_cancel,
       priceCents: cls.price_cents,
       pricePer: cls.price_per,
+      accountingCategoryId: cls.accounting_category_id,
       lockByGrade: !!cls.lock_by_grade,
       lockByAge: !!cls.lock_by_age,
       allowParentCompleteLessons: !!cls.allow_parent_complete_lessons,
@@ -891,11 +893,17 @@ async function deleteClassSchedule(id) {
 // A real request: "# of students, # of teachers, # of class assistants
 // options should move to the top of staff and roster page" - out of the
 // Class Details form and onto the Staff & Roster tab's own form instead,
-// which needs its own scoped save (touching only these 3 columns) so it
+// which needs its own scoped save (touching only these columns) so it
 // doesn't have to resupply every other Class Details field just to
-// change a slot count.
-async function updateClassSlots(id, { capacity, teacherSlots, assistantSlots }) {
-  await db.prepare('UPDATE classes SET capacity = ?, teacher_slots = ?, assistant_slots = ? WHERE id = ?').run(capacity || null, teacherSlots || null, assistantSlots || null, id);
+// change a slot count. A later real request: "minimum and maximum
+// student settings, same row next to each other" moved Minimum Students
+// Needed here too, next to # of Students Allowed, for the same reason
+// every other "same row" pairing in this app needs its fields to
+// actually live in the same form to be laid out on the same row.
+async function updateClassSlots(id, { capacity, minCapacity, teacherSlots, assistantSlots }) {
+  await db
+    .prepare('UPDATE classes SET capacity = ?, min_capacity = ?, teacher_slots = ?, assistant_slots = ? WHERE id = ?')
+    .run(capacity || null, minCapacity || null, teacherSlots || null, assistantSlots || null, id);
 }
 
 // Deactivates (never hard-deletes) the class's auto-roster before removing

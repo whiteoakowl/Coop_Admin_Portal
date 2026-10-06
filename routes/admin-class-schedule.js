@@ -29,6 +29,10 @@ const {
   scoreAnswer,
 } = require('../utils/academics');
 const { primaryParentsFor } = require('../utils/scheduleCardData');
+// A real request: "after charge per add a dropdown choice for account
+// category" - reuses Events' own admin-managed accounting category list
+// (utils/events.js) rather than standing up a second, parallel list.
+const { listAccountingCategories } = require('../utils/events');
 const { adminRemoveStudentFromClass } = require('../utils/classRegistration');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter, imageFileFilter } = require('../utils/uploads');
@@ -426,8 +430,7 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, r
     enrolledStudents: await enrichRosterStudents(cls.students),
     availableStaff: (await activeMembersForStaff()).filter((p) => !staffIds.includes(p.id)),
     semesters: await listSemesters(),
-    sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
-    selectedSectionIds: await classSectionIds(id),
+    accountingCategories: await listAccountingCategories(),
     classImageUrl: classImageUrl(cls.image_key),
     assignments,
     chatMessages,
@@ -746,13 +749,19 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single(
       allowStudentRegister: !!cls.allow_student_register,
       allowCancel: !!cls.allow_cancel,
       autoRefundOnCancel: !!cls.auto_refund_on_cancel,
-      // # of Students/Teachers/Class Assistants Allowed moved to their
-      // own form on the Staff & Roster tab (see the /slots route below) -
-      // preserve them here the same way, rather than resetting them to
-      // null just because this save doesn't mention them.
+      // # of Students/Teachers/Class Assistants Allowed, and (per a later
+      // real request pairing it with # of Students Allowed on the same
+      // row) Minimum Students Needed too, all moved to their own form on
+      // the Staff & Roster tab (see the /slots route below) - preserve
+      // them here the same way, rather than resetting them to null just
+      // because this save doesn't mention them.
       capacity: cls.capacity,
+      minCapacity: cls.min_capacity,
       teacherSlots: cls.teacher_slots,
       assistantSlots: cls.assistant_slots,
+      // A real request: "after charge per add a dropdown choice for
+      // account category."
+      accountingCategoryId: req.body.accountingCategoryId ? parseInt(req.body.accountingCategoryId, 10) : null,
       // A real request: "grade and age should have a checkbox that says
       // lock class by grade or lock class by age."
       lockByGrade: req.body.lockByGrade === '1',
@@ -764,7 +773,11 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single(
       allowParentChat: req.body.allowParentChat === '1',
     });
     await setClassSemester(id, req.body.semesterId ? parseInt(req.body.semesterId, 10) : null);
-    await saveClassSections(id, req.body);
+    // A real request: "remove sections" (from Class Details) - this save
+    // no longer touches class_sections at all, same "preserve whatever
+    // isn't on this form" reasoning as capacity/minCapacity/slots above;
+    // whatever sections a class was created with (Add Class dialog) stay
+    // as-is.
     if (req.file) {
       await setClassImage(id, await saveClassImage(req.file, cls.image_key));
     }
@@ -833,6 +846,7 @@ router.post('/class-schedule/classes/:id/slots', requireFullAdmin, async (req, r
   if (!cls) return res.status(404).send('Not found');
   await updateClassSlots(id, {
     capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
+    minCapacity: req.body.minCapacity ? parseInt(req.body.minCapacity, 10) : null,
     teacherSlots: req.body.teacherSlots ? parseInt(req.body.teacherSlots, 10) : null,
     assistantSlots: req.body.assistantSlots ? parseInt(req.body.assistantSlots, 10) : null,
   });

@@ -155,28 +155,33 @@ test('Staff & Roster tab has its own Slots form at the top, and saving it does n
   assert.doesNotMatch(detailsFormHtml, /# of Students Allowed/);
   assert.doesNotMatch(detailsFormHtml, /# of Teachers Allowed/);
   assert.doesNotMatch(detailsFormHtml, /# of Class Assistants Allowed/);
-  assert.match(detailsFormHtml, /Minimum Students Needed/, 'Minimum Students Needed should stay on Details');
+  // A later real request: "minimum and maximum student settings, same
+  // row next to each other" moved Minimum Students Needed off Details
+  // and onto this same Slots form too, next to # of Students Allowed.
+  assert.doesNotMatch(detailsFormHtml, /Minimum Students Needed/, 'Minimum Students Needed should have moved off Details');
+  assert.match(rosterPage.text, /Minimum Students Needed/, 'Minimum Students Needed should now be on the Slots form');
 
   const csrfToken = extractCsrf(rosterPage.text);
   const res = await request(app)
     .post(`/admin/class-schedule/classes/${classId}/slots`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ capacity: '10', teacherSlots: '2', assistantSlots: '3', _csrf: csrfToken });
+    .send({ capacity: '10', minCapacity: '4', teacherSlots: '2', assistantSlots: '3', _csrf: csrfToken });
   assert.equal(res.status, 302);
   assert.match(res.headers.location, /tab=staffRoster/);
 
   const cls = await getClass(classId);
   assert.equal(cls.capacity, 10);
+  assert.equal(cls.min_capacity, 4);
   assert.equal(cls.teacher_slots, 2);
   assert.equal(cls.assistant_slots, 3);
   assert.equal(cls.room, 'Room 9', 'saving Slots must not disturb the Class Details fields');
   assert.equal(cls.description, 'Keep this description');
 });
 
-test('Saving the Class Details form does not reset slot counts set on the Staff & Roster tab', async () => {
+test('Saving the Class Details form does not reset slot counts (including Minimum Students Needed) set on the Staff & Roster tab', async () => {
   const admin = await loginAsAdmin();
-  const classId = await createClass({ day: 'wednesday', hourPosition: 1, className: 'Preserve Slots Class', capacity: 8, teacherSlots: 1, assistantSlots: 1 });
+  const classId = await createClass({ day: 'wednesday', hourPosition: 1, className: 'Preserve Slots Class', capacity: 8, minCapacity: 2, teacherSlots: 1, assistantSlots: 1 });
 
   const page = await request(app).get(`/admin/class-schedule/classes/${classId}/manage`).set('Cookie', admin.cookie);
   const csrfToken = extractCsrf(page.text);
@@ -189,6 +194,7 @@ test('Saving the Class Details form does not reset slot counts set on the Staff 
   const cls = await getClass(classId);
   assert.equal(cls.class_name, 'Preserve Slots Class (renamed)');
   assert.equal(cls.capacity, 8, 'capacity must survive a Details save that never mentions it');
+  assert.equal(cls.min_capacity, 2, 'min_capacity must survive a Details save that never mentions it');
   assert.equal(cls.teacher_slots, 1);
   assert.equal(cls.assistant_slots, 1);
 });

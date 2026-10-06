@@ -65,71 +65,75 @@
                 <% }); %>
               </div>
             </div>
-            <label>Class Hour
-              <select name="hourPosition" required>
-                <% hours.forEach(function(h) { %>
-                  <option value="<%= h.position %>" <%= cls.hour_position === h.position ? 'selected' : '' %>><%= h.label %></option>
-                <% }); %>
-              </select>
-            </label>
-            <label>Room
-              <input type="text" name="room" value="<%= cls.room || '' %>" />
-            </label>
-            <label>Start Time
-              <input type="text" name="startTime" value="<%= cls.start_time || '' %>" placeholder="9:00 AM" />
-            </label>
-            <label>End Time
-              <input type="text" name="endTime" value="<%= cls.end_time || '' %>" placeholder="10:00 AM" />
-            </label>
-            <%# A real request: "Details should have... start and end
-                dates" - the class's own overall term/session date range,
-                separate from Start/End Time above (its daily time slot). %>
-            <label>Start Date
-              <input type="date" name="startDate" value="<%= cls.start_date || '' %>" />
-            </label>
-            <label>End Date
-              <input type="date" name="endDate" value="<%= cls.end_date || '' %>" />
-            </label>
+            <%# A real request: "class hour and room option should be on
+                the same row next to eachother." %>
+            <div class="member-form-full class-edit-slots-row">
+              <label>Class Hour
+                <select name="hourPosition" required>
+                  <% hours.forEach(function(h) { %>
+                    <option value="<%= h.position %>" <%= cls.hour_position === h.position ? 'selected' : '' %>><%= h.label %></option>
+                  <% }); %>
+                </select>
+              </label>
+              <label>Room
+                <input type="text" name="room" value="<%= cls.room || '' %>" />
+              </label>
+            </div>
 
+            <%# A real request: "start time and end time on the same
+                row." %>
+            <div class="member-form-full class-edit-slots-row">
+              <label>Start Time
+                <input type="text" name="startTime" value="<%= cls.start_time || '' %>" placeholder="9:00 AM" />
+              </label>
+              <label>End Time
+                <input type="text" name="endTime" value="<%= cls.end_time || '' %>" placeholder="10:00 AM" />
+              </label>
+            </div>
+
+            <%# A real request: "start date and end date on the same
+                row." The class's own overall term/session date range,
+                separate from Start/End Time above (its daily time slot). %>
+            <div class="member-form-full class-edit-slots-row">
+              <label>Start Date
+                <input type="date" name="startDate" value="<%= cls.start_date || '' %>" />
+              </label>
+              <label>End Date
+                <input type="date" name="endDate" value="<%= cls.end_date || '' %>" />
+              </label>
+            </div>
+
+            <%# A real request: "lock class by grade check mark should be
+                near title. Check event settings for the grade and age
+                picker settings title layout" - same title-then-lock-
+                then-picker order Events' own Lock by Grade/Age already
+                uses (views/admin-events-builder.ejs). %>
             <div class="member-form-full">
-              <label class="roster-checkbox-label">Grade <span class="hint">(select all that apply)</span></label>
+              <span class="roster-checkbox-label">Grade <span class="hint">(select all that apply)</span></span>
+              <%# Checked by default, matching the old always-on behavior
+                  from before grade/age locks could be turned off
+                  independently. %>
+              <label class="checkbox-option"><input type="checkbox" name="lockByGrade" value="1" <%= cls.lock_by_grade == false || Number(cls.lock_by_grade) === 0 ? '' : 'checked' %> /> Lock class by grade</label>
               <%- include('partials/multi-select-checkbox', {
                 name: 'ageGroup',
                 options: gradeLevels.map(function(g) { return { value: g, label: g }; }),
                 selected: selectedGrades,
                 placeholder: 'All grades',
               }) %>
-              <%# A real request: "grade and age should have a checkbox
-                  that says lock class by grade or lock class by age" -
-                  grade and age selections used to always both gate
-                  registration together; this lets an admin turn either
-                  gate off independently (e.g. show an age range for
-                  information only, without it actually restricting who
-                  can register). Checked by default, matching that old
-                  always-on behavior. %>
-              <label class="checkbox-option"><input type="checkbox" name="lockByGrade" value="1" <%= cls.lock_by_grade == false || Number(cls.lock_by_grade) === 0 ? '' : 'checked' %> /> Lock class by grade</label>
             </div>
 
             <%# A real request: "grade selection and age selection should
                 be separate menus of choices" %>
             <div class="member-form-full">
-              <label class="roster-checkbox-label">Age <span class="hint">(select all that apply)</span></label>
+              <span class="roster-checkbox-label">Age <span class="hint">(select all that apply)</span></span>
+              <label class="checkbox-option"><input type="checkbox" name="lockByAge" value="1" <%= cls.lock_by_age == false || Number(cls.lock_by_age) === 0 ? '' : 'checked' %> /> Lock class by age</label>
               <%- include('partials/multi-select-checkbox', {
                 name: 'numericAges',
                 options: ageOptions.map(function(a) { return { value: a, label: a }; }),
                 selected: selectedAges,
                 placeholder: 'All ages',
               }) %>
-              <label class="checkbox-option"><input type="checkbox" name="lockByAge" value="1" <%= cls.lock_by_age == false || Number(cls.lock_by_age) === 0 ? '' : 'checked' %> /> Lock class by age</label>
             </div>
-
-            <%# A real request: "Add close registration check box on
-                detail page" - registration_open used to live on the old
-                per-class Class Settings table (now removed - see the
-                Co-op Class Settings rebuild), moved here instead. The
-                checkbox reads as "closed" while the underlying column is
-                "open", so the two are inverted in the POST handler. %>
-            <label class="member-form-full checkbox-option"><input type="checkbox" name="closeRegistration" value="1" <%= cls.registration_open ? '' : 'checked' %> /> Close Registration</label>
 
             <label>Semester <span class="hint">(optional)</span>
               <select name="semesterId">
@@ -140,11 +144,17 @@
               </select>
             </label>
 
-            <%# A real request moved these off the old global Co-op Class
-                Settings page onto each class's own Details form instead -
-                they stay per-class, just relocated here. %>
-            <label class="checkbox-option"><input type="checkbox" name="allowParentCompleteLessons" value="1" <%= cls.allow_parent_complete_lessons ? 'checked' : '' %> /> Parents Can Complete Lessons</label>
-            <label class="checkbox-option"><input type="checkbox" name="allowParentChat" value="1" <%= cls.allow_parent_chat ? 'checked' : '' %> /> Parents Can Use Class Chat</label>
+            <%# A real request: "close register checkbox should be near,
+                parents can use class chat" - grouped with the other two
+                per-class portal-behavior checkboxes instead of sitting
+                alone right after the Age picker. registration_open reads
+                as "closed" while the underlying column is "open", so the
+                two are inverted in the POST handler. %>
+            <div class="member-form-full">
+              <label class="checkbox-option"><input type="checkbox" name="closeRegistration" value="1" <%= cls.registration_open ? '' : 'checked' %> /> Close Registration</label>
+              <label class="checkbox-option"><input type="checkbox" name="allowParentCompleteLessons" value="1" <%= cls.allow_parent_complete_lessons ? 'checked' : '' %> /> Parents Can Complete Lessons</label>
+              <label class="checkbox-option"><input type="checkbox" name="allowParentChat" value="1" <%= cls.allow_parent_chat ? 'checked' : '' %> /> Parents Can Use Class Chat</label>
+            </div>
 
             <div class="member-form-full" data-forum-editor>
               <label>Class Description <span class="hint">(shown to parents browsing classes)</span></label>
@@ -159,15 +169,12 @@
 
             <%# A real request: "# of students, # of teachers, # of class
                 assistants options should move to the top of staff and
-                roster page" - moved to their own form there (see the
-                staffRoster tab below); Minimum Students Needed stays
-                here since it's a cancellation threshold, not a slot
-                count. %>
-            <div class="member-form-full class-edit-slots-row">
-              <label>Minimum Students Needed <span class="hint">(optional)</span>
-                <input type="number" name="minCapacity" min="0" value="<%= cls.min_capacity != null ? cls.min_capacity : '' %>" />
-              </label>
-            </div>
+                roster page", later followed by "minimum and maximum
+                student settings, same row next to each other" - Minimum
+                Students Needed moved from here onto that same Slots form
+                (staffRoster tab) too, so it can actually sit next to
+                Maximum Students on one row instead of just being
+                conceptually paired while living on two different tabs. %>
 
             <label>Price ($) <span class="hint">(blank = free)</span>
               <input type="number" name="priceDollars" min="0" step="0.01" value="<%= cls.price_cents != null ? (cls.price_cents / 100).toFixed(2) : '' %>" />
@@ -178,31 +185,32 @@
                 <option value="students_and_staff" <%= cls.price_per === 'students_and_staff' ? 'selected' : '' %>>Students and Teachers/Assistants</option>
               </select>
             </label>
+            <%# A real request: "after charge per add a dropdown choice
+                for account category." Reuses Events' own admin-managed
+                accounting category list (utils/events.js's own
+                listAccountingCategories), managed from Events' own
+                Settings tab - see the migration's own comment for why a
+                second, parallel list wasn't worth standing up here. %>
+            <label>Account Category <span class="hint">(optional)</span>
+              <select name="accountingCategoryId">
+                <option value="">None</option>
+                <% accountingCategories.forEach(function(c) { %>
+                  <option value="<%= c.id %>" <%= cls.accounting_category_id === c.id ? 'selected' : '' %>><%= c.name %></option>
+                <% }); %>
+              </select>
+            </label>
 
-            <% if (typeof sections !== 'undefined' && sections.length) { %>
-              <div class="member-form-full">
-                <label class="roster-checkbox-label">Sections <span class="hint">(leave all unchecked to allow every section)</span></label>
-                <div class="grade-pill-grid">
-                  <% sections.forEach(function(s) { %>
-                    <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= (typeof selectedSectionIds !== 'undefined' && selectedSectionIds.includes(s.id)) ? 'checked' : '' %> /> <%= s.name %></label>
-                  <% }); %>
-                </div>
-              </div>
-            <% } %>
-
-            <button type="submit" class="primary-btn member-form-full">Save Changes</button>
+            <%# A real request: "duplicate class button should be on the
+                same row as save button. Both buttons fit to text better
+                and better balanced." Duplicate Class is a plain dialog-
+                opener (no submission of its own), so it can sit right
+                inside this form next to the real Save Changes submit
+                button without needing its own separate section below. %>
+            <div class="member-form-full class-details-save-row">
+              <button type="submit" class="primary-btn">Save Changes</button>
+              <button type="button" class="roster-action-btn" onclick="document.getElementById('duplicate-class-dialog').showModal()">Duplicate Class</button>
+            </div>
           </form>
-        </div>
-
-        <%# A real request: "Individual class editing. Add a duplicate
-            class button at the bottom." Opens a popup asking whether to
-            also copy the current teachers/assistants and which semester/
-            day grid to add the copy to - see the matching POST route's
-            own comment in routes/admin-class-schedule.js for exactly
-            what gets copied (every Details/Slots/Sections field; never
-            the roster/enrollment). %>
-        <div class="manage-section no-print">
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('duplicate-class-dialog').showModal()">Duplicate Class</button>
         </div>
 
         <dialog id="duplicate-class-dialog" class="member-picker-dialog">
@@ -235,15 +243,28 @@
             <h2>Slots</h2>
           </div>
           <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/slots" class="member-form-grid">
-            <label># of Students Allowed <span class="hint">(blank = unlimited)</span>
-              <input type="number" name="capacity" min="0" value="<%= cls.capacity != null ? cls.capacity : '' %>" />
-            </label>
-            <label># of Teachers Allowed <span class="hint">(optional)</span>
-              <input type="number" name="teacherSlots" min="0" value="<%= cls.teacher_slots != null ? cls.teacher_slots : '' %>" />
-            </label>
-            <label># of Class Assistants Allowed <span class="hint">(optional)</span>
-              <input type="number" name="assistantSlots" min="0" value="<%= cls.assistant_slots != null ? cls.assistant_slots : '' %>" />
-            </label>
+            <%# A real request: "minimum and maximum student settings,
+                same row next to each other" - Minimum Students Needed
+                moved here from the Class Details tab so it can actually
+                sit beside Maximum (# of Students Allowed). %>
+            <div class="member-form-full class-edit-slots-row">
+              <label># of Students Allowed <span class="hint">(blank = unlimited)</span>
+                <input type="number" name="capacity" min="0" value="<%= cls.capacity != null ? cls.capacity : '' %>" />
+              </label>
+              <label>Minimum Students Needed <span class="hint">(optional)</span>
+                <input type="number" name="minCapacity" min="0" value="<%= cls.min_capacity != null ? cls.min_capacity : '' %>" />
+              </label>
+            </div>
+            <%# A real request: "maximum teachers and max class assistants
+                next to each other." %>
+            <div class="member-form-full class-edit-slots-row">
+              <label># of Teachers Allowed <span class="hint">(optional)</span>
+                <input type="number" name="teacherSlots" min="0" value="<%= cls.teacher_slots != null ? cls.teacher_slots : '' %>" />
+              </label>
+              <label># of Class Assistants Allowed <span class="hint">(optional)</span>
+                <input type="number" name="assistantSlots" min="0" value="<%= cls.assistant_slots != null ? cls.assistant_slots : '' %>" />
+              </label>
+            </div>
             <div class="member-form-full">
               <button type="submit" class="primary-btn">Save Slots</button>
             </div>

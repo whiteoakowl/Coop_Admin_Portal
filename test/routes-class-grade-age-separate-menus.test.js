@@ -105,8 +105,8 @@ test('Class Details form: Grade and Age are two separate multi-select menus', as
   const cls = await createClass(admin, { className: 'Menus Class' });
   const page = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage`).set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /<label class="roster-checkbox-label">Grade <span class="hint">/);
-  assert.match(page.text, /<label class="roster-checkbox-label">Age <span class="hint">/);
+  assert.match(page.text, /<span class="roster-checkbox-label">Grade <span class="hint">/);
+  assert.match(page.text, /<span class="roster-checkbox-label">Age <span class="hint">/);
   assert.match(page.text, /name="numericAges"/);
   assert.doesNotMatch(page.text, /Grade\/Age Group/);
 });

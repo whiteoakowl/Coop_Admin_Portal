@@ -7059,6 +7059,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .class-edit-slots-row > .class-form-field { flex: 1 1 auto; text-align: left; }
 }
 
+/* Class Details' own Save Changes + Duplicate Class - a real request:
+   "duplicate class button should be on the same row as save button.
+   Both buttons fit to text better and better balanced." A plain flex
+   row (not .roster-btn-row, whose own mobile column-counting JS -
+   roster-btn-row-grid.js - only counts .roster-action-btn children, not
+   .primary-btn, so mixing the two there would miscount columns) - each
+   button already sizes to its own text by default, this just keeps them
+   on one row with even spacing instead of Save Changes' old full-width
+   member-form-full stretch. */
+.class-details-save-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+
 /* Circular color swatches, selected one ringed + checkmarked - replaces a
    plain native color input. */
 /* flex-wrap + min-width: 0 so a full row of 12 swatches wraps onto more
