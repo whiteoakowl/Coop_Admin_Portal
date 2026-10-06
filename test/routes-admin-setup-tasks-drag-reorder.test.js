@@ -98,7 +98,7 @@ test('Setup/Cleanup Task List drag-and-drop reorder', async (t) => {
 
     const page = await request(app).get('/admin/setup/monday/tasks').set('Cookie', cookie);
     assert.match(page.text, /Third task/);
-    const rowRe = /<td class="task-list-num-col">(\d)<\/td>\s*<td><input type="text" name="itemDesc_\d+" value="Third task"/;
+    const rowRe = /<td class="task-list-num-col">(\d)<\/td>\s*<td><textarea name="itemDesc_\d+"[^>]*>Third task<\/textarea>/;
     const m = rowRe.exec(page.text);
     assert.ok(m, 'Third task row should exist with a # cell right before it');
     assert.equal(m[1], '1', "Third task's # should now be 1 after the drag");

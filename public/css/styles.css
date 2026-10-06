@@ -9169,13 +9169,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .task-list-team-badge { margin: 0; padding: 0 1rem 0.5rem; font-size: 0.8rem; }
 .task-list-table { margin: 0; }
 .task-list-num-col { width: 2.5rem; text-align: center !important; font-weight: 700; }
+/* A real request: "the task bar line should be a description box where
+   you can see the whole task" - was a single-line <input> (text that
+   overflowed its own width just scrolled sideways, hidden, instead of
+   being visible); now a <textarea> that wraps, auto-grown to fit its own
+   content by public/js/task-list-desc-autosize.js. resize: none/overflow:
+   hidden since that script is what controls height, not the user
+   dragging a resize handle or an internal scrollbar. */
 .task-list-desc-input {
+  display: block;
   width: 100%;
   border: none;
   background: none;
   font: inherit;
   color: inherit;
   padding: 0.15rem 0;
+  resize: none;
+  overflow: hidden;
 }
 .task-list-desc-input:not([readonly]) {
   background: #f8fafc;
@@ -9189,12 +9199,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    trash column) could eat enough of a table laid out at 100% width to
    squeeze the task text itself down to almost nothing. Pinning both to a
    deliberately small width below the normal column breakpoint keeps the
-   task input the one column that actually grows to fill the rest. */
+   task input the one column that actually grows to fill the rest.
+   A later real request: "shrink the whole table in mobile view to help
+   it be easier to read multiple line on one screen" - tighter row
+   padding/line-height so switching the task box to a wrapping textarea
+   (which takes more vertical room per row than the old single-line,
+   horizontally-clipped input did) still keeps several tasks' worth on
+   one screen instead of each wrapped row eating noticeably more height
+   than it has to. */
 @media (max-width: 640px) {
+  .task-list-table th, .task-list-table td { padding: 0.3rem 0.4rem; }
   .task-list-table .task-list-drag-handle { padding: 0.1rem; }
   .task-list-table .task-list-drag-handle .icon { width: 0.95rem; height: 0.95rem; }
   .task-list-num-col { width: 1.75rem; padding-left: 0.35rem !important; padding-right: 0.35rem !important; }
-  .task-list-desc-input { font-size: 0.85rem; }
+  .task-list-desc-input { font-size: 0.82rem; line-height: 1.3; }
 }
 
 .task-list-accent-0 .task-list-card-header { background: var(--brand-soft); color: var(--brand-dark); }
