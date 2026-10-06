@@ -6,7 +6,8 @@ const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { ageFromBirthday, formatFriendlyTimestamp, formatDateNumeric, formatDateLabel } = require('../utils/dates');
+const { ageFromBirthday, formatFriendlyTimestamp, formatDateNumeric, formatDateLabel, isValidISODate } = require('../utils/dates');
+const { qsSemester } = require('../utils/scheduleComboLinks');
 const {
   assignmentsForClass,
   getAssignment,
@@ -54,6 +55,11 @@ const {
   roomGridForDay,
   renameRoom,
   saveRoomOrder,
+  declaredRoomsForGrid,
+  saveRoomsForGrid,
+  listClassSchedules,
+  createClassSchedule,
+  updateClassSchedule,
   getClass,
   createClass,
   colorForClassName,
@@ -246,14 +252,25 @@ router.get('/class-schedule/:day', requireAdmin, requireClassDay, (req, res) => 
   res.redirect(`/admin/schedule?${params.toString()}`);
 });
 
-// Single "Edit" dialog covers both hour labels and room renames in one
-// Save, instead of two separate toolbar buttons/dialogs/routes.
+// A real request: "add/edit class schedule grid button on the class
+// schedule page. When you click this button it opens a pop up to allow
+// you to create a new schedule grid, choose a semester/day, choose
+// column titles and row titles" - replaces the old plain "Edit" dialog
+// (hour labels + room renames only, always the shared day-only grid).
+// Now also: picks which semester this save applies to (own copy of the
+// 4 hour rows + its own declared Rooms list, falling back to the shared
+// ones until customized - see utils/classSchedule.js's own hoursForDay/
+// saveRoomsForGrid), and sets that day+semester's own class_schedules
+// Start/End Date, folding in what the retired Day Settings tab used to
+// manage separately - creating that combo's own catalog row if this is
+// the first time it's been saved for.
 router.post('/class-schedule/:day/edit', requireFullAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
+  const semesterId = req.body.semesterId ? parseInt(req.body.semesterId, 10) : null;
   const labels = [].concat(req.body.labels || []);
   const startTimes = [].concat(req.body.startTimes || []);
   const endTimes = [].concat(req.body.endTimes || []);
-  await saveHourLabels(day, labels, startTimes, endTimes);
+  await saveHourLabels(day, labels, startTimes, endTimes, semesterId);
 
   const oldNames = [].concat(req.body.oldNames || []);
   const newNames = [].concat(req.body.newNames || []);
@@ -261,10 +278,22 @@ router.post('/class-schedule/:day/edit', requireFullAdmin, requireClassDay, asyn
   for (let i = 0; i < oldNames.length; i++) {
     const oldName = oldNames[i];
     const newName = (newNames[i] || '').trim();
-    if (newName && newName !== oldName) {
+    if (oldName && newName && newName !== oldName) {
       await renameRoom(day, oldName, newName);
       renamed++;
     }
+  }
+  await saveRoomsForGrid(day, semesterId, newNames);
+
+  const startDate = isValidISODate(req.body.startDate) ? req.body.startDate : null;
+  const endDate = isValidISODate(req.body.endDate) ? req.body.endDate : null;
+  const existingCombo = (await listClassSchedules()).find((cs) => cs.day_of_week === day && cs.semester_id === semesterId);
+  if (existingCombo) {
+    await updateClassSchedule(existingCombo.id, { title: existingCombo.title, dayOfWeek: day, semesterId, startDate, endDate });
+  } else {
+    const semester = semesterId ? (await listSemesters()).find((s) => s.id === semesterId) : null;
+    const title = semester ? `${semester.title} - ${CLASS_DAY_LABELS_FULL[day]}` : CLASS_DAY_LABELS_FULL[day];
+    await createClassSchedule({ title, dayOfWeek: day, semesterId, startDate, endDate });
   }
 
   // Every schedule row (class or floater) that falls back to the hour's
@@ -274,8 +303,8 @@ router.post('/class-schedule/:day/edit', requireFullAdmin, requireClassDay, asyn
   await syncMemberSchedulesForDay(day);
 
   res.redirect(
-    `/admin/class-schedule/${day}?notice=` +
-      encodeURIComponent(`Hours updated${renamed ? ` and ${renamed} room(s) renamed` : ''}.`)
+    `/admin/schedule?tab=${day}&semesterId=${qsSemester(semesterId)}&notice=` +
+      encodeURIComponent(`Class Schedule Grid updated${renamed ? ` and ${renamed} room(s) renamed` : ''}.`)
   );
 });
 

@@ -87,7 +87,7 @@ test('POST /admin/volunteers/:day/teams/:sectionId/hour-label renames only that 
 
   await t.test('renaming hour 1 does not reset the other hours to their defaults', async () => {
     // Give hour 2 a custom label first, so we can confirm it survives.
-    await db.prepare("INSERT INTO class_schedule_hours (day, position, label) VALUES ('monday', 2, 'Custom Hour 2') ON CONFLICT(day, position) DO UPDATE SET label = excluded.label").run();
+    await db.prepare("INSERT INTO class_schedule_hours (day, position, label, semester_id) VALUES ('monday', 2, 'Custom Hour 2', NULL) ON CONFLICT(day, coalesce(semester_id, -1), position) DO UPDATE SET label = excluded.label").run();
 
     const res = await request(app)
       .post(`/admin/volunteers/monday/teams/${firstSection.id}/hour-label`)

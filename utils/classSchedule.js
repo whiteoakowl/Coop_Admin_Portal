@@ -149,8 +149,23 @@ async function colorForClassName(day, room, className, ageGroup) {
   return existing ? existing.color : nextPaletteColor();
 }
 
-async function hoursForDay(day) {
-  return db.prepare('SELECT * FROM class_schedule_hours WHERE day = ? ORDER BY position').all(day);
+// semesterId is optional - every existing caller (Floater, Substitutes,
+// Playground, badges, the public Class Schedule page, etc.) omits it and
+// keeps reading the shared day-only rows exactly as before (every row
+// already has semester_id null before a semester ever customizes
+// anything - see this file's own migration comment). Only the Classes
+// grid's own day-tab view and the new Add/Edit Class Schedule Grid popup
+// pass a real semesterId: an exact (day, semesterId) match wins if that
+// semester has ever customized its own hours, otherwise it falls back to
+// the same shared day-only rows every other caller reads - so nothing
+// changes for a semester until an admin actually opens the popup and
+// saves something for it.
+async function hoursForDay(day, semesterId) {
+  if (semesterId !== undefined) {
+    const own = await db.prepare('SELECT * FROM class_schedule_hours WHERE day = ? AND semester_id IS NOT DISTINCT FROM ? ORDER BY position').all(day, semesterId);
+    if (own.length > 0) return own;
+  }
+  return db.prepare('SELECT * FROM class_schedule_hours WHERE day = ? AND semester_id IS NULL ORDER BY position').all(day);
 }
 
 // startTimes/endTimes are optional, same shape as labels (indexed by
@@ -158,16 +173,20 @@ async function hoursForDay(day) {
 // derivedHourTimeRanges's own comment on how this feeds arrival/
 // departure and each class's displayed time), set once here instead of
 // requiring an admin to open every individual class's own Manage page.
-async function saveHourLabels(day, labels, startTimes = [], endTimes = []) {
+// semesterId is optional, same meaning as hoursForDay's own - omitted
+// (or null, the "No Semester" combo) saves into the shared day-only
+// rows; a real semesterId saves that one semester's own customized copy
+// instead, leaving every other semester's (or the shared) rows untouched.
+async function saveHourLabels(day, labels, startTimes = [], endTimes = [], semesterId = null) {
   const upsert = db.prepare(
-    `INSERT INTO class_schedule_hours (day, position, label, start_time, end_time) VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(day, position) DO UPDATE SET label = excluded.label, start_time = excluded.start_time, end_time = excluded.end_time`
+    `INSERT INTO class_schedule_hours (day, position, label, start_time, end_time, semester_id) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(day, coalesce(semester_id, -1), position) DO UPDATE SET label = excluded.label, start_time = excluded.start_time, end_time = excluded.end_time`
   );
   for (const position of HOUR_POSITIONS) {
     const label = (labels[position - 1] || `Hour ${position}`).trim() || `Hour ${position}`;
     const startTime = (startTimes[position - 1] || '').trim() || null;
     const endTime = (endTimes[position - 1] || '').trim() || null;
-    await upsert.run(day, position, label, startTime, endTime);
+    await upsert.run(day, position, label, startTime, endTime, semesterId);
   }
 }
 
@@ -179,9 +198,14 @@ async function saveHourLabels(day, labels, startTimes = [], endTimes = []) {
 // hour's label back to its "Hour N" default.
 async function saveHourLabel(day, position, label) {
   const trimmed = (label || '').trim() || `Hour ${position}`;
+  // Floater's own hour cards always read/write the shared day-only row
+  // (semester_id null) - same bucket hoursForDay/saveHourLabels fall back
+  // to for any semester that hasn't customized its own, so renaming an
+  // hour from here still shows up for a semester-specific grid that's
+  // never touched the Add/Edit Class Schedule Grid popup's own copy.
   await db.prepare(
-    `INSERT INTO class_schedule_hours (day, position, label) VALUES (?, ?, ?)
-     ON CONFLICT(day, position) DO UPDATE SET label = excluded.label`
+    `INSERT INTO class_schedule_hours (day, position, label, semester_id) VALUES (?, ?, ?, NULL)
+     ON CONFLICT(day, coalesce(semester_id, -1), position) DO UPDATE SET label = excluded.label`
   ).run(day, position, trimmed);
 }
 
@@ -219,13 +243,32 @@ async function getClass(id) {
   return { ...cls, students: await studentsForClass(id), staff: await staffForClass(id) };
 }
 
+// semesterId is optional, same meaning throughout this file - omitted
+// means "every class on the day, regardless of semester" (every
+// existing caller except the Classes grid's own day-tab view and the
+// new Add/Edit Class Schedule Grid popup). A real request confirmed a
+// class that's never been tagged with a semester (semester_id null -
+// still the common case; nothing requires tagging one) should keep
+// showing up no matter which semester is selected, not just the "No
+// Semester" combo - so a real semesterId shows that semester's own
+// classes PLUS every untagged one; explicitly picking the "No Semester"
+// combo (semesterId === null) shows only the untagged ones, since
+// there's nothing even less specific than that to also include.
+async function classesForDaySemester(day, semesterId) {
+  if (semesterId === undefined) {
+    return db.prepare('SELECT * FROM classes WHERE day = ? ORDER BY hour_position, LOWER(class_name)').all(day);
+  }
+  if (semesterId === null) {
+    return db.prepare('SELECT * FROM classes WHERE day = ? AND semester_id IS NULL ORDER BY hour_position, LOWER(class_name)').all(day);
+  }
+  return db.prepare('SELECT * FROM classes WHERE day = ? AND (semester_id = ? OR semester_id IS NULL) ORDER BY hour_position, LOWER(class_name)').all(day, semesterId);
+}
+
 // Every class on a day, grouped under its hour slot - the shape the
 // colored grid (admin and public) renders directly.
-async function gridForDay(day) {
-  const hours = await hoursForDay(day);
-  const classes = await db
-    .prepare('SELECT * FROM classes WHERE day = ? ORDER BY hour_position, LOWER(class_name)')
-    .all(day);
+async function gridForDay(day, semesterId) {
+  const hours = await hoursForDay(day, semesterId);
+  const classes = await classesForDaySemester(day, semesterId);
 
   const byHour = {};
   for (const h of HOUR_POSITIONS) byHour[h] = [];
@@ -310,11 +353,44 @@ async function saveRoomOrder(day, rooms) {
   await setAppSetting(roomOrderSettingKey(day), JSON.stringify(rooms));
 }
 
-async function roomGridForDay(day) {
-  const storedHours = await hoursForDay(day);
-  const rawClasses = await db
-    .prepare('SELECT * FROM classes WHERE day = ? ORDER BY hour_position, LOWER(class_name)')
-    .all(day);
+// A semester+day's own declared room list (the new Add/Edit Class
+// Schedule Grid popup's Rooms column) - [] if that combo has never had
+// one authored, meaning roomGridForDay/roomsForDay keep deriving rooms
+// from live classes exactly as they always have (see this file's own
+// migration comment: purely additive, nothing changes until the popup
+// is actually used for that specific day+semester).
+async function declaredRoomsForGrid(day, semesterId) {
+  return db
+    .prepare('SELECT * FROM class_schedule_rooms WHERE day = ? AND semester_id IS NOT DISTINCT FROM ? ORDER BY position')
+    .all(day, semesterId ?? null);
+}
+
+// Full reconcile (not an add-only) - the popup represents a semester+
+// day's own complete room list, same "resync to exactly what's there"
+// shape as setMemberSections. Blank/duplicate names are dropped; an
+// empty list is a legitimate save (clears any previously declared list,
+// falling back to deriving rooms from classes again).
+async function saveRoomsForGrid(day, semesterId, names) {
+  const sid = semesterId ?? null;
+  const cleaned = [];
+  const seen = new Set();
+  for (const raw of names) {
+    const name = (raw || '').trim();
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    cleaned.push(name);
+  }
+  await db.withTransaction(async (tx) => {
+    await tx.prepare('DELETE FROM class_schedule_rooms WHERE day = ? AND semester_id IS NOT DISTINCT FROM ?').run(day, sid);
+    for (let i = 0; i < cleaned.length; i++) {
+      await tx.prepare('INSERT INTO class_schedule_rooms (day, semester_id, name, position) VALUES (?, ?, ?, ?)').run(day, sid, cleaned[i], i);
+    }
+  });
+}
+
+async function roomGridForDay(day, semesterId) {
+  const storedHours = await hoursForDay(day, semesterId);
+  const rawClasses = await classesForDaySemester(day, semesterId);
 
   // Each position's real effective start time, derived from whichever
   // currently-live classes actually occupy it (earliest, if more than
@@ -378,20 +454,36 @@ async function roomGridForDay(day) {
   }
 
   const discoveredRoomNames = [...new Set(classes.map((c) => (c.room && c.room.trim() ? c.room.trim() : UNASSIGNED_ROOM)))];
-  const savedOrder = await getRoomOrder(day);
-  // Whatever's saved comes first, in that order (skipping any room no
-  // longer in use); anything new/unordered is appended alphabetically -
-  // the same fallback order this grid always used before drag-reordering
-  // existed, so a day nobody's ever reordered looks exactly as before.
-  const ordered = savedOrder.filter((r) => discoveredRoomNames.includes(r));
-  const remaining = discoveredRoomNames
-    .filter((r) => !ordered.includes(r))
-    .sort((a, b) => {
-      if (a === UNASSIGNED_ROOM) return 1;
-      if (b === UNASSIGNED_ROOM) return -1;
-      return a.localeCompare(b, undefined, { sensitivity: 'base' });
-    });
-  const roomNames = [...ordered, ...remaining];
+  // A real request: an admin can now declare this semester+day's own
+  // Rooms list up front (the Add/Edit Class Schedule Grid popup) - once
+  // they have, that declared list and order wins outright (a room with
+  // no classes yet still shows its own empty row), with any class whose
+  // own room string isn't on that list appended rather than silently
+  // dropped. A combo that's never had rooms declared keeps deriving
+  // rooms from live classes + the day's drag-reordered save, exactly as
+  // before this feature existed.
+  const declaredRooms = await declaredRoomsForGrid(day, semesterId);
+  let roomNames;
+  if (declaredRooms.length > 0) {
+    const declaredNames = declaredRooms.map((r) => r.name);
+    const extra = discoveredRoomNames.filter((r) => !declaredNames.includes(r));
+    roomNames = [...declaredNames, ...extra];
+  } else {
+    const savedOrder = await getRoomOrder(day);
+    // Whatever's saved comes first, in that order (skipping any room no
+    // longer in use); anything new/unordered is appended alphabetically -
+    // the same fallback order this grid always used before drag-reordering
+    // existed, so a day nobody's ever reordered looks exactly as before.
+    const ordered = savedOrder.filter((r) => discoveredRoomNames.includes(r));
+    const remaining = discoveredRoomNames
+      .filter((r) => !ordered.includes(r))
+      .sort((a, b) => {
+        if (a === UNASSIGNED_ROOM) return 1;
+        if (b === UNASSIGNED_ROOM) return -1;
+        return a.localeCompare(b, undefined, { sensitivity: 'base' });
+      });
+    roomNames = [...ordered, ...remaining];
+  }
 
   const rows = roomNames.map((room) => {
     const byHour = {};
@@ -457,14 +549,22 @@ async function roomGridForDay(day) {
 // Rooms aren't their own managed entity otherwise (just whatever string
 // is typed into each class's room field), so this is still derived, not a
 // fixed table, same idea as Edit Hours.
-async function roomsForDay(day) {
+// semesterId is optional, same meaning as hoursForDay's own - when given,
+// a semester+day's own declared rooms (see declaredRoomsForGrid, the new
+// Add/Edit Class Schedule Grid popup) are included too, even one with no
+// classes in it yet (so it's pickable as a suggestion while adding a
+// class, not just after the fact).
+async function roomsForDay(day, semesterId) {
   const named = (
     await db
       .prepare("SELECT DISTINCT room, LOWER(room) AS \"sortRoom\" FROM classes WHERE day = ? AND room IS NOT NULL AND room != '' ORDER BY \"sortRoom\"")
       .all(day)
   ).map((r) => r.room);
   const hasUnassigned = await db.prepare("SELECT 1 FROM classes WHERE day = ? AND (room IS NULL OR room = '') LIMIT 1").get(day);
-  return hasUnassigned ? [...named, UNASSIGNED_ROOM] : named;
+  const list = hasUnassigned ? [...named, UNASSIGNED_ROOM] : named;
+  if (semesterId === undefined) return list;
+  const declared = (await declaredRoomsForGrid(day, semesterId)).map((r) => r.name);
+  return [...new Set([...declared, ...list])];
 }
 
 // Renames a room across every class on a day that currently uses it - the
@@ -2238,6 +2338,8 @@ module.exports = {
   renameRoom,
   getRoomOrder,
   saveRoomOrder,
+  declaredRoomsForGrid,
+  saveRoomsForGrid,
   getClass,
   createClass,
   colorForClassName,
