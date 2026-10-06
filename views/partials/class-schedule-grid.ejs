@@ -423,6 +423,23 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
                     <% } %>
                   >
                     <div class="class-card-header">
+                      <%# A real request: "when clicking bulk edit for
+                          classes, check boxes should appear on each class
+                          as well so a select few can be chosen" - Bulk
+                          Edit used to only offer per-class checkboxes in
+                          List view (see the matching checkbox a few
+                          hundred lines below); this is the exact same
+                          checkbox (same name/value/form attribute, so
+                          Select All/the Bulk Edit toggle already handle it
+                          for free) on the Grid card itself. class-schedule-
+                          view.js's own click handler already excludes
+                          .class-card-checkbox from the card's "navigate to
+                          Manage" click target - this class name was left
+                          in place for exactly this, from before the old
+                          per-card Archive checkbox was removed. %>
+                      <% if (!gridReadOnly) { %>
+                        <input type="checkbox" class="class-card-checkbox" name="classIds" value="<%= cls.id %>" form="class-bulk-edit-form-<%= day %>" aria-label="Select <%= cls.class_name %> for bulk edit" hidden />
+                      <% } %>
                       <h3><%= cls.class_name %></h3>
                     </div>
                     <%# Grade/teacher/assistant only - no student roster here;

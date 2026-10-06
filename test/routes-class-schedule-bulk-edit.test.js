@@ -71,6 +71,30 @@ test('List view renders a Bulk Edit toggle, a per-class checkbox, and the bulk-e
   assert.match(page.text, /<script src="\/js\/archive-select-toggle\.js">/);
 });
 
+// A real request: "when clicking bulk edit for classes, check boxes should
+// appear on each class as well so a select few can be chosen" - Bulk Edit
+// used to only put a per-class checkbox on the List view's own rows, with
+// nothing to check while Grid view (the default) was showing. The Grid
+// card's own checkbox shares the exact same name/value/form attribute as
+// the List row's, so Select All and the Bulk Edit toggle (both of which
+// just query every checkbox tied to the form) already pick it up with no
+// JS changes needed.
+test('Grid view cards also get their own per-class Bulk Edit checkbox', async () => {
+  const admin = await loginAsAdmin();
+  const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'Grid Checkbox Class', room: 'Room A' });
+
+  const page = await request(app).get('/admin/schedule?tab=monday').set('Cookie', admin.cookie);
+  const gridCheckboxRe = new RegExp(`<input type="checkbox" class="class-card-checkbox" name="classIds" value="${classId}" form="class-bulk-edit-form-monday"`);
+  assert.match(page.text, gridCheckboxRe, 'the Grid card should carry its own checkbox, wired to the same bulk-edit form as the List row');
+
+  // Both the Grid card's checkbox and the List row's checkbox for this same
+  // class must be present at once (both views are always rendered; only
+  // which one is visible is a client-side CSS toggle) - Select All has to
+  // reach both.
+  const matches = page.text.match(new RegExp(`name="classIds" value="${classId}" form="class-bulk-edit-form-monday"`, 'g')) || [];
+  assert.equal(matches.length, 2, 'one checkbox from the Grid card and one from the List row');
+});
+
 test('bulk-editing a blank field leaves that column alone on every selected class', async () => {
   const admin = await loginAsAdmin();
   const classA = await createClass({ day: 'monday', hourPosition: 1, className: 'Keep My Room A', room: 'Room A', description: 'Original description A' });
