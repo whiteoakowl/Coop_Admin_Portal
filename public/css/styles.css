@@ -9877,26 +9877,37 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
    rule), because that's what the reference image itself uses there too.
    Icon buttons are uniform squares (same sizing convention as .icon-btn
    elsewhere) regardless of whether their icon is an <svg> or a character. */
-.forum-editor-toolbar { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-alt, #f7f8fa); padding: 0.5rem; }
-.forum-editor-toolbar-row { display: flex; gap: 0.25rem; flex-wrap: wrap; align-items: center; }
-.forum-editor-toolbar-row + .forum-editor-toolbar-row { padding-top: 0.35rem; border-top: 1px solid var(--border); }
+/* A real request: "the text/description box editing...needs to be
+   shrunk by at least half the height...and just to make it smaller and
+   easier to read in general" - every dimension below (button size,
+   icon size, gaps, padding) is cut roughly in half from what it was.
+   flex-wrap: nowrap + overflow-x: auto replaces the old flex-wrap: wrap
+   - "keep each section of icons for editing on its own row": each
+   .forum-editor-toolbar-row is already one icon group, but on a narrow
+   phone the old wrap let a single group split across 2-3 stacked lines
+   once it ran out of width, which is what bloated the toolbar's height
+   in the first place. Scrolling that one row horizontally instead keeps
+   every group on its own single line at any width. */
+.forum-editor-toolbar { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-alt, #f7f8fa); padding: 0.3rem; }
+.forum-editor-toolbar-row { display: flex; gap: 0.15rem; flex-wrap: nowrap; overflow-x: auto; align-items: center; }
+.forum-editor-toolbar-row + .forum-editor-toolbar-row { padding-top: 0.2rem; border-top: 1px solid var(--border); }
 .forum-editor-toolbar button {
-  width: 1.9rem;
-  height: 1.9rem;
+  width: 1.35rem;
+  height: 1.35rem;
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
   background: none;
-  border-radius: 6px;
-  font-size: 0.85rem;
+  border-radius: 5px;
+  font-size: 0.68rem;
   font-weight: 600;
   color: var(--ink);
   cursor: pointer;
   line-height: 1;
 }
-.forum-editor-toolbar button .icon { width: 1.05rem; height: 1.05rem; }
+.forum-editor-toolbar button .icon { width: 0.8rem; height: 0.8rem; }
 /* .forum-editor-toolbar button.forum-editor-btn-text (element+class,
    not just the class alone) - the base button rule right above this one
    is itself element+class (.forum-editor-toolbar button), one specificity
@@ -9907,19 +9918,19 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
    spellcheck, the Ω special-character button, "--" horizontal rule)
    overflows both edges of that square instead of the button actually
    growing to fit it. */
-.forum-editor-toolbar button.forum-editor-btn-text { width: auto; padding: 0 0.5rem; gap: 0.3rem; white-space: nowrap; }
-.forum-editor-toolbar-row-bottom button { width: auto; padding: 0 0.65rem; gap: 0.35rem; font-weight: 600; }
+.forum-editor-toolbar button.forum-editor-btn-text { width: auto; padding: 0 0.4rem; gap: 0.2rem; white-space: nowrap; }
+.forum-editor-toolbar-row-bottom button { width: auto; padding: 0 0.5rem; gap: 0.25rem; font-weight: 600; }
 .forum-editor-toolbar button:hover { background: var(--surface); border-color: var(--border); }
 .forum-editor-toolbar button.forum-editor-toggle-on { background: var(--brand-soft, #eef4fb); border-color: var(--brand); color: var(--brand-dark); }
-.forum-editor-toolbar-row-dropdowns { gap: 0.5rem; }
+.forum-editor-toolbar-row-dropdowns { gap: 0.35rem; }
 /* width/min-width explicit (not just min-width) - several forms this
    toolbar lives inside (.stack-form, .member-form-grid, ...) set their
    own `select { width: 100% }` at the same specificity as this rule, and
    without an explicit width here that survives untouched, stretching
    every dropdown to the row's full width and forcing Paragraph/Font/Size
    into three stacked rows instead of sitting side by side. */
-.forum-editor-toolbar select { border: 1px solid var(--border); background-color: var(--surface); border-radius: 6px; padding: 0.4rem 1.9rem 0.4rem 0.65rem; background-position: right 0.55rem center; background-size: 0.7rem; font-size: 0.85rem; font-weight: 600; color: var(--ink); cursor: pointer; line-height: 1.2; width: auto; min-width: 8rem; }
-.forum-editor-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 0.15rem; }
+.forum-editor-toolbar select { border: 1px solid var(--border); background-color: var(--surface); border-radius: 5px; padding: 0.22rem 1.5rem 0.22rem 0.5rem; background-position: right 0.45rem center; background-size: 0.6rem; font-size: 0.72rem; font-weight: 600; color: var(--ink); cursor: pointer; line-height: 1.2; width: auto; min-width: 5.5rem; flex: 0 0 auto; }
+.forum-editor-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 0.1rem; flex: 0 0 auto; }
 /* label.forum-editor-color (element+class, not just .forum-editor-color)
    - on the event/class edit forms this toolbar lives inside a
    .member-form-grid container, whose own `.member-form-grid label` rule
@@ -9930,14 +9941,14 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
    stacks the "A"/highlight glyph above its color swatch instead of
    beside it. flex-shrink: 0 additionally keeps the label from being
    squeezed below its content width on those same narrower forms. */
-label.forum-editor-color { display: inline-flex; flex-direction: row; align-items: center; gap: 0.25rem; width: auto; height: 1.9rem; flex-shrink: 0; padding: 0 0.4rem; border: 1px solid transparent; background: none; border-radius: 6px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+label.forum-editor-color { display: inline-flex; flex-direction: row; align-items: center; gap: 0.2rem; width: auto; height: 1.35rem; flex-shrink: 0; padding: 0 0.3rem; border: 1px solid transparent; background: none; border-radius: 5px; font-size: 0.68rem; font-weight: 700; cursor: pointer; }
 .forum-editor-color:hover { background: var(--surface); border-color: var(--border); }
 /* The glyph ("A" or the highlighter icon) carries a colored underline
    that forum-editor.js keeps in sync with the color input's value - the
    reference toolbar's own text-color/highlight-color buttons show an
    underline under the glyph, not a separate boxed swatch. */
-.forum-editor-color-glyph { display: inline-flex; align-items: center; justify-content: center; padding-bottom: 2px; border-bottom: 3px solid; line-height: 1; }
-.forum-editor-color-glyph .icon { width: 1.05rem; height: 1.05rem; }
+.forum-editor-color-glyph { display: inline-flex; align-items: center; justify-content: center; padding-bottom: 1px; border-bottom: 2px solid; line-height: 1; }
+.forum-editor-color-glyph .icon { width: 0.8rem; height: 0.8rem; }
 /* Visually hidden, not display:none - it has to stay a real, focusable,
    clickable form control (clicking anywhere in the wrapping <label>,
    including the glyph and its underline, forwards the click to it and
@@ -9955,7 +9966,7 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .forum-editor-findreplace { align-items: center; }
 .forum-editor-findreplace input[type="text"] { border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
 .forum-editor-findreplace button { width: auto; height: auto; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.85rem; cursor: pointer; }
-.forum-editor-hint { margin: 0.35rem 0 0; font-size: 0.8rem; color: var(--muted); }
+.forum-editor-hint { margin: 0.25rem 0 0; font-size: 0.72rem; color: var(--muted); }
 .forum-editor-hint kbd { display: inline-block; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0.05rem 0.35rem; font-family: inherit; font-size: 0.75rem; background: var(--surface); }
 .forum-editable { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 0.9rem; min-height: 6rem; background: var(--surface); }
 .forum-editable:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
