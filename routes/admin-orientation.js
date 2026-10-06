@@ -15,7 +15,7 @@ const express = require('express');
 const router = express.Router();
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const db = require('../db');
-const { FIELDS, orientationRows, setOrientationField, defaultSemesterId, setOrientationLink, orientationTrainingLinks } = require('../utils/orientation');
+const { FIELDS, LINKABLE_FIELDS, orientationRows, setOrientationField, defaultSemesterId, setOrientationLink, orientationTrainingLinks } = require('../utils/orientation');
 
 // Shared by every page in this router - `?semesterId=` if given, else the
 // most recently created semester, else null (the fallback "every class
@@ -69,11 +69,11 @@ router.get('/orientation/settings', requireFullAdmin, async (req, res) => {
   // up before publishing, or keep it after archiving a training that's
   // done its job) - every training is offered, not just published ones.
   const trainings = await db.prepare('SELECT id, title FROM trainings ORDER BY title').all();
-  res.render('admin-orientation-settings', { title: 'Orientation Settings', trainingLinks, trainings, notice: req.query.notice || null, error: req.query.error || null });
+  res.render('admin-orientation-settings', { title: 'Orientation Settings', trainingLinks, trainings, linkableFields: LINKABLE_FIELDS, notice: req.query.notice || null, error: req.query.error || null });
 });
 
 router.post('/orientation/settings', requireFullAdmin, async (req, res) => {
-  for (const field of FIELDS) {
+  for (const [field] of LINKABLE_FIELDS) {
     const trainingId = req.body[field + 'TrainingId'] ? parseInt(req.body[field + 'TrainingId'], 10) : null;
     await setOrientationLink(field, trainingId);
   }

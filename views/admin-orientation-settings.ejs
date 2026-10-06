@@ -19,17 +19,19 @@
         and that column's header on the main Orientation Tracking list
         links straight to it instead of being a plain label. %>
     <p class="hint">Link an actual Training from the Training module to each orientation column. Leave one set to "No linked training" to keep that column a plain label with no auto-check.</p>
+    <%# A real request: "tour and open house section should be removed.
+        Only linking trainings for parent orientation and teacher
+        orientation. Tour check in and open house check in will
+        automatically show a check mark in those columns matching those
+        members who were scanned in." Those two Check-In subpages already
+        set their own column directly on a scan - nothing to link here. %>
+    <p class="hint">Tour and Open House are checked automatically by their own Check-In pages, not a linked Training.</p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <form method="POST" action="/admin/orientation/settings" class="member-form-grid">
-      <% [
-        ['video', 'Parent Orientation'],
-        ['teacherTraining', 'Teacher Orientation'],
-        ['tour', 'Tour'],
-        ['openHouse', 'Open House'],
-      ].forEach(function(pair) { var field = pair[0], label = pair[1]; %>
+      <% linkableFields.forEach(function(pair) { var field = pair[0], label = pair[1]; %>
         <label class="member-form-full"><%= label %> - Linked Training
           <select name="<%= field %>TrainingId">
             <option value="">No linked training</option>

@@ -33,6 +33,22 @@ const { byLastName } = require('./members');
 const FIELDS = ['video', 'teacherTraining', 'tour', 'openHouse'];
 const COLUMN_PREFIX = { video: 'video', teacherTraining: 'teacher_training', tour: 'tour', openHouse: 'open_house' };
 
+// A real request: "Orientation settings, tour and open house section
+// should be removed. Only linking trainings for parent orientation and
+// teacher orientation. Tour check in and open house check in will
+// automatically show a check mark in those columns matching those members
+// who were scanned in." Tour/Open House are never completed via a
+// Training - they're only ever set by the two Check-In subpages'
+// own handleCheckin (routes/admin-orientation.js), which already calls
+// setOrientationField directly on a scan. Settings only ever offers
+// linking a Training to the two columns that are genuinely Training-
+// backed; Tour/Open House stay real columns on the main grid, just with
+// nothing to link here.
+const LINKABLE_FIELDS = [
+  ['video', 'Parent Orientation'],
+  ['teacherTraining', 'Teacher Orientation'],
+];
+
 // The most recently created semester - the default view when no
 // ?semesterId is given, so the page always opens on a concrete semester
 // once any exist rather than the old global/unscoped view.
@@ -215,25 +231,55 @@ async function orientationObligationMemberId(memberId) {
   return primary.id;
 }
 
+// A real bug report: "the columns linked to trainings ... are not
+// automatically checking green if that member completed the designated
+// training. Everything is set properly." applyTrainingCompletion used to
+// always guess "whichever semester is most recently created" (defaultSemesterId)
+// as the target - but orientationRows() keys its own lookup to whichever
+// semester a family's enrolled student(s) actually sit under, which is
+// NOT necessarily the newest semester that exists (e.g. a co-op setting
+// up next semester's shell before this semester's families have all
+// finished enrolling). A guessed semester that doesn't match leaves the
+// checkmark written to a row Orientation Tracking never displays - silent
+// to everyone involved. Resolves the real semester(s) this family's
+// enrollment is actually under instead of guessing, so the checkmark
+// always lands on a row the admin can actually see.
+async function semesterIdsForFamily(memberId) {
+  const self = await db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId);
+  if (!self || self.family_id == null) return [];
+  const rows = await db
+    .prepare(
+      `SELECT DISTINCT c.semester_id FROM class_enrollments ce
+       JOIN classes c ON c.id = ce.class_id
+       JOIN members student ON student.id = ce.student_id
+       WHERE student.family_id = ? AND student.active = 1 AND c.semester_id IS NOT NULL`
+    )
+    .all(self.family_id);
+  return rows.map((r) => r.semester_id);
+}
+
 // Called from utils/training.js's own maybeFinalizeAttempt right after a
 // training attempt is finalized as passed - looks up every orientation
 // column linked to this training and marks it complete for that member.
-// Training completions aren't semester-scoped the way class enrollment
-// is, so "whichever semester Orientation itself currently defaults to"
-// (the same most-recently-created-semester fallback every other
-// semester-aware view already uses) is the closest sensible target.
 async function applyTrainingCompletion(trainingId, memberId) {
   const rows = await db.prepare('SELECT field FROM orientation_settings WHERE training_id = ?').all(trainingId);
   if (rows.length === 0) return;
   const targetMemberId = await orientationObligationMemberId(memberId);
-  const semesterId = await defaultSemesterId();
-  for (const row of rows) {
-    await setOrientationField(targetMemberId, semesterId, row.field, true);
+  const realSemesterIds = await semesterIdsForFamily(targetMemberId);
+  // No real enrollment to key off of (e.g. no semesters exist at all yet) -
+  // fall back to the same "newest semester" guess as before, same as every
+  // other semester-aware view's own fallback.
+  const semesterIds = realSemesterIds.length > 0 ? realSemesterIds : [await defaultSemesterId()];
+  for (const semesterId of semesterIds) {
+    for (const row of rows) {
+      await setOrientationField(targetMemberId, semesterId, row.field, true);
+    }
   }
 }
 
 module.exports = {
   FIELDS,
+  LINKABLE_FIELDS,
   orientationRows,
   setOrientationField,
   defaultSemesterId,
@@ -241,4 +287,5 @@ module.exports = {
   orientationTrainingLinks,
   applyTrainingCompletion,
   orientationObligationMemberId,
+  semesterIdsForFamily,
 };

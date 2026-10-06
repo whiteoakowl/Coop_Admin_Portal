@@ -26,7 +26,7 @@ const app = require('../server');
 const db = require('../db');
 const T = require('../utils/training');
 const { setOrientationLink, orientationTrainingLinks, defaultSemesterId, orientationRows } = require('../utils/orientation');
-const { createClass, setEnrollment } = require('../utils/classSchedule');
+const { createClass, createSemester, setEnrollment } = require('../utils/classSchedule');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -97,6 +97,63 @@ test('Orientation Settings: a Training can be linked to a column via its dropdow
   // Re-opening Settings should show it pre-selected.
   const after = await request(app).get('/admin/orientation/settings').set('Cookie', admin.cookie);
   assert.match(after.text, new RegExp(`<option value="${trainingId}" selected>Teacher Orientation Video</option>`));
+});
+
+// A real request: "Orientation settings. Tour and open house section
+// should be removed. Only linking trainings for parent orientation and
+// teacher orientation." The settings PAGE should offer exactly those two
+// dropdowns and no Tour/Open House ones; submitting the settings form
+// (even with a tourTrainingId/openHouseTrainingId smuggled in, since
+// nothing in the form itself offers one any more) must never create a
+// link for either.
+test('Orientation Settings only offers linking Parent Orientation and Teacher Orientation - no Tour or Open House section', async () => {
+  const admin = await loginAsAdmin();
+  const { trainingId } = await buildOneQuestionTraining('Some Training');
+
+  const settingsPage = await request(app).get('/admin/orientation/settings').set('Cookie', admin.cookie);
+  assert.match(settingsPage.text, /Parent Orientation - Linked Training/);
+  assert.match(settingsPage.text, /Teacher Orientation - Linked Training/);
+  assert.doesNotMatch(settingsPage.text, /Tour - Linked Training/);
+  assert.doesNotMatch(settingsPage.text, /Open House - Linked Training/);
+  assert.doesNotMatch(settingsPage.text, /name="tourTrainingId"/);
+  assert.doesNotMatch(settingsPage.text, /name="openHouseTrainingId"/);
+  const csrf = extractCsrf(settingsPage.text);
+
+  await request(app)
+    .post('/admin/orientation/settings')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: csrf, tourTrainingId: String(trainingId), openHouseTrainingId: String(trainingId) });
+
+  const links = await orientationTrainingLinks();
+  assert.equal(links.tour, undefined, 'Tour must never get a Training link from Settings');
+  assert.equal(links.openHouse, undefined, 'Open House must never get a Training link from Settings');
+});
+
+// "Tour check in and open house check in will automatically show a check
+// mark in those columns matching those members who were scanned in" - a
+// statement of existing behavior (handleCheckin in routes/admin-
+// orientation.js already calls setOrientationField directly), confirmed
+// here end to end through the real Tour Check-In route rather than
+// assuming it still works just because Settings changed.
+test('Tour Check-In still checks the Tour column directly for a scanned-in member, with no Training involved at all', async () => {
+  const admin = await loginAsAdmin();
+  const { studentId, primaryParentId } = await makeFamilyWithStudentAndTwoParents();
+  const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'Tour Checkin Class', room: 'Room D' });
+  await setEnrollment(classId, [studentId]);
+
+  const checkinPage = await request(app).get('/admin/orientation/tour-checkin').set('Cookie', admin.cookie);
+  const csrf = extractCsrf(checkinPage.text);
+
+  await request(app)
+    .post('/admin/orientation/tour-checkin')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: csrf, members: String(primaryParentId) });
+
+  const row = await db.prepare('SELECT tour_complete FROM orientation_progress WHERE member_id = ?').get(primaryParentId);
+  assert.ok(row);
+  assert.equal(Number(row.tour_complete), 1);
 });
 
 test('passing a linked Training auto-checks the matching Orientation column for that member', async () => {
@@ -252,4 +309,40 @@ test('linking a Training retroactively credits the PRIMARY parent even when a no
   const primaryRow = await db.prepare('SELECT teacher_training_complete FROM orientation_progress WHERE member_id = ?').get(primaryParentId);
   assert.ok(primaryRow, 'retroactively linking should backfill the primary parent, not the member who actually passed it');
   assert.equal(Number(primaryRow.teacher_training_complete), 1);
+});
+
+// A real bug report: "the columns linked to trainings, parent orientation
+// and teacher orientation are not automatically checking green if that
+// member completed the designated training. Everything is set properly."
+// applyTrainingCompletion used to always guess "the most recently CREATED
+// semester" as the target to write the checkmark under - if a co-op has
+// since created a newer semester shell (e.g. getting a head start on next
+// semester's setup) while this family is still enrolled under an OLDER
+// one, the checkmark landed on a semester Orientation Tracking was never
+// showing this family under at all.
+test('a passed Training checks the column under the family\'s OWN enrolled semester, not just whichever semester is newest', async () => {
+  const older = await createSemester('Fall 2026');
+  const newer = await createSemester('Spring 2027'); // created after, and numerically newer - but this family has nothing to do with it
+
+  const { primaryParentId, studentId } = await makeFamilyWithStudentAndTwoParents();
+  const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'Older Semester Class', room: 'Room C', semesterId: older.id });
+  await setEnrollment(classId, [studentId]);
+
+  const { trainingId, quizLessonId } = await buildOneQuestionTraining('Parent Orientation (older semester family)');
+  await setOrientationLink('video', trainingId);
+
+  const result = await passTraining(trainingId, quizLessonId, primaryParentId);
+  assert.equal(result.passed, true);
+
+  const row = await db.prepare('SELECT video_complete FROM orientation_progress WHERE member_id = ? AND semester_id = ?').get(primaryParentId, older.id);
+  assert.ok(row, 'the checkmark must be written under the semester this family is actually enrolled in');
+  assert.equal(Number(row.video_complete), 1);
+
+  const wrongSemesterRow = await db.prepare('SELECT * FROM orientation_progress WHERE member_id = ? AND semester_id = ?').get(primaryParentId, newer.id);
+  assert.equal(wrongSemesterRow, undefined, 'must not also write (or instead write) under the newer, unrelated semester');
+
+  const rowsForOlderSemester = await orientationRows(older.id);
+  const familyRow = rowsForOlderSemester.find((r) => r.memberId === primaryParentId);
+  assert.ok(familyRow, 'the family must show up under the semester they are actually enrolled in');
+  assert.equal(familyRow.video, true, 'the admin viewing the correct (older) semester must see the green check');
 });
