@@ -51,14 +51,18 @@ test('Members page toolbar: Add Member/Edit Permissions/Edit Member List/Import/
   assert.equal(page.status, 200);
 
   const buttonRowIndex = page.text.indexOf('+ Add Member');
-  const filterIndex = page.text.indexOf('for="type-select"');
+  const filterIndex = page.text.indexOf('members-filter-dialog');
   assert.ok(buttonRowIndex > -1 && filterIndex > -1 && buttonRowIndex < filterIndex, 'the button row must come before the filter control');
 
   assert.match(page.text, />Edit Permissions</);
   assert.match(page.text, />Edit Member List</);
   assert.match(page.text, />Import</);
   assert.match(page.text, />Export</);
-  assert.match(page.text, /<label for="type-select">Filter<\/label>/);
+  // A real request: "filter dropdown should change to an orange button
+  // with a popup" - same Filter-button-opens-a-dialog shape as the
+  // Member Schedules page's own Filter.
+  assert.match(page.text, /onclick="document\.getElementById\('members-filter-dialog'\)\.showModal\(\)"/);
+  assert.match(page.text, /<h3>Filter Members<\/h3>/);
   assert.doesNotMatch(page.text, /Filter by type or family/);
 });
 

@@ -65,10 +65,15 @@ test('Main Admin / portal pages (partials/portal-nav.ejs) load the fullscreenNav
   const loginRes = await request(app).post('/login').type('form').send({ email: 'mainadmin@coop.local', password: 'changeme123', next: '/main-admin' });
   const cookie = loginRes.headers['set-cookie'];
 
-  const res = await request(app).get('/main-admin/members').set('Cookie', cookie);
+  // Not /main-admin/members any more - its own Filter dropdown became a
+  // button+popup (a real request: "filter dropdown should change to an
+  // orange button with a popup"), which submits via a plain <form> GET,
+  // not fullscreenNavigate. Name Tags' own Requests tab date picker
+  // still uses it, confirming this is a real, live consumer page.
+  const res = await request(app).get('/main-admin/name-tags?tab=requests').set('Cookie', cookie);
   assert.equal(res.status, 200);
   assert.match(res.text, /<script src="\/js\/fullscreen-navigate-shim\.js"><\/script>/);
-  assert.match(res.text, /onchange="window\.fullscreenNavigate\(this\.value\)"/);
+  assert.match(res.text, /onchange="window\.fullscreenNavigate\(/);
 });
 
 test('the shim script itself only defines window.fullscreenNavigate when nothing already has', async () => {

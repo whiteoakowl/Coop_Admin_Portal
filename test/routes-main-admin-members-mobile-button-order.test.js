@@ -50,8 +50,10 @@ test('Members tab toolbar: buttons/filter appear in the exact requested 3/2/4 ro
   const editPermissionsIdx = toolbar.indexOf('Edit Permissions');
   const addSectionsIdx = toolbar.indexOf('Add/Edit Sections');
   const break2Idx = toolbar.indexOf('roster-btn-row-break', break1Idx + 1);
-  // Row 3: Filter, Import, Export, Print.
-  const filterIdx = toolbar.indexOf('class="category-filter"');
+  // Row 3: Filter, Import, Export, Print. Filter is a button+popup now
+  // (a real request: "filter dropdown should change to an orange button
+  // with a popup"), not a <select>.
+  const filterIdx = toolbar.indexOf("document.getElementById('members-filter-dialog')");
   const importIdx = toolbar.indexOf('>Import<');
   const exportIdx = toolbar.indexOf('>Export<');
   const printIdx = toolbar.indexOf('>Print<');
@@ -66,8 +68,8 @@ test('Archive tab still has its own Filter dropdown, with no button toolbar to j
   const page = await request(app).get('/main-admin/members?tab=archive').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.doesNotMatch(page.text, /roster-btn-row-fit-text/, 'the Archive tab has no button toolbar');
-  const rowMatch = /<div class="members-search-filter-row no-print">([\s\S]*?)<\/div>/.exec(page.text);
+  const rowMatch = /<div class="members-search-filter-row no-print">([\s\S]*?)<\/dialog>/.exec(page.text);
   assert.ok(rowMatch, 'expected the search+filter row');
   assert.match(rowMatch[1], /class="members-search-bar"/);
-  assert.match(rowMatch[1], /class="category-filter"/);
+  assert.match(rowMatch[1], /onclick="document\.getElementById\('members-filter-dialog'\)\.showModal\(\)"/);
 });

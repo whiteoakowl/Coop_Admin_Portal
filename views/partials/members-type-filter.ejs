@@ -1,25 +1,60 @@
 <%
-// The Members/Archive page's own type+family filter dropdown - shared
-// between two different spots on views/main-admin-members.ejs depending
-// on activeTab: a real request moved it into the Members tab's own
-// button toolbar (as the lead item of its mobile "row 3": "filter,
-// import, export, print"), but the Archive tab has no such toolbar at
-// all, so it keeps rendering this same dropdown in the original
-// .members-search-filter-row spot next to the search box.
+// The Members/Archive page's own type+family filter - shared between two
+// different spots on views/main-admin-members.ejs depending on activeTab:
+// a real request moved it into the Members tab's own button toolbar (as
+// the lead item of its mobile "row 3": "filter, import, export, print"),
+// but the Archive tab has no such toolbar at all, so it keeps rendering
+// this same control in the original .members-search-filter-row spot next
+// to the search box. Only one copy of this partial is ever on the page
+// at once (gated by activeTab either way), so the dialog's own id below
+// is safe to hardcode.
+//
+// A real request: "filter dropdown should change to an orange button
+// with a popup" - same Filter-button-opens-a-dialog shape as the Member
+// Schedules page's own Filter (views/admin-schedule.ejs's own
+// schedule-filter-dialog). A plain <select> could only ever pick ONE of
+// Type or Family at a time (they were alternate options in the same
+// list); utils/members.js's own membersWithDetails already ANDs both
+// together when both are given, so this dialog's own radio group (Type)
+// + separate <select> (Family), submitted together, lets an admin
+// combine them for the first time - e.g. "Students" in "the Smith
+// Family" at once.
+const selectedFamily = families.find(function (f) { return f.id === familyFilter; });
+const filterLabelParts = [];
+if (typeFilter === 'parent') filterLabelParts.push('Parent');
+else if (typeFilter === 'student') filterLabelParts.push('Student');
+else if (typeFilter === 'admin') filterLabelParts.push('Admin');
+if (selectedFamily) filterLabelParts.push(selectedFamily.name + ' Family');
 %>
-<div class="category-filter">
-  <label for="type-select">Filter</label>
-  <select id="type-select" onchange="window.fullscreenNavigate(this.value)">
-    <option value="/main-admin/members?tab=<%= activeTab %>" <%= (!typeFilter && !familyFilter) ? 'selected' : '' %>>All</option>
-    <option value="/main-admin/members?tab=<%= activeTab %>&type=parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
-    <option value="/main-admin/members?tab=<%= activeTab %>&type=student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
-    <option value="/main-admin/members?tab=<%= activeTab %>&type=admin" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
+<button type="button" class="roster-action-btn" onclick="document.getElementById('members-filter-dialog').showModal()">
+  <svg class="icon"><use href="#icon-filter"/></svg>
+  Filter<% if (filterLabelParts.length > 0) { %>: <%= filterLabelParts.join(', ') %><% } %>
+</button>
+
+<dialog id="members-filter-dialog" class="member-picker-dialog">
+  <form method="GET" action="/main-admin/members">
+    <h3>Filter Members</h3>
+    <input type="hidden" name="tab" value="<%= activeTab %>" />
+    <div class="radio-group">
+      <label class="checkbox-option"><input type="radio" name="type" value="" <%= !typeFilter ? 'checked' : '' %> /> All</label>
+      <label class="checkbox-option"><input type="radio" name="type" value="parent" <%= typeFilter === 'parent' ? 'checked' : '' %> /> Parent</label>
+      <label class="checkbox-option"><input type="radio" name="type" value="student" <%= typeFilter === 'student' ? 'checked' : '' %> /> Student</label>
+      <label class="checkbox-option"><input type="radio" name="type" value="admin" <%= typeFilter === 'admin' ? 'checked' : '' %> /> Admin</label>
+    </div>
     <% if (families.length > 0) { %>
-      <optgroup label="Family">
-        <% families.forEach(function(f) { %>
-          <option value="/main-admin/members?tab=<%= activeTab %>&family=<%= f.id %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %></option>
-        <% }); %>
-      </optgroup>
+      <div class="category-filter">
+        <label for="members-filter-family-select">Family</label>
+        <select id="members-filter-family-select" name="family">
+          <option value="">All Families</option>
+          <% families.forEach(function(f) { %>
+            <option value="<%= f.id %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %> Family</option>
+          <% }); %>
+        </select>
+      </div>
     <% } %>
-  </select>
-</div>
+    <div class="notes-dialog-actions">
+      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+      <button type="submit" class="primary-btn">Apply Filter</button>
+    </div>
+  </form>
+</dialog>
