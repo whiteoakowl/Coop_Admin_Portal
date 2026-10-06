@@ -106,8 +106,9 @@ async function createParentWithChild() {
 // Print/Export/sort-order/CSV coverage that used to live here -
 // /parent/classes/:id/unregister itself is still very much alive though
 // (the Classroom Dashboard's own Delete button, and the Class
-// Registration day grid's fragment popup Cancel form, both still call
-// it), so its fetch-vs-redirect JSON contract is still covered below.
+// Registration day grid's fragment popup Withdraw button, both still
+// call it via fetch now), so its fetch-vs-redirect JSON contract is
+// still covered below.
 test('Classroom Dashboard Delete: fetch-style cancel (X-Requested-With) returns JSON instead of redirecting, and actually cancels', async () => {
   const admin = await loginAsAdmin();
   const cls = await createClass(admin, { className: 'Instant Delete Class' });

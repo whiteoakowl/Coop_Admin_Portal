@@ -134,12 +134,16 @@ test('Parent Portal: the Classes nav tab has all 5 remaining subpages', async ()
 });
 
 // The Class Registration day-grid's own fragment popup (views/parent-
-// class-fragment.ejs) still has a plain (non-fetch) Cancel form for an
-// already-enrolled child - the one remaining real caller of /parent/
-// classes/:id/unregister outside the Classroom Dashboard's own fetch-
-// based Delete button. It now always redirects back to the day grid
-// (classesBackUrl no longer has a "manage" page to send it to instead).
-test('Class Registration day grid: cancelling (non-fetch) from the fragment popup redirects back to the day grid', async () => {
+// class-fragment.ejs) - a later real request: "page should not refresh
+// when withdraw happens. Stay on the class and change to the members
+// name and register button" - replaced its own plain Cancel form with a
+// data-withdraw-btn button, same fetch()-based, no-reload pattern public/
+// js/classroom-dashboard-withdraw.js already uses for the Classroom
+// Dashboard's own withdraw (public/js/parent-class-register-withdraw.js).
+// /parent/classes/:id/unregister already supported JSON for a fetch
+// caller before this, so no route changes were needed - this just proves
+// that same JSON path still works for this page's own caller too.
+test('Class Registration day grid: the fragment popup withdraws via fetch (JSON), not a plain form redirect', async () => {
   const admin = await loginAsAdmin();
   const cls = await createClass(admin, { className: 'Fragment Cancel Class' });
   const parent = await createParentWithChild();
@@ -151,15 +155,23 @@ test('Class Registration day grid: cancelling (non-fetch) from the fragment popu
     .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
 
   const fragment = await request(app).get(`/parent/classes/${cls.id}/fragment?day=monday`).set('Cookie', parent.cookie);
-  assert.match(fragment.text, new RegExp(`action="/parent/classes/${cls.id}/unregister"`));
+  assert.doesNotMatch(fragment.text, new RegExp(`action="/parent/classes/${cls.id}/unregister"`));
+  assert.match(fragment.text, new RegExp(`data-child-row data-class-id="${cls.id}" data-student-id="${parent.childId}" data-day="monday"`));
+  assert.match(fragment.text, /data-withdraw-btn>Withdraw</);
+  // The not-registered fallback (name + Register button) is already in
+  // the DOM, just hidden - swapped into view client-side on a successful
+  // withdraw instead of being fetched separately.
+  assert.match(fragment.text, new RegExp(`data-not-registered-state hidden><input type="hidden" name="studentId" value="${parent.childId}"`));
 
   const cancelRes = await request(app)
     .post(`/parent/classes/${cls.id}/unregister`)
     .set('Cookie', parent.cookie)
+    .set('X-Requested-With', 'fetch')
+    .set('Accept', 'application/json')
     .type('form')
     .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
-  assert.equal(cancelRes.status, 302);
-  assert.match(cancelRes.headers.location, /^\/parent\/classes\?day=monday&/);
+  assert.equal(cancelRes.status, 200);
+  assert.deepEqual(cancelRes.body, { ok: true });
 });
 
 test('Policy Handbook page renders the admin-edited handbook content', async () => {
