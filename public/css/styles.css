@@ -6724,7 +6724,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .grid-box.roster-grid-col .roster-scroll { margin-top: 0.5rem; }
 .grid-box-header + .legend { margin-top: 0.5rem; margin-bottom: 0; }
-.grid-box-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+/* A real request: "proper spacing between buttons, rows and titles on
+   staff and roster page" - this header's own h2 is margin:0 below, so
+   without a deliberate gap here the space before whatever followed (a
+   roster-log-list, an empty-state <p>, a Slots form) was purely
+   incidental - a <p>'s own default browser margin when empty, nothing
+   at all once a <ul>/<form> with no margin of its own took its place.
+   One explicit margin-bottom makes that gap the same every time. */
+.grid-box-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.9rem; }
 .grid-box-header h2 { margin: 0; }
 .grid-box .btn-secondary { margin-top: 0.75rem; }
 .grid-box-expanded { flex: 1 1 100%; }
@@ -8031,7 +8038,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   flex-shrink: 0;
   cursor: help;
 }
-.roster-log-empty { color: var(--muted); font-size: 0.9rem; padding: 0.5rem 0; }
+.roster-log-empty { color: var(--muted); font-size: 0.9rem; margin: 0; padding: 0.5rem 0; }
 
 /* This page prints portrait (see the @page rule in the view), the same
    shape .print-page already defaults to - overridden here only to swap
