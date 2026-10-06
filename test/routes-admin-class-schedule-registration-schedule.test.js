@@ -326,21 +326,26 @@ test('Teacher Portal self-signup is also gated by a registration window (previou
   assert.match(decodeURIComponent(allowed.headers.location), /notice=/);
 });
 
-// Action-type scoping follows the exact same "match ALL of at least one
-// window's own restrictions" rule schedule-grid/section scoping already
-// use (see the section-scoped test above: creating even one narrowly-
-// scoped window makes every OTHER action/class opt-in too, unless a
-// second, unrestricted window also exists to cover it) - a window
-// scoped to only 'parent_teacher' still blocks assistant/parent/student
-// actions it doesn't apply to, exactly as a section-only window blocks
-// classes outside that section.
-test('A window scoped to only the "parent_teacher" action blocks assistant self-signup too (same all-or-nothing rule as section/schedule-grid scoping) until a second, unrestricted window also exists', async () => {
+// A real bug report: a co-op checked only "Parents can register for
+// teaching positions" and "...assistant positions" on their one
+// Registration Window (meant as an early-access window for staff), and
+// it silently closed ordinary parent-student registration site-wide too
+// - every parent got "Registration isn't open for your account yet"
+// with no "it opens..." date, since nothing anywhere had ever opened a
+// window for that action. Schedule-grid/section scoping both already
+// follow "empty/unmatched = doesn't apply to this one, keep checking
+// other windows" (see the section- and schedule-grid-scoped tests
+// above); action-type scoping now follows the same idea one level up -
+// each of the 4 checkboxes gates ONLY the action(s) it's checked for,
+// never any other, and multiple boxes on one window still combine
+// (checking 2 means that window covers both of those 2, same as before).
+test('A window scoped to only "parent_teacher"/"parent_assistant" does not block parent-student or student-self registration, which no window has ever checked (each action-type checkbox works independently)', async () => {
   await clearWindows();
   const { createWindow } = require('../utils/registrationWindows');
-  await createWindow({ label: 'Teachers Only Window', opensAt: '2020-01-01 00:00:00', closesAt: null, actionTypes: ['parent_teacher'] });
+  await createWindow({ label: 'Staff Early Access', opensAt: '2020-01-01 00:00:00', closesAt: null, actionTypes: ['parent_teacher', 'parent_assistant'] });
 
   const admin = await loginAsAdmin();
-  const cls = await createClass(admin, { className: 'Assistant Gated Class' });
+  const cls = await createClass(admin, { className: 'Independent Action Types Class' });
   const teacher = await createTeacherAccount();
 
   const teacherAllowed = await request(app)
@@ -351,18 +356,22 @@ test('A window scoped to only the "parent_teacher" action blocks assistant self-
   assert.match(decodeURIComponent(teacherAllowed.headers.location), /notice=/);
 
   await db.prepare('DELETE FROM class_staff WHERE class_id = ?').run(cls.id);
-  const assistantBlocked = await request(app)
-    .post(`/teacher/classes/${cls.id}/join`)
-    .set('Cookie', teacher.cookie)
-    .type('form')
-    .send({ role: 'assistant', _csrf: teacher.csrfToken });
-  assert.match(decodeURIComponent(assistantBlocked.headers.location), /Registration is not open for your account yet/);
-
-  await createWindow({ label: 'Everyone Else', opensAt: '2020-01-01 00:00:00', closesAt: null, actionTypes: ['parent_assistant'] });
   const assistantAllowed = await request(app)
     .post(`/teacher/classes/${cls.id}/join`)
     .set('Cookie', teacher.cookie)
     .type('form')
     .send({ role: 'assistant', _csrf: teacher.csrfToken });
   assert.match(decodeURIComponent(assistantAllowed.headers.location), /notice=/);
+
+  // The real bug: a parent registering their own child, an action this
+  // window never checked, must stay open exactly as if no window
+  // existed at all - not get swept up as "closed by default" just
+  // because a DIFFERENT action now has its own window.
+  const parent = await createParentWithChild();
+  const parentReg = await request(app)
+    .post(`/parent/classes/${cls.id}/register`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
+  assert.match(parentReg.headers.location, /notice=/);
 });

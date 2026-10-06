@@ -112,10 +112,18 @@ function windowAppliesToAction(w, actionType) {
 // given action. No windows defined at all means every class's own
 // registration_open flag is the only gate (the original, pre-windows
 // behavior) - a co-op that never sets up staged windows sees no change
-// at all. Once at least one window exists, an account qualifies once
-// it's inside a window that's unrestricted (no schedule grid/sections/
-// action types selected) or matches every one of the ones it does
-// restrict. `classScheduleId` (the CLASS's own Schedule Grid, from
+// at all. Each of the 4 action-type checkboxes works independently - a
+// real bug report: a window checking only "Parents can register for
+// teaching positions" silently closed ordinary parent-student/
+// student-self registration site-wide too, since nothing else ever
+// mentioned those actions. So unless at least one window anywhere opts
+// into gating this specific actionType (restricted to it, or left fully
+// unrestricted), that action behaves exactly as if no windows existed at
+// all - regardless of how many windows exist for OTHER actions. Once at
+// least one window does cover this action, an account qualifies once
+// it's inside a window that's unrestricted (no schedule grid/sections
+// selected) or matches every one of the ones it does restrict.
+// `classScheduleId` (the CLASS's own Schedule Grid, from
 // classScheduleIdForClass - not the member's) and `sectionIds` (the
 // CLASS's own section restriction, from classSectionIds) narrow a window
 // to one schedule grid / one Sections group; omit either to check across
@@ -126,6 +134,7 @@ function windowAppliesToAction(w, actionType) {
 async function isRegistrationOpenForAccount(accountRoles, { classScheduleId, sectionIds, actionType } = {}) {
   const windows = await db.prepare('SELECT * FROM registration_windows').all();
   if (windows.length === 0) return true;
+  if (actionType !== undefined && !windows.some((w) => windowAppliesToAction(w, actionType))) return true;
 
   const nowText = (await db.prepare('SELECT now_text() AS now').get()).now;
   const sectionsByWindow = await sectionIdsByWindow();
