@@ -196,8 +196,10 @@
           var cancelDisabled = !cls.allow_cancel;
           return (
             '<div class="parent-class-child-row" data-child-row data-class-id="' + cls.id + '" data-student-id="' + child.id + '" data-day="' + escapeHtml(day) + '">' +
-            '<span class="parent-class-child-name">' + name + '</span>' +
+            '<span class="parent-class-child-name">' +
+            '<span class="parent-class-child-name-text">' + name + '</span>' +
             '<span class="badge-pill' + (waitlistPos != null ? '' : ' badge-pill-present') + '" data-registered-state>' + statusLabel + '</span>' +
+            '</span>' +
             (cancelDisabled
               ? '<span class="hint parent-class-child-trailing" data-registered-state>Cancellation not allowed for this class</span>'
               : '<button type="button" class="roster-action-btn roster-action-btn-danger parent-class-child-trailing" data-registered-state data-withdraw-btn>Withdraw</button>' +
@@ -207,7 +209,7 @@
         }
         return (
           '<div class="parent-class-child-row">' +
-          '<span class="parent-class-child-name">' + name + '</span>' +
+          '<span class="parent-class-child-name"><span class="parent-class-child-name-text">' + name + '</span></span>' +
           registerControl(child, false) +
           '</div>'
         );

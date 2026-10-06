@@ -7770,12 +7770,29 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    with grow already at 0), while the literal `content` keyword actually
    sized it to its own text, as intended. */
 .parent-class-child-row .parent-class-child-trailing { margin-left: auto; flex-grow: 0; flex-shrink: 0; flex-basis: content; }
+/* A real request: "green bubble for registered should be in the white
+   bubble with member name" - the status badge now nests inside this
+   pill instead of sitting next to it as its own separate bubble.
+   display: inline-flex so the name text and the nested badge sit side
+   by side; flex-basis: content (not the default flex-basis: auto a flex
+   CONTAINER that's also a flex item needs here) for the same reason
+   already documented on .parent-class-child-trailing above - confirmed
+   live, auto doesn't reliably size this to its own content once it's
+   also display:flex internally. */
 .parent-class-child-name {
   font-weight: 600;
   color: var(--ink);
   background: #fff;
   border-radius: 999px;
   padding: 0.5rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  flex-shrink: 1;
+  flex-basis: content;
+}
+.parent-class-child-name-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
