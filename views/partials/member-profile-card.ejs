@@ -34,12 +34,15 @@ var fullAddress = [member.address, member.city, member.state, member.zip].filter
 // at all under their own Family card).
 var otherChildren = famChildren.filter(function(m) { return m.id !== member.id; });
 %>
+<p class="subtitle no-print"><a href="<%= backHref %>">&larr; <%= backLabel %></a></p>
+
 <div class="member-profile-banner">
   <span class="member-profile-banner-title"><svg class="icon"><use href="#icon-users"/></svg> Member Profile</span>
-  <div class="member-profile-banner-actions">
-    <% if (typeof editHref !== 'undefined' && editHref) { %><a class="member-profile-banner-back" href="<%= editHref %>">Edit</a><% } %>
-    <a class="member-profile-banner-back" href="<%= backHref %>">&larr; <%= backLabel %></a>
-  </div>
+  <% if (typeof editHref !== 'undefined' && editHref) { %>
+    <div class="member-profile-banner-actions no-print">
+      <a class="roster-action-btn" href="<%= editHref %>">Edit</a>
+    </div>
+  <% } %>
 </div>
 
 <div class="member-profile-main-card">
@@ -71,29 +74,17 @@ var otherChildren = famChildren.filter(function(m) { return m.id !== member.id; 
   </div>
 </div>
 
+<%
+// A real request: "on mobile, family card should be listed above
+// sections and portals. On desktop, family should be on the left and
+// sections/portals on the right" - .member-profile-cards-grid lays
+// its two children out left-to-right (desktop's 2-column grid) or
+// top-to-bottom (mobile's single column, see its own mobile media
+// query above) purely by DOM order, so putting Family first here
+// satisfies both asks at once: it lands in the left column on desktop
+// and on top on mobile, with no extra CSS ordering needed.
+%>
 <div class="member-profile-cards-grid">
-  <section class="member-profile-side-card">
-    <h2><svg class="icon"><use href="#icon-shield"/></svg> Portal Permissions</h2>
-    <span class="member-profile-side-card-label">Sections</span>
-    <% if (memberSections.length === 0) { %>
-      <p class="hint">—</p>
-    <% } else { %>
-      <ul class="member-profile-plain-list">
-        <% memberSections.forEach(function(s) { %><li><%= s.name %></li><% }); %>
-      </ul>
-    <% } %>
-    <span class="member-profile-side-card-label member-profile-side-card-label-icon"><svg class="icon"><use href="#icon-user-circle"/></svg> Portal Roles</span>
-    <% if (memberPortalRoles === null) { %>
-      <p class="hint">No portal account</p>
-    <% } else if (memberPortalRoles.length === 0) { %>
-      <p class="hint">—</p>
-    <% } else { %>
-      <ul class="member-profile-plain-list">
-        <% memberPortalRoles.forEach(function(r) { %><li><%= r.label %></li><% }); %>
-      </ul>
-    <% } %>
-  </section>
-
   <section class="member-profile-side-card">
     <h2><svg class="icon"><use href="#icon-users"/></svg> Family</h2>
     <% if (famParents.length === 0 && otherChildren.length === 0) { %>
@@ -122,6 +113,27 @@ var otherChildren = famChildren.filter(function(m) { return m.id !== member.id; 
           <% }); %>
         </ul>
       <% } %>
+    <% } %>
+  </section>
+
+  <section class="member-profile-side-card">
+    <h2><svg class="icon"><use href="#icon-shield"/></svg> Sections</h2>
+    <% if (memberSections.length === 0) { %>
+      <p class="hint">—</p>
+    <% } else { %>
+      <ul class="member-profile-plain-list">
+        <% memberSections.forEach(function(s) { %><li><%= s.name %></li><% }); %>
+      </ul>
+    <% } %>
+    <h2 class="member-profile-side-card-second-title"><svg class="icon"><use href="#icon-user-circle"/></svg> Portal Roles</h2>
+    <% if (memberPortalRoles === null) { %>
+      <p class="hint">No portal account</p>
+    <% } else if (memberPortalRoles.length === 0) { %>
+      <p class="hint">—</p>
+    <% } else { %>
+      <ul class="member-profile-plain-list">
+        <% memberPortalRoles.forEach(function(r) { %><li><%= r.label %></li><% }); %>
+      </ul>
     <% } %>
   </section>
 </div>

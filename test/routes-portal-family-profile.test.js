@@ -72,9 +72,9 @@ test('clicking a family member\'s name renders the shared Member Profile card, r
   assert.match(page.text, /Member Profile/);
   assert.match(page.text, new RegExp(`Family Profile Kid ${familyCounter}`));
   assert.match(page.text, /3rd Grade/);
-  // Read-only - no Edit link in the banner, unlike Co-op/Main Admin's own
-  // version of this same shared partial.
-  assert.doesNotMatch(page.text, /member-profile-banner-back" href="[^"]*\/edit"/);
+  // Read-only - no Edit button in the banner, unlike Co-op/Main Admin's
+  // own version of this same shared partial.
+  assert.doesNotMatch(page.text, /roster-action-btn" href="[^"]*\/edit"/);
 });
 
 test('a parent cannot view a member outside their own family by guessing an id', async () => {
