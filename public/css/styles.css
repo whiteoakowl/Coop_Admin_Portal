@@ -4866,6 +4866,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .schedule-preview-dialog h3 { margin: 0 0 0.75rem; }
 .schedule-preview-dialog h4 { margin: 0.75rem 0 0.35rem; font-size: 0.95rem; color: var(--muted); }
 .schedule-preview-dialog table { width: 100%; margin-bottom: 0.5rem; }
+/* A real screenshot: a long class name spilled this table (and its
+   dialog's own Room column) off the right edge of the dialog entirely.
+   Its own table carries .roster-table (for the border/padding look), so
+   .roster-table td's own nowrap default (styles.css, above) kept the
+   name on one line no matter how long, and table-layout:auto's "the
+   specified width is only a floor" behavior let the table grow past the
+   100% above to fit it. Two classes beats .roster-table td's one on
+   specificity, same fix as .members-list-table's own nowrap override
+   elsewhere in this file. */
+.schedule-preview-dialog .schedule-print-table td { white-space: normal; }
 
 /* Public-form submission result, shown as a centered popup instead of an
    inline banner so it can't be missed on a long form. */
@@ -7204,9 +7214,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .store-analytics-figure { font-weight: 700; text-align: right; }
 
 .import-sample-link { display: inline-block; margin-bottom: 0.75rem; }
+/* Two real screenshots: Chat's own "Add Chat Group" dialog (a <textarea>
+   missing from this list) and Admins' own Edit Position dialog (an
+   `email` field missing from it) both left a label's text sitting
+   beside its own control instead of above it - same inline-flow bug the
+   .dialog-label-stack comment below describes for `display: block`,
+   just for a control this old type-by-type list hadn't caught yet.
+   Named one type at a time rather than the site-wide base input rule's
+   own :not()-exclusion list above - that much higher specificity (one
+   :not() per excluded type) turned out to beat a real narrower-by-design
+   input elsewhere (Reading's own Hours/Minutes pair, each deliberately
+   5rem wide) that a plain [type="..."] list never could. */
 .member-picker-dialog input[type="file"],
 .member-picker-dialog input[type="text"],
-.member-picker-dialog input[type="date"] {
+.member-picker-dialog input[type="date"],
+.member-picker-dialog input[type="email"],
+.member-picker-dialog textarea {
   width: 100%;
   margin-bottom: 0.5rem;
 }
@@ -7685,6 +7708,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-view-header-text { flex: 1; min-width: 0; }
 .class-view-header-text h3 { margin: 0 0 0.15rem; font-size: 1.25rem; line-height: 1.25; }
 .class-view-eyebrow { display: block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+/* A real screenshot (the Events card popup): a long title's own second
+   line ran right under the close button - same "nothing reserved it any
+   space" bug .class-view-header's own close button already had fixed
+   (see that rule's own comment, below), just not yet applied to this
+   "-v2" header shape. .class-view-header-text's flex:1 fills the whole
+   row - including the corner the absolutely-positioned close button
+   sits over - unless the button is a normal flex item instead, so its
+   own width gets subtracted from what flex:1 leaves for the title. */
+.class-view-header-v2 .class-form-dialog-close { position: static; }
 
 .class-view-info-row { display: flex; align-items: flex-start; gap: 1rem; margin: 0.9rem 0; flex-wrap: wrap; }
 .class-view-info-item { display: flex; align-items: flex-start; gap: 0.55rem; flex: 1; min-width: 140px; }
@@ -9274,6 +9306,16 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
   .training-lesson-row-main { flex-wrap: wrap; }
   .training-lesson-actions { flex-wrap: wrap; width: 100%; }
 }
+/* A real screenshot: on a wide desktop screen (where the rule above
+   never applies), a role/item with two-plus family members' own Sign
+   Up/Cancel buttons still squeezed .training-lesson-info down to a
+   sliver and ran the buttons right over its text - the "there's room on
+   desktop" this file's own comment above counts on isn't true inside
+   .event-registration-edit-dialog's own much narrower width (min(560px,
+   92vw) - styles.css, Edit Registration's own popup), regardless of how
+   wide the actual screen is. */
+.event-registration-edit-dialog .training-lesson-row-main { flex-wrap: wrap; }
+.event-registration-edit-dialog .training-lesson-actions { flex-wrap: wrap; width: 100%; }
 
 .training-quiz-question-list { margin: 0.6rem 0 0 2.2rem; display: flex; flex-direction: column; gap: 0.35rem; }
 .training-quiz-question-row {
