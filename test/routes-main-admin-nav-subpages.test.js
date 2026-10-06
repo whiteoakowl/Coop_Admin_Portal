@@ -69,6 +69,22 @@ test('Main Admin sidebar: each accordion group lists its real subpages', async (
   assert.match(membersGroup[1], /href="\/main-admin\/members\?tab=settings">Settings</);
 });
 
+// A real request: "Main admin portal, chat, there should be a subpage
+// for chat rooms." The Chat Rooms tab (routes/admin-forums.js's own
+// FORUMS_TABS) already existed and worked once you were on the page -
+// this nav group just never listed it as one of the clickable subpages
+// the way Chat Groups and Archive already were.
+test('Main Admin sidebar: Chat group lists a Chat Rooms subpage alongside Chat Groups and Archive', async () => {
+  const cookie = await loginAsMainAdmin();
+  const res = await request(app).get('/main-admin').set('Cookie', cookie);
+
+  const chatGroup = /<details class="admin-nav-group">\s*<summary>[\s\S]*?Chat[\s\S]*?<\/summary>\s*<div class="admin-nav-subpages">([\s\S]*?)<\/div>\s*<\/details>/.exec(res.text);
+  assert.ok(chatGroup, 'Chat group should be found');
+  assert.match(chatGroup[1], /href="\/main-admin\/forums">Chat Groups</);
+  assert.match(chatGroup[1], /href="\/main-admin\/forums\?tab=rooms">Chat Rooms</);
+  assert.match(chatGroup[1], /href="\/main-admin\/forums\?tab=archive">Archive</);
+});
+
 test('Members/Communication/Events/Name Tags/Resource Links/Directory/Classifieds/Chat/Babysitters each still render (page content unaffected by moving their tabs into the nav shell)', async () => {
   const cookie = await loginAsMainAdmin();
   const pages = [
@@ -111,7 +127,7 @@ test('Mobile orange bar: every subpages-bearing item gets its own popup trigger 
     { slug: 'members', tabCount: 4 },
     { slug: 'communication', tabCount: 4 },
     { slug: 'events', tabCount: 5 },
-    { slug: 'chat', tabCount: 2 },
+    { slug: 'chat', tabCount: 3 },
     { slug: 'volunteers', tabCount: 3 },
     { slug: 'name-tags', tabCount: 3 },
     { slug: 'resource-links', tabCount: 2 },
