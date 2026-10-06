@@ -48,16 +48,19 @@ async function loginAsAdmin() {
   return { cookie, csrfToken: extractCsrf(page.text) };
 }
 
-test('Day Settings tab offers a Day of Week dropdown with all 7 days, and lists Monday/Wednesday by default', async () => {
+// A later real request retired the Day Settings tab entirely:
+// "selecting days for the semester is already included in add a
+// semester settings. Instead let's do an add/edit class schedule grid
+// button [on the Classes grid itself]." An old ?settingsTab=days
+// bookmark still lands somewhere sensible (General) instead of a
+// missing tab, and the underlying class_schedules routes this tab used
+// to call are still there - every other test in this file exercises
+// those directly and keeps passing unchanged.
+test('an old ?settingsTab=days bookmark redirects to the General settings tab', async () => {
   const admin = await loginAsAdmin();
   const res = await request(app).get('/admin/schedule?tab=settings&settingsTab=days').set('Cookie', admin.cookie);
-  assert.equal(res.status, 200);
-  assert.match(res.text, /Add a Day/);
-  for (const day of ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']) {
-    assert.match(res.text, new RegExp(`<option value="${day.toLowerCase()}">${day}</option>`));
-  }
-  assert.match(res.text, />Monday<\/td>/);
-  assert.match(res.text, />Wednesday<\/td>/);
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /settingsTab=general/);
 });
 
 test('Adding a Tuesday day schedule makes it a real Classes grid tab, with Add Class/Edit Hours/Bulk Edit/Import/Export/Print all reachable', async () => {

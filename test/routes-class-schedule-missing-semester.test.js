@@ -71,8 +71,9 @@ test('a brand new class defaults to the most-recently-created semester, and clas
 
   // The "Data Missing a Semester" UI section was removed (a real
   // request: "everything is connected to semesters now, remove it") -
-  // the Settings > Semester tab no longer surfaces it at all.
-  const settings = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
+  // the Semesters tab (now under the gear Settings icon - see
+  // routes/admin.js) no longer surfaces it at all.
+  const settings = await request(app).get('/admin/settings?tab=semesters').set('Cookie', admin.cookie);
   assert.doesNotMatch(settings.text, /Data Missing a Semester/);
 
   // The underlying bulk-assign route is still reachable directly (no UI

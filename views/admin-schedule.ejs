@@ -39,12 +39,21 @@
         <%# A real request: "There needs to be tabs for this page general,
             semester, registration schedule. Move all those features to
             there designated pages only" - General/Semester/Registration
-            Schedule each used to render stacked on one long page; now
-            each one only renders under its own sub-tab. %>
+            Schedule each used to render stacked on one long page; a
+            later real request ("Add a semester settings should be under
+            the gear settings icon at the top. This tab should be called
+            registration schedule and just have those features") moved
+            the Semesters list itself to /admin/settings (the gear icon -
+            see routes/admin.js's own 'semesters' tab) and renamed this
+            one Registration Schedule, down to just its windows feature.
+            Day Settings is retired entirely - "selecting days for the
+            semester is already included in add a semester settings,"
+            and the new Add/Edit Class Schedule Grid popup (views/
+            partials/class-schedule-grid.ejs) covers its Start/End Date
+            editing. %>
         <div class="view-tabs no-print">
           <a class="view-tab<%= settingsTab === 'general' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=general">General</a>
-          <a class="view-tab<%= settingsTab === 'semester' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=semester">Semester</a>
-          <a class="view-tab<%= settingsTab === 'days' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=days">Day Settings</a>
+          <a class="view-tab<%= settingsTab === 'registration-schedule' ? ' active' : '' %>" href="/admin/schedule?tab=settings&settingsTab=registration-schedule">Registration Schedule</a>
         </div>
 
       <% if (settingsTab === 'general') { %>
@@ -109,25 +118,18 @@
             </div>
           </form>
         </section>
-      <% } else if (settingsTab === 'semester') { %>
-
-        <%# A real request: "Overall class settings. Add a place to
-            create and add new semester titles." Just a title list - each
-            class's own assignment is its own Semester dropdown, now on
-            that class's own Details tab. %>
-        <h2>Semesters</h2>
-        <%- include('partials/semester-manager', { semesters, classDays, classDayLabels, classSchedules, backUrl: '/admin/schedule?tab=settings&settingsTab=semester' }) %>
+      <% } else if (settingsTab === 'registration-schedule') { %>
 
         <%# A real request: "add registration schedule. Be able to
             control who can signup on each schedule grid monday/
             Wednesday. Date, time and section and open for teacher or
             assistant registration." Follow-ups: this gates everyone
             (parents/students/teachers), "section" means the existing
-            Sections feature, and it was later folded in here under
-            Semester - "this settings is done through the semester tab" -
-            dropping its own separate sub-tab, with Add a Window turned
-            into a button+popup and an Edit button added next to Delete. %>
-        <h2>Registration Schedule</h2>
+            Sections feature, and it was later folded under Semester -
+            "this settings is done through the semester tab" - then
+            given back its own tab, renamed Registration Schedule, once
+            Semesters itself moved to the gear Settings icon. Add a
+            Window is a button+popup with an Edit button next to Delete. %>
         <p class="hint">
           Stage class registration in rounds (e.g. teachers first, then everyone else), scoped to one specific
           Schedule Grid and/or one or more Sections if you like, and to specific actions (parents registering to
@@ -199,93 +201,6 @@
             <%- include('partials/registration-window-form', { action: `/admin/schedule/registration-windows/${w.id}/update`, submitLabel: 'Save Changes', w, classSchedules, semesters, sections }) %>
           </dialog>
         <% }); %>
-      <% } else { %>
-
-        <%# A real request: "Full 7 day expansion so multiple semesters
-            can be created and managed... now day settings. So we can
-            create multiple semester schedule grids and all the floater
-            and setup cleanup features for each to go with it." Activating
-            a day here adds it to the Classes grid's own day-tab row (see
-            utils/classSchedule.js's listActiveClassDays) - re-activating
-            an already-used day for a different semester is also allowed
-            (its own separate record), since the tab itself is keyed by
-            day of week, not by which semester first created it. %>
-        <p class="hint">Add a day of the week to the Classes grid, or keep a record of which semester a day has been used for. The grid's own tabs always show every day that's ever been added here, regardless of which semester you're viewing - use each grid's own Semester filter (or the Kiosk tab, for Floater/Setup-Cleanup) to scope what you see day to day.</p>
-
-        <section class="portal-dashboard-card portal-dashboard-card-wide">
-          <h2>Add a Day</h2>
-          <form method="POST" action="/admin/schedule/class-schedules" class="member-form-grid">
-            <label class="member-form-full">Title
-              <input type="text" name="title" placeholder="e.g. Tuesday Enrichment" required />
-            </label>
-            <label>Semester
-              <select name="semesterId">
-                <option value="">No Semester</option>
-                <% semesters.forEach(function(s) { %>
-                  <option value="<%= s.id %>"><%= s.title %></option>
-                <% }); %>
-              </select>
-            </label>
-            <label>Day of Week
-              <select name="dayOfWeek" required>
-                <% classDays.forEach(function(d) { %>
-                  <option value="<%= d %>"><%= classDayLabels[d] %></option>
-                <% }); %>
-              </select>
-            </label>
-            <label>Start Date
-              <input type="date" name="startDate" />
-            </label>
-            <label>End Date
-              <input type="date" name="endDate" />
-            </label>
-            <div class="member-form-full">
-              <button type="submit" class="primary-btn">Add Day</button>
-            </div>
-          </form>
-        </section>
-
-        <section class="portal-dashboard-section">
-          <% if (classSchedules.length === 0) { %>
-            <p class="roster-empty">No days added yet.</p>
-          <% } else { %>
-            <div class="roster-scroll">
-              <table class="roster-table members-table condensed-table">
-                <thead>
-                  <tr><th>Title</th><th>Day</th><th>Semester</th><th>Start Date</th><th>End Date</th><th></th><th></th></tr>
-                </thead>
-                <tbody>
-                  <%# Each row's edit fields live outside their <form> (a
-                      lone <form> directly spanning multiple <td>s isn't
-                      valid HTML) and link back to it via the HTML5 form=
-                      attribute instead - same "every field posts together
-                      as one save" result as a normal <form>-wrapped row. %>
-                  <% classSchedules.forEach(function(cs) { %>
-                    <tr>
-                      <td class="roster-name-col"><input type="text" name="title" form="edit-schedule-<%= cs.id %>" value="<%= cs.title %>" aria-label="Rename <%= cs.title %>" required /></td>
-                      <td><%= classDayLabels[cs.day_of_week] %></td>
-                      <td><%= (semesters.find(function(s) { return s.id === cs.semester_id; }) || {}).title || 'No Semester' %></td>
-                      <td><input type="date" name="startDate" form="edit-schedule-<%= cs.id %>" value="<%= cs.start_date || '' %>" aria-label="Start date" /></td>
-                      <td><input type="date" name="endDate" form="edit-schedule-<%= cs.id %>" value="<%= cs.end_date || '' %>" aria-label="End date" /></td>
-                      <td>
-                        <button type="submit" form="edit-schedule-<%= cs.id %>" class="roster-action-btn">Save</button>
-                        <form id="edit-schedule-<%= cs.id %>" method="POST" action="/admin/schedule/class-schedules/<%= cs.id %>">
-                          <input type="hidden" name="dayOfWeek" value="<%= cs.day_of_week %>" />
-                          <input type="hidden" name="semesterId" value="<%= cs.semester_id || '' %>" />
-                        </form>
-                      </td>
-                      <td class="actions-cell">
-                        <form method="POST" action="/admin/schedule/class-schedules/<%= cs.id %>/delete" data-confirm="Remove the &quot;<%= cs.title %>&quot; day schedule? The day stays on the Classes grid if another schedule still uses it.">
-                          <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
-                        </form>
-                      </td>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
-            </div>
-          <% } %>
-        </section>
       <% } %>
       <% } else { %>
         <%

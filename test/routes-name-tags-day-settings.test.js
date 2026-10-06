@@ -42,7 +42,7 @@ function extractCsrf(html) {
 async function activateTuesday() {
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   const cookie = loginRes.headers['set-cookie'];
-  const page = await request(app).get('/admin/schedule?tab=settings&settingsTab=days').set('Cookie', cookie);
+  const page = await request(app).get('/admin/schedule?tab=settings').set('Cookie', cookie);
   const csrfToken = extractCsrf(page.text);
   await request(app)
     .post('/admin/schedule/class-schedules')

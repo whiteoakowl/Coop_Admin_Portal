@@ -152,9 +152,9 @@ test('Classes > Settings tab: Add a Window form has Schedule Grid, Section, and 
   // there instead of 404ing/landing on General.
   const oldLink = await request(app).get('/admin/schedule?tab=settings&settingsTab=registration').set('Cookie', admin.cookie);
   assert.equal(oldLink.status, 302);
-  assert.match(oldLink.headers.location, /settingsTab=semester/);
+  assert.match(oldLink.headers.location, /settingsTab=registration-schedule/);
 
-  const page = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
+  const page = await request(app).get('/admin/schedule?tab=settings&settingsTab=registration-schedule').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /Registration Schedule/);
   // "Add a Window" is now a button that opens a popup, not an always-
@@ -183,7 +183,7 @@ test('Classes > Settings tab: Add a Window form has Schedule Grid, Section, and 
       _csrf: admin.csrfToken,
     });
 
-  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
+  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=registration-schedule').set('Cookie', admin.cookie);
   assert.match(after.text, /Monday Teen Window/);
   assert.match(after.text, />Monday</);
   assert.match(after.text, /Teen Co-op/);
@@ -222,7 +222,7 @@ test('Editing a registration window updates its fields', async () => {
       _csrf: admin.csrfToken,
     });
 
-  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
+  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=registration-schedule').set('Cookie', admin.cookie);
   assert.match(after.text, /Renamed Window/);
   assert.doesNotMatch(after.text, /Editable Window</);
   assert.match(after.text, /Student: Register Self/);
@@ -243,7 +243,7 @@ test('Deleting a registration window removes it from Current Windows', async () 
   const win = await db.prepare("SELECT id FROM registration_windows WHERE label = 'To Delete'").get();
 
   await request(app).post(`/admin/schedule/registration-windows/${win.id}/delete`).set('Cookie', admin.cookie).type('form').send({ _csrf: admin.csrfToken });
-  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
+  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=registration-schedule').set('Cookie', admin.cookie);
   assert.doesNotMatch(after.text, /To Delete/);
 });
 

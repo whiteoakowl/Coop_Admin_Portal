@@ -76,7 +76,7 @@ const uploadDesignImage = multer({
 });
 
 const SPECIAL_SCHEDULE_TABS = ['members', 'settings'];
-const SETTINGS_SUBTABS = ['general', 'semester', 'days'];
+const SETTINGS_SUBTABS = ['general', 'registration-schedule'];
 const MEMBER_TYPE_FILTERS = ['student', 'parent'];
 const PAGE_SIZE = 25;
 
@@ -126,13 +126,28 @@ router.get('/schedule', requireAdmin, async (req, res) => {
     return res.redirect('/admin/schedule?' + qs.toString());
   }
 
-  // Registration Schedule used to be its own Settings sub-tab - "this
-  // settings is done through the semester tab" now, folded into Settings
-  // > Semester instead. An old ?settingsTab=registration bookmark still
-  // lands somewhere sensible rather than silently falling back to General.
-  if (req.query.tab === 'settings' && req.query.settingsTab === 'registration') {
+  // Registration Schedule used to be its own Settings sub-tab, then got
+  // folded into Settings > Semester ("this settings is done through the
+  // semester tab"), and a later real request ("Add a semester settings
+  // should be under the gear settings icon at the top. This tab should
+  // be called registration schedule and just have those features")
+  // split them again: the Semesters list itself moved to /admin/settings
+  // (see routes/admin.js's own 'semesters' tab), and this Settings tab
+  // was renamed Registration Schedule and now holds only the windows
+  // feature. Both old ?settingsTab=registration and ?settingsTab=semester
+  // bookmarks still land somewhere sensible instead of silently falling
+  // back to General; an old ?settingsTab=days bookmark (Day Settings,
+  // fully retired - see partials/semester-manager.ejs's own "Add a
+  // Schedule" day checkboxes and the new Add/Edit Class Schedule Grid
+  // popup, which cover what it used to) just lands on General.
+  if (req.query.tab === 'settings' && (req.query.settingsTab === 'registration' || req.query.settingsTab === 'semester')) {
     const qs = new URLSearchParams(req.query);
-    qs.set('settingsTab', 'semester');
+    qs.set('settingsTab', 'registration-schedule');
+    return res.redirect('/admin/schedule?' + qs.toString());
+  }
+  if (req.query.tab === 'settings' && req.query.settingsTab === 'days') {
+    const qs = new URLSearchParams(req.query);
+    qs.set('settingsTab', 'general');
     return res.redirect('/admin/schedule?' + qs.toString());
   }
 
@@ -167,9 +182,17 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       combos,
       selectedComboId: findComboId(combos, tab, resolvedSemesterId),
       selectedSemesterId: qsSemester(resolvedSemesterId),
-      hours: await hoursForDay(tab),
-      roomGrid: await roomGridForDay(tab),
-      rooms: await roomsForDay(tab),
+      // A real request: "create a new schedule grid, choose a semester/
+      // day, choose column titles and row titles" - each combo's own
+      // hours/rooms, falling back to the day's shared/derived versions
+      // until that combo has actually had its own grid customized (see
+      // utils/classSchedule.js's own hoursForDay/roomGridForDay/
+      // roomsForDay). A class never tagged with a semester still shows
+      // up no matter which real semester is selected - only explicitly
+      // picking "No Semester" narrows to just those.
+      hours: await hoursForDay(tab, resolvedSemesterId),
+      roomGrid: await roomGridForDay(tab, resolvedSemesterId),
+      rooms: await roomsForDay(tab, resolvedSemesterId),
       gradeLevels: GRADE_LEVELS,
       ageOptions: AGE_OPTIONS,
       colorPalette: COLOR_PALETTE,
@@ -220,13 +243,9 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
       semesters: await listSemesters(),
       classSettings: await classGlobalSettings(),
-      // Settings > Day Settings - a real request: "Full 7 day expansion
-      // so multiple semesters can be created and managed... now day
-      // settings." classDays is every weekday CLASS_DAY_LABELS can offer
-      // in the Add/Edit Day Schedule dialog; classSchedules is the
-      // existing list (title/day/semester/dates) shown and edited here.
-      classDays: CLASS_DAYS,
-      classDayLabels: CLASS_DAY_LABELS,
+      // Registration Schedule's own Add/Edit Window dialog - the Schedule
+      // Grid dropdown (partials/registration-window-form.ejs) needs the
+      // full list to offer, alongside the semesters fetched just above.
       classSchedules: await listClassSchedules(),
       error: req.query.error || null,
       notice: req.query.notice || null,
@@ -341,7 +360,7 @@ router.post('/schedule/registration-windows', requireFullAdmin, async (req, res)
   const label = (req.body.label || '').trim();
   const opensAt = easternInputToUtcText(req.body.opensAt);
   const closesAt = easternInputToUtcText(req.body.closesAt);
-  const back = '/admin/schedule?tab=settings&settingsTab=semester';
+  const back = '/admin/schedule?tab=settings&settingsTab=registration-schedule';
   if (!label || !opensAt) {
     return res.redirect(back + '&error=' + encodeURIComponent('A label and an opens-at date/time are required.'));
   }
@@ -360,7 +379,7 @@ router.post('/schedule/registration-windows/:id/update', requireFullAdmin, async
   const label = (req.body.label || '').trim();
   const opensAt = easternInputToUtcText(req.body.opensAt);
   const closesAt = easternInputToUtcText(req.body.closesAt);
-  const back = '/admin/schedule?tab=settings&settingsTab=semester';
+  const back = '/admin/schedule?tab=settings&settingsTab=registration-schedule';
   if (!label || !opensAt) {
     return res.redirect(back + '&error=' + encodeURIComponent('A label and an opens-at date/time are required.'));
   }
@@ -377,7 +396,7 @@ router.post('/schedule/registration-windows/:id/update', requireFullAdmin, async
 
 router.post('/schedule/registration-windows/:id/delete', requireFullAdmin, async (req, res) => {
   await deleteWindow(req.params.id);
-  res.redirect('/admin/schedule?tab=settings&settingsTab=semester&notice=' + encodeURIComponent('Registration window removed.'));
+  res.redirect('/admin/schedule?tab=settings&settingsTab=registration-schedule&notice=' + encodeURIComponent('Registration window removed.'));
 });
 
 // --- Classes > Settings: Semesters - a real request: "Overall class
@@ -391,7 +410,7 @@ router.post('/schedule/registration-windows/:id/delete', requireFullAdmin, async
 // from instead of always bouncing to the Settings tab.
 function semesterSettingsBack(req) {
   const back = req.body.back || req.query.back;
-  return back && back.startsWith('/admin/schedule') ? back : '/admin/schedule?tab=settings&settingsTab=semester';
+  return back && (back.startsWith('/admin/schedule') || back.startsWith('/admin/settings')) ? back : '/admin/settings?tab=semesters';
 }
 
 // days[] is the "Add a Schedule" checkbox group (a real request: "then a
@@ -505,12 +524,19 @@ router.post('/schedule/semesters/assign-missing', requireFullAdmin, async (req, 
   res.redirect(back + sep + 'notice=' + encodeURIComponent(notice));
 });
 
-// --- Classes > Settings: Day Settings (class_schedules) - a real
-// request: "Full 7 day expansion so multiple semesters can be created and
-// managed... now day settings. So we can create multiple semester
-// schedule grids." Activating a day here (or re-activating it for a new
-// semester) is what adds it to the Classes grid's own day-tab row - see
-// utils/classSchedule.js's own listActiveClassDays/createClassSchedule.
+// --- class_schedules CRUD - a real request originally built "Full 7 day
+// expansion so multiple semesters can be created and managed... now day
+// settings. So we can create multiple semester schedule grids" as its
+// own visible Day Settings tab; a later real request ("selecting days
+// for the semester is already included in add a semester settings...
+// instead let's do an add/edit class schedule grid button") retired
+// that tab - partials/semester-manager.ejs's own "Add a Schedule" day
+// checkboxes and the new Add/Edit Class Schedule Grid popup (views/
+// partials/class-schedule-grid.ejs) now cover everything it did. These
+// routes are what both of those actually call; activating a day (or
+// re-activating it for a new semester) is what adds it to the Classes
+// grid's own day-tab row - see utils/classSchedule.js's own
+// listActiveClassDays/createClassSchedule.
 function classScheduleFields(req) {
   return {
     title: req.body.title,
@@ -522,7 +548,7 @@ function classScheduleFields(req) {
 }
 
 router.post('/schedule/class-schedules', requireFullAdmin, async (req, res) => {
-  const back = '/admin/schedule?tab=settings&settingsTab=days';
+  const back = '/admin/schedule?tab=settings&settingsTab=general';
   try {
     await createClassSchedule(classScheduleFields(req));
   } catch (err) {
@@ -532,7 +558,7 @@ router.post('/schedule/class-schedules', requireFullAdmin, async (req, res) => {
 });
 
 router.post('/schedule/class-schedules/:id', requireFullAdmin, async (req, res) => {
-  const back = '/admin/schedule?tab=settings&settingsTab=days';
+  const back = '/admin/schedule?tab=settings&settingsTab=general';
   try {
     await updateClassSchedule(parseInt(req.params.id, 10), classScheduleFields(req));
   } catch (err) {
@@ -543,7 +569,7 @@ router.post('/schedule/class-schedules/:id', requireFullAdmin, async (req, res) 
 
 router.post('/schedule/class-schedules/:id/delete', requireFullAdmin, async (req, res) => {
   await deleteClassSchedule(parseInt(req.params.id, 10));
-  res.redirect('/admin/schedule?tab=settings&settingsTab=days&notice=' + encodeURIComponent('Day schedule removed.'));
+  res.redirect('/admin/schedule?tab=settings&settingsTab=general&notice=' + encodeURIComponent('Day schedule removed.'));
 });
 
 // A real request rebuilt Co-op Class Settings entirely: "Remove [the

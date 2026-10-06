@@ -40,14 +40,14 @@ function extractCsrf(html) {
 async function loginAsAdmin() {
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   const cookie = loginRes.headers['set-cookie'];
-  const page = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', cookie);
+  const page = await request(app).get('/admin/settings?tab=semesters').set('Cookie', cookie);
   return { cookie, csrfToken: extractCsrf(page.text) };
 }
 
 test('Add a Semester now has a day-checkbox "Add a Schedule" section, and checking days creates a class_schedules row for each one', async () => {
   const admin = await loginAsAdmin();
 
-  const settingsPage = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
+  const settingsPage = await request(app).get('/admin/settings?tab=semesters').set('Cookie', admin.cookie);
   assert.match(settingsPage.text, /Add a Schedule/);
   assert.match(settingsPage.text, /<input type="checkbox" name="days" value="monday" \/>/);
   assert.match(settingsPage.text, /<input type="checkbox" name="days" value="tuesday" \/>/);
@@ -75,7 +75,7 @@ test('Add a Semester now has a day-checkbox "Add a Schedule" section, and checki
   // the list table itself starts, since "Fall 2026" also appears earlier
   // on the page as the "Add a Semester" form's own title placeholder
   // text ("e.g. Fall 2026").
-  const afterPage = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
+  const afterPage = await request(app).get('/admin/settings?tab=semesters').set('Cookie', admin.cookie);
   const tableStart = afterPage.text.indexOf('semester-list-table');
   const rowStart = afterPage.text.indexOf('Fall 2026', tableStart);
   const rowEnd = afterPage.text.indexOf('</tr>', rowStart);
@@ -91,7 +91,7 @@ test('clicking a semester\'s title opens an edit form that can rename it and add
     .send({ title: 'Spring 2027', days: ['monday'], _csrf: admin.csrfToken });
   const semester = await db.prepare('SELECT * FROM semesters WHERE title = ?').get('Spring 2027');
 
-  const page = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
+  const page = await request(app).get('/admin/settings?tab=semesters').set('Cookie', admin.cookie);
   assert.match(page.text, new RegExp(`data-semester-edit-toggle="semester-edit-${semester.id}"[^>]*>Spring 2027<`));
   // The edit row's own Monday checkbox should already be checked, Tuesday not.
   const editRowMatch = new RegExp(`id="semester-edit-${semester.id}"[\\s\\S]*?</tr>`).exec(page.text);
@@ -121,7 +121,7 @@ test('deleting a semester shows the updated, accurate confirm text (not just "Cl
     .type('form')
     .send({ title: 'Delete Confirm Semester', _csrf: admin.csrfToken });
 
-  const page = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
+  const page = await request(app).get('/admin/settings?tab=semesters').set('Cookie', admin.cookie);
   assert.match(
     page.text,
     /data-confirm="Are you sure you want to delete the &quot;Delete Confirm Semester&quot; semester\? This action can&#39;t be reversed\./
@@ -136,7 +136,7 @@ test('a semester with no days yet shows "No days yet" instead of a blank cell', 
     .type('form')
     .send({ title: 'No Days Semester', _csrf: admin.csrfToken });
 
-  const page = await request(app).get('/admin/schedule?tab=settings&settingsTab=semester').set('Cookie', admin.cookie);
+  const page = await request(app).get('/admin/settings?tab=semesters').set('Cookie', admin.cookie);
   const tableStart = page.text.indexOf('semester-list-table');
   const rowStart = page.text.indexOf('No Days Semester', tableStart);
   const rowEnd = page.text.indexOf('</tr>', rowStart);

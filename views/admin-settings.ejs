@@ -41,6 +41,13 @@
               <p class="hint">Choose which semester the Kiosk is currently running.</p>
             </a>
           </div>
+          <div class="team-col">
+            <a class="team-info-card" href="/admin/settings?tab=semesters">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-calendar-check"/></svg></span>
+              <h3 class="team-info-title">Semesters</h3>
+              <p class="hint">Add, rename, or remove semesters and which days each one covers.</p>
+            </a>
+          </div>
         <% } %>
         <div class="team-col">
           <a class="team-info-card" href="/admin/settings?tab=quicklinks">
@@ -113,9 +120,18 @@
             </div>
           </form>
           <% if (semesters.length === 0) { %>
-            <p class="roster-empty">No semesters yet - add one on the Classes &gt; Settings &gt; Semester tab first.</p>
+            <p class="roster-empty">No semesters yet - add one on the Semesters tab first.</p>
           <% } %>
         </div>
+      <% } else if (activeTab === 'semesters') { %>
+        <%# A real request: "Add a semester settings should be under the
+            gear settings icon at the top." Moved here from Classes >
+            Settings > Semester (that tab is now Registration Schedule
+            only) - the actual Add/Edit/Delete Semester routes stay on
+            /admin/schedule/semesters (routes/admin-schedule.js), which
+            already honors wherever its forms' own back field points. %>
+        <h2>Semesters</h2>
+        <%- include('partials/semester-manager', { semesters, classDays, classDayLabels, classSchedules, backUrl: '/admin/settings?tab=semesters' }) %>
       <% } else if (activeTab === 'install') { %>
         <div class="manage-section">
           <h2>Install as an App</h2>

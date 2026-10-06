@@ -7,7 +7,16 @@ const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { todayISO, formatDateLabel, formatShortDateLabel, weekdayOf, isValidISODate } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { todaysSessionDays, absenceFormSubmissionsForRoster } = require('../utils/alerts');
-const { ensureDayRoster, classesAtRiskForDay, classesNeedingStaffForDay, CLASS_DAY_LABELS_FULL, listActiveClassDays, listSemesters } = require('../utils/classSchedule');
+const {
+  ensureDayRoster,
+  classesAtRiskForDay,
+  classesNeedingStaffForDay,
+  CLASS_DAY_LABELS_FULL,
+  listActiveClassDays,
+  listSemesters,
+  CLASS_DAYS,
+  listClassSchedules,
+} = require('../utils/classSchedule');
 const { getActiveKioskSemesterId, setActiveKioskSemesterId } = require('../utils/kioskSettings');
 const { CLASS_DAY_WEEKDAY_FULL } = require('../utils/classDays');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
@@ -362,8 +371,8 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 // It should move to the documents page." - 'documents' is gone from here
 // too; that upload form and management list now live entirely on
 // /admin/documents itself (routes/admin-documents.js).
-const SETTINGS_TABS = ['account', 'classcheckin', 'kiosk', 'quicklinks', 'install'];
-const FULL_ADMIN_ONLY_TABS = ['account', 'classcheckin', 'kiosk'];
+const SETTINGS_TABS = ['account', 'classcheckin', 'kiosk', 'semesters', 'quicklinks', 'install'];
+const FULL_ADMIN_ONLY_TABS = ['account', 'classcheckin', 'kiosk', 'semesters'];
 
 async function renderSettings(req, res, error, success, activeTab) {
   const isFullAdmin = !!req.session.adminId;
@@ -389,8 +398,19 @@ async function renderSettings(req, res, error, success, activeTab) {
     // settings" - moved here from Classes > Settings > Kiosk (routes/
     // admin-schedule.js used to own this). Only fetched for the tab that
     // actually needs it, same as every other tab-scoped query here.
-    semesters: tab === 'kiosk' ? await listSemesters() : null,
+    semesters: tab === 'kiosk' || tab === 'semesters' ? await listSemesters() : null,
     activeKioskSemesterId: tab === 'kiosk' ? await getActiveKioskSemesterId() : null,
+    // A real request: "Add a semester settings should be under the gear
+    // settings icon at the top." Moved here from Classes > Settings >
+    // Semester (routes/admin-schedule.js still owns the actual Add/Edit/
+    // Delete Semester routes themselves, under /admin/schedule/semesters -
+    // only where the semester-manager partial renders moved). classDays/
+    // classDayLabels/classSchedules are only what partials/semester-
+    // manager.ejs itself needs (its own "Add a Schedule" day checkboxes
+    // and each semester's day list).
+    classDays: tab === 'semesters' ? CLASS_DAYS : null,
+    classDayLabels: tab === 'semesters' ? CLASS_DAY_LABELS_FULL : null,
+    classSchedules: tab === 'semesters' ? await listClassSchedules() : null,
     error,
     success,
   });

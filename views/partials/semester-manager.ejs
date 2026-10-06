@@ -5,7 +5,7 @@
 // semester already covers), backUrl (optional - where each form's own
 // POST redirects back to; defaults to the Settings tab). Used by the
 // Settings tab's own Semester sub-tab.
-const semesterBackUrl = typeof backUrl !== 'undefined' && backUrl ? backUrl : '/admin/schedule?tab=settings';
+const semesterBackUrl = typeof backUrl !== 'undefined' && backUrl ? backUrl : '/admin/settings?tab=semesters';
 // classDays is already in calendar order, so filtering it (rather than
 // mapping classSchedules directly) gives each semester's own day list
 // back in calendar order too, not creation order.
