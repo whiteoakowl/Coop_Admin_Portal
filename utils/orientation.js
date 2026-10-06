@@ -25,6 +25,7 @@
 const db = require('../db');
 const { primaryParentsFor } = require('./scheduleCardData');
 const { CLASS_DAY_LABELS_FULL } = require('./classDays');
+const { byLastName } = require('./members');
 
 // A real request: "add a column for open house" - same shape as the 4
 // original circle columns (openHouse -> open_house_complete/
@@ -189,6 +190,31 @@ async function orientationTrainingLinks() {
   return byField;
 }
 
+// A real bug report: "primary member signed up from each of the signed up
+// families is not showing their green check mark for completing trainings
+// that they did." orientationRows() only ever displays progress keyed to
+// the family's own primary parent (utils/scheduleCardData.js's own
+// primaryParentsFor, the same "whose obligation is this" lookup Schedule
+// Cards use) - but a Training can be assigned to and passed by ANY member
+// of the family (whoever the admin actually picked when assigning it, or
+// whoever logged in and took it), not necessarily that one specific row.
+// Resolves any member to the same primary-parent id orientationRows()
+// would show for their family, so a passed Training always credits the
+// row the admin is actually looking at - same is_primary_parent-first,
+// else-first-by-last-name tie-break primaryParentsFor itself uses.
+// Returns the member's own id unchanged if they have no family on file, or
+// no parent/admin on file in that family (nothing else to redirect to).
+async function orientationObligationMemberId(memberId) {
+  const self = await db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId);
+  if (!self || self.family_id == null) return memberId;
+  const parents = (
+    await db.prepare("SELECT * FROM members WHERE family_id = ? AND member_type IN ('parent', 'admin') AND active = 1").all(self.family_id)
+  ).sort(byLastName);
+  if (parents.length === 0) return memberId;
+  const primary = parents.find((p) => p.is_primary_parent) || parents[0];
+  return primary.id;
+}
+
 // Called from utils/training.js's own maybeFinalizeAttempt right after a
 // training attempt is finalized as passed - looks up every orientation
 // column linked to this training and marks it complete for that member.
@@ -199,9 +225,10 @@ async function orientationTrainingLinks() {
 async function applyTrainingCompletion(trainingId, memberId) {
   const rows = await db.prepare('SELECT field FROM orientation_settings WHERE training_id = ?').all(trainingId);
   if (rows.length === 0) return;
+  const targetMemberId = await orientationObligationMemberId(memberId);
   const semesterId = await defaultSemesterId();
   for (const row of rows) {
-    await setOrientationField(memberId, semesterId, row.field, true);
+    await setOrientationField(targetMemberId, semesterId, row.field, true);
   }
 }
 
@@ -213,4 +240,5 @@ module.exports = {
   setOrientationLink,
   orientationTrainingLinks,
   applyTrainingCompletion,
+  orientationObligationMemberId,
 };

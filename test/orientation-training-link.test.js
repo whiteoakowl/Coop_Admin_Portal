@@ -25,7 +25,8 @@ const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
 const T = require('../utils/training');
-const { setOrientationLink, orientationTrainingLinks, defaultSemesterId } = require('../utils/orientation');
+const { setOrientationLink, orientationTrainingLinks, defaultSemesterId, orientationRows } = require('../utils/orientation');
+const { createClass, setEnrollment } = require('../utils/classSchedule');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -178,4 +179,77 @@ test('a Training with no linked column does not touch Orientation at all', async
 
   const row = await db.prepare('SELECT * FROM orientation_progress WHERE member_id = ?').get(memberId);
   assert.equal(row, undefined);
+});
+
+// A real bug report: "primary member signed up from each of the signed up
+// families is not showing their green check mark for completing trainings
+// that they did." Orientation Tracking only ever displays progress keyed
+// to the family's own primary parent (same row Schedule Cards' own
+// primaryParentsFor would pick), but a Training can be passed by whichever
+// family member actually took it - a non-primary parent, or the admin's
+// assignment simply wasn't given to the one flagged Primary. Covers the
+// whole chain end to end: family with 2 parents, the SECOND (non-primary)
+// one passes a linked Training, and the checkmark must still show on the
+// Orientation Tracking row for the PRIMARY parent - the one the admin is
+// actually looking at.
+async function makeFamilyWithStudentAndTwoParents() {
+  const family = await db.prepare('INSERT INTO families (name) VALUES (?) RETURNING *').get(`Test Family ${Date.now()}-${Math.random()}`);
+  const primaryParentId = (
+    await db
+      .prepare("INSERT INTO members (name, barcode, member_type, family_id, is_primary_parent) VALUES (?, ?, 'parent', ?, 1)")
+      .run(`Primary Parent ${family.id}`, `primary-${family.id}`, family.id)
+  ).lastInsertRowid;
+  const secondParentId = (
+    await db
+      .prepare("INSERT INTO members (name, barcode, member_type, family_id, is_primary_parent) VALUES (?, ?, 'parent', ?, 0)")
+      .run(`Second Parent ${family.id}`, `second-${family.id}`, family.id)
+  ).lastInsertRowid;
+  const studentId = (
+    await db
+      .prepare("INSERT INTO members (name, barcode, member_type, family_id) VALUES (?, ?, 'student', ?)")
+      .run(`Student ${family.id}`, `student-${family.id}`, family.id)
+  ).lastInsertRowid;
+  return { familyId: family.id, primaryParentId, secondParentId, studentId };
+}
+
+test('a Training passed by a non-primary parent still checks the column on the family\'s PRIMARY parent row', async () => {
+  const { primaryParentId, secondParentId, studentId } = await makeFamilyWithStudentAndTwoParents();
+  const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'Orientation Credit Class', room: 'Room A' });
+  await setEnrollment(classId, [studentId]);
+
+  const { trainingId, quizLessonId } = await buildOneQuestionTraining('Parent Orientation (non-primary passes)');
+  await setOrientationLink('video', trainingId);
+
+  const result = await passTraining(trainingId, quizLessonId, secondParentId);
+  assert.equal(result.passed, true);
+
+  // The checkmark must land on the PRIMARY parent's own row, not the one
+  // who actually clicked through the training.
+  const primaryRow = await db.prepare('SELECT video_complete FROM orientation_progress WHERE member_id = ?').get(primaryParentId);
+  assert.ok(primaryRow, 'the primary parent should have an orientation_progress row');
+  assert.equal(Number(primaryRow.video_complete), 1);
+
+  const secondRow = await db.prepare('SELECT * FROM orientation_progress WHERE member_id = ?').get(secondParentId);
+  assert.equal(secondRow, undefined, 'the non-primary parent who actually passed it must not get their own separate row');
+
+  const rows = await orientationRows(null);
+  const familyRow = rows.find((r) => r.memberId === primaryParentId);
+  assert.ok(familyRow, 'Orientation Tracking should list this family under the primary parent');
+  assert.equal(familyRow.video, true, 'the green check must show on the row the admin actually sees');
+});
+
+test('linking a Training retroactively credits the PRIMARY parent even when a non-primary parent already passed it', async () => {
+  const { primaryParentId, secondParentId, studentId } = await makeFamilyWithStudentAndTwoParents();
+  const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'Orientation Retroactive Credit Class', room: 'Room B' });
+  await setEnrollment(classId, [studentId]);
+
+  const { trainingId, quizLessonId } = await buildOneQuestionTraining('Teacher Orientation (retroactive, non-primary)');
+  const result = await passTraining(trainingId, quizLessonId, secondParentId);
+  assert.equal(result.passed, true);
+
+  await setOrientationLink('teacherTraining', trainingId);
+
+  const primaryRow = await db.prepare('SELECT teacher_training_complete FROM orientation_progress WHERE member_id = ?').get(primaryParentId);
+  assert.ok(primaryRow, 'retroactively linking should backfill the primary parent, not the member who actually passed it');
+  assert.equal(Number(primaryRow.teacher_training_complete), 1);
 });
