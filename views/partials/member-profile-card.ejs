@@ -28,7 +28,10 @@
 //     list this card itself is built from.
 var roleLabel = member.member_type === 'admin' ? 'Admin' : member.member_type === 'parent' ? 'Parent' : 'Student';
 var fullAddress = [member.address, member.city, member.state, member.zip].filter(Boolean).join(', ');
-var otherParents = famParents.filter(function(m) { return m.id !== member.id; });
+// A real request: "add all parents under list of family" - unlike
+// Children below, Parents lists everyone including the member being
+// viewed (a lone parent's own profile would otherwise show no parents
+// at all under their own Family card).
 var otherChildren = famChildren.filter(function(m) { return m.id !== member.id; });
 %>
 <div class="member-profile-banner">
@@ -93,14 +96,18 @@ var otherChildren = famChildren.filter(function(m) { return m.id !== member.id; 
 
   <section class="member-profile-side-card">
     <h2><svg class="icon"><use href="#icon-users"/></svg> Family</h2>
-    <% if (otherParents.length === 0 && otherChildren.length === 0) { %>
+    <% if (famParents.length === 0 && otherChildren.length === 0) { %>
       <p class="hint">—</p>
     <% } else { %>
-      <% if (otherParents.length) { %>
+      <% if (famParents.length) { %>
         <span class="member-profile-side-card-label">Parents</span>
         <ul class="member-profile-plain-list">
-          <% otherParents.forEach(function(m) { %>
-            <li><% if (typeof familyMemberHref === 'function' && familyMemberHref(m.id)) { %><a href="<%= familyMemberHref(m.id) %>"><%= m.name %></a><% } else { %><%= m.name %><% } %></li>
+          <% famParents.forEach(function(m) { %>
+            <li>
+              <% if (m.id === member.id) { %><%= m.name %> <span class="hint">(You)</span>
+              <% } else if (typeof familyMemberHref === 'function' && familyMemberHref(m.id)) { %><a href="<%= familyMemberHref(m.id) %>"><%= m.name %></a>
+              <% } else { %><%= m.name %><% } %>
+            </li>
           <% }); %>
         </ul>
       <% } %>

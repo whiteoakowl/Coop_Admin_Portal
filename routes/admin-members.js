@@ -479,7 +479,11 @@ router.get('/members/:id', async (req, res) => {
     // children title. Should show grade levels next to students in
     // parenthesis." Full member records now (not just names), so the view
     // can group by member_type and read each student's grade_level.
-    familyMembers: restOfFamily,
+    // familyRoster (not restOfFamily) - a later real request: "add all
+    // parents under list of family" - the member being viewed should
+    // still show up under Parents if they themselves are one (partials/
+    // member-profile-card.ejs keeps excluding them from Children only).
+    familyMembers: familyRoster,
     memberSections: allSections.filter((s) => memberSectionIds.has(s.id)),
     portalRoles: portalStatus.account ? allRoles.filter((r) => portalStatus.roleIds.has(r.id)) : null,
     // Includes the member being viewed (not just the rest of the family)

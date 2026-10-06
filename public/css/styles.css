@@ -11547,9 +11547,13 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .member-profile-cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 @media (max-width: 720px) {
   .member-profile-cards-grid { grid-template-columns: 1fr; }
-  .member-profile-main-card { flex-direction: column; align-items: center; text-align: center; }
+  /* Avatar + name stay centered as a header, but a real request says
+     the address/phone/email lines below should read left-aligned, not
+     centered - so the info column gets an explicit full width + left
+     text-align, overriding the centered column it sits in. */
+  .member-profile-main-card { flex-direction: column; align-items: center; }
+  .member-profile-main-info { width: 100%; text-align: left; }
   .member-profile-main-top { justify-content: center; }
-  .member-profile-contact-row { justify-content: center; }
 }
 .member-profile-side-card {
   background: var(--brand-soft);
