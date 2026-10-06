@@ -7076,6 +7076,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    on one row with even spacing instead of Save Changes' old full-width
    member-form-full stretch. */
 .class-details-save-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+/* That "each button already sizes to its own text by default" turned out
+   false for Duplicate Class specifically: .roster-action-btn's own global
+   rule sets flex: 1 0 auto for its usual home (a roster-btn-row toolbar,
+   where every button SHOULD grow to fill the row) - inside THIS flex row
+   that grew Duplicate Class to fill all the row's remaining space while
+   Save Changes (a plain .primary-btn, no flex-grow of its own) stayed its
+   natural width, confirmed live as a lopsided wide-button-next-to-narrow-
+   button row. A real request: "duplicate class button should be the same
+   size as save changes button" - flex: 0 1 auto stops the growth, and
+   matching .primary-btn's own padding/font-size directly (rather than
+   .roster-action-btn's smaller toolbar-button sizing) makes the two
+   genuinely the same size, not just similarly shaped. */
+.class-details-save-row .roster-action-btn { flex: 0 1 auto; min-width: 0; padding: 0.85rem 1.5rem; font-size: 1rem; }
 
 /* Circular color swatches, selected one ringed + checkmarked - replaces a
    plain native color input. */
@@ -7514,6 +7527,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      fields legible, not to survive a sub-320px phone too - drop it so the
      form column can shrink all the way down with the rest of the dialog. */
   .class-manage-form-col { min-width: 0; }
+  /* A real request: "add students button should be under the title just
+     like teachers & assistants" - both headers share the exact same
+     .grid-box-header markup, so whether a header's own title+button text
+     was short enough to still fit one line (Student Roster) or not
+     (Teachers & Assistants) was pure coincidence of word count, not a
+     deliberate choice - stacking both the same way here removes that
+     inconsistency. */
+  .class-manage-roster-col .grid-box-header { flex-direction: column; align-items: flex-start; }
 }
 
 /* A real request: "remove the edit button and attendance link button
@@ -9902,8 +9923,18 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
    phone the old wrap let a single group split across 2-3 stacked lines
    once it ran out of width, which is what bloated the toolbar's height
    in the first place. Scrolling that one row horizontally instead keeps
-   every group on its own single line at any width. */
-.forum-editor-toolbar { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-alt, #f7f8fa); padding: 0.3rem; }
+   every group on its own single line at any width.
+   A follow-up request: on a wide desktop form the grey box used to
+   stretch the full width of its container (a plain block defaults to
+   100% width), leaving a lot of empty grey past the actual icons -
+   "it should stop and create a nice box around the icons only... it
+   should be the size on mobile for desktop." width: fit-content snugs
+   the box to its widest row's real content width on any screen, same
+   as it already looked on a narrow phone where the container itself
+   left no room to stretch into; max-width: 100% is the safety net for
+   the rare row still wider than the container even after shrinking
+   (that row's own overflow-x: auto above still handles it). */
+.forum-editor-toolbar { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-alt, #f7f8fa); padding: 0.3rem; width: fit-content; max-width: 100%; }
 .forum-editor-toolbar-row { display: flex; gap: 0.15rem; flex-wrap: nowrap; overflow-x: auto; align-items: center; }
 .forum-editor-toolbar-row + .forum-editor-toolbar-row { padding-top: 0.2rem; border-top: 1px solid var(--border); }
 .forum-editor-toolbar button {
