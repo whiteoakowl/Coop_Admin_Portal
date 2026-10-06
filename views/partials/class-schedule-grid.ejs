@@ -268,20 +268,20 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
     <span class="class-form-section-label">Class Size</span>
     <div class="class-form-row class-edit-slots-row">
       <div class="class-form-field">
-        <span class="class-form-field-label"># of Students Allowed <span class="optional-tag">(optional - blank means unlimited)</span></span>
+        <span class="class-form-field-label">Minimum Students <span class="optional-tag">(optional)</span></span>
+        <input type="number" name="minCapacity" min="0" placeholder="e.g. 4" />
+      </div>
+      <div class="class-form-field">
+        <span class="class-form-field-label">Maximum Students <span class="optional-tag">(optional - blank means unlimited)</span></span>
         <input type="number" name="capacity" min="0" placeholder="e.g. 12" />
       </div>
       <div class="class-form-field">
-        <span class="class-form-field-label"># of Teachers Allowed <span class="optional-tag">(optional)</span></span>
+        <span class="class-form-field-label"># of Teachers Needed <span class="optional-tag">(optional)</span></span>
         <input type="number" name="teacherSlots" min="0" placeholder="e.g. 1" />
       </div>
       <div class="class-form-field">
-        <span class="class-form-field-label"># of Class Assistants Allowed <span class="optional-tag">(optional)</span></span>
+        <span class="class-form-field-label"># of Class Assistants Needed <span class="optional-tag">(optional)</span></span>
         <input type="number" name="assistantSlots" min="0" placeholder="e.g. 3" />
-      </div>
-      <div class="class-form-field">
-        <span class="class-form-field-label">Minimum Students Needed <span class="optional-tag">(optional)</span></span>
-        <input type="number" name="minCapacity" min="0" placeholder="e.g. 4" />
       </div>
     </div>
 

@@ -104,17 +104,17 @@
         </label>
 
         <div class="member-form-full class-edit-slots-row">
-          <label># of Students Allowed <span class="hint">(blank = unlimited)</span>
+          <label>Minimum Students <span class="hint">(optional)</span>
+            <input type="number" name="minCapacity" min="0" value="<%= cls.min_capacity != null ? cls.min_capacity : '' %>" disabled />
+          </label>
+          <label>Maximum Students <span class="hint">(blank = unlimited)</span>
             <input type="number" name="capacity" min="0" value="<%= cls.capacity != null ? cls.capacity : '' %>" disabled />
           </label>
-          <label># of Teachers Allowed <span class="hint">(optional)</span>
+          <label># of Teachers Needed <span class="hint">(optional)</span>
             <input type="number" name="teacherSlots" min="0" value="<%= cls.teacher_slots != null ? cls.teacher_slots : '' %>" disabled />
           </label>
-          <label># of Class Assistants Allowed <span class="hint">(optional)</span>
+          <label># of Class Assistants Needed <span class="hint">(optional)</span>
             <input type="number" name="assistantSlots" min="0" value="<%= cls.assistant_slots != null ? cls.assistant_slots : '' %>" disabled />
-          </label>
-          <label>Minimum Students Needed <span class="hint">(optional)</span>
-            <input type="number" name="minCapacity" min="0" value="<%= cls.min_capacity != null ? cls.min_capacity : '' %>" disabled />
           </label>
         </div>
 

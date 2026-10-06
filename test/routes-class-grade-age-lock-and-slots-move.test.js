@@ -144,22 +144,24 @@ test('Staff & Roster tab has its own Slots form at the top, and saving it does n
   assert.equal(rosterPage.status, 200);
   assert.match(rosterPage.text, /<h2>Slots<\/h2>/);
   assert.match(rosterPage.text, /action="\/admin\/class-schedule\/classes\/\d+\/slots"/);
-  assert.match(rosterPage.text, /# of Students Allowed/);
-  assert.match(rosterPage.text, /# of Teachers Allowed/);
-  assert.match(rosterPage.text, /# of Class Assistants Allowed/);
+  assert.match(rosterPage.text, /Maximum Students/);
+  assert.match(rosterPage.text, /# of Teachers Needed/);
+  assert.match(rosterPage.text, /# of Class Assistants Needed/);
   // The Details tab (Class Details form) should no longer carry these 3.
   const detailsPage = await request(app).get(`/admin/class-schedule/classes/${classId}/manage`).set('Cookie', admin.cookie);
   const detailsFormStart = detailsPage.text.indexOf('Class Details');
   const detailsFormEnd = detailsPage.text.indexOf('Save Changes');
   const detailsFormHtml = detailsPage.text.slice(detailsFormStart, detailsFormEnd);
-  assert.doesNotMatch(detailsFormHtml, /# of Students Allowed/);
-  assert.doesNotMatch(detailsFormHtml, /# of Teachers Allowed/);
-  assert.doesNotMatch(detailsFormHtml, /# of Class Assistants Allowed/);
+  assert.doesNotMatch(detailsFormHtml, /Maximum Students/);
+  assert.doesNotMatch(detailsFormHtml, /# of Teachers Needed/);
+  assert.doesNotMatch(detailsFormHtml, /# of Class Assistants Needed/);
   // A later real request: "minimum and maximum student settings, same
-  // row next to each other" moved Minimum Students Needed off Details
-  // and onto this same Slots form too, next to # of Students Allowed.
-  assert.doesNotMatch(detailsFormHtml, /Minimum Students Needed/, 'Minimum Students Needed should have moved off Details');
-  assert.match(rosterPage.text, /Minimum Students Needed/, 'Minimum Students Needed should now be on the Slots form');
+  // row next to each other" moved Minimum Students off Details and onto
+  // this same Slots form too, next to Maximum Students. A still later
+  // request renamed both from "# of Students Allowed"/"Minimum Students
+  // Needed" to "Maximum Students"/"Minimum Students".
+  assert.doesNotMatch(detailsFormHtml, /Minimum Students/, 'Minimum Students should have moved off Details');
+  assert.match(rosterPage.text, /Minimum Students/, 'Minimum Students should now be on the Slots form');
 
   const csrfToken = extractCsrf(rosterPage.text);
   const res = await request(app)
@@ -179,7 +181,7 @@ test('Staff & Roster tab has its own Slots form at the top, and saving it does n
   assert.equal(cls.description, 'Keep this description');
 });
 
-test('Saving the Class Details form does not reset slot counts (including Minimum Students Needed) set on the Staff & Roster tab', async () => {
+test('Saving the Class Details form does not reset slot counts (including Minimum Students) set on the Staff & Roster tab', async () => {
   const admin = await loginAsAdmin();
   const classId = await createClass({ day: 'wednesday', hourPosition: 1, className: 'Preserve Slots Class', capacity: 8, minCapacity: 2, teacherSlots: 1, assistantSlots: 1 });
 
