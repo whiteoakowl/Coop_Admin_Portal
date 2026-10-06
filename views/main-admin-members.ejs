@@ -489,97 +489,146 @@
         </div>
       <% } %>
     <% } else if (activeTab === 'settings') { %>
-      <%# A real request: "this will have an approval and deny letter
-          that can be edited by admin. these letters are sent
-          automatically went approve or deny buttons are clicked." A
-          second real request: "approval and denial messages should have
-          the same text editing icons we added to other chat boxes" -
-          same forum-editor-toolbar/forum-editor.js rich-text component
-          the Policy Handbook editor below already uses. %>
-      <%
-        // The two letters were plain text (newline-separated paragraphs)
-        // before this editor existed - dropped straight into a
-        // contenteditable div, a run of newlines collapses to a single
-        // space in HTML, losing the paragraph breaks on first load even
-        // though the underlying saved text is untouched. Detecting "no
-        // HTML tags yet" and turning newlines into real breaks only for
-        // that initial fill (not the stored value) keeps a legacy letter
-        // readable until the next time an admin saves it as real HTML.
-        function toEditableHtml(text) {
-          if (/<[a-z][\s\S]*>/i.test(text || '')) return text;
-          const esc = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          return esc.split(/\n{2,}/).map((p) => '<p>' + p.replace(/\n/g, '<br>') + '</p>').join('');
-        }
-      %>
-      <div class="manage-section">
-        <h2>Approval Letter</h2>
-        <form method="POST" action="/main-admin/members/settings/letters/approval" class="stack-form" data-forum-editor>
-          <label class="member-form-full">Subject
-            <input type="text" name="subject" value="<%= templates.approval.subject %>" required />
-          </label>
-          <%- include('partials/forum-editor-toolbar') %>
-          <div class="forum-editable" data-forum-editable contenteditable="true"><%- toEditableHtml(templates.approval.body) %></div>
-          <input type="hidden" name="body" data-forum-body-input />
-          <button type="submit" class="primary-btn">Save Approval Letter</button>
-        </form>
-      </div>
-      <div class="manage-section">
-        <h2>Denial Letter</h2>
-        <form method="POST" action="/main-admin/members/settings/letters/denial" class="stack-form" data-forum-editor>
-          <label class="member-form-full">Subject
-            <input type="text" name="subject" value="<%= templates.denial.subject %>" required />
-          </label>
-          <%- include('partials/forum-editor-toolbar') %>
-          <div class="forum-editable" data-forum-editable contenteditable="true"><%- toEditableHtml(templates.denial.body) %></div>
-          <input type="hidden" name="body" data-forum-body-input />
-          <button type="submit" class="primary-btn">Save Denial Letter</button>
-        </form>
+      <%# A real request: "All of these member settings are currently on
+          one page. They should be moved to their own tabs under member
+          settings for better viewing." Same in-page tab pattern views/
+          portal-profile.ejs already uses for its own Profile/Schedules/
+          Event Signups tabs - everything below was already fetched
+          together up front either way (routes/main-admin-members.js), so
+          switching sub-tabs is just which section is visible, no reload. %>
+      <div class="view-tabs no-print">
+        <a class="view-tab<%= settingsTab === 'grade-levels' ? ' active' : '' %>" href="/main-admin/members?tab=settings&settingsTab=grade-levels">Grade Level Settings</a>
+        <a class="view-tab<%= settingsTab === 'fee-payment' ? ' active' : '' %>" href="/main-admin/members?tab=settings&settingsTab=fee-payment">Membership Fee &amp; Payment</a>
+        <a class="view-tab<%= settingsTab === 'form-fields' ? ' active' : '' %>" href="/main-admin/members?tab=settings&settingsTab=form-fields">Membership Form Fields</a>
+        <a class="view-tab<%= settingsTab === 'approval-denial' ? ' active' : '' %>" href="/main-admin/members?tab=settings&settingsTab=approval-denial">Approval/Denial</a>
+        <a class="view-tab<%= settingsTab === 'handbook' ? ' active' : '' %>" href="/main-admin/members?tab=settings&settingsTab=handbook">Policy Handbook</a>
       </div>
 
-      <%# A real request: "there should be a place at the bottom of the
-          membership application to check a box after reading the policy
-          handbook. can't check the box until you have scrolled through
-          the entire handbook." What's written here is what a family
-          reads and must scroll through on the public application
-          (views/portal-register.ejs) before they can submit. %>
-      <div class="manage-section">
-        <h2>Policy Handbook</h2>
-        <form method="POST" action="/main-admin/members/settings/handbook" class="stack-form" data-forum-editor>
-          <%- include('partials/forum-editor-toolbar') %>
-          <div class="forum-editable" data-forum-editable contenteditable="true"><%- handbookHtml %></div>
-          <input type="hidden" name="handbookHtml" data-forum-body-input />
-          <button type="submit" class="primary-btn">Save Policy Handbook</button>
-        </form>
-      </div>
-
-      <%# A real request: "place at the bottom of the application for
-          payment." This app has no online "pay now" flow anywhere (see
-          utils/membershipHandbook.js's own comment) - what's saved here
-          is the fee amount and how a family actually pays, shown as
-          information on the application, not a checkout. %>
-      <div class="manage-section">
-        <h2>Membership Fee &amp; Payment</h2>
-        <form method="POST" action="/main-admin/members/settings/payment" class="stack-form">
-          <label>Membership Fee (USD)
-            <input type="number" name="feeDollars" min="0" step="0.01" value="<%= (paymentInfo.feeCents / 100).toFixed(2) %>" />
-          </label>
-          <label class="member-form-full">Payment Instructions
-            <textarea name="instructions" rows="4" placeholder="e.g. Pay by cash, check, or Venmo once your registration is approved."><%= paymentInfo.instructions %></textarea>
-          </label>
-          <button type="submit" class="primary-btn">Save Payment Info</button>
-        </form>
-      </div>
-
-      <%# A real request: "under members in main admin portal there
-          should be a settings tab for editing and adding parts of the
-          membership form." Admin-defined extra questions, shown on both
-          the admin-entered Membership Form/Add Member forms and the
-          public self-registration application. %>
-      <div class="manage-section">
-        <h2>Membership Form Fields</h2>
-        <%- include('partials/membership-fields-manager', { target: 'parent', label: 'Parent', fields: parentFormFields, fieldTypes }) %>
-        <%- include('partials/membership-fields-manager', { target: 'child', label: 'Student', fields: childFormFields, fieldTypes }) %>
-      </div>
+      <% if (settingsTab === 'grade-levels') { %>
+        <%# A real request: "Under member settings add a tab called grade
+            level settings. Here is a list of graded levels. Next to each
+            grade level is a date picker and another column for age.
+            Clean rows. Each row will say, if student is (age), by
+            (date/calendar picker), then they will be in (grade level)."
+            One row per utils/classSchedule.js's own GRADE_LEVELS (see
+            utils/gradeLevelSettings.js) - a reference list an admin
+            fills in and reads, not wired into the Grade Level dropdown
+            on the member form itself (still its own manual per-member
+            choice). %>
+        <div class="manage-section">
+          <h2>Grade Level Settings</h2>
+          <form method="POST" action="/main-admin/members/settings/grade-levels" class="stack-form">
+            <table class="roster-table">
+              <thead><tr><th>If student is&hellip;</th><th>&hellip;by this date&hellip;</th><th>&hellip;then they will be in</th></tr></thead>
+              <tbody>
+                <% gradeLevelRules.forEach(function(row) { %>
+                  <tr>
+                    <td>
+                      <input type="hidden" name="gradeLevel" value="<%= row.gradeLevel %>" />
+                      <input type="number" name="age" min="0" step="1" value="<%= row.age != null ? row.age : '' %>" placeholder="Age" /> years old
+                    </td>
+                    <td><input type="date" name="cutoffDate" value="<%= row.cutoffDate || '' %>" /></td>
+                    <td><%= row.gradeLevel %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+            <button type="submit" class="primary-btn">Save Grade Level Settings</button>
+          </form>
+        </div>
+      <% } else if (settingsTab === 'fee-payment') { %>
+        <%# A real request: "place at the bottom of the application for
+            payment." This app has no online "pay now" flow anywhere (see
+            utils/membershipHandbook.js's own comment) - what's saved
+            here is the fee amount and how a family actually pays, shown
+            as information on the application, not a checkout. %>
+        <div class="manage-section">
+          <h2>Membership Fee &amp; Payment</h2>
+          <form method="POST" action="/main-admin/members/settings/payment" class="stack-form">
+            <label>Membership Fee (USD)
+              <input type="number" name="feeDollars" min="0" step="0.01" value="<%= (paymentInfo.feeCents / 100).toFixed(2) %>" />
+            </label>
+            <label class="member-form-full">Payment Instructions
+              <textarea name="instructions" rows="4" placeholder="e.g. Pay by cash, check, or Venmo once your registration is approved."><%= paymentInfo.instructions %></textarea>
+            </label>
+            <button type="submit" class="primary-btn">Save Payment Info</button>
+          </form>
+        </div>
+      <% } else if (settingsTab === 'form-fields') { %>
+        <%# A real request: "under members in main admin portal there
+            should be a settings tab for editing and adding parts of the
+            membership form." Admin-defined extra questions, shown on
+            both the admin-entered Membership Form/Add Member forms and
+            the public self-registration application. %>
+        <div class="manage-section">
+          <h2>Membership Form Fields</h2>
+          <%- include('partials/membership-fields-manager', { target: 'parent', label: 'Parent', fields: parentFormFields, fieldTypes }) %>
+          <%- include('partials/membership-fields-manager', { target: 'child', label: 'Student', fields: childFormFields, fieldTypes }) %>
+        </div>
+      <% } else if (settingsTab === 'approval-denial') { %>
+        <%# A real request: "this will have an approval and deny letter
+            that can be edited by admin. these letters are sent
+            automatically went approve or deny buttons are clicked." A
+            second real request: "approval and denial messages should
+            have the same text editing icons we added to other chat
+            boxes" - same forum-editor-toolbar/forum-editor.js rich-text
+            component the Policy Handbook editor uses. %>
+        <%
+          // The two letters were plain text (newline-separated
+          // paragraphs) before this editor existed - dropped straight
+          // into a contenteditable div, a run of newlines collapses to a
+          // single space in HTML, losing the paragraph breaks on first
+          // load even though the underlying saved text is untouched.
+          // Detecting "no HTML tags yet" and turning newlines into real
+          // breaks only for that initial fill (not the stored value)
+          // keeps a legacy letter readable until the next save as HTML.
+          function toEditableHtml(text) {
+            if (/<[a-z][\s\S]*>/i.test(text || '')) return text;
+            const esc = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return esc.split(/\n{2,}/).map((p) => '<p>' + p.replace(/\n/g, '<br>') + '</p>').join('');
+          }
+        %>
+        <div class="manage-section">
+          <h2>Approval Letter</h2>
+          <form method="POST" action="/main-admin/members/settings/letters/approval" class="stack-form" data-forum-editor>
+            <label class="member-form-full">Subject
+              <input type="text" name="subject" value="<%= templates.approval.subject %>" required />
+            </label>
+            <%- include('partials/forum-editor-toolbar') %>
+            <div class="forum-editable" data-forum-editable contenteditable="true"><%- toEditableHtml(templates.approval.body) %></div>
+            <input type="hidden" name="body" data-forum-body-input />
+            <button type="submit" class="primary-btn">Save Approval Letter</button>
+          </form>
+        </div>
+        <div class="manage-section">
+          <h2>Denial Letter</h2>
+          <form method="POST" action="/main-admin/members/settings/letters/denial" class="stack-form" data-forum-editor>
+            <label class="member-form-full">Subject
+              <input type="text" name="subject" value="<%= templates.denial.subject %>" required />
+            </label>
+            <%- include('partials/forum-editor-toolbar') %>
+            <div class="forum-editable" data-forum-editable contenteditable="true"><%- toEditableHtml(templates.denial.body) %></div>
+            <input type="hidden" name="body" data-forum-body-input />
+            <button type="submit" class="primary-btn">Save Denial Letter</button>
+          </form>
+        </div>
+      <% } else { %>
+        <%# A real request: "there should be a place at the bottom of the
+            membership application to check a box after reading the
+            policy handbook. can't check the box until you have scrolled
+            through the entire handbook." What's written here is what a
+            family reads and must scroll through on the public
+            application (views/portal-register.ejs) before submitting. %>
+        <div class="manage-section">
+          <h2>Policy Handbook</h2>
+          <form method="POST" action="/main-admin/members/settings/handbook" class="stack-form" data-forum-editor>
+            <%- include('partials/forum-editor-toolbar') %>
+            <div class="forum-editable" data-forum-editable contenteditable="true"><%- handbookHtml %></div>
+            <input type="hidden" name="handbookHtml" data-forum-body-input />
+            <button type="submit" class="primary-btn">Save Policy Handbook</button>
+          </form>
+        </div>
+      <% } %>
     <% } %>
   </main>
   <script src="/js/permissions-edit-toggle.js"></script>

@@ -63,7 +63,7 @@ test('POST /main-admin/members/settings/membership-fields adds a field, shown on
   assert.equal(res.status, 302);
   assert.match(res.headers.location, /notice=/);
 
-  const settingsPage = await request(app).get('/main-admin/members?tab=settings').set('Cookie', cookie);
+  const settingsPage = await request(app).get('/main-admin/members?tab=settings&settingsTab=form-fields').set('Cookie', cookie);
   assert.match(settingsPage.text, /T-Shirt Size/);
   assert.match(settingsPage.text, /Medium/);
 

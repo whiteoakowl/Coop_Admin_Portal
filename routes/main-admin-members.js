@@ -60,6 +60,7 @@ const {
 const membershipApprovals = require('../utils/membershipApprovals');
 const membershipHandbook = require('../utils/membershipHandbook');
 const membershipFormFields = require('../utils/membershipFormFields');
+const gradeLevelSettings = require('../utils/gradeLevelSettings');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_members'));
@@ -123,6 +124,14 @@ function groupAttendanceByRoster(history) {
 // their own small, unrelated dataset instead.
 const MEMBERS_TABS = ['members', 'approvals', 'settings', 'archive'];
 
+// A real request: "Membership fee and payment should be its own tab...
+// Membership form fields should be its own tab... Approval/denial named
+// tab... Tab for policy handbook... grade level settings [tab]. All of
+// these member settings are currently on one page. They should be moved
+// to their own tabs." - nested tabs under the Settings tab above, in the
+// order the request listed them.
+const SETTINGS_SUBTABS = ['grade-levels', 'fee-payment', 'form-fields', 'approval-denial', 'handbook'];
+
 router.get('/', async (req, res) => {
   const activeTab = MEMBERS_TABS.includes(req.query.tab) ? req.query.tab : 'members';
 
@@ -137,15 +146,32 @@ router.get('/', async (req, res) => {
   }
 
   if (activeTab === 'settings') {
+    // A real request: "All of these member settings are currently on one
+    // page. They should be moved to their own tabs under member settings
+    // for better viewing." - a second, nested level of tabs (settingsTab)
+    // under this same top-level Settings tab, same in-page .view-tabs
+    // pattern views/portal-profile.ejs already uses for its own Profile/
+    // Schedules/Event Signups tabs. Everything's still fetched together
+    // either way (each one's its own small, cheap read) rather than
+    // re-querying per sub-tab switch.
+    const settingsTab = SETTINGS_SUBTABS.includes(req.query.settingsTab) ? req.query.settingsTab : SETTINGS_SUBTABS[0];
     return res.render('main-admin-members', {
       title: 'Members',
       activeTab,
+      settingsTab,
       templates: await membershipApprovals.getLetterTemplates(),
       handbookHtml: await membershipHandbook.getHandbookHtml(),
       paymentInfo: await membershipHandbook.getPaymentInfo(),
       parentFormFields: await membershipFormFields.listFields('parent'),
       childFormFields: await membershipFormFields.listFields('child'),
       fieldTypes: membershipFormFields.FIELD_TYPES,
+      // A real request: "Under member settings add a tab called grade
+      // level settings. Here is a list of graded levels. Next to each
+      // grade level is a date picker and another column for age... if
+      // student is (age), by (date), then they will be in (grade
+      // level)." One row per utils/classSchedule.js's own GRADE_LEVELS,
+      // in that order - see utils/gradeLevelSettings.js.
+      gradeLevelRules: await gradeLevelSettings.listGradeLevelRules(),
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -345,12 +371,12 @@ router.post('/settings/letters/:kind', async (req, res) => {
   const kind = req.params.kind;
   const subject = (req.body.subject || '').trim();
   const body = sanitizePostBody(req.body.body || '');
-  if (kind !== 'approval' && kind !== 'denial') return res.redirect('/main-admin/members?tab=settings');
+  if (kind !== 'approval' && kind !== 'denial') return res.redirect('/main-admin/members?tab=settings&settingsTab=approval-denial');
   if (!subject || !body) {
-    return res.redirect('/main-admin/members?tab=settings&error=' + encodeURIComponent('Subject and body are both required.'));
+    return res.redirect('/main-admin/members?tab=settings&settingsTab=approval-denial&error=' + encodeURIComponent('Subject and body are both required.'));
   }
   await membershipApprovals.updateLetterTemplate(kind, subject, body);
-  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent(`${kind === 'approval' ? 'Approval' : 'Denial'} letter saved.`));
+  res.redirect('/main-admin/members?tab=settings&settingsTab=approval-denial&notice=' + encodeURIComponent(`${kind === 'approval' ? 'Approval' : 'Denial'} letter saved.`));
 });
 
 // A real request: "there should be a place at the bottom of the
@@ -359,7 +385,7 @@ router.post('/settings/letters/:kind', async (req, res) => {
 // register.ejs) is admin-edited here.
 router.post('/settings/handbook', async (req, res) => {
   await membershipHandbook.setHandbookHtml(sanitizePostBody(req.body.handbookHtml || ''));
-  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Policy Handbook saved.'));
+  res.redirect('/main-admin/members?tab=settings&settingsTab=handbook&notice=' + encodeURIComponent('Policy Handbook saved.'));
 });
 
 // A real request: "place at the bottom of the application for payment."
@@ -370,7 +396,7 @@ router.post('/settings/payment', async (req, res) => {
   const dollars = parseFloat(req.body.feeDollars || '0');
   const feeCents = Number.isFinite(dollars) ? Math.round(dollars * 100) : 0;
   await membershipHandbook.setPaymentInfo(feeCents, (req.body.instructions || '').trim());
-  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Payment info saved.'));
+  res.redirect('/main-admin/members?tab=settings&settingsTab=fee-payment&notice=' + encodeURIComponent('Payment info saved.'));
 });
 
 // A real request: "under members in main admin portal there should be a
@@ -382,18 +408,35 @@ router.post('/settings/payment', async (req, res) => {
 router.post('/settings/membership-fields', async (req, res) => {
   const target = req.body.target === 'child' ? 'child' : 'parent';
   const id = await membershipFormFields.createField(target, req.body.label, req.body.fieldType, req.body.options, req.body.isRequired === '1');
-  if (!id) return res.redirect('/main-admin/members?tab=settings&error=' + encodeURIComponent('A field label is required.'));
-  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Field added.'));
+  if (!id) return res.redirect('/main-admin/members?tab=settings&settingsTab=form-fields&error=' + encodeURIComponent('A field label is required.'));
+  res.redirect('/main-admin/members?tab=settings&settingsTab=form-fields&notice=' + encodeURIComponent('Field added.'));
 });
 
 router.post('/settings/membership-fields/:id/update', async (req, res) => {
   await membershipFormFields.updateField(parseInt(req.params.id, 10), req.body.label, req.body.fieldType, req.body.options, req.body.isRequired === '1');
-  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Field saved.'));
+  res.redirect('/main-admin/members?tab=settings&settingsTab=form-fields&notice=' + encodeURIComponent('Field saved.'));
 });
 
 router.post('/settings/membership-fields/:id/delete', async (req, res) => {
   await membershipFormFields.deleteField(parseInt(req.params.id, 10));
-  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Field deleted.'));
+  res.redirect('/main-admin/members?tab=settings&settingsTab=form-fields&notice=' + encodeURIComponent('Field deleted.'));
+});
+
+// A real request: "Under member settings add a tab called grade level
+// settings. Here is a list of graded levels. Next to each grade level is
+// a date picker and another column for age... if student is (age), by
+// (date), then they will be in (grade level)." One combined save for
+// every row at once (parallel gradeLevel[]/age[]/cutoffDate[] arrays),
+// same shape as the Membership Form Fields list above being a single
+// list rather than one row = one request.
+router.post('/settings/grade-levels', async (req, res) => {
+  const gradeLevelList = [].concat(req.body.gradeLevel || []);
+  const ageList = [].concat(req.body.age || []);
+  const cutoffDateList = [].concat(req.body.cutoffDate || []);
+  await gradeLevelSettings.saveGradeLevelRules(
+    gradeLevelList.map((gradeLevel, i) => ({ gradeLevel, age: ageList[i], cutoffDate: cutoffDateList[i] }))
+  );
+  res.redirect('/main-admin/members?tab=settings&settingsTab=grade-levels&notice=' + encodeURIComponent('Grade Level Settings saved.'));
 });
 
 // --- Edit mode bulk actions (checkboxes + Actions dropdown on the

@@ -53,7 +53,7 @@ test('POST /main-admin/members/settings/handbook saves sanitized HTML shown on t
   assert.equal(res.status, 302);
   assert.match(res.headers.location, /notice=/);
 
-  const settingsPage = await request(app).get('/main-admin/members?tab=settings').set('Cookie', cookie);
+  const settingsPage = await request(app).get('/main-admin/members?tab=settings&settingsTab=handbook').set('Cookie', cookie);
   assert.match(settingsPage.text, /Be kind\./);
   assert.doesNotMatch(settingsPage.text, /<script>alert/);
 

@@ -62,7 +62,7 @@ test('POST /main-admin/members/settings/letters/approval sanitizes rich-text HTM
   assert.match(templates.approval.body, /<strong>welcome<\/strong>/);
   assert.doesNotMatch(templates.approval.body, /<script>/);
 
-  const settingsPage = await request(app).get('/main-admin/members?tab=settings').set('Cookie', cookie);
+  const settingsPage = await request(app).get('/main-admin/members?tab=settings&settingsTab=approval-denial').set('Cookie', cookie);
   assert.match(settingsPage.text, /<strong>welcome<\/strong>/);
 });
 
