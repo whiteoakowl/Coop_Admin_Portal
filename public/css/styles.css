@@ -4810,6 +4810,31 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 @media (max-width: 640px) {
   .committees-table { font-size: 0.78rem; }
   .committees-table th, .committees-table td { padding: 0.3rem 0.4rem; }
+  /* A real bug report: "edit button and trash button in same row. All
+     information for a committee should be on the same row." They
+     technically already were (one <tr> each), but the Name column's own
+     sticky/nowrap default (.roster-name-col) let a long committee name
+     stretch that one column past the whole viewport width, pushing
+     Leader/Volunteers/Enabled/Edit/Delete off past it entirely - nothing
+     short of scrolling sideways (not an obvious affordance here, unlike
+     a true roster view) showed them. Capping the Name column's width and
+     letting it wrap to a second line instead frees up enough room for
+     every other column to actually fit on screen together. */
+  .committees-table .roster-name-col { max-width: 7.5rem; white-space: normal; }
+  .committees-table .roster-action-btn-fit { padding: 0.3rem 0.45rem; font-size: 0.72rem; }
+  /* Edit/Delete were still stacking one above the other even with
+     roster-btn-row-nowrap on the wrapper - that class only ever declares
+     flex-wrap/overflow-x (never display), so it loses to this same
+     media query's own unscoped ".roster-btn-row { display: grid }" rule
+     (equal specificity, later in source always wins - the same cascade
+     trap already documented a few times elsewhere in this file). Scoped
+     higher specificity here to actually win it back. */
+  .committees-table .roster-btn-row { display: flex; }
+  .committees-table .roster-btn-row > .roster-action-btn,
+  .committees-table .roster-btn-row > form {
+    width: auto;
+    flex: 0 0 auto;
+  }
 }
 
 .settings-account-grid { display: flex; gap: 1.5rem; flex-wrap: wrap; }
