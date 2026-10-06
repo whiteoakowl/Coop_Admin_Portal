@@ -12,8 +12,6 @@
         <a class="btn-secondary" href="/admin/orientation/settings">Orientation Settings</a>
       </div>
     </div>
-    <p class="hint">Every family with a student registered for classes this semester, and their orientation progress. Click a circle to mark it complete/incomplete by hand - Tour and Open House are usually set from their own Check-In subpage instead.</p>
-
     <%# A real request: "Orientation gets a dropdown to pick which
         semester to view" - defaults to the newest semester (see
         resolveSemesterId in routes/admin-orientation.js); only shown
@@ -57,11 +55,11 @@
         ];
       %>
       <div class="roster-scroll">
-        <table class="roster-table members-table condensed-table">
+        <table class="roster-table members-table condensed-table orientation-table">
           <thead>
             <tr>
               <th></th>
-              <th>Member</th>
+              <th class="roster-name-col">Member</th>
               <th>Day</th>
               <% columns.forEach(function(col) { %>
                 <th class="orientation-col-center">

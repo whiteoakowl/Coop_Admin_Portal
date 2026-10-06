@@ -8313,6 +8313,51 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .orientation-dot-complete { background: var(--green); border-color: var(--green); }
 .orientation-dot-complete:hover { background: var(--green); border-color: var(--green); }
 
+/* A real request: "title row of column members should freeze with
+   member column." .roster-name-col is already sticky left:0 everywhere
+   (freezing the Member column itself on horizontal scroll) - this adds a
+   matching sticky top:0 header row scoped to this one table (same
+   .roster-view-page-style scoping other pages' own frozen-header/frozen-
+   column combo already uses), so scrolling either direction always
+   leaves both the header row and the Member column in view. The header's
+   own Member cell needs the z-index bump since it's sticky on BOTH axes
+   at once (the corner) and must render above every other sticky cell. */
+.orientation-table thead th { position: sticky; top: 0; z-index: 1; }
+.orientation-table thead .roster-name-col { z-index: 2; }
+
+/* A real request: "shrink the whole table on mobile to fit the entire
+   table in one mobile view" - same compacting treatment as .committees-
+   table/.registrations-table, plus shrinking the circles themselves
+   (the one thing on this table those don't have) so all 4 training/
+   check-in columns plus %/Date Completed stay readable without the
+   .roster-scroll wrapper needing to scroll sideways. */
+@media (max-width: 640px) {
+  .orientation-table { font-size: 0.6rem; }
+  .orientation-table th, .orientation-table td { padding: 0.15rem 0.15rem; }
+  .orientation-table .orientation-dot { width: 0.9rem; height: 0.9rem; }
+  .orientation-table .roster-drag-col { width: 0.8rem; }
+  /* The chevron toggle button's own default 2rem square (.icon-btn) was
+     the real floor under the arrow column's width - auto table layout
+     sizes a column to its widest cell across every row, not just the
+     (empty) header, so shrinking the th alone did nothing. */
+  .orientation-table .icon-btn { width: 1.1rem; height: 1.1rem; }
+  .orientation-table .icon-btn .icon { width: 0.7rem; height: 0.7rem; }
+  /* The Member column is the single biggest variable-width column (a
+     real name, not a short label) - letting it wrap to 2-3 lines instead
+     of forcing one unbroken nowrap line (.roster-table's own base rule)
+     is what actually buys back enough room for the rest of row to fit
+     without the table needing to scroll sideways. */
+  .orientation-table .roster-name-col { white-space: normal; max-width: 3.2rem; }
+  /* The 2-line stacked headers (Parent/Teacher Orientation, % Complete,
+     Date Completed) are the other main width driver - each column's
+     actual circle/percent/date content is much narrower than its own
+     header text, so the header is what table auto-layout is sizing the
+     whole column to. Shrinking just the header text (not the row data
+     below it, which stays readable at the table's own base mobile size)
+     lets every one of those columns shrink toward its real content. */
+  .orientation-table thead th { font-size: 0.52rem; line-height: 1.1; }
+}
+
 /* A real request: "Members are only listed once with arrow dropdown for
    children to expand and close" - public/js/orientation-toggle.js
    toggles the chevron rotation and the hidden attribute on the very next
