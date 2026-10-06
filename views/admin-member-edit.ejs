@@ -20,7 +20,46 @@
         class="member-edit-form member-edit-form-page"
         data-add-family-url="/admin/members/families/new"
       >
-        <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, gradeLevels }) %>
+        <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, gradeLevels, adminPositions, memberAdminPositionIds }) %>
+
+        <%# A real request: "Only main admin and co-op admin can change
+            sections, portal roles, family, and birthday." Same box as
+            Main Admin's own edit page (views/main-admin-member-edit.ejs),
+            minus the Password field - creating a portal account is still
+            Main Admin-only (see routes/main-admin-members.js's own "No
+            creating users" comment); Sections and Portal Roles themselves
+            were never actually restricted to Main Admin, just never
+            built out here - Co-op Admin already shows both read-only on
+            the Member Profile page (views/admin-member-profile.ejs). %>
+        <% if (mode === 'edit') { %>
+          <div class="manage-section">
+            <h2><svg class="icon"><use href="#icon-sliders"/></svg> Portal Settings</h2>
+
+            <p><strong>Sections</strong></p>
+            <% if (allSections.length === 0) { %>
+              <p class="hint">No sections defined yet.</p>
+            <% } else { %>
+              <div class="grade-pill-grid">
+                <% allSections.forEach(function(s) { %>
+                  <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= memberSectionIds.has(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
+                <% }); %>
+              </div>
+            <% } %>
+
+            <p><strong>Portal Roles</strong></p>
+            <% if (!portalAccount) { %>
+              <p class="hint">No portal account yet - an account has to be created from Main Admin &gt; Users before roles can be granted.</p>
+            <% } else if (allRoles.length === 0) { %>
+              <p class="hint">No roles defined yet.</p>
+            <% } else { %>
+              <div class="grade-pill-grid">
+                <% allRoles.forEach(function(r) { %>
+                  <label class="grade-pill"><input type="checkbox" name="roleIds" value="<%= r.id %>" <%= portalRoleIds.has(r.id) ? 'checked' : '' %> /> <%= r.label %></label>
+                <% }); %>
+              </div>
+            <% } %>
+          </div>
+        <% } %>
 
         <div class="member-form-footer">
           <div class="member-form-footer-edit">

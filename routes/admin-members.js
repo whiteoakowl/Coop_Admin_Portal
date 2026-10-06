@@ -32,7 +32,7 @@ const { buildCardPairs } = require('../utils/cardPairs');
 const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE, memberFamilyGroupKey } = require('../utils/pagination');
 const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions, adminPositionTitlesForMembers } = require('../utils/adminPositions');
-const { portalStatusForMembers, sectionIdsForMembers } = require('../utils/portalPermissions');
+const { portalStatusForMembers, sectionIdsForMembers, setMemberSections, setMemberRoles } = require('../utils/portalPermissions');
 const { resolveFamilyId, createParentMember, createChildMember, uploadIntakePhotos, parseArrayField } = require('../utils/memberIntake');
 const membershipFormFields = require('../utils/membershipFormFields');
 const memberImport = require('../utils/memberImport');
@@ -513,6 +513,15 @@ router.get('/members/:id/edit', async (req, res) => {
   const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
 
+  // A real request: "Only main admin and co-op admin can change sections,
+  // portal roles, family, and birthday." Family and Birthday were already
+  // admin-only (this is the only edit form that ever touches them), but
+  // Sections/Portal Roles were only ever readable here (see /members/:id
+  // above) - this is Co-op Admin gaining the same write access Main
+  // Admin's own edit page already has (views/main-admin-member-edit.ejs),
+  // minus Password/account-creation, which stays Main Admin-only (see
+  // routes/main-admin-members.js's own "No creating users" comment).
+  const portalStatus = (await portalStatusForMembers([id]))[id];
   res.render('admin-member-edit', {
     title: `Edit ${member.name}`,
     mode: 'edit',
@@ -522,6 +531,11 @@ router.get('/members/:id/edit', async (req, res) => {
     gradeLevels: GRADE_LEVELS,
     adminPositions: await listAdminPositions(),
     memberAdminPositionIds: await adminPositionIdsForMember(id),
+    allSections: await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all(),
+    memberSectionIds: (await sectionIdsForMembers([id]))[id],
+    portalAccount: portalStatus.account,
+    allRoles: await db.prepare('SELECT * FROM roles ORDER BY label').all(),
+    portalRoleIds: portalStatus.roleIds,
     error: req.query.error || null,
   });
 });
@@ -586,6 +600,19 @@ router.post('/members/:id/edit', uploadMemberPhoto((req) => `/admin/members/${re
   await clearVolunteerMembershipIfNotParent(id, f.memberType);
   await setMemberFamily(id, f.familyId);
   await setPrimaryParent(id, f.isPrimaryParent);
+
+  // Sections/Portal Roles - see this file's own GET /members/:id/edit
+  // comment on why Co-op Admin can now write these too, not just read
+  // them. setMemberRoles is already a no-op for a member with no portal
+  // account yet (utils/portalPermissions.js), same as Main Admin's own
+  // identical handling when no password is set in the same submit.
+  const sectionIds = [].concat(req.body.sectionIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  await setMemberSections(id, sectionIds);
+  const portalStatus = (await portalStatusForMembers([id]))[id];
+  if (portalStatus.account) {
+    const roleIds = [].concat(req.body.roleIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+    await setMemberRoles(id, roleIds, null);
+  }
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} updated.`));
 });

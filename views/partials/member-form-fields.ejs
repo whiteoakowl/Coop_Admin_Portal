@@ -161,17 +161,24 @@ const US_STATES = [
       <textarea name="medicalNotes" rows="3" placeholder="Enter any medical conditions, allergies, or important notes"><%= member.medical_notes || '' %></textarea>
     </div>
   </div>
-  <%# A real request: "No parent/student choice on membership forms or
-      profiles. All children are automatically counted as student and
-      adults counted as parents." Birthday is no longer student-only - it
-      has to be visible/editable for everyone now, since it's what decides
-      student vs. parent (see utils/dates.js's own isChildAge and this
-      form's own top comment); public/js/member-form.js listens for it
-      changing to re-theme the header and toggle Grade Level live. Grade
-      Level itself is still only meaningful for a student, so it stays
-      gated behind data-student-only. %>
+  <%# A real request: "We don't ask adults/parents for their birthday."
+      Reverses an earlier request that made Birthday visible/editable for
+      everyone so member type could be derived from it live - it's gated
+      the same condition Grade Level already uses (!isParent && !isAdmin),
+      but deliberately NOT marked data-student-only like Grade Level is:
+      that attribute is toggled live by public/js/member-form.js as the
+      Birthday field itself changes, and if Birthday carried it too, the
+      field would hide itself out from under an admin's cursor the moment
+      they finish typing a date that crosses the adult cutoff while
+      editing an existing student. Gating only on the member's type as
+      already stored (stable for the whole edit session) keeps the field
+      visible and stable throughout one continuous edit, and still means
+      an existing Parent/Admin's on-file value - if any, from before this
+      change - round-trips through a save unseen and unchanged rather
+      than being blanked out, since the input stays in the DOM (just
+      hidden), not disabled. %>
   <div class="class-form-row">
-    <div class="class-form-field">
+    <div class="class-form-field" data-birthday-field style="<%= (!isParent && !isAdmin) ? '' : 'display:none;' %>">
       <span class="class-form-field-label">Birthday</span>
       <input type="date" name="birthday" value="<%= member.birthday || '' %>" />
     </div>
