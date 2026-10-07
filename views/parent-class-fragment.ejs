@@ -25,29 +25,10 @@
     <img src="<%= classImageUrl %>" alt="" style="max-width: 100%; border-radius: var(--radius); display: block; margin-bottom: 0.75rem;" />
   <% } %>
 
-  <div class="class-view-info-row">
-    <div class="class-view-info-item">
-      <svg class="icon"><use href="#icon-calendar-check"/></svg>
-      <div>
-        <span class="class-view-info-label">Day &amp; Time</span>
-        <strong class="class-view-info-value">
-          <%= dayLabels[cls.day] || cls.day %>
-          <% if (cls.start_time || cls.end_time) { %><br /><%= cls.start_time || '?' %>&ndash;<%= cls.end_time || '?' %><% } %>
-        </strong>
-      </div>
-    </div>
-    <% if (cls.room) { %>
-      <div class="class-view-info-divider"></div>
-      <div class="class-view-info-item">
-        <svg class="icon"><use href="#icon-map-pin"/></svg>
-        <div>
-          <span class="class-view-info-label">Location</span>
-          <strong class="class-view-info-value">Room <%= cls.room %></strong>
-        </div>
-      </div>
-    <% } %>
-  </div>
-
+  <%# A real request: "move teacher to very top row" - the Teacher/
+      Assistant box used to sit below the Day & Time/Location row; it's
+      the first thing a parent actually wants to know ("who's teaching
+      this"), so it leads now, directly under the header/image. %>
   <% if (teacherNames.length || assistantNames.length) { %>
     <div class="class-view-people-box">
       <% if (teacherNames.length) { %>
@@ -72,6 +53,16 @@
     </div>
   <% } %>
 
+  <%# A real request: "Enrollment on class registration should say status
+      and show open or closed for if the class is simply open or closed
+      for registration. Move this row to the top row." - Enrollment used
+      to show the enrolled-count-over-capacity number (now just "Students"
+      further down, the Students/Assistants/Waitlist row already computes
+      that same enrolledCount/cls.capacity math); this row instead answers
+      the simpler, more urgent question of whether registration is even
+      open at all right now (cls.registration_open - the same flag
+      registerControl()/the Teacher-Assistant box below already gate on),
+      and moved up to be the first info row, right under the Teacher box. %>
   <div class="class-view-info-row">
     <% if (gradeLabel) { %>
       <div class="class-view-info-item">
@@ -84,23 +75,14 @@
       <div class="class-view-info-divider"></div>
     <% } %>
     <div class="class-view-info-item">
-      <svg class="icon"><use href="#icon-users"/></svg>
+      <svg class="icon"><use href="#icon-check-circle"/></svg>
       <div>
-        <span class="class-view-info-label">Enrollment</span>
-        <%# A real request: "students registered should show 0/12 - first
-            number is how many signed up, 2nd number is max for the
-            class set by the class settings by admin" - this used to show
-            only "Open enrollment"/"Full"/"X seats left" here, none of
-            which actually gives the enrolled-count-over-capacity number
-            the Students row further down already computes (enrolledCount/
-            cls.capacity, straight off the admin's own Maximum Students
-            field) - reused here instead of inventing a second copy of the
-            same math. %>
+        <span class="class-view-info-label">Status</span>
         <strong class="class-view-info-value">
-          <% if (cls.capacity == null) { %>
-            Open enrollment
+          <% if (cls.registration_open) { %>
+            <span class="badge-pill badge-pill-present">Open</span>
           <% } else { %>
-            <%= enrolledCount %> / <%= cls.capacity %><% if (isFull) { %> <span class="badge-pill badge-pill-absent">Full</span><% } %>
+            <span class="badge-pill badge-pill-absent">Closed</span>
           <% } %>
         </strong>
       </div>
@@ -112,6 +94,29 @@
         <div>
           <span class="class-view-info-label">Price</span>
           <strong class="class-view-info-value">$<%= (cls.price_cents / 100).toFixed(2) %> / student</strong>
+        </div>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="class-view-info-row">
+    <div class="class-view-info-item">
+      <svg class="icon"><use href="#icon-calendar-check"/></svg>
+      <div>
+        <span class="class-view-info-label">Day &amp; Time</span>
+        <strong class="class-view-info-value">
+          <%= dayLabels[cls.day] || cls.day %>
+          <% if (cls.start_time || cls.end_time) { %><br /><%= cls.start_time || '?' %>&ndash;<%= cls.end_time || '?' %><% } %>
+        </strong>
+      </div>
+    </div>
+    <% if (cls.room) { %>
+      <div class="class-view-info-divider"></div>
+      <div class="class-view-info-item">
+        <svg class="icon"><use href="#icon-map-pin"/></svg>
+        <div>
+          <span class="class-view-info-label">Location</span>
+          <strong class="class-view-info-value">Room <%= cls.room %></strong>
         </div>
       </div>
     <% } %>

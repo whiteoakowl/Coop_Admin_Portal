@@ -207,7 +207,7 @@ test('Class registration popup: redesigned card shows icon header, Day & Time/Lo
   assert.match(fragment.text, /class-view-people-box/);
   assert.match(fragment.text, /Teacher<\/span>/);
   assert.match(fragment.text, /Sandrine Powell/);
-  assert.match(fragment.text, /Grade Level<\/span>|Enrollment<\/span>/);
+  assert.match(fragment.text, /Grade Level<\/span>|Status<\/span>/);
   assert.match(fragment.text, /class-view-register-box/);
   assert.match(fragment.text, /Register your children/);
   assert.match(fragment.text, /<button type="submit" class="primary-btn primary-btn-dark">Register<\/button>/);

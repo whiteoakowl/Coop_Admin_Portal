@@ -7902,7 +7902,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .parent-class-child-name {
   font-weight: 600;
   color: var(--ink);
-  background: #fff;
+  /* A real request removed .class-view-register-box's own orange fill in
+     favor of a plain white card with a shadow - this pill's own white
+     background would otherwise blend straight into it with no visible
+     edge, so it gets a light neutral tint instead (same #f8fafc the
+     Teacher/Assistant box above already uses) to still read as its own
+     pill against the now-white box. */
+  background: #f8fafc;
   border-radius: 999px;
   padding: 0.5rem 0.75rem;
   display: inline-flex;
@@ -8008,7 +8014,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .class-attendance-table .status-badge { font-size: 0.72rem; padding: 0.15rem 0.5rem; }
 }
 
-.class-view-register-box { background: var(--orange-bg); border-radius: var(--radius); padding: 1.1rem 1rem; margin-top: 1.1rem; }
+/* A real request: "Remove orange from class registration boxes. Shadow
+   the background of the boxes to make them standout" - same white-
+   surface-plus-soft-shadow "standout card" pattern already used
+   elsewhere (e.g. the kiosk panel) instead of a solid color fill. */
+.class-view-register-box { background: var(--surface); border-radius: var(--radius); padding: 1.1rem 1rem; margin-top: 1.1rem; box-shadow: 0 4px 24px rgba(0,0,0,0.1); }
 .class-view-register-box h4 { margin: 0 0 0.75rem; display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; white-space: nowrap; }
 .class-view-register-box h4 .icon { width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
 .class-view-register-box .primary-btn-dark,
@@ -8071,22 +8081,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      padding (1rem each side, unchanged by this block) was eating real
      width this row needed more than the box did, so it gets a mobile-
      only trim here too alongside tighter name/badge/button sizing. */
-  .class-view-register-box { padding: 0.9rem 0.6rem; }
+  .class-view-register-box { padding: 0.9rem 0.45rem; }
   .class-view-register-box h4 { font-size: 0.88rem; gap: 0.35rem; }
   .class-view-register-box h4 .icon { width: 0.95rem; height: 0.95rem; }
-  .parent-class-child-row { gap: 0.3rem; }
-  .parent-class-child-name { padding: 0.3rem 0.55rem; font-size: 0.8rem; }
-  .class-view-register-box .badge-pill { font-size: 0.62rem; padding: 0.1rem 0.35rem; }
+  .parent-class-child-row { gap: 0.25rem; }
+  .parent-class-child-name { padding: 0.25rem 0.45rem; font-size: 0.78rem; }
+  .class-view-register-box .badge-pill { font-size: 0.58rem; padding: 0.08rem 0.28rem; }
   .class-view-register-box .primary-btn-dark,
-  .class-view-register-box .roster-action-btn-danger { padding: 0.32rem 0.5rem; font-size: 0.66rem; }
+  .class-view-register-box .roster-action-btn-danger { padding: 0.28rem 0.4rem; font-size: 0.62rem; }
   /* Same narrow-phone trim as the rest of this box - confirmed live the
      "Register as Teacher"/"Register as Assistant" buttons' own desktop
      padding/font (set just above, outside this breakpoint) was still too
      wide for both to share one row on a real ~390px phone without
      wrapping their label again. */
-  .class-view-register-box .actions-btn-row { gap: 0.3rem; }
+  .class-view-register-box .actions-btn-row { gap: 0.25rem; }
   .class-view-register-box .actions-btn-row .roster-action-btn,
-  .class-view-register-box .actions-btn-row .btn-secondary { padding: 0.42rem 0.3rem; font-size: 0.68rem; }
+  .class-view-register-box .actions-btn-row .btn-secondary { padding: 0.38rem 0.25rem; font-size: 0.64rem; }
 }
 
 /* Allergies/Medical log popup - reuses .class-view-dialog's chrome but
