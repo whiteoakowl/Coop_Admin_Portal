@@ -1296,7 +1296,23 @@ create table if not exists registration_windows (
   closes_at text,
   created_at text not null default now_text()
 );
-create index if not exists idx_registration_windows_role on registration_windows(role_key);
+-- Guarded (rather than a plain "create index if not exists") because
+-- 20261031010000_registration_windows_action_types.sql later drops
+-- role_key from this table - dropping a column also drops any index
+-- built solely on it, so replaying this file after that migration has
+-- already run once would otherwise recreate the index against a column
+-- that's gone (the same real bug report as store_product_options' own
+-- identical guard in 20260921010000_store_product_options.sql: "column
+-- does not exist" on a second full run).
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'registration_windows' and column_name = 'role_key'
+  ) then
+    create index if not exists idx_registration_windows_role on registration_windows(role_key);
+  end if;
+end $$;
 
 -- ===== 20260825040000_academic_records.sql =====
 -- Lessons/assignments/grading, diplomas, and transcripts - the last of
@@ -2187,7 +2203,23 @@ create table if not exists resource_links (
   created_by_account_id integer references member_accounts(id) on delete set null,
   created_at text not null default now_text()
 );
-create index if not exists idx_resource_links_role on resource_links(role_key);
+-- Guarded (rather than a plain "create index if not exists") because
+-- 20261108010000_resource_link_roles.sql later drops role_key from this
+-- table - dropping a column also drops any index built solely on it, so
+-- replaying this file after that migration has already run once would
+-- otherwise recreate the index against a column that's gone (the same
+-- real bug report as store_product_options' own identical guard in
+-- 20260921010000_store_product_options.sql: "column does not exist" on
+-- a second full run).
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'resource_links' and column_name = 'role_key'
+  ) then
+    create index if not exists idx_resource_links_role on resource_links(role_key);
+  end if;
+end $$;
 
 -- ===== 20260827030000_babysitter_directory.sql =====
 -- Babysitter Directory - a real request: "Add a Babysitter directory. It
@@ -3506,7 +3538,23 @@ alter table events add column if not exists payment_instructions_text text;
 -- windows, or a window that leaves these blank, sees no behavior change.
 alter table registration_windows add column if not exists day text check (day in ('monday', 'wednesday'));
 alter table registration_windows add column if not exists section_id integer references sections(id) on delete set null;
-create index if not exists idx_registration_windows_section on registration_windows(section_id);
+-- Guarded (rather than a plain "create index if not exists") because
+-- 20261031010000_registration_windows_action_types.sql later drops
+-- section_id from this table - dropping a column also drops any index
+-- built solely on it, so replaying this file after that migration has
+-- already run once would otherwise recreate the index against a column
+-- that's gone (the same real bug report as store_product_options' own
+-- identical guard in 20260921010000_store_product_options.sql: "column
+-- does not exist" on a second full run).
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'registration_windows' and column_name = 'section_id'
+  ) then
+    create index if not exists idx_registration_windows_section on registration_windows(section_id);
+  end if;
+end $$;
 
 -- ===== 20260930010000_class_chat_messages.sql =====
 -- A real request: "classes tabs, add class chat" - a simple message log
@@ -4170,8 +4218,22 @@ insert into store_settings (id) values (1) on conflict (id) do nothing;
 -- column, read by utils/training.js's own maybeFinalizeAttempt to
 -- auto-call setOrientationField whenever a member passes that training.
 -- link_url now needs to be nullable too, since a column can have a
--- linked training with no header URL at all.
-alter table orientation_settings alter column link_url drop not null;
+-- linked training with no header URL at all. Guarded because
+-- 20261102010000_orientation_settings_drop_link_url.sql later drops
+-- link_url entirely - replaying this file after that migration has
+-- already run once would otherwise try to alter a column that's gone
+-- (the same real bug report as store_product_options' own identical
+-- guard in 20260921010000_store_product_options.sql: "column does not
+-- exist" on a second full run).
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'orientation_settings' and column_name = 'link_url'
+  ) then
+    alter table orientation_settings alter column link_url drop not null;
+  end if;
+end $$;
 alter table orientation_settings add column if not exists training_id integer references trainings(id) on delete set null;
 
 -- ===== 20261024010000_kiosk_semester_scoping.sql =====
@@ -4442,10 +4504,24 @@ create table if not exists registration_window_sections (
 create index if not exists idx_registration_window_sections_section on registration_window_sections(section_id);
 
 -- Carry forward any existing single-section targeting into the new join
--- table before the old column goes away.
-insert into registration_window_sections (window_id, section_id)
-select id, section_id from registration_windows where section_id is not null
-on conflict (window_id, section_id) do nothing;
+-- table before the old column goes away. Guarded by an information_
+-- schema check (same real bug report as 20261005010000_store_option_
+-- groups.sql's own identical guard: running this whole consolidated file
+-- a second time - it's meant to be safe to replay in full - failed with
+-- "column section_id does not exist", since the first run's own DROP
+-- COLUMN below already removed it by the time this INSERT's query was
+-- re-parsed).
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'registration_windows' and column_name = 'section_id'
+  ) then
+    insert into registration_window_sections (window_id, section_id)
+    select id, section_id from registration_windows where section_id is not null
+    on conflict (window_id, section_id) do nothing;
+  end if;
+end $$;
 
 -- role_key (the old generic "Open For" role dropdown) and day (the
 -- never-widened 'monday'/'wednesday'-only column) are both fully
@@ -4546,11 +4622,25 @@ create table if not exists resource_link_roles (
   primary key (resource_link_id, role_key)
 );
 
-insert into resource_link_roles (resource_link_id, role_key)
-  select id, role_key from resource_links where role_key is not null
-  on conflict do nothing;
+-- Guarded by an information_schema check (same real bug report as
+-- 20261005010000_store_option_groups.sql's own identical guard: running
+-- this whole consolidated file a second time - it's meant to be safe to
+-- replay in full - failed with "column role_key does not exist", since
+-- the first run's own DROP COLUMN below already removed it by the time
+-- this INSERT's query was re-parsed).
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'resource_links' and column_name = 'role_key'
+  ) then
+    insert into resource_link_roles (resource_link_id, role_key)
+      select id, role_key from resource_links where role_key is not null
+      on conflict do nothing;
 
-alter table resource_links drop column if exists role_key;
+    alter table resource_links drop column if exists role_key;
+  end if;
+end $$;
 
 -- ===== 20261109010000_photo_albums_uploads_archive.sql =====
 -- A real request: "add a check box permission for members can add

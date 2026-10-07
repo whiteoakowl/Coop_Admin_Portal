@@ -30,10 +30,24 @@ create table if not exists registration_window_sections (
 create index if not exists idx_registration_window_sections_section on registration_window_sections(section_id);
 
 -- Carry forward any existing single-section targeting into the new join
--- table before the old column goes away.
-insert into registration_window_sections (window_id, section_id)
-select id, section_id from registration_windows where section_id is not null
-on conflict (window_id, section_id) do nothing;
+-- table before the old column goes away. Guarded by an information_
+-- schema check (same real bug report as 20261005010000_store_option_
+-- groups.sql's own identical guard: running this whole consolidated file
+-- a second time - it's meant to be safe to replay in full - failed with
+-- "column section_id does not exist", since the first run's own DROP
+-- COLUMN below already removed it by the time this INSERT's query was
+-- re-parsed).
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'registration_windows' and column_name = 'section_id'
+  ) then
+    insert into registration_window_sections (window_id, section_id)
+    select id, section_id from registration_windows where section_id is not null
+    on conflict (window_id, section_id) do nothing;
+  end if;
+end $$;
 
 -- role_key (the old generic "Open For" role dropdown) and day (the
 -- never-widened 'monday'/'wednesday'-only column) are both fully

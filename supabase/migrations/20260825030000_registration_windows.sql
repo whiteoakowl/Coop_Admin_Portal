@@ -17,4 +17,20 @@ create table if not exists registration_windows (
   closes_at text,
   created_at text not null default now_text()
 );
-create index if not exists idx_registration_windows_role on registration_windows(role_key);
+-- Guarded (rather than a plain "create index if not exists") because
+-- 20261031010000_registration_windows_action_types.sql later drops
+-- role_key from this table - dropping a column also drops any index
+-- built solely on it, so replaying this file after that migration has
+-- already run once would otherwise recreate the index against a column
+-- that's gone (the same real bug report as store_product_options' own
+-- identical guard in 20260921010000_store_product_options.sql: "column
+-- does not exist" on a second full run).
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'registration_windows' and column_name = 'role_key'
+  ) then
+    create index if not exists idx_registration_windows_role on registration_windows(role_key);
+  end if;
+end $$;
