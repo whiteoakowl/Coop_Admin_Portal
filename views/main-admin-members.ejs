@@ -518,21 +518,23 @@
         <div class="manage-section">
           <h2>Grade Level Settings</h2>
           <form method="POST" action="/main-admin/members/settings/grade-levels" class="stack-form">
-            <table class="roster-table">
-              <thead><tr><th>If student is&hellip;</th><th>&hellip;by this date&hellip;</th><th>&hellip;then they will be in</th></tr></thead>
-              <tbody>
-                <% gradeLevelRules.forEach(function(row) { %>
-                  <tr>
-                    <td>
-                      <input type="hidden" name="gradeLevel" value="<%= row.gradeLevel %>" />
-                      <input type="number" name="age" min="0" step="1" value="<%= row.age != null ? row.age : '' %>" placeholder="Age" /> years old
-                    </td>
-                    <td><input type="date" name="cutoffDate" value="<%= row.cutoffDate || '' %>" /></td>
-                    <td><%= row.gradeLevel %></td>
-                  </tr>
-                <% }); %>
-              </tbody>
-            </table>
+            <div class="roster-scroll">
+              <table class="roster-table condensed-table grade-level-settings-table">
+                <thead><tr><th>If student is&hellip;</th><th>&hellip;by this date&hellip;</th><th>&hellip;then they will be in</th></tr></thead>
+                <tbody>
+                  <% gradeLevelRules.forEach(function(row) { %>
+                    <tr>
+                      <td class="grade-level-settings-age-cell">
+                        <input type="hidden" name="gradeLevel" value="<%= row.gradeLevel %>" />
+                        <input type="number" name="age" min="0" step="1" value="<%= row.age != null ? row.age : '' %>" placeholder="Age" /> years old
+                      </td>
+                      <td><input type="date" name="cutoffDate" value="<%= row.cutoffDate || '' %>" /></td>
+                      <td><%= row.gradeLevel %></td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
             <button type="submit" class="primary-btn">Save Grade Level Settings</button>
           </form>
         </div>

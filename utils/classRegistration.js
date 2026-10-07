@@ -72,12 +72,15 @@ async function staffCountsForClass(classId) {
 }
 
 // Self-signup as a class's teacher/assistant - originally Teacher
-// Portal's own "Sign Up to Teach" page only, now shared with Parent
-// Portal's own class view too (a real request: a parent looking at a
-// class that still needs an assistant should be able to register
-// themselves for it right there, without needing the separate 'teacher'
-// portal role Teacher Portal itself still requires) - both call this
-// exact same function so neither drifts from the other. Writes directly
+// Portal's own "Sign Up to Teach" page only, called from Parent Portal's
+// own class view too once a parent could register themselves right
+// there without the separate 'teacher' portal role Teacher Portal
+// required. A follow-up request ("Teacher portal should not have that
+// feature at all") then removed Teacher Portal's own copy of the
+// feature entirely, so Parent Portal's POST /classes/:id/join is now the
+// only caller - this function stays its own module rather than folding
+// back into routes/parent-portal.js, since nothing about it is Parent-
+// Portal-specific. Writes directly
 // to class_staff, the EXISTING teacher/assistant model admin-assigned
 // staff already uses - self-signup and admin-assignment are the same
 // table, just two different ways a row gets added. `member` is the

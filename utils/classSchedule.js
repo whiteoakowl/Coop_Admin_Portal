@@ -640,7 +640,15 @@ async function createClass(fields) {
       fields.startDate || null,
       fields.endDate || null,
       fields.capacity || null,
-      fields.registrationOpen ? 1 : 0,
+      // Default-open like every sibling field below (allowParentRegister
+      // etc.) rather than default-closed - a real bug report: a brand
+      // new class could never be self-signed-up for no matter what
+      // Registration Schedule said, because the Create Class form
+      // (views/partials/class-schedule-grid.ejs) and the bulk Class
+      // Schedule Import route both omit this field entirely, and the old
+      // `fields.registrationOpen ? 1 : 0` silently read that omission as
+      // closed.
+      fields.registrationOpen === false ? 0 : 1,
       fields.description || null,
       fields.supplyList || null,
       fields.allowParentRegister === false ? 0 : 1,

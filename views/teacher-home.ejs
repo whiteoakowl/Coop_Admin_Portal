@@ -42,7 +42,7 @@
 
     <p class="hint">Your classes and their rosters.</p>
     <% if (classes.length === 0) { %>
-      <p class="roster-empty">You're not staffed on any classes yet. Contact an admin if this looks wrong. <a href="/teacher/browse-classes">Sign up to teach a class &rarr;</a></p>
+      <p class="roster-empty">You're not staffed on any classes yet. Contact an admin if this looks wrong.</p>
     <% } else { %>
       <div class="portal-dashboard-grid">
         <% classes.forEach(function(c) { %>
@@ -56,7 +56,6 @@
           </section>
         <% }); %>
       </div>
-      <p><a href="/teacher/browse-classes">+ Sign up to teach another class</a></p>
     <% } %>
   </main>
 </body>

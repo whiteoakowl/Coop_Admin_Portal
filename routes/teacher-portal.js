@@ -11,8 +11,7 @@ const path = require('path');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
-const { allClassesList, removeStaff } = require('../utils/classSchedule');
-const { joinClassAsStaff } = require('../utils/classRegistration');
+const { allClassesList } = require('../utils/classSchedule');
 const {
   assignmentsForClass,
   getAssignment,
@@ -93,76 +92,6 @@ router.get('/classes', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const classes = await classesForTeacher(member);
   res.render('teacher-classes', { title: 'My Classes', classes });
-});
-
-// Batch version for the "Sign Up to Teach" browse page below - that page
-// used to call staffCountsForClass once per open class in a loop, a real
-// N+1 (one query per class shown, every time a teacher browses open
-// classes). One GROUP BY query covering every open class instead. Returns
-// { [classId]: { teacher, assistant } }, defaulting a class with no staff
-// rows at all to { teacher: 0, assistant: 0 } same as the single version.
-async function staffCountsForClasses(classIds) {
-  const counts = {};
-  classIds.forEach((id) => {
-    counts[id] = { teacher: 0, assistant: 0 };
-  });
-  if (classIds.length === 0) return counts;
-  const placeholders = classIds.map(() => '?').join(',');
-  const rows = await db.prepare(`SELECT class_id AS "classId", role, COUNT(*) AS c FROM class_staff WHERE class_id IN (${placeholders}) GROUP BY class_id, role`).all(...classIds);
-  rows.forEach((r) => {
-    counts[r.classId][r.role] = Number(r.c);
-  });
-  return counts;
-}
-
-router.get('/browse-classes', async (req, res) => {
-  const member = await memberForAccount(req.portalAccount.id);
-  const myClasses = await classesForTeacher(member);
-  const myClassIds = new Set(myClasses.map((c) => c.id));
-
-  const openClasses = (await allClassesList(null)).filter((c) => c.registration_open && !myClassIds.has(c.id));
-  const countsByClass = await staffCountsForClasses(openClasses.map((c) => c.id));
-
-  res.render('teacher-browse-classes', {
-    title: 'Sign Up to Teach',
-    openClasses,
-    myClasses,
-    countsByClass,
-    error: req.query.error || null,
-    notice: req.query.notice || null,
-  });
-});
-
-// Self-signup as a teacher or assistant on a class - a real request:
-// "teachers and class assistants will be able to register" for a class
-// themselves. The actual logic (joinClassAsStaff) is shared with Parent
-// Portal's own class view, which got this same self-signup capability
-// later (a real request: a parent viewing a class that still needs an
-// assistant should be able to register themselves right there, not need
-// this separate 'teacher' portal role) - see utils/classRegistration.js's
-// own header comment on that function.
-router.post('/classes/:id/join', async (req, res) => {
-  const classId = parseInt(req.params.id, 10);
-  const role = req.body.role === 'assistant' ? 'assistant' : 'teacher';
-  const back = '/teacher/browse-classes';
-  const member = await memberForAccount(req.portalAccount.id);
-  const result = await joinClassAsStaff({ classId, member, accountId: req.portalAccount.id, portalRoles: req.portalRoles, role });
-  if (!result.ok) return res.redirect(back + '?error=' + encodeURIComponent(result.error));
-  res.redirect(back + '?notice=' + encodeURIComponent(result.notice));
-});
-
-router.post('/classes/:id/leave', async (req, res) => {
-  const classId = parseInt(req.params.id, 10);
-  const back = '/teacher/browse-classes';
-  const member = await memberForAccount(req.portalAccount.id);
-  if (!member) return res.redirect(back + '?error=' + encodeURIComponent('No profile found for your account.'));
-
-  // removeStaff (not a raw DELETE) so a self-signup that paid to join a
-  // 'students_and_staff'-priced class (see the /classes/:id/join route
-  // below) gets the same unpaid-charge cleanup admin-side removal already
-  // gets, rather than leaving an orphaned pending charge behind.
-  await removeStaff(classId, member.id);
-  res.redirect(back + '?notice=' + encodeURIComponent('Removed from that class.'));
 });
 
 router.get('/classes/:id', async (req, res) => {

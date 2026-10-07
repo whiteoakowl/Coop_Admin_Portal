@@ -225,10 +225,11 @@
       teacher/assistant should be able to register THEMSELVES for it
       right here - previously only possible via the separate Teacher
       Portal, which required the account to already have a 'teacher'
-      portal role. Same POST /parent/classes/:id/join route (and
-      joinClassAsStaff) Teacher Portal's own "Sign Up to Teach" page
-      posts to, so slots/registration-window rules can't drift between
-      the two. %>
+      portal role. This is now the ONLY self-signup path - a follow-up
+      request ("Teacher portal should not have that feature at all")
+      removed Teacher Portal's own former "Sign Up to Teach" page and
+      its join/leave routes outright, since keeping both only risked
+      the two drifting apart. %>
   <% if (cls.registration_open) { %>
     <div class="class-view-register-box">
       <h4><svg class="icon"><use href="#icon-user"/></svg> Register as Teacher/Assistant</h4>

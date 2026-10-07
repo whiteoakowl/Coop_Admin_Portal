@@ -338,12 +338,16 @@ router.get('/classes/:id/fragment', async (req, res) => {
 
   // A real request: a parent looking at a class that still needs a
   // teacher/assistant should be able to register THEMSELVES for it right
-  // here, not need the separate 'teacher' portal role Teacher Portal's
-  // own "Sign Up to Teach" page requires - see POST /classes/:id/join
-  // below and utils/classRegistration.js's own joinClassAsStaff, shared
-  // with that page. myStaffRole is this account's own member row, not a
-  // child's, same distinction registerForClass's studentId vs this
-  // route's member draws.
+  // here, not need a separate 'teacher' portal role - see POST
+  // /classes/:id/join below and utils/classRegistration.js's own
+  // joinClassAsStaff. This is now the ONLY self-signup path - a follow-up
+  // request ("they should be able to signup under parent portal not
+  // teacher portal. Teacher portal should not have that feature at
+  // all") removed Teacher Portal's own former "Sign Up to Teach" page
+  // and its /browse-classes, /classes/:id/join, /classes/:id/leave
+  // routes outright, rather than keeping both. myStaffRole is this
+  // account's own member row, not a child's, same distinction
+  // registerForClass's studentId vs this route's member draws.
   const member = await memberForAccount(req.portalAccount.id);
   const myStaffRole = member ? (staff.find((s) => s.id === member.id) || {}).role || null : null;
   const classScheduleId = await classScheduleIdForClass(cls);

@@ -343,7 +343,18 @@ router.post('/class-schedule/classes/new', requireFullAdmin, async (req, res) =>
     startTime: (req.body.startTime || '').trim(),
     endTime: (req.body.endTime || '').trim(),
     capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
-    registrationOpen: req.body.registrationOpen === '1',
+    // A real bug report: a parent couldn't self-signup to teach/assist a
+    // brand new class no matter what Registration Schedule said, because
+    // registrationOpen was moved off this Create Class form onto the
+    // Edit dialog's own "Close Registration" checkbox (admin-class-
+    // schedule-manage.ejs) - same move registrationFieldsFromBody's own
+    // comment above describes for allowParentRegister/allowTeacherRegister
+    // - but unlike those two, this field read req.body.registrationOpen
+    // === '1' with no absent-field default, so every brand new class
+    // silently landed registration_open = false (closed) with no way to
+    // open it from this form at all. Defaults to open, same as every
+    // other field this form no longer submits.
+    registrationOpen: req.body.registrationOpen === undefined ? true : req.body.registrationOpen === '1',
     description: sanitizePostBody(req.body.description || ''),
     ...registrationFieldsFromBody(req.body),
   });

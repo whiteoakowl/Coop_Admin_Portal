@@ -21,7 +21,7 @@
     <h1>Classes</h1>
 
     <% if (classes.length === 0) { %>
-      <p class="roster-empty">You're not staffed on any classes yet. <a href="/teacher/browse-classes">Sign up to teach a class &rarr;</a></p>
+      <p class="roster-empty">You're not staffed on any classes yet.</p>
     <% } else { %>
       <div class="portal-dashboard-grid">
         <% classes.forEach(function(c) { %>
@@ -36,7 +36,6 @@
         <% }); %>
       </div>
     <% } %>
-    <p><a href="/teacher/browse-classes">+ Sign up to teach another class</a></p>
   </main>
 </body>
 </html>

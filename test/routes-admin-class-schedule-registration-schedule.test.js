@@ -301,29 +301,60 @@ test('A section-scoped registration window only gates registration for classes r
   assert.match(gatedReg.headers.location, /notice=/);
 });
 
-test('Teacher Portal self-signup is also gated by a registration window (previously had zero enforcement)', async () => {
+// Self-signup as a class's Teacher/Assistant lives only on Parent Portal
+// now (a real request: "they should be able to signup under parent
+// portal not teacher portal. Teacher portal should not have that
+// feature at all") - routes/teacher-portal.js's own /browse-classes,
+// /classes/:id/join and /classes/:id/leave were removed outright, and
+// POST /parent/classes/:id/join (shared joinClassAsStaff logic) is the
+// only way left to self-signup, so an ordinary parent account (no
+// 'teacher' portal role at all) is what exercises this below.
+test('Parent Portal self-signup to teach/assist is also gated by a registration window (previously had zero enforcement)', async () => {
   await clearWindows();
   const { createWindow } = require('../utils/registrationWindows');
   await createWindow({ label: 'Not Open Yet', opensAt: '2099-01-01 00:00:00', closesAt: null, actionTypes: ['parent_teacher'] });
 
   const admin = await loginAsAdmin();
   const cls = await createClass(admin, { className: 'Teacher Gated Class' });
-  const teacher = await createTeacherAccount();
+  const parent = await createParentWithChild();
 
   const blocked = await request(app)
-    .post(`/teacher/classes/${cls.id}/join`)
-    .set('Cookie', teacher.cookie)
+    .post(`/parent/classes/${cls.id}/join`)
+    .set('Cookie', parent.cookie)
     .type('form')
-    .send({ role: 'teacher', _csrf: teacher.csrfToken });
+    .send({ role: 'teacher', day: 'monday', _csrf: parent.csrfToken });
   assert.match(decodeURIComponent(blocked.headers.location), /Registration is not open for your account yet/);
 
   await clearWindows();
   const allowed = await request(app)
+    .post(`/parent/classes/${cls.id}/join`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ role: 'teacher', day: 'monday', _csrf: parent.csrfToken });
+  assert.match(decodeURIComponent(allowed.headers.location), /notice=/);
+});
+
+test('Teacher Portal no longer exposes any self-signup route or page', async () => {
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'No Teacher Self Signup Class' });
+  const teacher = await createTeacherAccount();
+
+  const browse = await request(app).get('/teacher/browse-classes').set('Cookie', teacher.cookie);
+  assert.equal(browse.status, 404);
+
+  const join = await request(app)
     .post(`/teacher/classes/${cls.id}/join`)
     .set('Cookie', teacher.cookie)
     .type('form')
     .send({ role: 'teacher', _csrf: teacher.csrfToken });
-  assert.match(decodeURIComponent(allowed.headers.location), /notice=/);
+  assert.equal(join.status, 404);
+
+  const leave = await request(app)
+    .post(`/teacher/classes/${cls.id}/leave`)
+    .set('Cookie', teacher.cookie)
+    .type('form')
+    .send({ _csrf: teacher.csrfToken });
+  assert.equal(leave.status, 404);
 });
 
 // A real bug report: a co-op checked only "Parents can register for
@@ -346,32 +377,77 @@ test('A window scoped to only "parent_teacher"/"parent_assistant" does not block
 
   const admin = await loginAsAdmin();
   const cls = await createClass(admin, { className: 'Independent Action Types Class' });
-  const teacher = await createTeacherAccount();
+  const parent = await createParentWithChild();
 
   const teacherAllowed = await request(app)
-    .post(`/teacher/classes/${cls.id}/join`)
-    .set('Cookie', teacher.cookie)
+    .post(`/parent/classes/${cls.id}/join`)
+    .set('Cookie', parent.cookie)
     .type('form')
-    .send({ role: 'teacher', _csrf: teacher.csrfToken });
+    .send({ role: 'teacher', day: 'monday', _csrf: parent.csrfToken });
   assert.match(decodeURIComponent(teacherAllowed.headers.location), /notice=/);
 
   await db.prepare('DELETE FROM class_staff WHERE class_id = ?').run(cls.id);
   const assistantAllowed = await request(app)
-    .post(`/teacher/classes/${cls.id}/join`)
-    .set('Cookie', teacher.cookie)
+    .post(`/parent/classes/${cls.id}/join`)
+    .set('Cookie', parent.cookie)
     .type('form')
-    .send({ role: 'assistant', _csrf: teacher.csrfToken });
+    .send({ role: 'assistant', day: 'monday', _csrf: parent.csrfToken });
   assert.match(decodeURIComponent(assistantAllowed.headers.location), /notice=/);
 
   // The real bug: a parent registering their own child, an action this
   // window never checked, must stay open exactly as if no window
   // existed at all - not get swept up as "closed by default" just
   // because a DIFFERENT action now has its own window.
-  const parent = await createParentWithChild();
   const parentReg = await request(app)
     .post(`/parent/classes/${cls.id}/register`)
     .set('Cookie', parent.cookie)
     .type('form')
     .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
   assert.match(parentReg.headers.location, /notice=/);
+});
+
+// A real bug report: "I still can't signup as a parent for teaching or
+// assisting. It says its not unlocked, but it is" - traced to a brand
+// new class always landing registration_open = 0 (closed) regardless of
+// Registration Schedule, since the real "Add Class" form (views/
+// partials/class-schedule-grid.ejs) never submits a registrationOpen
+// field at all (that checkbox lives only on the Edit dialog's "Close
+// Registration" - admin-class-schedule-manage.ejs) and the old `fields.
+// registrationOpen ? 1 : 0` in utils/classSchedule.js's createClass read
+// that absence as closed. This test deliberately does NOT use this
+// file's own createClass(admin, overrides) helper above, which has
+// always forced registration_open = 1 by hand right after creating -
+// exactly the kind of workaround that was masking this bug - and posts
+// to the real route directly instead, the same way an admin's browser
+// actually would.
+test('A brand new class defaults to registration_open = 1 (open), so a parent can self-signup to teach/assist it with no extra step', async () => {
+  await clearWindows();
+  const { createWindow } = require('../utils/registrationWindows');
+  await createWindow({ label: 'Staff Open Now', opensAt: '2020-01-01 00:00:00', closesAt: null, actionTypes: ['parent_teacher', 'parent_assistant'] });
+
+  const admin = await loginAsAdmin();
+  await request(app)
+    .post('/admin/class-schedule/classes/new')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({
+      day: 'monday',
+      className: 'Freshly Created Class',
+      hourPosition: '1',
+      room: 'Room A',
+      color: '#EE9A4D',
+      startTime: '9:00 AM',
+      endTime: '9:45 AM',
+      _csrf: admin.csrfToken,
+    });
+  const cls = await db.prepare("SELECT * FROM classes WHERE class_name = 'Freshly Created Class'").get();
+  assert.equal(Number(cls.registration_open), 1, 'a brand new class should default to registration open');
+
+  const parent = await createParentWithChild();
+  const joined = await request(app)
+    .post(`/parent/classes/${cls.id}/join`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ role: 'teacher', day: 'monday', _csrf: parent.csrfToken });
+  assert.match(decodeURIComponent(joined.headers.location), /notice=/);
 });

@@ -4802,6 +4802,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .admins-table th, .admins-table td { padding: 0.3rem 0.4rem; }
 }
 
+/* Main Admin Members > Settings > Grade Level Settings - a real
+   request: "shrink table and text to fit on mobile. All in one view" -
+   17 rows (one per utils/classSchedule.js's own GRADE_LEVELS) of fairly
+   long sentence-style headers ("If student is... by this date... then
+   they will be in") plus a fixed-width date input (.stack-form input
+   [type="date"]'s own 192px) easily ran wider than a phone screen.
+   Headers/cells wrap instead of the site-wide .roster-table nowrap
+   default, and both inputs shrink at narrow widths so the whole table
+   (not just its text) actually fits without a sideways scroll. */
+.grade-level-settings-table th, .grade-level-settings-table td { white-space: normal; }
+.grade-level-settings-age-cell input[type="number"] { width: 4.5rem; display: inline-block; }
+@media (max-width: 640px) {
+  .grade-level-settings-table { font-size: 0.78rem; }
+  .grade-level-settings-table th, .grade-level-settings-table td { padding: 0.35rem 0.5rem; }
+  .grade-level-settings-age-cell input[type="number"] { width: 3.5rem; }
+  .grade-level-settings-table input[type="date"] { width: 8.5rem; }
+}
+
 /* Main Admin Volunteers > Committees list - a real request: "shrink
    columns and table for cleaner view on desktop and especially
    mobile." Same compacting treatment as .admins-table/.registrations-
