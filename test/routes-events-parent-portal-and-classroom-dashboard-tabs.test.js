@@ -200,10 +200,10 @@ test('Classroom Dashboard Details tab has Teacher(s), Description, and Cost per 
 
   const detail = await request(app).get(`/parent/classes/dashboard/${cls.id}?studentId=${parent.childId}`).set('Cookie', parent.cookie);
   assert.equal(detail.status, 200);
-  assert.match(detail.text, /<strong>Teacher\(s\):<\/strong> Classroom Tabs Teacher/);
-  assert.match(detail.text, /<strong>Description:<\/strong>/);
+  assert.match(detail.text, /<span class="class-view-info-label">Teacher\(s\)<\/span>\s*<strong class="class-view-info-value">Classroom Tabs Teacher/);
+  assert.match(detail.text, /Class Description/);
   assert.match(detail.text, /A fun class about fun things\./);
-  assert.match(detail.text, /<strong>Cost per Student:<\/strong> \$25\.00/);
+  assert.match(detail.text, /<span class="class-view-info-label">Cost per Student<\/span>\s*<strong class="class-view-info-value">\$25\.00/);
 
   // Tab order: Details, Assignments, Lessons, Attendance, then Grades last.
   const tabOrder = ['Details', 'Assignments', 'Lessons', 'Attendance', 'Grades'];

@@ -23,9 +23,15 @@
     <% } %>
 
     <div class="filter-row no-print">
+      <%# A real request: "add icons at the top for grid view vs list
+          view of classes like co-op class portal." %>
+      <div class="class-schedule-view-toggle" role="group" aria-label="Grid or list view">
+        <a class="icon-btn<%= view === 'grid' ? ' icon-btn-active' : '' %>" href="/parent/classes?day=<%= day %>&view=grid" aria-pressed="<%= view === 'grid' %>" aria-label="Grid view" title="Grid view"><svg class="icon"><use href="#icon-grid"/></svg></a>
+        <a class="icon-btn<%= view === 'list' ? ' icon-btn-active' : '' %>" href="/parent/classes?day=<%= day %>&view=list" aria-pressed="<%= view === 'list' %>" aria-label="List view" title="List view"><svg class="icon"><use href="#icon-clipboard-list"/></svg></a>
+      </div>
       <div class="day-toggle schedule-day-toggle">
         <% activeDays.forEach(function (d) { %>
-          <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/parent/classes?day=<%= d %>"><%= dayLabels[d] %></a>
+          <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/parent/classes?day=<%= d %>&view=<%= view %>"><%= dayLabels[d] %></a>
         <% }); %>
       </div>
       <%# A real request: "Parents can filter classes by grade level and
@@ -59,72 +65,51 @@
       <% } %>
     </div>
 
-    <div class="roster-scroll">
-      <table class="roster-table class-schedule-room-grid">
-        <thead>
-          <tr>
-            <th class="class-schedule-room-col">Room</th>
-            <% roomGrid.hours.forEach(function(h) { %>
-              <th><%= h.label %></th>
-            <% }); %>
-          </tr>
-        </thead>
-        <tbody>
-          <% if (roomGrid.rows.length === 0) { %>
-            <tr><td colspan="<%= roomGrid.hours.length + 1 %>" class="roster-empty">No classes have been scheduled yet.</td></tr>
-          <% } %>
-          <% roomGrid.rows.forEach(function(row) { %>
+    <% if (view === 'list') { %>
+      <div class="parent-class-list">
+        <% if (classList.length === 0) { %>
+          <p class="roster-empty">No classes have been scheduled yet.</p>
+        <% } else { %>
+          <% classList.forEach(function(cls) { %>
+            <%- include('partials/parent-class-card', { cls, day, view, enrolledClassIds }) %>
+          <% }); %>
+        <% } %>
+      </div>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table class-schedule-room-grid">
+          <thead>
             <tr>
-              <td class="class-schedule-room-col"><%= row.room %></td>
-              <% row.cells.forEach(function(cell) { %>
-                <td colspan="<%= cell.span %>" class="class-schedule-cell">
-                  <% if (cell.classes.length === 0) { %>
-                    &nbsp;
-                  <% } else { %>
-                    <% cell.classes.forEach(function(cls) { %>
-                      <button
-                        type="button"
-                        class="class-card class-card-clickable"
-                        style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 42%, white);"
-                        data-view-class="<%= cls.id %>"
-                        data-view-class-day="<%= day %>"
-                        data-class-grade-list="<%= (cls.age_group || '').split(',').map(function(g) { return g.trim(); }).filter(Boolean).join(',') %>"
-                      >
-                        <%# A real request: "the class image should show on
-                            the left side of the class card on the parent
-                            and student portal" - .class-card-thumb-row
-                            wraps the card's existing content so the photo
-                            (when this class has one) sits to its left; a
-                            class with no photo just renders the content
-                            div alone, same as before this change. %>
-                        <div class="class-card-thumb-row">
-                          <% if (cls.classImageUrl) { %>
-                            <img class="class-card-thumb" src="<%= cls.classImageUrl %>" alt="" />
-                          <% } %>
-                          <div class="class-card-thumb-content">
-                            <div class="class-card-header">
-                              <h3><%= cls.class_name %></h3>
-                              <% if (enrolledClassIds.indexOf(cls.id) !== -1) { %>
-                                <span class="badge-pill badge-pill-present" title="One of your children is enrolled">Registered</span>
-                              <% } %>
-                            </div>
-                            <div class="class-card-info">
-                              <% if (cls.gradeLabel) { %><p class="class-card-line"><%= cls.gradeLabel %></p><% } %>
-                              <p class="class-card-line"><span class="class-card-line-label">Teacher:</span> <%= cls.teacherNames.length ? cls.teacherNames.join(', ') : '—' %></p>
-                              <% if (cls.room) { %><p class="class-card-line"><span class="class-card-line-label">Room:</span> <%= cls.room %></p><% } %>
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    <% }); %>
-                  <% } %>
-                </td>
+              <th class="class-schedule-room-col">Room</th>
+              <% roomGrid.hours.forEach(function(h) { %>
+                <th><%= h.label %></th>
               <% }); %>
             </tr>
-          <% }); %>
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            <% if (roomGrid.rows.length === 0) { %>
+              <tr><td colspan="<%= roomGrid.hours.length + 1 %>" class="roster-empty">No classes have been scheduled yet.</td></tr>
+            <% } %>
+            <% roomGrid.rows.forEach(function(row) { %>
+              <tr>
+                <td class="class-schedule-room-col"><%= row.room %></td>
+                <% row.cells.forEach(function(cell) { %>
+                  <td colspan="<%= cell.span %>" class="class-schedule-cell">
+                    <% if (cell.classes.length === 0) { %>
+                      &nbsp;
+                    <% } else { %>
+                      <% cell.classes.forEach(function(cls) { %>
+                        <%- include('partials/parent-class-card', { cls, day, view, enrolledClassIds }) %>
+                      <% }); %>
+                    <% } %>
+                  </td>
+                <% }); %>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
   </main>
 
   <dialog id="parent-class-dialog" class="parent-class-dialog"></dialog>

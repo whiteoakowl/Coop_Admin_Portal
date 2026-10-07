@@ -152,6 +152,34 @@ test('a cancelled charge no longer counts toward balance and its status never ch
   assert.equal(after.status, 'cancelled');
 });
 
+// Coverage for a real request: "find a member should be search member.
+// Same row as search member there is a search bar for typing member
+// name." The old <select> of every member (for jumping to one with no
+// charge history yet, to add its first charge) is now a typed search
+// that widens the Main Admin list below to ANY matching active member,
+// not just ones who already have charges.
+test('Main Admin Accounting home: Search Member finds an active member with no charge history yet, and View still works for them', async () => {
+  const admin = await loginAsMainAdmin();
+  const parent = await createParentAccount();
+
+  // Every active member (charge history or not) legitimately appears in
+  // this page's own +Invoice/+Payment member-picker dialogs - the
+  // assertion below is scoped to the roster TABLE's own row link, not
+  // the whole page, so it isn't tripped up by that.
+  const noQuery = await request(app).get('/main-admin/accounting').set('Cookie', admin.cookie);
+  assert.doesNotMatch(noQuery.text, new RegExp(`>Parent ${familyCounter}</a>`));
+  assert.match(noQuery.text, /placeholder="Search member&hellip;"/);
+  assert.doesNotMatch(noQuery.text, /Find a member/);
+
+  const searched = await request(app).get(`/main-admin/accounting?q=Parent ${familyCounter}`).set('Cookie', admin.cookie);
+  assert.match(searched.text, new RegExp(`>Parent ${familyCounter}</a>`));
+  assert.match(searched.text, new RegExp(`/main-admin/accounting/members/${parent.memberId}`));
+
+  const memberPage = await request(app).get(`/main-admin/accounting/members/${parent.memberId}`).set('Cookie', admin.cookie);
+  assert.equal(memberPage.status, 200);
+  assert.match(memberPage.text, /No charges yet/);
+});
+
 test('an account only ever sees its own family\'s charges, not another family\'s', async () => {
   const admin = await loginAsMainAdmin();
   const parentA = await createParentAccount();

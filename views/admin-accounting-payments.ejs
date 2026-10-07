@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Payments</h1>
+    <p class="hint">Every payment recorded against a charge, across every member, newest first.</p>
+
+    <% if (rows.length === 0) { %>
+      <p class="roster-empty">No payments recorded yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr>
+              <th>Member</th>
+              <th>For</th>
+              <th>Amount</th>
+              <th>Note</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(p) { %>
+              <tr>
+                <td><a href="/main-admin/accounting/members/<%= p.member_id %>"><%= p.memberName %></a></td>
+                <td><%= p.chargeDescription %></td>
+                <td><%= formatCents(p.amount_cents) %></td>
+                <td><%= p.note || '' %></td>
+                <td><%= p.created_at %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

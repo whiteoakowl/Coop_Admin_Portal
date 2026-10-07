@@ -27,6 +27,7 @@ const {
   attendanceHistoryForRoster,
   GRADE_LEVELS,
   classScheduleIdForClass,
+  parseClockMinutesLocal,
 } = require('../utils/classSchedule');
 const { CLASS_DAY_ORDER } = require('../utils/classDays');
 const { getHandbookHtml } = require('../utils/membershipHandbook');
@@ -52,6 +53,7 @@ const {
   getQuizAttempt,
   submitQuizAttempt,
   contentItemsForAssignment,
+  markLessonItemComplete,
 } = require('../utils/academics');
 const notifications = require('../utils/notifications');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('../utils/sections');
@@ -231,9 +233,19 @@ function classesBackUrl(day) {
 // seeing on the grid (and still show an already-enrolled child, added
 // straight through Co-op Admin's own roster tools) - only the fragment
 // dialog's own register controls actually gate on it.
+// A real request: "add icons at the top for grid view vs list view of
+// classes like co-op class portal" - the room/hour grid (default) is
+// hard to scan on a narrow phone since every class card still has to
+// fit inside one grid cell; List view flattens the same day's classes,
+// sorted by actual start time, into one simple top-to-bottom stack
+// instead - the Filter panel's own client-side grade filtering (public/
+// js/parent-class-filters.js, matching on each card's own data-class-
+// grade-list attribute) still works unchanged since it's the identical
+// .class-card markup either way.
 router.get('/classes', async (req, res) => {
   const activeDays = await listActiveClassDays();
   const day = activeDays.includes(req.query.day) ? req.query.day : (activeDays[0] || 'monday');
+  const view = req.query.view === 'list' ? 'list' : 'grid';
   const children = await childrenForAccount(req.portalAccount);
   const childIds = children.map((c) => c.id);
 
@@ -251,13 +263,23 @@ router.get('/classes', async (req, res) => {
   const windowOpen = await isRegistrationOpenForAccount(req.portalRoles, { actionType: 'parent_register_student' });
   const nextWindow = windowOpen ? null : await nextWindowForAccount(req.portalRoles, { actionType: 'parent_register_student' });
 
+  const roomGrid = await roomGridForDay(day);
+  const classList =
+    view === 'list'
+      ? roomGrid.rows
+          .flatMap((row) => row.cells.flatMap((cell) => cell.classes))
+          .sort((a, b) => (parseClockMinutesLocal(a.start_time) ?? 0) - (parseClockMinutesLocal(b.start_time) ?? 0) || a.class_name.localeCompare(b.class_name))
+      : [];
+
   res.render('parent-classes', {
     title: 'Class Registration',
     day,
+    view,
     activeDays,
     dayLabels: CLASS_DAY_LABELS_FULL,
     hours: await hoursForDay(day),
-    roomGrid: await roomGridForDay(day),
+    roomGrid,
+    classList,
     hasChildren: children.length > 0,
     children,
     gradeLevels: GRADE_LEVELS,
@@ -649,9 +671,11 @@ router.post('/classes/dashboard/:id/chat', async (req, res) => {
 // children is enrolled in, AND that class has to have allow_parent_
 // complete_lessons on - either failing gets the same 404 a nonexistent
 // quiz would, so this route can't be used to probe which classes exist.
-async function contentItemForParent(req, contentItemId) {
+async function contentItemForParent(req, contentItemId, { requireQuiz = true } = {}) {
   const contentItem = await getContentItem(contentItemId);
-  if (!contentItem || contentItem.type !== 'quiz') return null;
+  if (!contentItem) return null;
+  if (requireQuiz && contentItem.type !== 'quiz') return null;
+  if (!requireQuiz && contentItem.type === 'quiz') return null;
   const assignment = await db.prepare('SELECT * FROM class_assignments WHERE id = ?').get(contentItem.assignment_id);
   if (!assignment) return null;
   const children = await childrenForAccount(req.portalAccount);
@@ -687,6 +711,19 @@ router.post('/content/:id/quiz', async (req, res) => {
   });
   await submitQuizAttempt({ contentItemId: contentItem.id, studentId: selectedChild.id, answers });
   res.redirect(`/parent/classes/dashboard/${assignment.class_id}?tab=lessons&studentId=${selectedChild.id}&notice=` + encodeURIComponent('Quiz submitted.'));
+});
+
+// "Mark Complete" for a video/text/file/assignment_upload content item -
+// the parent-side counterpart to routes/student-portal.js's own
+// /content/:id/complete, same allow_parent_complete_lessons gate the
+// quiz routes above already use.
+router.post('/content/:id/complete', async (req, res) => {
+  const found = await contentItemForParent(req, parseInt(req.params.id, 10), { requireQuiz: false });
+  if (!found) return res.status(404).render('404', { title: 'Not Found' });
+  const { contentItem, assignment, selectedChild } = found;
+  if (assignment.open_date && assignment.open_date > todayISO()) return res.status(404).render('404', { title: 'Not Found' });
+  await markLessonItemComplete(contentItem.id, selectedChild.id);
+  res.redirect(`/parent/classes/dashboard/${assignment.class_id}?tab=lessons&studentId=${selectedChild.id}`);
 });
 
 // A real request: "Policy Handbook" as one of the Classes tab's

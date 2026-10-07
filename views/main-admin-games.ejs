@@ -16,7 +16,7 @@
         <p class="roster-empty">No scores logged yet.</p>
       <% } else { %>
         <div class="roster-scroll">
-          <table class="roster-table condensed-table">
+          <table class="roster-table condensed-table fun-admin-table">
             <thead><tr><th>Game</th><th>Top Player</th><th>Score</th></tr></thead>
             <tbody>
               <% topScores.forEach(function(s) { %>
@@ -38,7 +38,7 @@
         <p class="roster-empty">No games played yet.</p>
       <% } else { %>
         <div class="roster-scroll">
-          <table class="roster-table condensed-table">
+          <table class="roster-table condensed-table fun-admin-table">
             <thead><tr><th>Player</th><th>Game</th><th>Played At</th></tr></thead>
             <tbody>
               <% recentPlays.forEach(function(p) { %>

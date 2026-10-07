@@ -16,7 +16,7 @@
         <p class="roster-empty">No rounds played yet.</p>
       <% } else { %>
         <div class="roster-scroll">
-          <table class="roster-table condensed-table">
+          <table class="roster-table condensed-table fun-admin-table">
             <thead><tr><th>Rank</th><th>Name</th><th>Points</th></tr></thead>
             <tbody>
               <% topPlayers.forEach(function(p) { %>
@@ -42,7 +42,7 @@
       <div class="manage-section">
         <div class="grid-box-header"><h2><%= list.label %> Word List (<%= list.words.length %>)</h2></div>
         <div class="roster-scroll">
-          <table class="roster-table condensed-table">
+          <table class="roster-table condensed-table fun-admin-table">
             <thead><tr><th>Word</th><th>Clue</th></tr></thead>
             <tbody>
               <% list.words.forEach(function(w) { %>

@@ -8,38 +8,43 @@
 // A later real request ("all classes should have a delete button and
 // view class button on each row to the right... you can now cancel the
 // class on the classroom dashboard") replaced the whole-card link with
-// explicit View Class / Delete buttons - the card body itself is no
-// longer clickable, since Delete needed its own separate click target
-// right next to View Class rather than living inside one. A parent's
-// teaching card has nowhere to click through to at all yet (that detail
-// route is student-enrollment-only) and isn't a registration to
-// withdraw from either, so it still renders with no action row.
+// explicit View Class / Delete buttons. A further real request ("Class
+// card should not have view class button, you should be able to just
+// click the class card to view. Delete button should say withdraw and
+// be much smaller.") restores the whole-card click target - the color
+// bar + body are wrapped in their own link instead, so the small
+// Withdraw button can keep living beside it as its own separate click
+// target without also triggering navigation. A parent's teaching card
+// has nowhere to click through to at all yet (that detail route is
+// student-enrollment-only) and isn't a registration to withdraw from
+// either, so it still renders with no link/action row.
 %>
 <div class="class-dash-card">
-  <div class="class-dash-card-color-bar" style="background:<%= c.color %>"></div>
-  <div class="class-dash-card-body">
-    <% if (c.classImageUrl) { %>
-      <img class="class-dash-card-image" src="<%= c.classImageUrl %>" alt="" />
-    <% } else { %>
-      <span class="class-dash-card-image class-dash-card-image-placeholder"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
-    <% } %>
-    <div class="class-dash-card-text">
-      <h3 class="class-dash-card-title"><%= c.class_name %></h3>
-      <p class="class-dash-card-meta"><%= c.timeLabel %></p>
-      <p class="class-dash-card-meta"><%= c.room || 'No room set' %></p>
-      <p class="class-dash-card-meta">Teacher: <%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
+  <% if (selectedChild) { %><a class="class-dash-card-link" href="/parent/classes/dashboard/<%= c.id %>?studentId=<%= selectedChild.id %>"><% } %>
+    <div class="class-dash-card-color-bar" style="background:<%= c.color %>"></div>
+    <div class="class-dash-card-body">
+      <% if (c.classImageUrl) { %>
+        <img class="class-dash-card-image" src="<%= c.classImageUrl %>" alt="" />
+      <% } else { %>
+        <span class="class-dash-card-image class-dash-card-image-placeholder"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
+      <% } %>
+      <div class="class-dash-card-text">
+        <h3 class="class-dash-card-title"><%= c.class_name %></h3>
+        <p class="class-dash-card-meta"><%= c.timeLabel %></p>
+        <p class="class-dash-card-meta"><%= c.room || 'No room set' %></p>
+        <p class="class-dash-card-meta">Teacher: <%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
+      </div>
     </div>
-  </div>
+  <% if (selectedChild) { %></a><% } %>
   <% if (selectedChild) { %>
     <div class="class-dash-card-actions">
-      <a class="roster-action-btn" href="/parent/classes/dashboard/<%= c.id %>?studentId=<%= selectedChild.id %>">View Class</a>
       <button
         type="button"
-        class="roster-action-btn roster-action-btn-danger"
+        class="roster-action-btn roster-action-btn-danger roster-action-btn-small"
         data-withdraw-class-btn
         data-withdraw-class-url="/parent/classes/<%= c.id %>/unregister"
         data-withdraw-student-id="<%= selectedChild.id %>"
-      >Delete</button>
+      >Withdraw</button>
     </div>
   <% } %>
 </div>

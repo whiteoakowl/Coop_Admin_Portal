@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Accounting Logs</h1>
+    <p class="hint">Every payment recorded, refund issued, or charge cancelled - the same audit trail <a href="/main-admin/audit-log">Audit Log</a> keeps for every feature, pre-filtered to Accounting.</p>
+
+    <% if (entries.length === 0) { %>
+      <p class="roster-empty">Nothing recorded yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table">
+          <thead>
+            <tr>
+              <th>Action</th>
+              <th>Detail</th>
+              <th>By</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% entries.forEach(function(e) { %>
+              <tr>
+                <td><%= e.action.replace(/_/g, ' ') %></td>
+                <td><%= e.detail || '' %></td>
+                <td><%= e.actor_email || '—' %></td>
+                <td><%= e.created_at %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

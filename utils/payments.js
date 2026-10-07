@@ -81,6 +81,37 @@ async function balanceForMember(memberId) {
   return owed;
 }
 
+// Every charge across every member - Accounting's own Invoices subpage
+// (one invoice per existing payment_charges row, per the answered design
+// question: "one invoice per existing charge" rather than inventing a
+// separate order/invoice table). `status` optionally narrows to one of
+// payment_charges' own CHECK-constraint values.
+async function allCharges(status) {
+  const charges = status
+    ? await db.prepare('SELECT c.*, m.name AS "memberName" FROM payment_charges c JOIN members m ON m.id = c.member_id WHERE c.status = ? ORDER BY c.created_at DESC').all(status)
+    : await db.prepare('SELECT c.*, m.name AS "memberName" FROM payment_charges c JOIN members m ON m.id = c.member_id ORDER BY c.created_at DESC').all();
+  for (const c of charges) c.amountPaid = await amountPaidForCharge(c.id);
+  return charges;
+}
+
+// Every real payment/refund row across every member, for Accounting's own
+// Payments and Adjustments subpages - "payments" (money actually
+// received, amount_cents > 0) and "adjustments" (refunds/corrections,
+// amount_cents < 0) read the exact same payment_payments table, just
+// split by that sign the way recalculateStatus above already does to
+// tell a refund apart from a payment.
+async function allPayments(direction) {
+  const cmp = direction === 'refund' ? '<' : '>';
+  return db
+    .prepare(
+      `SELECT p.*, c.member_id AS "member_id", m.name AS "memberName", c.description AS "chargeDescription" FROM payment_payments p
+       JOIN payment_charges c ON c.id = p.charge_id
+       JOIN members m ON m.id = c.member_id
+       WHERE p.amount_cents ${cmp} 0 ORDER BY p.created_at DESC`
+    )
+    .all();
+}
+
 async function receiptHistoryForMember(memberId) {
   return db
     .prepare(
@@ -106,6 +137,8 @@ module.exports = {
   cancelCharge,
   chargesForMember,
   balanceForMember,
+  allCharges,
+  allPayments,
   receiptHistoryForMember,
   formatCents,
 };

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Accounting Settings</h1>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Payment Methods</h2></div>
+      <p class="hint">One per line. These are the choices Record Payment offers when an admin logs how a payment actually came in.</p>
+      <form method="POST" action="/main-admin/accounting/settings/payment-methods" class="stack-form">
+        <textarea name="methods" rows="6"><%= methods.join('\n') %></textarea>
+        <div class="member-form-footer">
+          <div class="member-form-footer-edit">
+            <button type="submit" class="primary-btn">Save</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+</body>
+</html>

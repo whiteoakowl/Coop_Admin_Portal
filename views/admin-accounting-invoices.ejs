@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Invoices</h1>
+    <p class="hint">One invoice per charge on record - the same charges each member's own Account page shows, listed here across everyone.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <div class="roster-btn-row accounting-list-toolbar no-print">
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('new-invoice-dialog').showModal()">+ Invoice</button>
+    </div>
+
+    <form method="GET" action="/main-admin/accounting/invoices" class="roster-btn-row no-print" style="margin-bottom: 1rem;">
+      <select name="status" onchange="this.form.submit()">
+        <option value="">All Statuses</option>
+        <option value="pending" <%= status === 'pending' ? 'selected' : '' %>>Pending</option>
+        <option value="paid" <%= status === 'paid' ? 'selected' : '' %>>Paid</option>
+        <option value="cancelled" <%= status === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
+        <option value="refunded" <%= status === 'refunded' ? 'selected' : '' %>>Refunded</option>
+        <option value="partially_refunded" <%= status === 'partially_refunded' ? 'selected' : '' %>>Partially Refunded</option>
+      </select>
+      <% if (memberId) { %>
+        <input type="hidden" name="memberId" value="<%= memberId %>" />
+        <span class="badge-pill badge-pill-gray">Filtered to one member - <a href="/main-admin/accounting/invoices<%= status ? '?status=' + status : '' %>">clear</a></span>
+      <% } %>
+    </form>
+
+    <% if (invoices.length === 0) { %>
+      <p class="roster-empty">No invoices match.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr>
+              <th>Invoice #</th>
+              <th>Member</th>
+              <th>Description</th>
+              <th>Amount</th>
+              <th>Paid</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% invoices.forEach(function(c) { %>
+              <tr>
+                <td>#<%= c.id %></td>
+                <td><a href="/main-admin/accounting/members/<%= c.member_id %>"><%= c.memberName %></a></td>
+                <td><%= c.description %></td>
+                <td><%= formatCents(c.amount_cents) %></td>
+                <td><%= formatCents(c.amountPaid) %></td>
+                <td><span class="badge-pill badge-pill-<%= c.status === 'paid' ? 'green' : c.status === 'cancelled' || c.status === 'refunded' ? 'gray' : 'orange' %>"><%= c.status.replace('_', ' ') %></span></td>
+                <td><%= c.created_at %></td>
+                <td><a class="icon-btn" href="/main-admin/accounting/members/<%= c.member_id %>?autoprint=1" aria-label="Print invoice #<%= c.id %>" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <dialog id="new-invoice-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/accounting/invoices">
+        <h3>New Invoice</h3>
+        <label>Member
+          <select name="memberId" required>
+            <option value="">Select a member&hellip;</option>
+            <% allMembers.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
+          </select>
+        </label>
+        <label>Description
+          <input type="text" name="description" placeholder="e.g. Registration Fee" required />
+        </label>
+        <label>Amount ($)
+          <input type="number" name="amount" min="0.01" step="0.01" required />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

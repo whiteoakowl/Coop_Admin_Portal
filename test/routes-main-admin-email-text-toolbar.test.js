@@ -14,6 +14,11 @@
 // boxes should be below filter and create email buttons" - Filter/Create
 // Email now lead their own .email-toolbar-row, Select All/Select None
 // follow in a second .email-toolbar-row right under it.
+//
+// A further real request removed Select None entirely ("remove select
+// none option") - unchecking Select All (or any individual row) already
+// clears a selection, so the separate momentary checkbox was redundant.
+// Only Select All remains in that second row now.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -54,13 +59,13 @@ function checkToolbar(text) {
   // "select all and select none check boxes should be below filter and
   // create email buttons" - their own row, right after Filter/Create's.
   assert.match(selectRow, /<label class="checkbox-option email-select-all"><input type="checkbox" id="email-select-all" \/> Select All<\/label>/);
-  assert.match(selectRow, /<label class="checkbox-option email-select-none"><input type="checkbox" id="email-select-none" \/> Select None<\/label>/);
-  assert.ok(text.indexOf(filterRow) < text.indexOf(selectRow), 'Filter/Create row should come before the Select All/None row');
+  assert.doesNotMatch(selectRow, /Select None/);
+  assert.ok(text.indexOf(filterRow) < text.indexOf(selectRow), 'Filter/Create row should come before the Select All row');
   // No more combined select-all/none checkbox living in the table's own header cell.
   assert.doesNotMatch(text, /<th><input type="checkbox" id="email-select-all"/);
 }
 
-test('Main Admin Email tab: Select All/Select None checkboxes and Filter/Create Email buttons share one toolbar row, same button class', async () => {
+test('Main Admin Email tab: Select All checkbox and Filter/Create Email buttons share one toolbar row, same button class', async () => {
   const cookie = await loginAsMainAdmin();
   const res = await request(app).get('/main-admin/announcements/email').set('Cookie', cookie);
   assert.equal(res.status, 200);

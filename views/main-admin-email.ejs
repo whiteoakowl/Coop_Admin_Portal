@@ -34,15 +34,17 @@
     <form method="POST" action="/main-admin/announcements/email/compose" id="email-select-form">
       <%# A real request: "select all and select none check boxes should
           be below filter and create email buttons" - Filter/Create Email
-          lead the toolbar now, Select All/None moved to their own row
-          underneath. %>
+          lead the toolbar now, Select All moved to its own row
+          underneath. A later request: "remove select none option" -
+          unchecking Select All (or any individual row) already clears a
+          selection, so the separate momentary Select None checkbox was
+          redundant. %>
       <div class="roster-btn-row email-toolbar-row">
         <button type="button" class="roster-action-btn" onclick="document.getElementById('email-filter-dialog').showModal()">Filter</button>
         <button type="submit" class="roster-action-btn">Create Email</button>
       </div>
       <div class="roster-btn-row email-toolbar-row">
         <label class="checkbox-option email-select-all"><input type="checkbox" id="email-select-all" /> Select All</label>
-        <label class="checkbox-option email-select-none"><input type="checkbox" id="email-select-none" /> Select None</label>
       </div>
       <p class="hint" id="email-select-count"></p>
 

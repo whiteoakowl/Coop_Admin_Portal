@@ -49,12 +49,12 @@ test('Main Admin sidebar: sections with subpages render as an accordion group, n
   const res = await request(app).get('/main-admin').set('Cookie', cookie);
   assert.equal(res.status, 200);
 
-  ['Members', 'Communication', 'Events', 'Name Tags', 'Resource Links', 'Business Directory', 'Classifieds', 'Chat', 'Babysitters'].forEach((label) => {
+  ['Members', 'Accounting', 'Communication', 'Events', 'Name Tags', 'Resource Links', 'Business Directory', 'Classifieds', 'Chat', 'Babysitters'].forEach((label) => {
     assert.match(res.text, new RegExp(`<details class="admin-nav-group">\\s*<summary>[\\s\\S]*?${label}`), `${label} should be an accordion group`);
   });
 
   // Sections with no subpages stay plain links, unaffected.
-  assert.match(res.text, /<a href="\/main-admin\/accounting"[^>]*>[\s\S]*?Accounting<\/a>/);
+  assert.match(res.text, /<a href="\/main-admin\/forms"[^>]*>[\s\S]*?Custom Forms<\/a>/);
 });
 
 test('Main Admin sidebar: each accordion group lists its real subpages', async () => {
@@ -125,6 +125,7 @@ test('Mobile orange bar: every subpages-bearing item gets its own popup trigger 
 
   const sections = [
     { slug: 'members', tabCount: 4 },
+    { slug: 'accounting', tabCount: 7 },
     { slug: 'communication', tabCount: 4 },
     { slug: 'events', tabCount: 5 },
     { slug: 'chat', tabCount: 3 },

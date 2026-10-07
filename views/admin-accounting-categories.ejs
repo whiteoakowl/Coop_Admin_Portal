@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Accounting Categories</h1>
+    <p class="hint">A fixed list an event's Finance tab picks one of, for internal bookkeeping.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <form method="POST" action="/main-admin/accounting/accounting-categories" class="stack-form">
+      <div class="member-form-grid">
+        <label>Category Name
+          <input type="text" name="name" placeholder="e.g. Fundraising Revenue" required />
+        </label>
+      </div>
+      <div class="member-form-footer">
+        <div class="member-form-footer-edit">
+          <button type="submit" class="primary-btn">+ Add Accounting Category</button>
+        </div>
+      </div>
+    </form>
+
+    <% if (accountingCategories.length === 0) { %>
+      <p class="roster-empty">No accounting categories yet - add one above.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table">
+          <thead><tr><th>Category</th><th></th></tr></thead>
+          <tbody>
+            <% accountingCategories.forEach(function(c) { %>
+              <tr>
+                <td>
+                  <form method="POST" action="/main-admin/accounting/accounting-categories/<%= c.id %>/update" class="inline-block-form">
+                    <input type="text" name="name" value="<%= c.name %>" onchange="this.form.submit()" aria-label="Name for <%= c.name %>" />
+                  </form>
+                </td>
+                <td>
+                  <form method="POST" action="/main-admin/accounting/accounting-categories/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete this accounting category? Events using it will just show no category.">
+                    <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

@@ -6,7 +6,11 @@
     or off for different classes"). `lessons` comes from utils/
     academics.js's lessonsForStudentView. quizBasePath defaults to
     '/student' so existing callers that only ever passed canTakeQuiz
-    don't need to change. %>
+    don't need to change. canTakeQuiz also gates the plain "Mark
+    Complete" button below for non-quiz content - a real request:
+    "Student and parent portal you can't click on class lessons to
+    complete them" - video/text/file items had no completion action of
+    their own at all before this. %>
 <% var quizBasePathLocal = typeof quizBasePath !== 'undefined' ? quizBasePath : '/student'; %>
 <% var quizQueryLocal = typeof quizQuery !== 'undefined' ? quizQuery : ''; %>
 <% if (lessons.length === 0) { %>
@@ -32,17 +36,21 @@
                 <strong><%= item.title || 'Video' %></strong>
                 <% if (item.description) { %><div class="hint"><%= item.description %></div><% } %>
                 <% if (item.video_url) { %><div><a href="<%= item.video_url %>" target="_blank" rel="noopener">Watch Video</a></div><% } %>
+                <%- include('lesson-item-complete', { item, canTakeQuiz, quizBasePathLocal, quizQueryLocal }) %>
               <% } else if (item.type === 'text') { %>
                 <strong><%= item.title || 'Description' %></strong>
                 <% if (item.body) { %><div class="forum-editable-display"><%- item.body %></div><% } %>
+                <%- include('lesson-item-complete', { item, canTakeQuiz, quizBasePathLocal, quizQueryLocal }) %>
               <% } else if (item.type === 'file') { %>
                 <strong><%= item.title || 'File' %></strong>
                 <% if (item.description) { %><div class="hint"><%= item.description %></div><% } %>
                 <% if (item.file_url) { %><div><a href="<%= item.file_url %>" target="_blank" rel="noopener">Open File</a></div><% } %>
+                <%- include('lesson-item-complete', { item, canTakeQuiz, quizBasePathLocal, quizQueryLocal }) %>
               <% } else if (item.type === 'assignment_upload') { %>
                 <strong><%= item.title || 'Assignment' %></strong>
                 <% if (item.body) { %><div class="forum-editable-display"><%- item.body %></div><% } %>
                 <% if (item.attachmentUrl) { %><div><a href="<%= item.attachmentUrl %>" target="_blank" rel="noopener"><%= item.attachment_name || 'Download Attachment' %></a></div><% } %>
+                <%- include('lesson-item-complete', { item, canTakeQuiz, quizBasePathLocal, quizQueryLocal }) %>
               <% } else if (item.type === 'quiz') { %>
                 <strong><%= item.title || 'Quiz' %></strong>
                 <div>

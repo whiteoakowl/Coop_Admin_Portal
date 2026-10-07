@@ -53,20 +53,29 @@ async function listGradeLevels() {
   return rows.map((r) => r.grade_level);
 }
 
-// Every active portal account, with the roster/section/registration
-// detail the filter popup and member-list table both need. Filtering
-// itself happens against this full list (role/section/gradeLevel/
-// ageGroup/registered), not in SQL - see this file's own header comment
-// on why (small candidate counts, and several of the facets - age group,
-// registration status - are cheapest to compute here rather than as
-// several more JOINs).
+// Every portal account with a real, usable email address - the filter
+// popup and member-list table both need the roster/section/registration
+// detail below. Filtering itself happens against this full list (role/
+// section/gradeLevel/ageGroup/registered), not in SQL - see this file's
+// own header comment on why (small candidate counts, and several of the
+// facets - age group, registration status - are cheapest to compute
+// here rather than as several more JOINs).
+//
+// A real bug report: "all current members are full members with
+// accounts and should appear on this list. Currently there are only 3."
+// This used to require ma.status = 'active' - excluding every member
+// whose account is still 'pending' (awaiting the separate portal-login
+// approval step, distinct from the co-op already treating them as a
+// full member) even though their email address is just as real and
+// mailable. Only 'suspended'/'denied' accounts - the ones a Main Admin
+// deliberately locked out - are excluded now.
 async function listRecipientCandidates() {
   const rows = await db
     .prepare(
       `SELECT ma.id AS account_id, ma.email, m.id AS member_id, m.name, m.member_type, m.grade_level, m.birthday
        FROM member_accounts ma
        JOIN members m ON m.id = ma.member_id
-       WHERE ma.status = 'active'
+       WHERE ma.status IN ('active', 'pending')
        ORDER BY LOWER(m.name)`
     )
     .all();

@@ -101,7 +101,12 @@ test('the View/Cancel Classes page no longer exists', async () => {
   assert.equal(res.status, 404);
 });
 
-test('Classroom Dashboard: each enrolled class card has a View Class button and a Delete button', async () => {
+// A real request: "Class card should not have view class button, you
+// should be able to just click the class card to view. Delete button
+// should say withdraw and be much smaller." The whole card (color bar +
+// body) is now its own link to the class detail page instead of a
+// separate View Class button, and the remaining button reads Withdraw.
+test('Classroom Dashboard: each enrolled class card is itself a link to the class detail page, plus a small Withdraw button', async () => {
   const admin = await loginAsAdmin();
   const cls = await createClass(admin);
   const parent = await createParentWithChild();
@@ -113,10 +118,11 @@ test('Classroom Dashboard: each enrolled class card has a View Class button and 
 
   const dashboard = await request(app).get(`/parent/classes/dashboard?studentId=${parent.childId}`).set('Cookie', parent.cookie);
   assert.equal(dashboard.status, 200);
-  assert.match(dashboard.text, new RegExp(`href="/parent/classes/dashboard/${cls.id}\\?studentId=${parent.childId}">View Class</a>`));
+  assert.match(dashboard.text, new RegExp(`<a class="class-dash-card-link" href="/parent/classes/dashboard/${cls.id}\\?studentId=${parent.childId}">`));
+  assert.doesNotMatch(dashboard.text, />View Class</);
   assert.match(dashboard.text, new RegExp(`data-withdraw-class-url="/parent/classes/${cls.id}/unregister"`));
   assert.match(dashboard.text, new RegExp(`data-withdraw-student-id="${parent.childId}"`));
-  assert.match(dashboard.text, />Delete<\/button>/);
+  assert.match(dashboard.text, />Withdraw<\/button>/);
 });
 
 test('Classroom Dashboard withdraw JS carries the exact confirmation wording and Cancel/Confirm buttons', async () => {

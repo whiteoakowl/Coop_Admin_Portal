@@ -1,0 +1,15 @@
+<%# "Mark Complete" action for a non-quiz content item - see lessons-
+    view.ejs's own header comment for the real request this answers.
+    Reuses canTakeQuiz/quizBasePathLocal/quizQueryLocal exactly as the
+    quiz branch does: same portal/per-class gate, same base path. %>
+<div class="lesson-item-complete">
+  <% if (item.completed) { %>
+    <span class="status-badge status-badge-present">Completed</span>
+  <% } else if (canTakeQuiz) { %>
+    <form method="POST" action="<%= quizBasePathLocal %>/content/<%= item.id %>/complete<%= quizQueryLocal %>" class="inline-block-form">
+      <button type="submit" class="roster-action-btn roster-action-btn-small">Mark Complete</button>
+    </form>
+  <% } else { %>
+    <span class="hint">Not completed yet</span>
+  <% } %>
+</div>

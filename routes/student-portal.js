@@ -29,6 +29,7 @@ const {
   getQuizAttempt,
   submitQuizAttempt,
   contentItemsForAssignment,
+  markLessonItemComplete,
 } = require('../utils/academics');
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
 const forums = require('../utils/forums');
@@ -344,6 +345,26 @@ router.post('/content/:id/quiz', async (req, res) => {
   });
   await submitQuizAttempt({ contentItemId: contentItem.id, studentId: member.id, answers });
   res.redirect(`/student/classes/${assignment.class_id}?tab=lessons&notice=` + encodeURIComponent('Quiz submitted.'));
+});
+
+// "Mark Complete" for a video/text/file/assignment_upload content item -
+// a real request: "Student and parent portal you can't click on class
+// lessons to complete them" - these types had no completion action at
+// all before this (only a quiz did, by submitting it). Re-derives the
+// student's own classes from scratch same as the quiz routes above, so a
+// student can't mark complete a lesson that isn't even in one of their
+// own classes.
+router.post('/content/:id/complete', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const contentItem = await getContentItem(parseInt(req.params.id, 10));
+  if (!contentItem || contentItem.type === 'quiz') return res.status(404).render('404', { title: 'Not Found' });
+  const assignment = await db.prepare('SELECT * FROM class_assignments WHERE id = ?').get(contentItem.assignment_id);
+  const classes = await classesForStudent(member);
+  const cls = assignment ? classes.find((c) => c.id === assignment.class_id) : null;
+  if (!cls) return res.status(404).render('404', { title: 'Not Found' });
+  if (assignment.open_date && assignment.open_date > todayISO()) return res.status(404).render('404', { title: 'Not Found' });
+  await markLessonItemComplete(contentItem.id, member.id);
+  res.redirect(`/student/classes/${assignment.class_id}?tab=lessons`);
 });
 
 router.get('/assignments', async (req, res) => {

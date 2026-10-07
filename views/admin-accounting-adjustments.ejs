@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Adjustments</h1>
+    <p class="hint">Refunds and cancelled charges - every way a bill gets walked back after the fact, across every member.</p>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Refunds</h2></div>
+      <% if (refunds.length === 0) { %>
+        <p class="roster-empty">No refunds recorded yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>For</th>
+                <th>Amount</th>
+                <th>Note</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% refunds.forEach(function(p) { %>
+                <tr>
+                  <td><a href="/main-admin/accounting/members/<%= p.member_id %>"><%= p.memberName %></a></td>
+                  <td><%= p.chargeDescription %></td>
+                  <td><%= formatCents(p.amount_cents) %></td>
+                  <td><%= p.note || '' %></td>
+                  <td><%= p.created_at %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Cancelled Charges</h2></div>
+      <% if (cancelled.length === 0) { %>
+        <p class="roster-empty">No cancelled charges.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% cancelled.forEach(function(c) { %>
+                <tr>
+                  <td><a href="/main-admin/accounting/members/<%= c.member_id %>"><%= c.memberName %></a></td>
+                  <td><%= c.description %></td>
+                  <td><%= formatCents(c.amount_cents) %></td>
+                  <td><%= c.created_at %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </main>
+</body>
+</html>

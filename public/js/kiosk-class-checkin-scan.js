@@ -1,4 +1,4 @@
-/* global keepInputFocused, initIdKeypad, initKioskMethodChooser, createKioskCameraScanner */
+/* global keepInputFocused, initIdKeypad, initKioskMethodChooser, createKioskCameraScanner, playKioskBeep */
 // Mirrors public/js/kiosk-checkin.js's fetch-and-show pattern, posting to
 // this scan's own scoped, mode-specific endpoint (routes/kiosk-class-
 // checkin.js) - see that route's own comment on why it's kept independent
@@ -73,9 +73,21 @@
     instructions.textContent = message;
   }
 
+  // A real request: "it should beep each time a person is scanned and
+  // show a checked in or checked out notification before allowing more
+  // continuous scan" - scanLocked blocks every entry method (hardware/
+  // Bluetooth scanner, the on-screen keypad, typing a name, and the
+  // camera) for as long as the result banner is showing, not just the
+  // camera's own separate same-frame-decode guard below. The confirmed
+  // choice for how long that lock (and the banner) lasts: auto-dismiss
+  // after ~1.5-2s, so the kiosk is ready for the next person without
+  // anyone having to tap anything.
+  let scanLocked = false;
+
   async function submitValue(rawValue) {
     const value = (rawValue || '').trim();
-    if (!value) return;
+    if (!value || scanLocked) return;
+    scanLocked = true;
 
     // Ignore further camera decodes while this one is being handled (and
     // for the "Checked In!" success pause after) so a badge still
@@ -85,6 +97,7 @@
     result.hidden = false;
     setState('loading', 'Checking…', 'loader');
 
+    let lockMs = 2000;
     try {
       const res = await fetch(`${scanBaseUrl}/scan/${mode}`, {
         method: 'POST',
@@ -97,20 +110,29 @@
           ? data.message
           : (mode === 'checkout' ? 'Checked Out!' : 'Checked In!');
         setState(data.alreadyChecked ? 'info' : 'success', label, data.alreadyChecked ? 'info-circle' : 'check-circle');
+        if (typeof playKioskBeep === 'function') playKioskBeep(true);
         setTimeout(() => { result.hidden = true; }, 2000);
       } else {
         setState('error', data.message, 'x-circle');
+        if (typeof playKioskBeep === 'function') playKioskBeep(false);
+        lockMs = 2500;
         setTimeout(() => { result.hidden = true; }, 2500);
       }
     } catch (err) {
       setState('error', 'Connection error. Please try again.', 'x-circle');
+      if (typeof playKioskBeep === 'function') playKioskBeep(false);
+      lockMs = 2500;
       setTimeout(() => { result.hidden = true; }, 2500);
     }
-    setTimeout(() => { cameraScanner.busy(false); }, 2000);
+    setTimeout(() => {
+      cameraScanner.busy(false);
+      scanLocked = false;
+    }, lockMs);
   }
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
+    if (scanLocked) return;
     const value = input.value;
     input.value = '';
     submitValue(value);
@@ -118,6 +140,7 @@
 
   nameForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    if (scanLocked) return;
     const value = nameInput.value;
     nameInput.value = '';
     submitValue(value);

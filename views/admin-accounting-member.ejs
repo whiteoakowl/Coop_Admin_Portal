@@ -13,10 +13,13 @@
       <h1><%= member.name %></h1>
       <span class="badge-pill badge-pill-<%= balanceCents > 0 ? 'orange' : 'green' %>"><%= formatCents(balanceCents) %> due</span>
     </div>
-    <p><a href="/main-admin/accounting">&larr; All Accounting</a></p>
+    <p><a href="/main-admin/accounting">&larr; All Accounts</a></p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (typeof autoprint !== 'undefined' && autoprint) { %>
+      <script>window.addEventListener('load', () => window.print());</script>
+    <% } %>
 
     <div class="manage-section">
       <div class="grid-box-header">
@@ -61,8 +64,13 @@
               <label>Amount ($)
                 <input type="number" name="amount" min="0.01" step="0.01" required />
               </label>
+              <label>Method
+                <select name="method">
+                  <% methods.forEach(function(meth) { %><option value="<%= meth %>"><%= meth %></option><% }); %>
+                </select>
+              </label>
               <label>Note
-                <input type="text" name="note" placeholder="e.g. Cash, Check #123, Venmo" />
+                <input type="text" name="note" placeholder="e.g. Check #123, Venmo @handle" />
               </label>
               <div class="notes-dialog-actions">
                 <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>

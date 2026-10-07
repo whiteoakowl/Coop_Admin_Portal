@@ -4208,6 +4208,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .member-form-footer .primary-btn { display: inline-flex; align-items: center; gap: 0.4rem; }
 .member-form-footer .primary-btn .icon { width: 0.9rem; height: 0.9rem; }
 
+/* A real request: "Send now and schedule for Later buttons should be on
+   the same row and similar width, same height, fit to text." They were
+   already on the same row (.member-form-footer-edit's own flex row), but
+   only .primary-btn ("Send Announcements Now") got matched by the sizing
+   reset above - "Schedule for Later" is a plain .roster-action-btn, which
+   kept its own base padding/font-size AND its flex: 1 0 auto (meant for
+   an even-width multi-button toolbar row elsewhere), growing it wider
+   than its text next to the fit-to-text Send button. Matched to the same
+   padding/font-size and flex-grow: 0 here so the two read as one pair. */
+.member-form-footer-edit .roster-action-btn { flex: 0 0 auto; min-width: 0; padding: 0.55rem 0.9rem; font-size: 0.9rem; }
+
 /* The whole Membership Form (header, fields, Family/Team boxes, footer)
    sits in one white card - same shape/chrome as the Create Class dialog
    (.class-form-dialog: white surface, rounded corners, this padding,
@@ -4426,6 +4437,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    stretching to fill the whole row on its own. */
 .email-toolbar-row .roster-action-btn { flex: 0 0 auto; }
 
+/* A real request: "give adequate space between rows and features" -
+   .roster-btn-row (which .email-toolbar-row extends) carries no margin
+   of its own by design (it's reused in dozens of places that already
+   supply their own spacing) - Email/Text's own two stacked toolbar rows
+   plus the table right underneath had nothing to keep them from
+   crowding each other. */
+.email-toolbar-row { margin-bottom: 0.75rem; }
+#email-select-count { margin-bottom: 0.75rem; }
+
+/* Same request, mobile: "shrink email member table to see the whole
+   table in mobile view" - same shrink-table-for-mobile convention as
+   .admins-table/.registrations-table/.committees-table elsewhere. */
+@media (max-width: 640px) {
+  #email-candidate-table { font-size: 0.78rem; }
+  #email-candidate-table th,
+  #email-candidate-table td { padding: 0.35rem 0.4rem; }
+}
+
 /* A real request (Committees' Edit Committee page): "edit button, add
    member button and add position buttons should be smaller and simply
    fit the text clean." Each already sits alone in its own .grid-box-
@@ -4584,17 +4613,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   }
   /* A real request: "communication email, select all or none on
      mobile should be next to each other on the same row. Same with
-     text page." Email/Text's own Select All/Select None row
-     (.email-toolbar-row) holds two .checkbox-option labels, neither a
-     .roster-action-btn nor a .btn-secondary - roster-btn-row-grid.js's
-     item count finds zero of them and returns before ever setting a
-     column count, same bug class as the .btn-secondary/.class-
-     schedule-view-toggle cases above, leaving each checkbox stacked
-     on its own row instead of side by side. Set directly here instead
-     of widening the JS's selector, since this is the only toolbar
-     shaped like "exactly two checkboxes, nothing else". */
+     text page." Email/Text's own Select All row (.email-toolbar-row,
+     now just the one .checkbox-option label since a later request
+     removed its Select None companion) holds no .roster-action-btn/
+     .btn-secondary - roster-btn-row-grid.js's item count finds zero of
+     them and returns before ever setting a column count, same bug
+     class as the .btn-secondary/.class-schedule-view-toggle cases
+     above, leaving the checkbox stretched as its own full-width grid
+     row. Set directly here instead of widening the JS's selector,
+     since this is the only toolbar shaped like "just a checkbox,
+     nothing else". */
   .email-toolbar-row:has(> .email-select-all) {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
   }
   /* A toolbar action that's really a tiny <form method="POST"> (Resync,
      Archive, ...) around its own .roster-action-btn button, not a plain
@@ -4818,6 +4848,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .grade-level-settings-table th, .grade-level-settings-table td { padding: 0.35rem 0.5rem; }
   .grade-level-settings-age-cell input[type="number"] { width: 3.5rem; }
   .grade-level-settings-table input[type="date"] { width: 8.5rem; }
+}
+
+/* A real follow-up request: the above still wasn't tight enough to "fit
+   perfectly and cleanly in mobile view" on a real phone width (375px) -
+   17 rows, each 3 cells wide, needed another pass: smaller type, tighter
+   padding, and a narrower date input, with a touch more row-to-row
+   breathing room (border-spacing) so the shrunk rows don't feel cramped
+   against each other. */
+@media (max-width: 480px) {
+  .grade-level-settings-table { font-size: 0.7rem; border-collapse: separate; border-spacing: 0 0.15rem; }
+  .grade-level-settings-table th, .grade-level-settings-table td { padding: 0.3rem 0.35rem; }
+  .grade-level-settings-age-cell input[type="number"] { width: 2.75rem; }
+  .grade-level-settings-table input[type="date"] { width: 7rem; padding: 0.3rem; }
 }
 
 /* Main Admin Volunteers > Committees list - a real request: "shrink
@@ -7408,6 +7451,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    just a tight pair of the sitewide .icon-btn, no extra chrome. */
 .class-schedule-view-toggle { display: flex; align-items: center; gap: 0.3rem; }
 
+/* Parent Portal Class Registration's own List view - a real request:
+   "add icons at the top for grid view vs list view of classes." Reuses
+   the exact same .class-card partial the grid view's own cells use -
+   .class-card's own max-width: 300px (sized to sit inside one narrow
+   grid cell) is dropped here so each card spans the full list width
+   instead. */
+.parent-class-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.parent-class-list .class-card { width: 100%; max-width: none; }
+
 /* List view - one flat row per class instead of the room x hour grid
    above, sorted alphabetically. Reuses .roster-table's base styling; the
    swatch mirrors the grid card's own left-border color accent so a class
@@ -7788,10 +7840,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    HIDDEN not-registered fallback after its visible controls for public/
    js/parent-class-register-withdraw.js to swap in, and that hidden
    element would otherwise become the new ":last-child" instead). */
+/* A later real request reversed course on the nowrap-only approach
+   above: "you must be able to always read the name fully of the
+   member to register or unregistered." Truncating the name with an
+   ellipsis to force everything onto one line (below) hid real
+   information - a parent couldn't tell WHICH of two similarly-named
+   children a half-cut name referred to. flex-wrap: wrap lets the
+   trailing control (Register/Withdraw/hint) drop to its own line on a
+   narrow screen when the full name doesn't leave room for it, instead
+   of the name losing characters - the name pill itself still shrinks
+   its padding/font at the 480px breakpoint below first, so wrapping is
+   the exception, not the common case. */
 .parent-class-child-row {
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   justify-content: flex-start;
   gap: 0.4rem;
 }
@@ -7835,11 +7898,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   flex-shrink: 1;
   flex-basis: content;
 }
+/* No longer truncated (overflow: hidden + ellipsis) - see the real
+   request on .parent-class-child-row above. white-space: normal lets a
+   long name wrap onto a second line within its own pill instead of
+   being cut off; overflow-wrap guards the rare name with no spaces
+   long enough to overflow even that. */
 .parent-class-child-name-text {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 .parent-class-child-row [data-registered-state] { flex-shrink: 0; }
 /* [data-not-registered-state] also carries a plain `hidden` attribute,
@@ -7892,6 +7959,40 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-view-avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%; background: var(--brand-soft); color: var(--brand-dark); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .class-view-avatar .icon { width: 1.2rem; height: 1.2rem; }
 .class-view-avatar-alt { background: var(--purple-soft); color: #5b3ea6; }
+
+/* Parent Portal Classroom Dashboard > class detail > Details tab - a real
+   request: "class details, change details to look like image attached" -
+   a vertical stack of labeled icon fields next to a Supply List box, with
+   Class Description as its own box below. Reuses .class-view-info-item/
+   -label/-value from the class-registration popup above (parent-class-
+   fragment.ejs) rather than inventing new field typography, just stacked
+   one per row (1fr min-width:0, not that component's own flex:1/min-width
+   :140px meant for a few-per-row wrapped layout) since there are too many
+   fields here to read cleanly side-by-side. */
+.class-detail-v2 { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; align-items: start; margin: 1rem 0; }
+.class-detail-v2-rows { display: flex; flex-direction: column; gap: 0.9rem; }
+.class-detail-v2-rows .class-view-info-item { flex: initial; min-width: 0; }
+.class-detail-v2-side, .class-detail-v2-description-box {
+  background: #f8fafc; border-radius: var(--radius); padding: 1rem 1.1rem;
+}
+.class-detail-v2-description-box { margin-top: 1.25rem; }
+.class-detail-v2-side h3, .class-detail-v2-description-box h3 {
+  display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.6rem; font-size: 0.95rem;
+}
+.class-detail-v2-side h3 .icon, .class-detail-v2-description-box h3 .icon { width: 1.1rem; height: 1.1rem; color: var(--muted); }
+@media (max-width: 780px) {
+  .class-detail-v2 { grid-template-columns: 1fr; }
+}
+
+/* A real request: "Class attendance view for a student should fit in
+   mobile view. Shrink table to fit." - Date/Status/Check-In/Check-Out,
+   used by both Parent Portal's own class detail Attendance tab and
+   Student Portal's own class detail Attendance tab. */
+@media (max-width: 640px) {
+  .class-attendance-table { font-size: 0.78rem; }
+  .class-attendance-table th, .class-attendance-table td { padding: 0.35rem 0.5rem; }
+  .class-attendance-table .status-badge { font-size: 0.72rem; padding: 0.15rem 0.5rem; }
+}
 
 .class-view-register-box { background: var(--orange-bg); border-radius: var(--radius); padding: 1.1rem 1rem; margin-top: 1.1rem; }
 .class-view-register-box h4 { margin: 0 0 0.75rem; display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; }
@@ -8661,6 +8762,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .view-tab-panel .schedule-edit-table { font-size: 0.75rem; }
 .view-tab-panel .schedule-edit-table th,
 .view-tab-panel .schedule-edit-table td { padding: 0.3rem 0.5rem; white-space: nowrap; }
+
+/* A real request: "Member profile, schedule tab. Shrink to fit schedule
+   cards to view the entire table in mobile view clearly." Desktop's own
+   nowrap (above) keeps every row on one line, but on a phone-width
+   screen that just pushes the Class Name column off into horizontal
+   scroll instead - shrinking the text further and letting only that one
+   column wrap (Time/Room/# stay short enough not to need it) keeps the
+   whole table visible without side-scrolling. */
+@media (max-width: 640px) {
+  .view-tab-panel .schedule-edit-table { font-size: 0.68rem; }
+  .view-tab-panel .schedule-edit-table th,
+  .view-tab-panel .schedule-edit-table td { padding: 0.25rem 0.35rem; }
+  .view-tab-panel .schedule-edit-table td:nth-child(3) { white-space: normal; }
+}
 
 .schedule-print-card {
   break-inside: avoid;
@@ -10067,7 +10182,7 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
    the rare row still wider than the container even after shrinking
    (that row's own overflow-x: auto above still handles it). */
 .forum-editor-toolbar { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-alt, #f7f8fa); padding: 0.3rem; width: fit-content; max-width: 100%; }
-.forum-editor-toolbar-row { display: flex; gap: 0.15rem; flex-wrap: nowrap; overflow-x: auto; align-items: center; }
+.forum-editor-toolbar-row { display: flex; gap: 0.15rem; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; align-items: center; }
 .forum-editor-toolbar-row + .forum-editor-toolbar-row { padding-top: 0.2rem; border-top: 1px solid var(--border); }
 .forum-editor-toolbar button {
   width: 1.35rem;
@@ -10136,8 +10251,21 @@ label.forum-editor-color { display: inline-flex; flex-direction: row; align-item
    label rules above: .member-form-grid input matches this too (it's
    still a plain <input>) at equal-or-higher specificity, and would
    otherwise blow this back up to width: 100% on the event/class edit
-   forms this toolbar also lives inside. */
-input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+   forms this toolbar also lives inside.
+   !important on width/height: a real bug report - "policy handbook rich-
+   text editor box cut off on the right on mobile" - traced to exactly
+   this still losing on .stack-form (Policy Handbook's own wrapping form
+   class): ".stack-form input:not([type="date"])" adds one more :not()
+   clause's worth of specificity than plain element+class here, so it won
+   outright regardless of source order, stretching this "hidden" input to
+   width:100% of the viewport (it has no positioned ancestor, so position:
+   absolute resolves against the initial containing block) - invisible
+   via clip, but still real layout box, inflating the page's own
+   scrollable width out from under body's overflow-x:hidden backstop.
+   Same !important precedent as .members-search-bar input[type="search"]
+   above for the identical "global input reset out-specifies a more
+   targeted selector" problem. */
+input.forum-editor-color-input { position: absolute; width: 1px !important; height: 1px !important; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .forum-editor-popup { position: relative; display: flex; flex-wrap: wrap; gap: 0.25rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 0.5rem; }
 .forum-editor-symbol-btn { min-width: 2rem; width: auto; height: auto; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 0.25rem 0.4rem; font-size: 1rem; cursor: pointer; }
 .forum-editor-symbol-btn:hover { background: var(--brand-soft, #eef4fb); }
@@ -11375,11 +11503,17 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    grid's clickable card and Student Portal's own "My Classes" grid). */
 .class-dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin: 0.75rem 0 1.5rem; }
 .class-dash-card {
-  display: block; text-decoration: none; color: inherit; border-radius: var(--radius);
+  display: block; border-radius: var(--radius);
   border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-sm);
   overflow: hidden; transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.class-dash-card:hover, .class-dash-card:focus-visible { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.class-dash-card:hover, .class-dash-card:focus-within { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+/* A real request: "Class card should not have view class button, you
+   should be able to just click the class card to view." Wraps the
+   color bar + body (not the actions row below) so the small Withdraw
+   button keeps its own separate click target instead of also
+   navigating. */
+.class-dash-card-link { display: block; text-decoration: none; color: inherit; }
 .class-dash-card-color-bar { height: 0.4rem; }
 /* A real request: "Class card should show Class image on left of card." */
 .class-dash-card-body { padding: 0.85rem 1rem 0.5rem; display: flex; gap: 0.75rem; align-items: flex-start; }
@@ -11409,6 +11543,10 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    edges of the card. flex-basis: content (not the auto keyword) is what
    actually sizes each button to its own text. */
 .class-dash-card-actions .roster-action-btn { flex-grow: 0; flex-shrink: 0; flex-basis: content; padding: 0.4rem 0.85rem; font-size: 0.82rem; }
+/* A real request: "Delete button should say withdraw and be much
+   smaller" - now the only button in its row (View Class folded into the
+   whole-card link above), so it no longer needs toolbar-button sizing. */
+.class-dash-card-actions .roster-action-btn-small { padding: 0.2rem 0.6rem; font-size: 0.72rem; min-width: 0; }
 
 /* Mini gameplay mockups - small trusted HTML snippets from each catalog
    entry's own `preview` field (utils/gamesCatalog.js), built entirely
@@ -11798,3 +11936,47 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .member-profile-plain-list a:hover { color: var(--brand-dark); text-decoration: underline; }
 .member-profile-extra-card { margin-top: 1rem; }
 .member-profile-extra-card p { margin: 0 0 0.5rem; }
+
+/* A real request: "Main admin, games, shrink all tables to fit in
+   mobile. And parent reading challenge. And student reading challenge.
+   And vocabulary game, and pets. And nature news." Shared by every
+   Fun-tab admin read-only table (Games, Reading Challenge, Vocabulary
+   Game, Pets) - same shrink-table-for-mobile convention as .admins-
+   table/.committees-table/.registrations-table elsewhere. */
+.fun-admin-table th, .fun-admin-table td { padding: 0.55rem 0.75rem; }
+@media (max-width: 640px) {
+  .fun-admin-table { font-size: 0.78rem; }
+  .fun-admin-table th, .fun-admin-table td { padding: 0.3rem 0.4rem; }
+}
+
+/* Pets' own admin table is the widest of the group (Student/Pet Name/
+   Look/Level/XP/Coins/Hunger/Happiness/Cleanliness - 9 columns) - the
+   shared shrink above alone still doesn't get it to fit a phone screen,
+   so it gets a second, tighter pass. .roster-scroll (already wrapping
+   every one of these tables) keeps handling whatever's still too wide
+   to fit even after this - a real horizontal scroll, not a cut-off. */
+@media (max-width: 640px) {
+  #main-admin-pets-table { font-size: 0.68rem; }
+  #main-admin-pets-table th, #main-admin-pets-table td { padding: 0.25rem 0.3rem; }
+}
+
+/* A real request (Main Admin Accounting home): "add/edit account
+   category button should be fit to text." It's the only button in its
+   own .roster-btn-row, so the shared .roster-action-btn flex:1 0 auto
+   (meant to let several buttons in a row share leftover space) stretched
+   it the full row width instead of sizing to its label - same class of
+   bug .roster-btn-row-centered already fixes elsewhere, scoped here
+   instead of centered since this page's own toolbar stays left-aligned
+   (the site-wide search+filter convention, see .members-search-filter-row). */
+.accounting-list-toolbar .roster-action-btn { flex: 0 0 auto; }
+
+/* Accounts page's own 2nd button row ("filters, email all invoices,
+   print preview icon, export icon") - same fit-to-text fix as
+   .accounting-list-toolbar above for its one text button, plus
+   align-items so the Past Due Only checkbox label doesn't stretch to a
+   mismatched height next to the buttons/icons beside it (.roster-btn-row
+   itself carries no align-items of its own, by design, since most of its
+   other dozens of callers are plain same-height buttons that never show
+   the gap this mismatch would create). */
+.accounting-accounts-toolbar-2 { align-items: center; }
+.accounting-accounts-toolbar-2 .roster-action-btn { flex: 0 0 auto; }

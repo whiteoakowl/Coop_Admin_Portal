@@ -16,7 +16,7 @@
         <p class="roster-empty">No pets created yet.</p>
       <% } else { %>
         <div class="roster-scroll">
-          <table class="roster-table condensed-table">
+          <table id="main-admin-pets-table" class="roster-table condensed-table fun-admin-table">
             <thead><tr><th>Student</th><th>Pet Name</th><th>Look</th><th>Level</th><th>XP</th><th>Coins</th><th>Hunger</th><th>Happiness</th><th>Cleanliness</th></tr></thead>
             <tbody>
               <% petRows.forEach(function(p) { %>

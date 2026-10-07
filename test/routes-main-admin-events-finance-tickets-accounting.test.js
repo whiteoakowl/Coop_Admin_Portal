@@ -116,11 +116,13 @@ test('Accounting Categories: manage from the Accounting tab (not Events Settings
   assert.doesNotMatch(settingsPage.text, /Add\/Edit Accounting Category/);
   assert.doesNotMatch(settingsPage.text, /id="manage-accounting-categories-dialog"/);
 
-  const accountingPage = await request(app).get('/main-admin/accounting').set('Cookie', admin.cookie);
-  assert.match(accountingPage.text, /Add\/Edit Accounting Category/);
-  assert.match(accountingPage.text, /id="manage-accounting-categories-dialog"/);
+  // A later real request moved this off a modal dialog on the Accounts
+  // list and onto its own Accounting > Categories subpage.
+  const categoriesPage = await request(app).get('/main-admin/accounting/categories').set('Cookie', admin.cookie);
+  assert.match(categoriesPage.text, /Accounting Categories/);
+  assert.doesNotMatch(categoriesPage.text, /id="manage-accounting-categories-dialog"/);
 
-  const csrf = extractCsrf(accountingPage.text);
+  const csrf = extractCsrf(categoriesPage.text);
   await request(app)
     .post('/main-admin/accounting/accounting-categories')
     .set('Cookie', admin.cookie)

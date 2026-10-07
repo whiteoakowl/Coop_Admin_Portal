@@ -2342,6 +2342,7 @@ module.exports = {
   saveHourLabel,
   gridForDay,
   roomGridForDay,
+  parseClockMinutesLocal,
   roomsForDay,
   renameRoom,
   getRoomOrder,

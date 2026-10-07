@@ -70,7 +70,22 @@ const MAIN_ADMIN_NAV_LINKS = [
     { href: '/main-admin/members?tab=archive', label: 'Archive' },
     { href: '/main-admin/members?tab=settings', label: 'Settings' },
   ] },
-  { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting' },
+  // A real request: "add subpages under accounting - accounts, accounting
+  // categories, invoices, payments, adjustments, logs, settings." Real
+  // separate routes (not ?tab= on one page) - same shape as Communication's
+  // own Announcements/Email/Text subpages right below, since each tab here
+  // is its own genuinely different listing (members+balances vs. charges
+  // vs. payments vs. refunds vs. an audit trail), not shared markup with a
+  // few fields swapped the way Members' own subpages are.
+  { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting', subpages: [
+    { href: '/main-admin/accounting', label: 'Accounts' },
+    { href: '/main-admin/accounting/categories', label: 'Categories' },
+    { href: '/main-admin/accounting/invoices', label: 'Invoices' },
+    { href: '/main-admin/accounting/payments', label: 'Payments' },
+    { href: '/main-admin/accounting/adjustments', label: 'Adjustments' },
+    { href: '/main-admin/accounting/logs', label: 'Logs' },
+    { href: '/main-admin/accounting/settings', label: 'Settings' },
+  ] },
   { href: '/main-admin/announcements', icon: 'bell', label: 'Communication', subpages: [
     { href: '/main-admin/announcements', label: 'Announcements' },
     { href: '/main-admin/announcements/email', label: 'Email' },

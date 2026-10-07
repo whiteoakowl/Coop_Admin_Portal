@@ -1,4 +1,4 @@
-/* exported keepInputFocused, initKioskMethodChooser, registerKioskPageCleanup */
+/* exported keepInputFocused, initKioskMethodChooser, registerKioskPageCleanup, playKioskBeep */
 // A kiosk left in fullscreen never truly reloads between "pages" -
 // fullscreen-nav.js swaps <body>'s contents in place instead of
 // navigating, precisely so the top-level document (and fullscreen) never
@@ -148,4 +148,41 @@ function initKioskMethodChooser(root, cameraScanner) {
   });
 
   return { showPanel, showChooser };
+}
+
+// A real request: "Class check in and out. It should beep each time a
+// person is scanned." A single short tone generated with the Web Audio
+// API - no audio file to host/load, and it works the instant a scan
+// resolves (success or error) rather than waiting on a network asset.
+// Browsers require a user gesture before audio will play at all; the
+// kiosk's own method-chooser taps/keypad presses that happen before any
+// scan can complete already count, so by the time a scan result comes
+// back there's always been one. One AudioContext is created lazily and
+// reused (each call just schedules a new short oscillator burst on it)
+// rather than a fresh context per beep, which is both wasteful and hits
+// a hard per-page browser limit on unclosed contexts if a kiosk runs
+// through enough scans in one sitting.
+let kioskBeepCtx = null;
+function playKioskBeep(success) {
+  try {
+    if (!kioskBeepCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      kioskBeepCtx = new Ctx();
+    }
+    const ctx = kioskBeepCtx;
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.frequency.value = success === false ? 220 : 880;
+    gain.gain.value = 0.15;
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    const now = ctx.currentTime;
+    oscillator.start(now);
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+    oscillator.stop(now + 0.15);
+  } catch (err) {
+    // Audio is a nice-to-have, never worth failing a real check-in/out over.
+  }
 }

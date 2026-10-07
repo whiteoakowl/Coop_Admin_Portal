@@ -102,7 +102,7 @@ test('Parent Portal: /parent/classes offers a Tuesday tab, and a parent can regi
 
   const page = await request(app).get('/parent/classes?day=tuesday').set('Cookie', (await createParentWithChild()).cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /class="day-toggle-option active" href="\/parent\/classes\?day=tuesday"/);
+  assert.match(page.text, /class="day-toggle-option active" href="\/parent\/classes\?day=tuesday&view=grid"/);
   assert.match(page.text, /Tuesday Pottery/);
 
   const parent = await createParentWithChild();

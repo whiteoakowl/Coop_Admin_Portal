@@ -9,11 +9,11 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <p class="subtitle"><a href="/parent/classes/dashboard?studentId=<%= selectedChild.id %>">&larr; Classroom Dashboard</a></p>
     <h1><%= cls.class_name %></h1>
-    <p class="hint">
-      Viewing for <strong><%= selectedChild.name %></strong> &middot;
-      <%= cls.dayLabel %> &middot; <%= cls.timeLabel %>
-      <% if (cls.room) { %> &middot; <%= cls.room %><% } %>
-    </p>
+    <%# A real request: "The top description above tabs should simply
+        say, (member name) registered for this class." - replaces the
+        older day/time/room summary line (that info now lives in the
+        Details tab's own Schedule row below). %>
+    <p class="hint"><strong><%= selectedChild.name %></strong> registered for this class.</p>
 
     <div class="view-tabs no-print">
       <a class="view-tab<%= tab === 'details' ? ' active' : '' %>" href="?tab=details&studentId=<%= selectedChild.id %>">Details</a>
@@ -30,28 +30,94 @@
       <% if (tab === 'details') { %>
         <%# A real request: "Details should have teachers, assistants,
             room number, start and end dates, start and end time, day of
-            the week, class description, supply list." Room, day, and time
-            show in the page header above these tabs - the rest lives here.
-            A later real request moved the description down here too (it
-            used to sit in that same header) and added Teacher(s)/Cost per
-            Student, which weren't broken out as their own Details rows
-            before. %>
-        <p><strong>Teacher(s):</strong> <%= cls.teacherNames.length ? cls.teacherNames.join(', ') : 'None assigned' %></p>
-        <p><strong>Assistant(s):</strong> <%= cls.assistantNames && cls.assistantNames.length ? cls.assistantNames.join(', ') : 'None assigned' %></p>
-        <% if (cls.price_cents != null) { %>
-          <p><strong>Cost per Student:</strong> $<%= (cls.price_cents / 100).toFixed(2) %></p>
-        <% } %>
+            the week, class description, supply list" - redesigned per a
+            later request to look like a provided reference image: a row
+            of labeled icon fields (Schedule/Teacher(s)/Assistant(s)/
+            Start Date/End Date/Grade-Age/Room/Enrolled) next to a Supply
+            List box, with Class Description as its own box underneath.
+            Reuses the same class-view-info-item/-label/-value classes
+            views/parent-class-fragment.ejs's own class-info popup
+            already established, just stacked one field per row instead
+            of side-by-side, since there are too many fields here to fit
+            a few per row cleanly. %>
+        <div class="class-detail-v2">
+          <div class="class-detail-v2-rows">
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-calendar-check"/></svg>
+              <div>
+                <span class="class-view-info-label">Schedule</span>
+                <strong class="class-view-info-value"><%= cls.dayLabel %> &middot; <%= cls.timeLabel %></strong>
+              </div>
+            </div>
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-user"/></svg>
+              <div>
+                <span class="class-view-info-label">Teacher(s)</span>
+                <strong class="class-view-info-value"><%= cls.teacherNames.length ? cls.teacherNames.join(', ') : 'None assigned' %></strong>
+              </div>
+            </div>
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-users"/></svg>
+              <div>
+                <span class="class-view-info-label">Assistant(s)</span>
+                <strong class="class-view-info-value"><%= cls.assistantNames && cls.assistantNames.length ? cls.assistantNames.join(', ') : 'None assigned' %></strong>
+              </div>
+            </div>
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-calendar-check"/></svg>
+              <div>
+                <span class="class-view-info-label">Start Date</span>
+                <strong class="class-view-info-value"><%= cls.start_date || 'Not set' %></strong>
+              </div>
+            </div>
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-calendar-check"/></svg>
+              <div>
+                <span class="class-view-info-label">End Date</span>
+                <strong class="class-view-info-value"><%= cls.end_date || 'Not set' %></strong>
+              </div>
+            </div>
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-graduation-cap"/></svg>
+              <div>
+                <span class="class-view-info-label">Grade/Age</span>
+                <strong class="class-view-info-value"><%= cls.gradeLabel || 'Not set' %></strong>
+              </div>
+            </div>
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-map-pin"/></svg>
+              <div>
+                <span class="class-view-info-label">Room</span>
+                <strong class="class-view-info-value"><%= cls.room || 'Not set' %></strong>
+              </div>
+            </div>
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-users"/></svg>
+              <div>
+                <span class="class-view-info-label">Enrolled</span>
+                <strong class="class-view-info-value"><%= cls.studentCount %><% if (cls.capacity != null) { %> / <%= cls.capacity %><% } %></strong>
+              </div>
+            </div>
+            <% if (cls.price_cents != null) { %>
+              <div class="class-view-info-item">
+                <svg class="icon"><use href="#icon-tag"/></svg>
+                <div>
+                  <span class="class-view-info-label">Cost per Student</span>
+                  <strong class="class-view-info-value">$<%= (cls.price_cents / 100).toFixed(2) %></strong>
+                </div>
+              </div>
+            <% } %>
+          </div>
+          <div class="class-detail-v2-side">
+            <h3><svg class="icon"><use href="#icon-clipboard-list"/></svg> Supply List</h3>
+            <p class="hint" style="white-space: pre-wrap;"><%= cls.supply_list || 'No supplies required.' %></p>
+          </div>
+        </div>
         <% if (cls.description) { %>
-          <p><strong>Description:</strong></p>
-          <div class="hint forum-editable-display"><%- cls.description %></div>
-        <% } %>
-        <p><strong>Start Date:</strong> <%= cls.start_date || 'Not set' %></p>
-        <p><strong>End Date:</strong> <%= cls.end_date || 'Not set' %></p>
-        <p><strong>Grade/Age:</strong> <%= cls.gradeLabel || 'Not set' %></p>
-        <p><strong>Enrolled:</strong> <%= cls.studentCount %><% if (cls.capacity != null) { %> / <%= cls.capacity %><% } %></p>
-        <% if (cls.supply_list) { %>
-          <p><strong>Supply List:</strong></p>
-          <p class="hint" style="white-space: pre-wrap;"><%= cls.supply_list %></p>
+          <div class="class-detail-v2-description-box">
+            <h3><svg class="icon"><use href="#icon-megaphone"/></svg> Class Description</h3>
+            <div class="hint forum-editable-display"><%- cls.description %></div>
+          </div>
         <% } %>
       <% } else if (tab === 'assignments') { %>
         <% if (assignments.length === 0) { %>
@@ -114,7 +180,7 @@
           <p class="roster-empty">No attendance recorded yet.</p>
         <% } else { %>
           <div class="roster-scroll">
-            <table class="roster-table members-table condensed-table">
+            <table class="roster-table members-table condensed-table class-attendance-table">
               <thead>
                 <tr><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th></tr>
               </thead>

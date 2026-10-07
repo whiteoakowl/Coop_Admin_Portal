@@ -380,6 +380,26 @@ async function getQuizAttempt(contentItemId, studentId) {
   return db.prepare('SELECT * FROM quiz_attempts WHERE content_item_id = ? AND student_id = ?').get(contentItemId, studentId);
 }
 
+// A real request: "Student and parent portal you can't click on class
+// lessons to complete them." A quiz content item is "completed" by
+// submitting it (quiz_attempts above) - a video/text/file item had no
+// equivalent action at all, nothing to click. This is that same "Mark
+// Complete" click for every other content type, recorded in its own
+// table (lesson_item_completions) rather than quiz_attempts since there's
+// no attempt/score data to go with it, just a timestamp.
+async function getLessonItemCompletion(contentItemId, studentId) {
+  return db.prepare('SELECT * FROM lesson_item_completions WHERE content_item_id = ? AND student_id = ?').get(contentItemId, studentId);
+}
+
+async function markLessonItemComplete(contentItemId, studentId) {
+  await db
+    .prepare(
+      `INSERT INTO lesson_item_completions (content_item_id, student_id) VALUES (?, ?)
+       ON CONFLICT (content_item_id, student_id) DO NOTHING`
+    )
+    .run(contentItemId, studentId);
+}
+
 // answers: array of { questionId, choiceId?, answerText? }. multiple_choice
 // answers auto-score immediately against quiz_choices.is_correct;
 // short_answer answers are stored with is_correct/points_earned left null
@@ -493,9 +513,12 @@ async function lessonsForStudentView(classId, studentId) {
       const contentItems = isOpen ? await contentItemsForAssignment(a.id, { includeAnswerKey: false }) : [];
       const withAttempts = await Promise.all(
         contentItems.map(async (item) => {
-          if (item.type !== 'quiz') return item;
-          const attempt = await getQuizAttempt(item.id, studentId);
-          return { ...item, attempt: attempt || null };
+          if (item.type === 'quiz') {
+            const attempt = await getQuizAttempt(item.id, studentId);
+            return { ...item, attempt: attempt || null };
+          }
+          const completion = await getLessonItemCompletion(item.id, studentId);
+          return { ...item, completed: !!completion };
         })
       );
       return { ...a, dueDateLabel: a.due_date ? formatDateLabel(a.due_date) : null, isOpen, contentItems: withAttempts };
@@ -504,16 +527,16 @@ async function lessonsForStudentView(classId, studentId) {
 }
 
 // A real request: "On lesson list show percentage of how many people in
-// the class completed the assignments." The only defined "complete a
-// lesson" action in this data model is submitting its quiz(zes) (see
-// lessonsForStudentView/views/partials/lessons-view.ejs's own "Take
-// Quiz" flow - a lesson with only video/text/file/assignment_upload
-// content has no submission of its own, nothing to be "complete" or not)
-// - a lesson counts as complete for one student once EVERY quiz content
-// item in it has that student's own quiz_attempts row. Returns
-// { [assignmentId]: percent|null } - null for a lesson with no quiz
-// content at all, or a class with no enrolled students, rather than a
-// misleading 0%/100%.
+// the class completed the assignments." A quiz content item counts as
+// complete once the student has a quiz_attempts row; every other content
+// type (video/text/file/assignment_upload) now has its own "Mark
+// Complete" click (lesson_item_completions - see the real request this
+// answers: "you can't click on class lessons to complete them", nothing
+// was clickable for those types before). A lesson counts as complete for
+// one student once EVERY content item in it - quiz or not - is done.
+// Returns { [assignmentId]: percent|null } - null for a lesson with no
+// content items at all, or a class with no enrolled students, rather
+// than a misleading 0%/100%.
 async function completionStatsForAssignments(classId) {
   const enrolled = await db
     .prepare(
@@ -528,18 +551,31 @@ async function completionStatsForAssignments(classId) {
       stats[a.id] = null;
       continue;
     }
-    const quizItems = await db.prepare("SELECT id FROM lesson_content_items WHERE assignment_id = ? AND type = 'quiz'").all(a.id);
-    if (quizItems.length === 0) {
+    const items = await db.prepare('SELECT id, type FROM lesson_content_items WHERE assignment_id = ?').all(a.id);
+    if (items.length === 0) {
       stats[a.id] = null;
       continue;
     }
-    const quizIds = quizItems.map((q) => q.id);
+    const quizIds = items.filter((i) => i.type === 'quiz').map((i) => i.id);
+    const otherIds = items.filter((i) => i.type !== 'quiz').map((i) => i.id);
     let completedCount = 0;
     for (const studentId of studentIds) {
-      const { c } = await db
-        .prepare(`SELECT COUNT(*) AS c FROM quiz_attempts WHERE student_id = ? AND content_item_id IN (${quizIds.map(() => '?').join(',')})`)
-        .get(studentId, ...quizIds);
-      if (Number(c) === quizIds.length) completedCount++;
+      let doneCount = 0;
+      if (quizIds.length) {
+        const { c } = await db
+          .prepare(`SELECT COUNT(*) AS c FROM quiz_attempts WHERE student_id = ? AND content_item_id IN (${quizIds.map(() => '?').join(',')})`)
+          .get(studentId, ...quizIds);
+        doneCount += Number(c);
+      }
+      if (otherIds.length) {
+        const { c } = await db
+          .prepare(
+            `SELECT COUNT(*) AS c FROM lesson_item_completions WHERE student_id = ? AND content_item_id IN (${otherIds.map(() => '?').join(',')})`
+          )
+          .get(studentId, ...otherIds);
+        doneCount += Number(c);
+      }
+      if (doneCount === items.length) completedCount++;
     }
     stats[a.id] = Math.round((completedCount / studentIds.length) * 100);
   }
@@ -577,6 +613,8 @@ module.exports = {
   deleteQuizQuestion,
   getQuizAttempt,
   submitQuizAttempt,
+  getLessonItemCompletion,
+  markLessonItemComplete,
   pendingReviewAnswers,
   scoreAnswer,
   lessonsForStudentView,

@@ -136,8 +136,8 @@ test('Parent Portal class detail Details tab shows Start Date, End Date, and Sup
   const parent = await createParentWithChildInClass(admin, cls);
   const page = await request(app).get(`/parent/classes/dashboard/${cls.id}?studentId=${parent.childId}&tab=details`).set('Cookie', parent.cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /<strong>Start Date:<\/strong> 2026-09-01/);
-  assert.match(page.text, /<strong>End Date:<\/strong> 2026-12-15/);
+  assert.match(page.text, /<span class="class-view-info-label">Start Date<\/span>\s*<strong class="class-view-info-value">2026-09-01/);
+  assert.match(page.text, /<span class="class-view-info-label">End Date<\/span>\s*<strong class="class-view-info-value">2026-12-15/);
   assert.match(page.text, /Notebook and pencils/);
 });
 
