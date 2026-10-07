@@ -35,3 +35,11 @@
 <link rel="apple-touch-icon" href="/img/apple-touch-icon.png" />
 <script src="/js/pwa.js" defer></script>
 <script src="/js/csrf.js" defer></script>
+<%# A real request: "the green/red notice banner should go away when the
+    page is refreshed" - every page's banner is rendered straight from
+    its own ?notice=/?error= query string (every route that redirects
+    back here after an action sets one), so without this the same
+    message kept reappearing on every reload since the query string
+    itself never went away. See public/js/clear-notice-params.js' own
+    comment for how it fixes that. %>
+<script src="/js/clear-notice-params.js" defer></script>

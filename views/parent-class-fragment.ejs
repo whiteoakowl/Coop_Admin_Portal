@@ -87,13 +87,20 @@
       <svg class="icon"><use href="#icon-users"/></svg>
       <div>
         <span class="class-view-info-label">Enrollment</span>
+        <%# A real request: "students registered should show 0/12 - first
+            number is how many signed up, 2nd number is max for the
+            class set by the class settings by admin" - this used to show
+            only "Open enrollment"/"Full"/"X seats left" here, none of
+            which actually gives the enrolled-count-over-capacity number
+            the Students row further down already computes (enrolledCount/
+            cls.capacity, straight off the admin's own Maximum Students
+            field) - reused here instead of inventing a second copy of the
+            same math. %>
         <strong class="class-view-info-value">
           <% if (cls.capacity == null) { %>
             Open enrollment
-          <% } else if (isFull) { %>
-            <span class="badge-pill badge-pill-absent">Full</span>
           <% } else { %>
-            <span class="badge-pill badge-pill-present"><%= seatsLeft %> seat<%= seatsLeft === 1 ? '' : 's' %> left</span>
+            <%= enrolledCount %> / <%= cls.capacity %><% if (isFull) { %> <span class="badge-pill badge-pill-absent">Full</span><% } %>
           <% } %>
         </strong>
       </div>

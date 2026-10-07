@@ -7845,16 +7845,30 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    member to register or unregistered." Truncating the name with an
    ellipsis to force everything onto one line (below) hid real
    information - a parent couldn't tell WHICH of two similarly-named
-   children a half-cut name referred to. flex-wrap: wrap lets the
-   trailing control (Register/Withdraw/hint) drop to its own line on a
-   narrow screen when the full name doesn't leave room for it, instead
-   of the name losing characters - the name pill itself still shrinks
-   its padding/font at the 480px breakpoint below first, so wrapping is
-   the exception, not the common case. */
+   children a half-cut name referred to. This used to solve that with
+   flex-wrap: wrap, letting the trailing control (Register/Withdraw/
+   hint) drop to its own line - but a real bug report ("withdraw button
+   is still showing not in the same row as the student name") on an
+   ordinary, not-even-long name ("Eden Vanderbilt") showed that was
+   unreliable: with margin-left: auto on the trailing control (below),
+   a wrapped trailing item lands alone on its own line, pushed by that
+   same auto margin all the way to the row's far-right edge - exactly
+   "not on the same row," and worse than the scattered layout this was
+   trying to avoid in the first place.
+   flex-wrap: nowrap here instead keeps name pill + trailing control
+   PERMANENTLY on one flex line - but unlike the first truncating
+   attempt, the name text itself (.parent-class-child-name-text below)
+   still has white-space: normal, so an unusually long name wraps onto
+   a second line WITHIN its own pill instead of either truncating or
+   dragging the trailing control down with it: the row just grows
+   taller, with the badge and trailing control staying vertically
+   centered beside it the whole time. The name pill's own flex-shrink: 1
+   (below) is what lets the browser narrow it down to make room for the
+   trailing control instead of either one overflowing the dialog. */
 .parent-class-child-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-start;
   gap: 0.4rem;
 }
@@ -8027,6 +8041,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    padding reclaims a little more of that width for the name itself
    before it has to start truncating. */
 .class-view-register-box .badge-pill { padding: 0.2rem 0.45rem; }
+/* A real request: "the green bubbles next to member that say registered,
+   teacher or assistant should be Grey bubbles with black text" - scoped
+   to this box specifically rather than touching .badge-pill-present
+   itself, since that shared class also colors unrelated green badges
+   elsewhere (Attendance's own Present status, among others) that nobody
+   asked to change. The "Registered"/"Teacher"/"Assistant" badges are the
+   only .badge-pill-present instances that ever appear inside this box,
+   so this can't accidentally catch anything else. Same neutral grey
+   #e2e8f0 .status-badge-none/.ach-badge-locked already use elsewhere,
+   paired with --ink instead of their own muted grey text for "black
+   text" specifically. */
+.class-view-register-box .badge-pill-present { background: #e2e8f0; color: var(--ink); }
 @media (max-width: 480px) {
   /* Moved below (not alongside) .parent-class-child-row's own general
      rules above so this wins the cascade - it shares equal selector
