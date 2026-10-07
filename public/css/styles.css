@@ -7995,10 +7995,30 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 
 .class-view-register-box { background: var(--orange-bg); border-radius: var(--radius); padding: 1.1rem 1rem; margin-top: 1.1rem; }
-.class-view-register-box h4 { margin: 0 0 0.75rem; display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; }
-.class-view-register-box h4 .icon { width: 1.1rem; height: 1.1rem; }
+.class-view-register-box h4 { margin: 0 0 0.75rem; display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; white-space: nowrap; }
+.class-view-register-box h4 .icon { width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
 .class-view-register-box .primary-btn-dark,
 .class-view-register-box .roster-action-btn-danger { margin-top: 0; padding: 0.5rem 0.85rem; border-radius: 999px; font-size: 0.8rem; }
+/* A real request: "parent register as an assistant or teacher should be
+   on the same row" - .roster-action-btn's own flex: 1 0 auto grows these
+   two buttons to fill the row, and that same class deliberately allows
+   its label to wrap (its usual home is a toolbar grid where that's fine -
+   see .roster-action-btn's own comment) - so inside this narrow (420px
+   max) dialog "Register as Teacher"/"Register as Assistant" wrapped to
+   two lines inside each stretched button instead of sitting tidily on
+   one row. flex: 1 1 0 with min-width: 0 still lets the two share the
+   row evenly, but white-space: nowrap plus the smaller font/padding below
+   keeps each one's own full label on a single line instead of growing
+   past its text and wrapping. */
+.class-view-register-box .actions-btn-row { flex-wrap: nowrap; }
+.class-view-register-box .actions-btn-row .roster-action-btn,
+.class-view-register-box .actions-btn-row .btn-secondary {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+  padding: 0.5rem 0.5rem;
+  font-size: 0.82rem;
+}
 /* A real request: "name, registered button and cancel buttons should be
    in the same row" - the name pill, status badge, and Withdraw button
    all have to coexist on this already-narrow (420px max) popup's own
@@ -8026,11 +8046,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      width this row needed more than the box did, so it gets a mobile-
      only trim here too alongside tighter name/badge/button sizing. */
   .class-view-register-box { padding: 0.9rem 0.6rem; }
+  .class-view-register-box h4 { font-size: 0.88rem; gap: 0.35rem; }
+  .class-view-register-box h4 .icon { width: 0.95rem; height: 0.95rem; }
   .parent-class-child-row { gap: 0.3rem; }
   .parent-class-child-name { padding: 0.3rem 0.55rem; font-size: 0.8rem; }
   .class-view-register-box .badge-pill { font-size: 0.62rem; padding: 0.1rem 0.35rem; }
   .class-view-register-box .primary-btn-dark,
   .class-view-register-box .roster-action-btn-danger { padding: 0.32rem 0.5rem; font-size: 0.66rem; }
+  /* Same narrow-phone trim as the rest of this box - confirmed live the
+     "Register as Teacher"/"Register as Assistant" buttons' own desktop
+     padding/font (set just above, outside this breakpoint) was still too
+     wide for both to share one row on a real ~390px phone without
+     wrapping their label again. */
+  .class-view-register-box .actions-btn-row { gap: 0.3rem; }
+  .class-view-register-box .actions-btn-row .roster-action-btn,
+  .class-view-register-box .actions-btn-row .btn-secondary { padding: 0.42rem 0.3rem; font-size: 0.68rem; }
 }
 
 /* Allergies/Medical log popup - reuses .class-view-dialog's chrome but
