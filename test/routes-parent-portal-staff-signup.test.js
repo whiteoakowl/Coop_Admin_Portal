@@ -126,7 +126,7 @@ test('A parent can register themselves as an assistant directly from Parent Port
   assert.equal(staffRow.role, 'assistant');
 });
 
-test('Once self-registered, the fragment shows "signed up as" instead of the registration buttons', async () => {
+test('Once self-registered, the fragment shows the member\'s own name + role badge + a Withdraw button instead of the registration buttons', async () => {
   const admin = await loginAsAdmin();
   const cls = await createClass(admin, { className: 'Already Staffed Class' });
   const parent = await createParentWithChild();
@@ -138,12 +138,55 @@ test('Once self-registered, the fragment shows "signed up as" instead of the reg
     .send({ role: 'teacher', day: 'monday', _csrf: parent.csrfToken });
 
   const fragment = await request(app).get(`/parent/classes/${cls.id}/fragment?day=monday`).set('Cookie', parent.cookie);
-  assert.match(fragment.text, /You're signed up as a Teacher for this class/);
+  const parentMember = await db.prepare('SELECT name FROM members WHERE id = ?').get(parent.memberId);
+  assert.match(fragment.text, new RegExp(`<span class="parent-class-child-name-text">${parentMember.name}</span>`));
+  assert.match(fragment.text, />Teacher<\/span>/);
+  assert.match(fragment.text, new RegExp(`action="/parent/classes/${cls.id}/leave"`));
+  assert.match(fragment.text, />Withdraw</);
   // The h4 heading itself always reads "Register as Teacher/Assistant" -
   // these check for the actual BUTTON text (anchored with a trailing
   // "<"), which must be gone once already staffed.
   assert.doesNotMatch(fragment.text, />Register as Teacher</);
   assert.doesNotMatch(fragment.text, />Register as Assistant</);
+});
+
+test('A real request: "there needs to also be a withdraw button for the teacher assistant" - POST /classes/:id/leave removes the self-signup and the Register buttons come back', async () => {
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'Withdraw Staff Class' });
+  const parent = await createParentWithChild();
+
+  await request(app)
+    .post(`/parent/classes/${cls.id}/join`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ role: 'assistant', day: 'monday', _csrf: parent.csrfToken });
+
+  const leave = await request(app)
+    .post(`/parent/classes/${cls.id}/leave`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ day: 'monday', _csrf: parent.csrfToken });
+  assert.match(decodeURIComponent(leave.headers.location), /notice=/);
+
+  const staffRow = await db.prepare('SELECT * FROM class_staff WHERE class_id = ? AND member_id = ?').get(cls.id, parent.memberId);
+  assert.equal(staffRow, undefined, 'the class_staff row should be gone');
+
+  const fragment = await request(app).get(`/parent/classes/${cls.id}/fragment?day=monday`).set('Cookie', parent.cookie);
+  assert.match(fragment.text, />Register as Assistant</);
+  assert.doesNotMatch(fragment.text, new RegExp(`action="/parent/classes/${cls.id}/leave"`));
+});
+
+test('Leaving a class you were never staffed on is rejected', async () => {
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'Never Staffed Class' });
+  const parent = await createParentWithChild();
+
+  const leave = await request(app)
+    .post(`/parent/classes/${cls.id}/leave`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ day: 'monday', _csrf: parent.csrfToken });
+  assert.match(decodeURIComponent(leave.headers.location), /You are not signed up for that class/);
 });
 
 test('Registering twice for the same class is rejected', async () => {

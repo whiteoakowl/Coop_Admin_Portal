@@ -890,18 +890,30 @@ async function listClassSchedules() {
   return db.prepare('SELECT * FROM class_schedules ORDER BY created_at DESC, id DESC').all();
 }
 
-// A class's own class_schedules row - the one Schedule Grid it actually
-// shows up on (same (day_of_week, semester_id) combo listScheduleCombos
-// groups by). Used by Registration Schedule windows (utils/
-// registrationWindows.js) to match a class against a window's own
-// class_schedule_id instead of a raw day string. Null for a class whose
-// day/semester combination has no class_schedules row at all - shouldn't
-// happen in practice (every active day/semester combo gets one), but a
-// window just treats that the same as "doesn't match a schedule-grid-
-// scoped window" rather than crashing.
-async function classScheduleIdForClass(cls) {
-  const row = await db.prepare('SELECT id FROM class_schedules WHERE day_of_week = ? AND semester_id IS NOT DISTINCT FROM ?').get(cls.day, cls.semester_id);
-  return row ? row.id : null;
+// Every class_schedules row (Schedule Grid) a class counts as belonging
+// to, for matching against a Registration Schedule window's own
+// class_schedule_id (utils/registrationWindows.js). A real bug report: a
+// window scoped to a specific named semester's grid ("Fall Monday 2026")
+// never opened for a class that genuinely WAS on that grid - the class
+// itself had never been explicitly tagged with a semester (semester_id
+// null, same "nothing requires tagging one" default
+// classesForDaySemester's own comment documents), which is exactly why
+// it still correctly SHOWED UP under "Fall Monday 2026" in every normal
+// listing (that function's own "a real semesterId shows that semester's
+// classes PLUS every untagged one" leniency) - but the single-id lookup
+// this used to do only ever matched semester_id IS NOT DISTINCT FROM
+// cls.semester_id, i.e. the literal untagged/no-semester grid alone,
+// never any of the real semesters' own grids an untagged class actually
+// displays under. Returns every matching id instead of one, the same
+// "doesn't match a schedule-grid-scoped window" null-case callers
+// already treat an empty array as.
+async function classScheduleIdsForClass(cls) {
+  if (cls.semester_id == null) {
+    const rows = await db.prepare('SELECT id FROM class_schedules WHERE day_of_week = ?').all(cls.day);
+    return rows.map((r) => r.id);
+  }
+  const row = await db.prepare('SELECT id FROM class_schedules WHERE day_of_week = ? AND semester_id = ?').get(cls.day, cls.semester_id);
+  return row ? [row.id] : [];
 }
 
 // The Classes grid's own tab list - every day_of_week that's ever been
@@ -2371,7 +2383,7 @@ module.exports = {
   isValidClassDay,
   requireClassDay,
   listClassSchedules,
-  classScheduleIdForClass,
+  classScheduleIdsForClass,
   listActiveClassDays,
   listScheduleCombos,
   createClassSchedule,

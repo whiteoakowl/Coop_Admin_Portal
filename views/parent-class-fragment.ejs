@@ -176,7 +176,7 @@
         if (!cls.allow_parent_register) {
           return '<span class="hint parent-class-child-trailing"' + attrs + '>Parent registration not open for this class</span>';
         }
-        if (!windowOpen) {
+        if (!windowOpenByChild[child.id]) {
           return '<span class="hint parent-class-child-trailing"' + attrs + '>Registration window not open yet</span>';
         }
         return (
@@ -234,7 +234,23 @@
     <div class="class-view-register-box">
       <h4><svg class="icon"><use href="#icon-user"/></svg> Register as Teacher/Assistant</h4>
       <% if (myStaffRole) { %>
-        <p class="hint">You're signed up as <%= myStaffRole === 'assistant' ? 'an Assistant' : 'a Teacher' %> for this class.</p>
+        <%# A real request: "there needs to also be a withdraw button for
+            the teacher assistant. The button and name should always fit
+            on one row. Shrink to fit so the members full name fits" -
+            same .parent-class-child-row/.parent-class-child-name markup
+            (and its own mobile shrink rules) the children's own Register/
+            Withdraw rows above already use, so this one fits exactly the
+            same way on a narrow phone. %>
+        <div class="parent-class-child-row">
+          <span class="parent-class-child-name">
+            <span class="parent-class-child-name-text"><%= myStaffName %></span>
+            <span class="badge-pill badge-pill-present"><%= myStaffRole === 'assistant' ? 'Assistant' : 'Teacher' %></span>
+          </span>
+          <form method="POST" action="/parent/classes/<%= cls.id %>/leave" class="inline-block-form parent-class-child-trailing">
+            <input type="hidden" name="day" value="<%= day %>" />
+            <button type="submit" class="roster-action-btn roster-action-btn-danger">Withdraw</button>
+          </form>
+        </div>
       <% } else {
         var teacherOpen = cls.teacher_slots == null || teacherCount < cls.teacher_slots;
         var assistantOpen = cls.assistant_slots == null || assistantCount < cls.assistant_slots;

@@ -273,7 +273,50 @@ test('A schedule-grid-scoped registration window only gates registration for cla
   assert.match(decodeURIComponent(wednesdayReg.headers.location), /Registration is not open for your account yet/);
 });
 
-test('A section-scoped registration window only gates registration for classes restricted to that section', async () => {
+// A class's own lock-by-section restriction (class_sections +
+// memberSatisfiesRestriction, utils/classRegistration.js's own
+// registerForClass) - unaffected by, and tested independently of, the
+// registration window's own Section scoping right below, which used to
+// quietly piggyback on this same restriction instead of having its own
+// member-facing meaning (see that test's own comment for the real bug
+// report this split apart).
+test('A class locked to a Section only lets a member in that Section register for it, independent of any registration window', async () => {
+  await clearWindows();
+  const sectionId = await createSection('Class-Lock Group');
+  const admin = await loginAsAdmin();
+  const gatedClass = await createClass(admin, { className: 'Section Restricted Class' });
+  await db.prepare('INSERT INTO class_sections (class_id, section_id) VALUES (?, ?)').run(gatedClass.id, sectionId);
+
+  const parent = await createParentWithChild();
+  const blocked = await request(app)
+    .post(`/parent/classes/${gatedClass.id}/register`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
+  assert.match(decodeURIComponent(blocked.headers.location), /This class is limited to specific sections you are not part of/);
+
+  await db.prepare('INSERT INTO member_sections (member_id, section_id) VALUES (?, ?)').run(parent.childId, sectionId);
+  const allowed = await request(app)
+    .post(`/parent/classes/${gatedClass.id}/register`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
+  assert.match(allowed.headers.location, /notice=/);
+});
+
+// A real bug report: a registration window's own Section checkboxes
+// compared against the CLASS's own separate lock-by-section restriction
+// instead of asking who's actually registering - a window scoped to
+// "Teen Co-op" silently did nothing at all for any class that had no
+// section lock of its own, which is most of them, since nothing about a
+// window's own Section field was ever about the class to begin with (an
+// admin reading "Section" on a Registration Schedule window reasonably
+// expects "which Sections can use this window," not "which already-
+// locked classes does this window apply to"). It now asks whether the
+// MEMBER actually registering (sectionIdsForMember, not classSectionIds)
+// belongs to one of the window's required Sections - works for an
+// entirely unrestricted class exactly the same as a locked one.
+test('A section-scoped registration window gates registration by which Section(s) the REGISTERING MEMBER belongs to, not whether the class itself is locked to that section', async () => {
   await clearWindows();
   const sectionId = await createSection('Section-Gated Group');
   const { createWindow } = require('../utils/registrationWindows');
@@ -281,24 +324,64 @@ test('A section-scoped registration window only gates registration for classes r
 
   const admin = await loginAsAdmin();
   const openClass = await createClass(admin, { className: 'Unrestricted Class' });
-  const gatedClass = await createClass(admin, { className: 'Section Restricted Class' });
-  await db.prepare('INSERT INTO class_sections (class_id, section_id) VALUES (?, ?)').run(gatedClass.id, sectionId);
 
   const parent = await createParentWithChild();
-  const openReg = await request(app)
+  const blocked = await request(app)
     .post(`/parent/classes/${openClass.id}/register`)
     .set('Cookie', parent.cookie)
     .type('form')
     .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
-  assert.match(decodeURIComponent(openReg.headers.location), /Registration is not open for your account yet/);
+  assert.match(decodeURIComponent(blocked.headers.location), /Registration is not open for your account yet/);
 
   await db.prepare('INSERT INTO member_sections (member_id, section_id) VALUES (?, ?)').run(parent.childId, sectionId);
-  const gatedReg = await request(app)
-    .post(`/parent/classes/${gatedClass.id}/register`)
+  const allowed = await request(app)
+    .post(`/parent/classes/${openClass.id}/register`)
     .set('Cookie', parent.cookie)
     .type('form')
     .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
-  assert.match(gatedReg.headers.location, /notice=/);
+  assert.match(allowed.headers.location, /notice=/);
+});
+
+// The real bug report this session traced the fix for: a window scoped
+// to a specific NAMED semester's own Schedule Grid never opened for a
+// class that genuinely belonged there. utils/classSchedule.js's own
+// createClass auto-tags every NEW class with currentDefaultSemesterId()
+// (whichever semester was created most recently) - but a class created
+// BEFORE the co-op ever set up any semester at all (a real, common
+// timeline: classes existed first, semesters added later) stays
+// semester_id null forever; nothing retags it. It still correctly SHOWS
+// UP under a later-added semester's own view everywhere else
+// (classesForDaySemester's own "a real semesterId shows that semester's
+// classes PLUS every untagged one" leniency), but the old single-id
+// classScheduleIdForClass lookup only ever matched the untagged class
+// against the literal no-semester grid, never the real semester's own
+// grid it actually displayed under - so a window scoped to that real
+// semester never opened for it.
+test('A registration window scoped to a specific semester\'s Schedule Grid still opens for a class that was created before any semester existed (so it stayed untagged) but now displays under that semester', async () => {
+  await clearWindows();
+  const admin = await loginAsAdmin();
+
+  // Created while zero semesters exist yet - currentDefaultSemesterId()
+  // has nothing to default to, so this class's own semester_id stays
+  // null, same as any class from before the co-op ever used the
+  // Semester feature at all.
+  const cls = await createClass(admin, { className: 'Pre-Semester Monday Class' });
+  assert.equal(cls.semester_id, null, 'a class created before any semester existed should stay untagged');
+
+  const semesterId = (await db.prepare("INSERT INTO semesters (title) VALUES ('Fall Semester Test') RETURNING id").get()).id;
+  await db.prepare("INSERT INTO class_schedules (day_of_week, title, semester_id) VALUES ('monday', 'Fall Monday Test', ?)").run(semesterId);
+  const taggedScheduleId = (await db.prepare("SELECT id FROM class_schedules WHERE day_of_week = 'monday' AND semester_id = ?").get(semesterId)).id;
+
+  const { createWindow } = require('../utils/registrationWindows');
+  await createWindow({ label: 'Fall Monday Only', opensAt: '2020-01-01 00:00:00', closesAt: null, classScheduleId: taggedScheduleId, actionTypes: ['parent_teacher'] });
+
+  const parent = await createParentWithChild();
+  const joined = await request(app)
+    .post(`/parent/classes/${cls.id}/join`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ role: 'teacher', day: 'monday', _csrf: parent.csrfToken });
+  assert.match(decodeURIComponent(joined.headers.location), /notice=/);
 });
 
 // Self-signup as a class's Teacher/Assistant lives only on Parent Portal

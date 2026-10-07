@@ -26,7 +26,7 @@ const {
   allClassesList,
   attendanceHistoryForRoster,
   GRADE_LEVELS,
-  classScheduleIdForClass,
+  classScheduleIdsForClass,
   parseClockMinutesLocal,
 } = require('../utils/classSchedule');
 const { CLASS_DAY_ORDER } = require('../utils/classDays');
@@ -57,7 +57,7 @@ const {
 } = require('../utils/academics');
 const notifications = require('../utils/notifications');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('../utils/sections');
-const { registerForClass, unregisterFromClass, joinClassAsStaff } = require('../utils/classRegistration');
+const { registerForClass, unregisterFromClass, joinClassAsStaff, leaveClassAsStaff } = require('../utils/classRegistration');
 const events = require('../utils/events');
 const babysitters = require('../utils/babysitters');
 const { imageFileFilter } = require('../utils/uploads');
@@ -334,17 +334,34 @@ router.get('/classes/:id/fragment', async (req, res) => {
 
   const allowedGrades = ageGroupList(cls.age_group);
   const allowedAges = ageGroupList(cls.numeric_ages);
+  // restriction is the CLASS's own lock-by-section setting (eligibility -
+  // can this child register for this class at all), separate from and
+  // unaffected by the per-child registration-window check right below it.
   const restriction = await classSectionIds(classId);
+  const classScheduleIds = await classScheduleIdsForClass(cls);
   const eligibleChildren = [];
+  // A real request: "individual or multiple sections for members" - a
+  // registration window's own Section scoping now asks which Section(s)
+  // the CHILD actually being registered belongs to, so this has to be
+  // computed per child (two siblings can be in different Sections) rather
+  // than once for the whole class view the way it used to be. Computed
+  // for every child that ends up in eligibleChildren, including an
+  // already-registered one - registerControl() below renders a HIDDEN
+  // fallback for them too (swapped visible by public/js/parent-class-
+  // register-withdraw.js right after a successful Withdraw), which needs
+  // this same answer ready at render time, not just a not-yet-registered
+  // child's own real Register button.
+  const windowOpenByChild = {};
   for (const child of children) {
-    if (enrolledIds.has(child.id) || waitlistPositionByStudentId[child.id] != null) {
-      eligibleChildren.push(child);
-      continue;
+    const isCurrentlyRegistered = enrolledIds.has(child.id) || waitlistPositionByStudentId[child.id] != null;
+    if (!isCurrentlyRegistered) {
+      if (cls.lock_by_grade && allowedGrades.length && !allowedGrades.includes(child.grade_level)) continue;
+      if (cls.lock_by_age && allowedAges.length && !allowedAges.includes(String(ageFromBirthday(child.birthday)))) continue;
     }
-    if (cls.lock_by_grade && allowedGrades.length && !allowedGrades.includes(child.grade_level)) continue;
-    if (cls.lock_by_age && allowedAges.length && !allowedAges.includes(String(ageFromBirthday(child.birthday)))) continue;
-    if (restriction.length && !memberSatisfiesRestriction(await sectionIdsForMember(child.id), restriction)) continue;
+    const childSectionIds = await sectionIdsForMember(child.id);
+    if (!isCurrentlyRegistered && restriction.length && !memberSatisfiesRestriction(childSectionIds, restriction)) continue;
     eligibleChildren.push(child);
+    windowOpenByChild[child.id] = await isRegistrationOpenForAccount(req.portalRoles, { classScheduleIds, sectionIds: [...childSectionIds], actionType: 'parent_register_student' });
   }
 
   const enrolledCount = Number((await db.prepare('SELECT COUNT(*) AS c FROM class_enrollments WHERE class_id = ?').get(classId)).c);
@@ -372,7 +389,11 @@ router.get('/classes/:id/fragment', async (req, res) => {
   // registerForClass's studentId vs this route's member draws.
   const member = await memberForAccount(req.portalAccount.id);
   const myStaffRole = member ? (staff.find((s) => s.id === member.id) || {}).role || null : null;
-  const classScheduleId = await classScheduleIdForClass(cls);
+  // The SIGNED-IN ACCOUNT's own Sections (never a child's) - who's
+  // actually registering to teach/assist is always the account itself,
+  // same distinction registerForClass's studentId vs this route's member
+  // draws everywhere else.
+  const myStaffSectionIds = member ? [...(await sectionIdsForMember(member.id))] : [];
 
   res.render('parent-class-fragment', {
     cls,
@@ -392,10 +413,11 @@ router.get('/classes/:id/fragment', async (req, res) => {
     hasChildren: children.length > 0,
     enrolledIds: [...enrolledIds],
     waitlistPositionByStudentId,
-    windowOpen: await isRegistrationOpenForAccount(req.portalRoles, { classScheduleId, sectionIds: restriction, actionType: 'parent_register_student' }),
+    windowOpenByChild,
     myStaffRole,
-    teacherWindowOpen: await isRegistrationOpenForAccount(req.portalRoles, { classScheduleId, sectionIds: restriction, actionType: 'parent_teacher' }),
-    assistantWindowOpen: await isRegistrationOpenForAccount(req.portalRoles, { classScheduleId, sectionIds: restriction, actionType: 'parent_assistant' }),
+    myStaffName: member ? member.name : null,
+    teacherWindowOpen: await isRegistrationOpenForAccount(req.portalRoles, { classScheduleIds, sectionIds: myStaffSectionIds, actionType: 'parent_teacher' }),
+    assistantWindowOpen: await isRegistrationOpenForAccount(req.portalRoles, { classScheduleIds, sectionIds: myStaffSectionIds, actionType: 'parent_assistant' }),
   });
 });
 
@@ -405,6 +427,15 @@ router.post('/classes/:id/join', async (req, res) => {
   const back = classesBackUrl(req.body.day);
   const member = await memberForAccount(req.portalAccount.id);
   const result = await joinClassAsStaff({ classId, member, accountId: req.portalAccount.id, portalRoles: req.portalRoles, role });
+  if (!result.ok) return res.redirect(back + 'error=' + encodeURIComponent(result.error));
+  res.redirect(back + 'notice=' + encodeURIComponent(result.notice));
+});
+
+router.post('/classes/:id/leave', async (req, res) => {
+  const classId = parseInt(req.params.id, 10);
+  const back = classesBackUrl(req.body.day);
+  const member = await memberForAccount(req.portalAccount.id);
+  const result = await leaveClassAsStaff({ classId, member, accountId: req.portalAccount.id });
   if (!result.ok) return res.redirect(back + 'error=' + encodeURIComponent(result.error));
   res.redirect(back + 'notice=' + encodeURIComponent(result.notice));
 });

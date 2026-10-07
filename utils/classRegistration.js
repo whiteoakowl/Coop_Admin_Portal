@@ -20,7 +20,7 @@
 // Registration Schedule's own role-scoped windows already cover that.
 const db = require('../db');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('./sections');
-const { ageGroupList, classGlobalSettings, classScheduleIdForClass } = require('./classSchedule');
+const { ageGroupList, classGlobalSettings, classScheduleIdsForClass } = require('./classSchedule');
 const { ageAsOfDate, todayISO } = require('./dates');
 const { createCharge, amountPaidForCharge, cancelCharge, recordPayment } = require('./payments');
 const { isRegistrationOpenForAccount } = require('./registrationWindows');
@@ -92,9 +92,15 @@ async function joinClassAsStaff({ classId, member, accountId, portalRoles, role 
   const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
   if (!cls || !cls.registration_open) return { ok: false, error: 'Self-signup is not open for that class.' };
 
-  const restriction = await classSectionIds(classId);
+  // A real request: a window's own Section scoping should gate by which
+  // Section(s) the person signing up themselves belongs to, not by
+  // whether the class happens to be locked to that Section at all (that
+  // separate class-level lock/eligibility check is registerForClass's
+  // own restriction+memberSatisfiesRestriction, below - staff self-
+  // signup has never gone through that check, so nothing changes there).
   const actionType = role === 'assistant' ? 'parent_assistant' : 'parent_teacher';
-  if (!(await isRegistrationOpenForAccount(portalRoles, { classScheduleId: await classScheduleIdForClass(cls), sectionIds: restriction, actionType }))) {
+  const memberSectionIds = [...(await sectionIdsForMember(member.id))];
+  if (!(await isRegistrationOpenForAccount(portalRoles, { classScheduleIds: await classScheduleIdsForClass(cls), sectionIds: memberSectionIds, actionType }))) {
     return { ok: false, error: 'Registration is not open for your account yet.' };
   }
   const already = await db.prepare('SELECT 1 FROM class_staff WHERE class_id = ? AND member_id = ?').get(classId, member.id);
@@ -123,18 +129,52 @@ async function joinClassAsStaff({ classId, member, accountId, portalRoles, role 
   return { ok: true, notice };
 }
 
+// Self-withdraw from a class's own Teacher/Assistant self-signup - the
+// mirror of joinClassAsStaff above. A real request: "there needs to also
+// be a withdraw button for the teacher assistant" - self-signup had no
+// way back out short of a Main Admin manually removing the staff row.
+// Settles any linked charge (a 'students_and_staff'-priced class) the
+// same way a parent cancelling their own child's registration already
+// does (settleChargeOnCancel + the same parent/system credit-adjustment
+// policy, since this is just as much a self-service removal as that is).
+// { ok: false, error } or { ok: true, notice }
+async function leaveClassAsStaff({ classId, member, accountId }) {
+  if (!member) return { ok: false, error: 'No profile found for your account.' };
+  const staffRow = await db.prepare('SELECT * FROM class_staff WHERE class_id = ? AND member_id = ?').get(classId, member.id);
+  if (!staffRow) return { ok: false, error: 'You are not signed up for that class.' };
+  const cls = await db.prepare('SELECT class_name FROM classes WHERE id = ?').get(classId);
+
+  await db.prepare('DELETE FROM class_staff WHERE class_id = ? AND member_id = ?').run(classId, member.id);
+
+  if (staffRow.charge_id) {
+    const settings = await classGlobalSettings();
+    await settleChargeOnCancel(staffRow.charge_id, accountId, settings.autoCreditOnParentOrSystemRemoval);
+  }
+  return { ok: true, notice: `You're no longer signed up for "${cls ? cls.class_name : 'that class'}".` };
+}
+
 // { ok: false, error } or { ok: true, notice, status, waitlistPosition }
 async function registerForClass({ classId, studentId, accountId, portalRoles, registrantType }) {
   const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
   if (!cls || !cls.registration_open) return { ok: false, error: 'Registration is not open for that class.' };
 
   const settings = await classGlobalSettings();
+  // restriction is the CLASS's own lock-by-section setting (unrelated to
+  // and untouched by the window-scoping change below) - whether this
+  // student is even eligible to register for this class at all.
+  // memberSectionIds (the STUDENT's own sections, not the class's) is a
+  // real request: "individual or multiple sections for members" - a
+  // window's own Section scoping now asks whether the person actually
+  // registering belongs to one of those Sections, the same question this
+  // eligibility check already asks, so it's fetched once and reused for
+  // both rather than two separate queries.
   const restriction = await classSectionIds(classId);
+  const memberSectionIds = await sectionIdsForMember(studentId);
   const actionType = registrantType === 'student' ? 'student_register_self' : 'parent_register_student';
-  if (!(await isRegistrationOpenForAccount(portalRoles, { classScheduleId: await classScheduleIdForClass(cls), sectionIds: restriction, actionType }))) {
+  if (!(await isRegistrationOpenForAccount(portalRoles, { classScheduleIds: await classScheduleIdsForClass(cls), sectionIds: [...memberSectionIds], actionType }))) {
     return { ok: false, error: 'Registration is not open for your account yet.' };
   }
-  if (restriction.length && !memberSatisfiesRestriction(await sectionIdsForMember(studentId), restriction)) {
+  if (restriction.length && !memberSatisfiesRestriction(memberSectionIds, restriction)) {
     return { ok: false, error: 'This class is limited to specific sections you are not part of.' };
   }
   const alreadyEnrolled = await db.prepare('SELECT 1 FROM class_enrollments WHERE class_id = ? AND student_id = ?').get(classId, studentId);
@@ -367,4 +407,4 @@ async function adminRemoveStudentFromClass(classId, studentId, adminAccountId) {
   }
 }
 
-module.exports = { registerForClass, unregisterFromClass, adminRemoveStudentFromClass, joinClassAsStaff, staffCountsForClass };
+module.exports = { registerForClass, unregisterFromClass, adminRemoveStudentFromClass, joinClassAsStaff, leaveClassAsStaff, staffCountsForClass };

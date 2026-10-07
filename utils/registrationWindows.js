@@ -123,15 +123,27 @@ function windowAppliesToAction(w, actionType) {
 // least one window does cover this action, an account qualifies once
 // it's inside a window that's unrestricted (no schedule grid/sections
 // selected) or matches every one of the ones it does restrict.
-// `classScheduleId` (the CLASS's own Schedule Grid, from
-// classScheduleIdForClass - not the member's) and `sectionIds` (the
-// CLASS's own section restriction, from classSectionIds) narrow a window
-// to one schedule grid / one Sections group; omit either to check across
-// all of them (used by page-level "is anything open" banners that aren't
-// scoped to one class). `actionType` narrows to one of the 4 keys in
-// ACTION_TYPE_COLUMNS above; omit it for an unscoped "is anything open"
-// check.
-async function isRegistrationOpenForAccount(accountRoles, { classScheduleId, sectionIds, actionType } = {}) {
+// `classScheduleIds` (every Schedule Grid a class counts as belonging to,
+// from classScheduleIdsForClass - a real class can match more than one
+// grid when it's never been tagged with a specific semester, see that
+// function's own comment) and `sectionIds` (the REGISTERING MEMBER's own
+// Sections, from sectionIdsForMember - which parent/student is actually
+// signing up, not the class's own separate lock-by-section restriction
+// classSectionIds/memberSatisfiesRestriction already gate independently)
+// narrow a window to one or more schedule grids / one or more Sections
+// the member belongs to; omit either to check across all of them (used
+// by page-level "is anything open" banners that aren't scoped to one
+// class/member). A real request: "individual or multiple sections for
+// members" - a window's own Section checkboxes now ask "is the person
+// registering in one of these Sections," the same question Events/Chat's
+// own Section-restriction already asks of a member, not "is the class
+// itself locked to one of these Sections" (a window used to piggyback on
+// the class's own lock instead of having its own member-facing meaning,
+// which made a Section-scoped window silently do nothing for any class
+// that had no section lock of its own). `actionType` narrows to one of
+// the 4 keys in ACTION_TYPE_COLUMNS above; omit it for an unscoped "is
+// anything open" check.
+async function isRegistrationOpenForAccount(accountRoles, { classScheduleIds, sectionIds, actionType } = {}) {
   const windows = await db.prepare('SELECT * FROM registration_windows').all();
   if (windows.length === 0) return true;
   if (actionType !== undefined && !windows.some((w) => windowAppliesToAction(w, actionType))) return true;
@@ -139,7 +151,7 @@ async function isRegistrationOpenForAccount(accountRoles, { classScheduleId, sec
   const nowText = (await db.prepare('SELECT now_text() AS now').get()).now;
   const sectionsByWindow = await sectionIdsByWindow();
   return windows.some((w) => {
-    if (w.class_schedule_id && classScheduleId !== undefined && w.class_schedule_id !== classScheduleId) return false;
+    if (w.class_schedule_id && classScheduleIds !== undefined && !classScheduleIds.includes(w.class_schedule_id)) return false;
     const requiredSections = sectionsByWindow[w.id] || [];
     if (requiredSections.length && sectionIds !== undefined && !sectionIds.some((id) => requiredSections.includes(id))) return false;
     if (!windowAppliesToAction(w, actionType)) return false;
@@ -154,12 +166,12 @@ async function isRegistrationOpenForAccount(accountRoles, { classScheduleId, sec
 // *when* registration opens for them, not just that it isn't open yet.
 // Null once no windows exist at all, or every window that applies to
 // this account has already closed.
-async function nextWindowForAccount(accountRoles, { classScheduleId, sectionIds, actionType } = {}) {
+async function nextWindowForAccount(accountRoles, { classScheduleIds, sectionIds, actionType } = {}) {
   const windows = await db.prepare('SELECT * FROM registration_windows').all();
   const nowText = (await db.prepare('SELECT now_text() AS now').get()).now;
   const sectionsByWindow = await sectionIdsByWindow();
   const applicable = windows
-    .filter((w) => !w.class_schedule_id || classScheduleId === undefined || w.class_schedule_id === classScheduleId)
+    .filter((w) => !w.class_schedule_id || classScheduleIds === undefined || classScheduleIds.includes(w.class_schedule_id))
     .filter((w) => {
       const requiredSections = sectionsByWindow[w.id] || [];
       return !requiredSections.length || sectionIds === undefined || sectionIds.some((id) => requiredSections.includes(id));
