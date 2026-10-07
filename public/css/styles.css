@@ -8017,12 +8017,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      silently won even under 480px, overflowing the dialog's fixed width
      instead of actually shrinking - "name, registered button and cancel
      buttons should be in the same row...on mobile" needs this to
-     actually take effect there. */
-  .parent-class-child-row { gap: 0.35rem; }
-  .parent-class-child-name { padding: 0.4rem 0.65rem; font-size: 0.88rem; }
-  .class-view-register-box .badge-pill { font-size: 0.68rem; padding: 0.15rem 0.4rem; }
+     actually take effect there.
+     A later real bug report: on a real phone (~390px wide) this first
+     pass still wasn't quite small enough - the Withdraw button was
+     still wrapping to its own line below the name/badge pill, the
+     opposite of "fit nicely on one row." The box's own left/right
+     padding (1rem each side, unchanged by this block) was eating real
+     width this row needed more than the box did, so it gets a mobile-
+     only trim here too alongside tighter name/badge/button sizing. */
+  .class-view-register-box { padding: 0.9rem 0.6rem; }
+  .parent-class-child-row { gap: 0.3rem; }
+  .parent-class-child-name { padding: 0.3rem 0.55rem; font-size: 0.8rem; }
+  .class-view-register-box .badge-pill { font-size: 0.62rem; padding: 0.1rem 0.35rem; }
   .class-view-register-box .primary-btn-dark,
-  .class-view-register-box .roster-action-btn-danger { padding: 0.4rem 0.6rem; font-size: 0.72rem; }
+  .class-view-register-box .roster-action-btn-danger { padding: 0.32rem 0.5rem; font-size: 0.66rem; }
 }
 
 /* Allergies/Medical log popup - reuses .class-view-dialog's chrome but
