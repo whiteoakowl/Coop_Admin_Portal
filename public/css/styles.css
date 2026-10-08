@@ -7502,31 +7502,33 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    buttons to their own line, staying inside this card, instead. */
 .class-card-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
 /* A real request: "make sure title shrink to fit in in class colored box/
-   card" - superseded the old unlimited-wrap approach (a real bug report
-   once found titles like "Brain Games and Logic" broken ONE CHARACTER PER
-   LINE on a narrow mobile column, fixed at the time by letting whole
-   words wrap at their own spaces instead of mid-word) with a 2-line clamp:
+   card" - the old unlimited-wrap approach once broke titles like "Brain
+   Games and Logic" ONE CHARACTER PER LINE on a narrow mobile column;
    public/js/class-card-title-fit.js shrinks this h3's own font-size down
-   (never up) until it fits in 2 lines, so a long title reads smaller
-   instead of wrapping the card tall and uneven next to its neighbors - a
-   plain single-line + ellipsis was tried first and rejected: confirmed
-   live, the mobile grid's hour columns are only ~70px wide, so even a
-   short, ordinary title like "Verify Spacing Class" ellipsized down to
-   "Verify S..." almost immediately, losing most of the actual name. The
-   -webkit-line-clamp/-webkit-box pair is a de facto standard now (every
-   evergreen browser implements it despite the prefix), the only way to
-   cap a wrapping element at an exact line count with its own ellipsis
-   when it still doesn't fit. */
+   (never up) to try to fit it in 2 lines, so a long title reads smaller
+   instead of wrapping the card tall and uneven next to its neighbors.
+   A later real bug report ("should be able to read the full title of each
+   class on schedule grid view mobile") found that fit attempt wasn't the
+   whole story: a permanent -webkit-line-clamp: 2 used to live here as the
+   static/no-JS fallback, and on the narrowest mobile breakpoint (480px,
+   below) the starting font-size was already at/under the JS shrink
+   script's own floor, so for any title that still didn't fit at that tiny
+   size the clamp just silently cut it off with "..." - a parent could no
+   longer tell which class was which. white-space: normal here is that
+   fallback now instead: an unclamped title just wraps across however many
+   lines it actually needs (growing the card/row a little), which is
+   worse for even row heights but strictly better than losing real class
+   names. The JS still applies its own TEMPORARY 2-line clamp purely to
+   measure whether shrinking the font would avoid that growth, then always
+   removes it before leaving the title on screen - see that file's own
+   comment. */
 .class-card-header h3 {
   margin: 0;
   font-size: 0.92rem;
   flex: 1;
   min-width: 0;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 /* Belt-and-suspenders for the same bug: even with the wrap fix above,
    nothing clips a card that somehow still renders wider than its cell

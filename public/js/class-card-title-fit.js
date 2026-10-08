@@ -2,27 +2,44 @@
 // Portal's Classes page - both render the exact same .class-card markup,
 // see views/partials/class-schedule-grid.ejs's own comment) - a real
 // request: "make sure title shrink to fit in in class colored box/card."
-// public/css/styles.css's own .class-card-header h3 rule caps the title
-// at 2 lines (-webkit-line-clamp: 2) with its own ellipsis as the static
-// no-JS fallback; this shrinks the font-size down first so a long title
-// reads smaller instead of hitting that clamp and losing text to "...".
-// scrollHeight vs clientHeight (not width) because the clamp box's
-// overflow is vertical - once a title needs more than 2 lines at the
-// current size, the clamped box's own fixed height is what stops
-// growing, while scrollHeight keeps reporting how tall it would be
-// unclamped. Same proven measure-and-shrink loop public/js/barcode-
-// print-shrink-name.js already uses for an identical class of problem
-// (a name below a barcode).
+// This shrinks the font-size down first so a long title reads smaller
+// instead of wrapping the card tall and uneven next to its neighbors.
+// scrollHeight vs clientHeight (not width) because the TEMPORARY clamp
+// applied below makes the box's overflow vertical while it's in place -
+// once a title needs more than 2 lines at the current size, the clamped
+// box's own fixed height is what stops growing, while scrollHeight keeps
+// reporting how tall it would be unclamped. Same proven measure-and-
+// shrink loop public/js/barcode-print-shrink-name.js already uses for an
+// identical class of problem (a name below a barcode).
 (function () {
   var MIN_FONT_SIZE_PX = 10;
 
   function shrinkToFit(el) {
     el.style.fontSize = ''; // back to the CSS default (already breakpoint-correct) before measuring.
+    // A real bug report ("should be able to read the full title of each
+    // class on schedule grid view mobile") found a PERMANENT clamp here
+    // (this used to live in styles.css itself) silently losing real class
+    // names to "..." once a title still didn't fit at the smallest size
+    // this loop would shrink to - on the narrowest mobile breakpoint the
+    // starting font-size was already at/under MIN_FONT_SIZE_PX, so the
+    // loop never even ran. The clamp is applied here ONLY to measure
+    // whether shrinking the font avoids wrapping past 2 lines, and is
+    // always stripped again below before the title is left on screen -
+    // so the worst case is a slightly taller card showing the FULL title,
+    // never a truncated one.
+    el.style.display = '-webkit-box';
+    el.style.webkitBoxOrient = 'vertical';
+    el.style.webkitLineClamp = '2';
+    el.style.overflow = 'hidden';
     var fontSize = parseFloat(getComputedStyle(el).fontSize);
     while (el.scrollHeight > el.clientHeight && fontSize > MIN_FONT_SIZE_PX) {
       fontSize -= 1;
       el.style.fontSize = fontSize + 'px';
     }
+    el.style.display = '';
+    el.style.webkitBoxOrient = '';
+    el.style.webkitLineClamp = '';
+    el.style.overflow = '';
   }
 
   function shrinkAll() {

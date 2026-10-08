@@ -41,7 +41,14 @@
         <% if (view === 'list') { %><p class="class-card-line"><span class="class-card-line-label">Time:</span> <%= cls.start_time || '?' %>&ndash;<%= cls.end_time || '?' %></p><% } %>
         <% if (cls.gradeLabel) { %><p class="class-card-line"><%= cls.gradeLabel %></p><% } %>
         <p class="class-card-line"><span class="class-card-line-label">Teacher:</span> <%= cls.teacherNames.length ? cls.teacherNames.join(', ') : '—' %></p>
-        <% if (cls.room) { %><p class="class-card-line"><span class="class-card-line-label">Room:</span> <%= cls.room %></p><% } %>
+        <%# A real request: "room: ... should not be on each class card on
+            the grid. It's already the 1st column of titles" - Grid view
+            (parent-classes.ejs) lays classes out in a Room x Hour table
+            with the room as each row's own header, so repeating it again
+            on every card in that row was redundant. List view has no such
+            row header (one flat row per class, see that file's own
+            comment) - Room still only shows there. %>
+        <% if (cls.room && view === 'list') { %><p class="class-card-line"><span class="class-card-line-label">Room:</span> <%= cls.room %></p><% } %>
       </div>
     </div>
   </div>
