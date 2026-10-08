@@ -276,10 +276,43 @@ test('Class Dashboard: dropdown includes parent names, and selecting one shows t
   assert.equal(teaching.status, 200);
   assert.match(teaching.text, /Taught By Parent Class/);
   assert.match(teaching.text, /Assisted By Parent Class/);
-  // A teaching parent's card has nowhere to click through to yet (the
-  // detail route below is student-enrollment-only), so it renders as a
-  // plain, non-linking card.
-  assert.doesNotMatch(teaching.text, new RegExp(`href="/parent/classes/dashboard/${taughtClass.id}`));
+  // A real bug report: "it won't let me click on class lessons under
+  // classroom dashboard" - a teaching parent's card used to have nowhere
+  // to click through to at all; it now links into the same detail page
+  // a child's enrolled-class card does, just in read-only staff mode.
+  assert.match(teaching.text, new RegExp(`href="/parent/classes/dashboard/${taughtClass.id}\\?viewer=parent-${parentMember.id}"`));
+  assert.match(teaching.text, new RegExp(`href="/parent/classes/dashboard/${assistedClass.id}\\?viewer=parent-${parentMember.id}"`));
+});
+
+// Coverage for the fix to the bug report above: the detail page itself,
+// not just the card's own link.
+test('Class Dashboard detail, staff view (?viewer=parent-<id>): shows Details/Lessons/Chat only (no Assignments/Grades/Attendance - those are per-student), no Withdraw button', async () => {
+  const admin = await loginAsAdmin();
+  const taughtClass = await createClass(admin, { className: 'Staff View Class' });
+  await db.prepare('UPDATE classes SET allow_parent_chat = 1 WHERE id = ?').run(taughtClass.id);
+  const parent = await createParentWithChild();
+  const parentMember = await db.prepare('SELECT * FROM members WHERE name = ?').get(`Dashboard Parent ${familyCounter}`);
+  await db.prepare("INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, 'teacher')").run(taughtClass.id, parentMember.id);
+
+  const detail = await request(app).get(`/parent/classes/dashboard/${taughtClass.id}?viewer=parent-${parentMember.id}`).set('Cookie', parent.cookie);
+  assert.equal(detail.status, 200);
+  assert.match(detail.text, new RegExp(`${parentMember.name}.*teaches or assists this class`));
+  assert.match(detail.text, />Details</);
+  assert.match(detail.text, />Lessons</);
+  assert.match(detail.text, />Chat</);
+  assert.doesNotMatch(detail.text, />Assignments</);
+  assert.doesNotMatch(detail.text, />Grades</);
+  assert.doesNotMatch(detail.text, />Attendance</);
+  assert.doesNotMatch(detail.text, /Withdraw/);
+
+  // A class this parent does NOT staff, or a parent id outside this
+  // account's own family, is 404 - never trust the request-supplied id.
+  const otherClass = await createClass(admin, { className: 'Not Staffed By This Parent' });
+  const notStaffed = await request(app).get(`/parent/classes/dashboard/${otherClass.id}?viewer=parent-${parentMember.id}`).set('Cookie', parent.cookie);
+  assert.equal(notStaffed.status, 404);
+
+  const outsideFamily = await request(app).get(`/parent/classes/dashboard/${taughtClass.id}?viewer=parent-999999`).set('Cookie', parent.cookie);
+  assert.equal(outsideFamily.status, 404);
 });
 
 test('Class Dashboard: a parent teaching/assisting in no classes yet sees an empty state, not their child\'s classes', async () => {

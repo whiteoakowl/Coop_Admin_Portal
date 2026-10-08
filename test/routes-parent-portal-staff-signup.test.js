@@ -372,3 +372,52 @@ test('A parent cannot register a child under 15, or a member of a DIFFERENT fami
   const noStaffRows = await db.prepare('SELECT COUNT(*) AS c FROM class_staff WHERE class_id = ?').get(cls.id);
   assert.equal(noStaffRows.c, 0);
 });
+
+// A real bug report: "it's not showing parent names to register as
+// teacher or assistant" - traced to staffEligibleFamilyMembers requiring
+// the account's own member to have a family_id set, when members.
+// family_id is nullable and gets cleared (ON DELETE SET NULL) if the
+// family row it pointed at is ever deleted or merged away, without
+// touching the member's own active status or portal account. A parent
+// with no children (the only prior caller of parentsForAccount/
+// childrenForAccount, both of which also bail out to [] on no family_id)
+// who got orphaned that way saw NOBODY listed, not even themselves -
+// even though self-signup never needed a family_id at all before this
+// feature existed.
+async function createParentWithNoFamily() {
+  familyCounter += 1;
+  const code = await generateMemberCode();
+  const memberInfo = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, is_primary_parent, active) VALUES (?, ?, ?, 'parent', NULL, 1, 1)")
+    .run(`Orphaned Parent ${familyCounter}`, code, code);
+  const email = `orphaned-parent${familyCounter}@example.com`;
+  const accountInfo = await db
+    .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text())")
+    .run(memberInfo.lastInsertRowid, email, hashPassword('testpassword123'));
+  const parentRole = await db.prepare("SELECT id FROM roles WHERE key = 'parent'").get();
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(accountInfo.lastInsertRowid, parentRole.id);
+
+  const loginRes = await request(app).post('/login').type('form').send({ email, password: 'testpassword123', next: '/parent' });
+  const cookie = loginRes.headers['set-cookie'];
+  const homePage = await request(app).get('/parent').set('Cookie', cookie);
+  return { cookie, csrfToken: extractCsrf(homePage.text), memberId: memberInfo.lastInsertRowid };
+}
+
+test('A parent with no family_id (orphaned by a deleted/merged family) still sees themselves in the Register as Teacher/Assistant section and can self-register', async () => {
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'Orphaned Parent Class' });
+  const parent = await createParentWithNoFamily();
+
+  const fragment = await request(app).get(`/parent/classes/${cls.id}/fragment?day=monday`).set('Cookie', parent.cookie);
+  assert.equal(fragment.status, 200);
+  const parentMember = await db.prepare('SELECT name FROM members WHERE id = ?').get(parent.memberId);
+  assert.match(fragment.text, new RegExp(`<span class="parent-class-child-name-text">${parentMember.name}</span>`));
+  assert.doesNotMatch(fragment.text, /No eligible family members/);
+
+  const joined = await request(app)
+    .post(`/parent/classes/${cls.id}/join`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ role: 'teacher', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
+  assert.match(decodeURIComponent(joined.headers.location), /notice=Signed up as teacher/);
+});

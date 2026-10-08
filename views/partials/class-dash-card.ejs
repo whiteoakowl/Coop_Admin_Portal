@@ -2,8 +2,10 @@
 // locals: c (one allClassesList row - see utils/classSchedule.js's own
 // classImageUrl field), selectedChild (null when the dashboard is
 // showing a parent's own teaching/assisting classes instead of a
-// child's enrolled ones - see views/parent-class-dashboard.ejs). A real
-// request: "Class card should show Class image on left of card."
+// child's enrolled ones - see views/parent-class-dashboard.ejs),
+// selectedParent (the mirror - set only in that teaching/assisting
+// case). A real request: "Class card should show Class image on left of
+// card."
 //
 // A later real request ("all classes should have a delete button and
 // view class button on each row to the right... you can now cancel the
@@ -14,13 +16,18 @@
 // be much smaller.") restores the whole-card click target - the color
 // bar + body are wrapped in their own link instead, so the small
 // Withdraw button can keep living beside it as its own separate click
-// target without also triggering navigation. A parent's teaching card
-// has nowhere to click through to at all yet (that detail route is
-// student-enrollment-only) and isn't a registration to withdraw from
-// either, so it still renders with no link/action row.
+// target without also triggering navigation.
+// A real bug report: "it won't let me click on class lessons under
+// classroom dashboard" - a parent's own teaching/assisting card used to
+// have nowhere to click through to at all (routes/parent-portal.js's own
+// GET /classes/dashboard/:id was student-enrollment-only), so the link
+// below was skipped outright for that case. That route now also accepts
+// ?viewer=parent-<id> for exactly this card, read-only (Details/Lessons/
+// Chat only, no Withdraw - staffing isn't a registration to withdraw
+// from the way a child's enrollment is).
 %>
 <div class="class-dash-card">
-  <% if (selectedChild) { %><a class="class-dash-card-link" href="/parent/classes/dashboard/<%= c.id %>?studentId=<%= selectedChild.id %>"><% } %>
+  <% if (selectedChild) { %><a class="class-dash-card-link" href="/parent/classes/dashboard/<%= c.id %>?studentId=<%= selectedChild.id %>"><% } else if (selectedParent) { %><a class="class-dash-card-link" href="/parent/classes/dashboard/<%= c.id %>?viewer=parent-<%= selectedParent.id %>"><% } %>
     <div class="class-dash-card-color-bar" style="background:<%= c.color %>"></div>
     <div class="class-dash-card-body">
       <% if (c.classImageUrl) { %>
@@ -35,7 +42,7 @@
         <p class="class-dash-card-meta">Teacher: <%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
       </div>
     </div>
-  <% if (selectedChild) { %></a><% } %>
+  <% if (selectedChild || selectedParent) { %></a><% } %>
   <% if (selectedChild) { %>
     <div class="class-dash-card-actions">
       <button

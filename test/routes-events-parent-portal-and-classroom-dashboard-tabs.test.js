@@ -205,8 +205,10 @@ test('Classroom Dashboard Details tab has Teacher(s), Description, and Cost per 
   assert.match(detail.text, /A fun class about fun things\./);
   assert.match(detail.text, /<span class="class-view-info-label">Cost per Student<\/span>\s*<strong class="class-view-info-value">\$25\.00/);
 
-  // Tab order: Details, Assignments, Lessons, Attendance, then Grades last.
-  const tabOrder = ['Details', 'Assignments', 'Lessons', 'Attendance', 'Grades'];
+  // Tab order: Details, Lessons, Attendance, then Grades last - a real
+  // request ("Remove assignment tab from classroom dashboard") dropped
+  // the Assignments tab that used to sit between Details and Lessons.
+  const tabOrder = ['Details', 'Lessons', 'Attendance', 'Grades'];
   const positions = tabOrder.map((label) => {
     const idx = detail.text.indexOf(`>${label}</a>`);
     assert.ok(idx !== -1, `expected to find tab "${label}"`);

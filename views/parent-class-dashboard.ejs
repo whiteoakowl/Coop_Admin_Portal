@@ -59,7 +59,7 @@
           <h2><%= dayLabels[d] %></h2>
           <div class="class-dash-grid">
             <% byDay[d].forEach(function(c) { %>
-              <%- include('partials/class-dash-card', { c: c, selectedChild: selectedChild }) %>
+              <%- include('partials/class-dash-card', { c: c, selectedChild: selectedChild, selectedParent: selectedParent }) %>
             <% }); %>
           </div>
         <% }); %>

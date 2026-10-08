@@ -7,23 +7,41 @@
   <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle"><a href="/parent/classes/dashboard?studentId=<%= selectedChild.id %>">&larr; Classroom Dashboard</a></p>
+    <p class="subtitle"><a href="/parent/classes/dashboard?<%= viewerQuery %>">&larr; Classroom Dashboard</a></p>
     <h1><%= cls.class_name %></h1>
     <%# A real request: "The top description above tabs should simply
         say, (member name) registered for this class." - replaces the
         older day/time/room summary line (that info now lives in the
-        Details tab's own Schedule row below). %>
-    <p class="hint"><strong><%= selectedChild.name %></strong> registered for this class.</p>
+        Details tab's own Schedule row below). A later real request
+        ("it won't let me click on class lessons under classroom
+        dashboard") added the selectedParent branch - this same page now
+        also shows a family member's own TEACHING/ASSISTING class
+        (?viewer=parent-<id>, no child/registration involved at all). %>
+    <% if (selectedParent) { %>
+      <p class="hint"><strong><%= selectedParent.name %></strong> teaches or assists this class.</p>
+    <% } else { %>
+      <p class="hint"><strong><%= selectedChild.name %></strong> registered for this class.</p>
+    <% } %>
 
+    <%# A real request: "Remove assignment tab from classroom dashboard" -
+        Grades (below) already covers the one thing parents actually used
+        Assignments for (seeing a scored assignment); the un-scored list
+        this tab duplicated is gone. selectedParent's own teaching/
+        assisting view never had Assignments/Grades/Attendance tabs at
+        all - those are per-STUDENT academic records, meaningless for a
+        teacher looking at their own class. %>
     <div class="view-tabs no-print">
-      <a class="view-tab<%= tab === 'details' ? ' active' : '' %>" href="?tab=details&studentId=<%= selectedChild.id %>">Details</a>
-      <a class="view-tab<%= tab === 'assignments' ? ' active' : '' %>" href="?tab=assignments&studentId=<%= selectedChild.id %>">Assignments</a>
-      <a class="view-tab<%= tab === 'lessons' ? ' active' : '' %>" href="?tab=lessons&studentId=<%= selectedChild.id %>">Lessons</a>
-      <a class="view-tab<%= tab === 'attendance' ? ' active' : '' %>" href="?tab=attendance&studentId=<%= selectedChild.id %>">Attendance</a>
-      <% if (cls.allow_parent_chat) { %>
-        <a class="view-tab<%= tab === 'chat' ? ' active' : '' %>" href="?tab=chat&studentId=<%= selectedChild.id %>">Chat</a>
+      <a class="view-tab<%= tab === 'details' ? ' active' : '' %>" href="?tab=details&<%= viewerQuery %>">Details</a>
+      <a class="view-tab<%= tab === 'lessons' ? ' active' : '' %>" href="?tab=lessons&<%= viewerQuery %>">Lessons</a>
+      <% if (!selectedParent) { %>
+        <a class="view-tab<%= tab === 'attendance' ? ' active' : '' %>" href="?tab=attendance&<%= viewerQuery %>">Attendance</a>
       <% } %>
-      <a class="view-tab<%= tab === 'grades' ? ' active' : '' %>" href="?tab=grades&studentId=<%= selectedChild.id %>">Grades</a>
+      <% if (cls.allow_parent_chat) { %>
+        <a class="view-tab<%= tab === 'chat' ? ' active' : '' %>" href="?tab=chat&<%= viewerQuery %>">Chat</a>
+      <% } %>
+      <% if (!selectedParent) { %>
+        <a class="view-tab<%= tab === 'grades' ? ' active' : '' %>" href="?tab=grades&<%= viewerQuery %>">Grades</a>
+      <% } %>
     </div>
 
     <div class="view-tab-panel">
@@ -119,36 +137,6 @@
             <div class="hint forum-editable-display"><%- cls.description %></div>
           </div>
         <% } %>
-      <% } else if (tab === 'assignments') { %>
-        <% if (assignments.length === 0) { %>
-          <p class="roster-empty">No assignments yet.</p>
-        <% } else { %>
-          <div class="roster-scroll">
-            <table class="roster-table members-table condensed-table">
-              <thead>
-                <tr><th>Assignment</th><th>Due</th><th>Grade</th></tr>
-              </thead>
-              <tbody>
-                <% assignments.forEach(function(a) { %>
-                  <tr>
-                    <td class="roster-name-col">
-                      <strong><%= a.title %></strong>
-                      <% if (a.description) { %><div class="hint"><%= a.description %></div><% } %>
-                    </td>
-                    <td><%= a.dueDateLabel || '—' %></td>
-                    <td>
-                      <% if (!a.graded) { %>
-                        <span class="hint">Not graded yet</span>
-                      <% } else { %>
-                        <strong><%= a.points_earned %><% if (a.points_possible != null) { %> / <%= a.points_possible %><% } %></strong>
-                      <% } %>
-                    </td>
-                  </tr>
-                <% }); %>
-              </tbody>
-            </table>
-          </div>
-        <% } %>
       <% } else if (tab === 'grades') { %>
         <% const graded = assignments.filter(function(a) { return a.graded; }); %>
         <% if (graded.length === 0) { %>
@@ -172,9 +160,13 @@
           </div>
         <% } %>
       <% } else if (tab === 'lessons') { %>
-        <%- include('partials/lessons-view', { lessons, canTakeQuiz: !!cls.allow_parent_complete_lessons, quizBasePath: '/parent', quizQuery: `?studentId=${selectedChild.id}` }) %>
+        <%# selectedParent (a teacher/assistant viewing their own class, no
+            child involved) never gets quiz-taking - allow_parent_complete_
+            lessons only ever means "let a parent complete a LESSON ON
+            BEHALF OF their child." %>
+        <%- include('partials/lessons-view', { lessons, canTakeQuiz: !selectedParent && !!cls.allow_parent_complete_lessons, quizBasePath: '/parent', quizQuery: `?${viewerQuery}` }) %>
       <% } else if (tab === 'chat') { %>
-        <%- include('partials/class-chat', { chatMessages, postUrl: `/parent/classes/dashboard/${cls.id}/chat?studentId=${selectedChild.id}` }) %>
+        <%- include('partials/class-chat', { chatMessages, postUrl: `/parent/classes/dashboard/${cls.id}/chat?${viewerQuery}` }) %>
       <% } else if (tab === 'attendance') { %>
         <% if (attendance.length === 0) { %>
           <p class="roster-empty">No attendance recorded yet.</p>

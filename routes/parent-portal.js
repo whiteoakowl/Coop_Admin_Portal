@@ -122,14 +122,26 @@ async function parentsForAccount(account) {
 // assistant it should list all parent names in that family and any
 // students 15 years old or older as eligible to register for teacher or
 // class assistant positions" - self-signup used to implicitly mean only
-// the logged-in account's own member. Reuses parentsForAccount/
-// childrenForAccount (both already scoped to the account's own family, not
-// a request-supplied id) rather than a third separate query, so this
-// stays in sync with "which family" the same way those two already do.
+// the logged-in account's own member.
+// A real bug report: "it's not showing parent names to register as
+// teacher or assistant" - this originally reused parentsForAccount/
+// childrenForAccount, which BOTH return [] outright when the account's
+// own member has no family_id, rather than falling back to at least the
+// account itself. members.family_id is nullable with ON DELETE SET NULL
+// (a deleted/merged family clears it on every member who was in it,
+// without touching their own active account), so a parent who got
+// orphaned that way - especially one with no children, since that's the
+// only path that ever called either of those two functions before - saw
+// literally nobody listed here, including themselves, even though the
+// OLD single-person self-signup (before this feature existed) never
+// needed a family_id at all, just memberForAccount. familyForAccount
+// (utils/portalAuth.js) already gets this right - self always included,
+// family_id or not - so this reuses that instead of re-deriving it.
 async function staffEligibleFamilyMembers(account) {
-  const [parents, children] = await Promise.all([parentsForAccount(account), childrenForAccount(account)]);
-  const teens = children.filter((c) => c.birthday && ageFromBirthday(c.birthday) >= 15);
-  return [...parents, ...teens].sort(byLastName);
+  const family = await familyForAccount(account.id);
+  return family
+    .filter((m) => m.member_type === 'parent' || (m.member_type === 'student' && m.birthday && ageFromBirthday(m.birthday) >= 15))
+    .sort(byLastName);
 }
 
 router.get('/', async (req, res) => {
@@ -687,7 +699,20 @@ router.get('/classes/dashboard', async (req, res) => {
   });
 });
 
-const CLASS_DASHBOARD_TABS = ['details', 'assignments', 'grades', 'lessons', 'attendance', 'chat'];
+// A real request: "Remove assignment tab from classroom dashboard" -
+// Grades (its own tab, kept) already covers the one thing that mattered
+// about a scored assignment; this was the un-scored duplicate list.
+const CLASS_DASHBOARD_TABS = ['details', 'grades', 'lessons', 'attendance', 'chat'];
+// A real bug report: "it won't let me click on class lessons under
+// classroom dashboard" - traced to views/partials/class-dash-card.ejs:
+// a parent's own TEACHING/ASSISTING card (picked via the "Parents"
+// option in the dashboard's viewer dropdown, not a child) rendered with
+// no link at all - its own comment said so outright ("has nowhere to
+// click through to at all yet... that detail route is student-
+// enrollment-only"). assignments/grades/attendance are per-STUDENT
+// academic records that make no sense for a teacher looking at their own
+// class, so the staff view only ever gets these three.
+const STAFF_DASHBOARD_TABS = ['details', 'lessons', 'chat'];
 
 // One class's own read-only info page for one child - details/
 // assignments/grades/lessons/attendance, the same academics data (and,
@@ -704,8 +729,52 @@ const CLASS_DASHBOARD_TABS = ['details', 'assignments', 'grades', 'lessons', 'at
 // class that's deliberately opted in. Only ever shows a class + child
 // pairing this account's own family actually has (never trusts either id
 // from the request).
+// A later real request added a second mode: ?viewer=parent-<id> shows
+// the SAME page for a class this account's own family member TEACHES or
+// ASSISTS (never a request-supplied member id - re-derived from
+// parentsForAccount the same never-trust rule as the student mode
+// above), read-only and with no child/grade context since there isn't
+// one. viewerQuery is the one query-string fragment (studentId=X or
+// viewer=parent-X) every link on the rendered page reuses, so the
+// template never has to branch on which mode it's in just to build a URL.
 router.get('/classes/dashboard/:id', async (req, res) => {
   const classId = parseInt(req.params.id, 10);
+  const staffViewerMatch = /^parent-(\d+)$/.exec(req.query.viewer || '');
+
+  if (staffViewerMatch) {
+    const parents = await parentsForAccount(req.portalAccount);
+    const selectedParent = parents.find((p) => p.id === parseInt(staffViewerMatch[1], 10));
+    if (!selectedParent) return res.status(404).render('404', { title: 'Not Found' });
+
+    const staffedClasses = await classesStaffedByMember(selectedParent.id);
+    const cls = staffedClasses.find((c) => c.id === classId);
+    if (!cls) return res.status(404).render('404', { title: 'Not Found' });
+
+    let tab = STAFF_DASHBOARD_TABS.includes(req.query.tab) ? req.query.tab : 'details';
+    if (tab === 'chat' && !cls.allow_parent_chat) tab = 'details';
+    const lessons = tab === 'lessons' ? await lessonsForStudentView(classId, null) : [];
+    const chatMessages =
+      tab === 'chat'
+        ? (await db.prepare('SELECT * FROM class_chat_messages WHERE class_id = ? ORDER BY id ASC').all(classId)).map((m) => ({
+            ...m,
+            createdAtLabel: formatFriendlyTimestamp(m.created_at),
+          }))
+        : [];
+
+    return res.render('parent-class-dashboard-detail', {
+      title: cls.class_name,
+      cls,
+      selectedChild: null,
+      selectedParent,
+      viewerQuery: `viewer=parent-${selectedParent.id}`,
+      tab,
+      assignments: [],
+      lessons,
+      attendance: [],
+      chatMessages,
+    });
+  }
+
   const children = await childrenForAccount(req.portalAccount);
   const selectedId = parseInt(req.query.studentId, 10);
   const selectedChild = children.find((c) => c.id === selectedId) || children[0] || null;
@@ -717,7 +786,7 @@ router.get('/classes/dashboard/:id', async (req, res) => {
 
   let tab = CLASS_DASHBOARD_TABS.includes(req.query.tab) ? req.query.tab : 'details';
   if (tab === 'chat' && !cls.allow_parent_chat) tab = 'details';
-  const assignments = ['assignments', 'grades'].includes(tab) ? await assignmentsForStudentInClass(selectedChild.id, classId) : [];
+  const assignments = tab === 'grades' ? await assignmentsForStudentInClass(selectedChild.id, classId) : [];
   const lessons = tab === 'lessons' ? await lessonsForStudentView(classId, selectedChild.id) : [];
   const attendance = tab === 'attendance' ? await attendanceHistoryForRoster(selectedChild.id, cls.roster_id) : [];
   const chatMessages =
@@ -731,8 +800,9 @@ router.get('/classes/dashboard/:id', async (req, res) => {
   res.render('parent-class-dashboard-detail', {
     title: cls.class_name,
     cls,
-    children,
     selectedChild,
+    selectedParent: null,
+    viewerQuery: `studentId=${selectedChild.id}`,
     tab,
     assignments,
     lessons,
@@ -746,20 +816,36 @@ router.get('/classes/dashboard/:id', async (req, res) => {
 // class_chat_messages log Co-op Admin's own Chat tab already reads/writes
 // (views/partials/class-chat.ejs, shared by both), gated by the class's
 // own allow_parent_chat setting the same way the GET route above hides
-// the tab entirely when it's off.
+// the tab entirely when it's off. Mirrors that same GET route's two
+// modes (a child's enrollment, or this account's own family member's
+// teaching/assisting role) for the same reason - a teacher posting in
+// their own class's chat is just as real as a parent posting in their
+// child's.
 router.post('/classes/dashboard/:id/chat', async (req, res) => {
   const classId = parseInt(req.params.id, 10);
-  const children = await childrenForAccount(req.portalAccount);
-  const selectedId = parseInt(req.query.studentId, 10);
-  const selectedChild = children.find((c) => c.id === selectedId) || children[0] || null;
-  if (!selectedChild) return res.status(404).render('404', { title: 'Not Found' });
+  const staffViewerMatch = /^parent-(\d+)$/.exec(req.query.viewer || '');
+  const body = (req.body.body || '').trim();
 
-  const classes = await classesForChild(selectedChild.id);
-  const cls = classes.find((c) => c.id === classId);
+  let cls;
+  let back;
+  if (staffViewerMatch) {
+    const parents = await parentsForAccount(req.portalAccount);
+    const selectedParent = parents.find((p) => p.id === parseInt(staffViewerMatch[1], 10));
+    if (!selectedParent) return res.status(404).render('404', { title: 'Not Found' });
+    const staffedClasses = await classesStaffedByMember(selectedParent.id);
+    cls = staffedClasses.find((c) => c.id === classId);
+    back = `/parent/classes/dashboard/${classId}?tab=chat&viewer=parent-${selectedParent.id}`;
+  } else {
+    const children = await childrenForAccount(req.portalAccount);
+    const selectedId = parseInt(req.query.studentId, 10);
+    const selectedChild = children.find((c) => c.id === selectedId) || children[0] || null;
+    if (!selectedChild) return res.status(404).render('404', { title: 'Not Found' });
+    const classes = await classesForChild(selectedChild.id);
+    cls = classes.find((c) => c.id === classId);
+    back = `/parent/classes/dashboard/${classId}?tab=chat&studentId=${selectedChild.id}`;
+  }
   if (!cls || !cls.allow_parent_chat) return res.status(404).render('404', { title: 'Not Found' });
 
-  const back = `/parent/classes/dashboard/${classId}?tab=chat&studentId=${selectedChild.id}`;
-  const body = (req.body.body || '').trim();
   if (!body) return res.redirect(back + '&error=' + encodeURIComponent('A message is required.'));
   const member = await memberForAccount(req.portalAccount.id);
   await db.prepare('INSERT INTO class_chat_messages (class_id, author_name, body) VALUES (?, ?, ?)').run(classId, member.name, body);
