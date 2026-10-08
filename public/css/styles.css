@@ -7890,6 +7890,27 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    with grow already at 0), while the literal `content` keyword actually
    sized it to its own text, as intended. */
 .parent-class-child-row .parent-class-child-trailing { margin-left: auto; flex-grow: 0; flex-shrink: 0; flex-basis: content; }
+/* A real request/bug report: a screenshot of an ineligible child's row
+   ("Serenity Vanderbilt - Not open for registration") showed the NAME
+   itself fractured into unreadable syllables ("Serenity"/"Vanderbi"/
+   "lt") while the hint text sat on its own full-width line - the hint
+   span above inherited flex-shrink: 0 same as the Withdraw/Register
+   buttons, so it always claimed its own full, un-shrunk text width
+   first and left the name (the one thing that must stay fully
+   readable - see .parent-class-child-name-text's own comment) to
+   absorb the entire remaining deficit alone, shrinking it far below
+   what it needed. A plain hint SPAN (never a button/form - those still
+   need to stay a fixed, tappable size) gets to shrink and wrap itself
+   instead, so the two share the squeeze instead of the name taking all
+   of it. */
+.parent-class-child-row span.hint.parent-class-child-trailing {
+  flex-shrink: 1;
+  flex-basis: auto;
+  flex-grow: 0;
+  white-space: normal;
+  text-align: right;
+  min-width: 0;
+}
 /* A real request: "green bubble for registered should be in the white
    bubble with member name" - the status badge now nests inside this
    pill instead of sitting next to it as its own separate bubble.
@@ -7914,17 +7935,37 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  min-width: 0;
+  /* flex-wrap: wrap (not the default nowrap an inline-flex pill would
+     otherwise use) - a real bug report ("Michael Thomps/on" split mid-
+     word) traced to this pill's badge (data-registered-state below,
+     flex-shrink: 0 - it must never shrink) competing with the name text
+     for width: with both forced onto one internal line, the ROW's own
+     shrink math (flex-basis: content below) treated the pill's floor as
+     name-width + badge-width SUMMED, and once the row's real available
+     space (squeezed further by the hint span alongside it) fell below
+     that sum, the name text itself - the only shrinkable thing left -
+     got pushed below its own longest-word width and broke mid-word.
+     Letting the badge wrap onto its own line under the name here means
+     the pill's floor is just whichever of (name's longest word) or
+     (badge width) is bigger, never their sum - small enough to almost
+     always fit, and on the rare class it doesn't, the badge drops below
+     the name instead of the name fracturing. */
+  flex-wrap: wrap;
   flex-shrink: 1;
   flex-basis: content;
 }
 /* No longer truncated (overflow: hidden + ellipsis) - see the real
    request on .parent-class-child-row above. white-space: normal lets a
    long name wrap onto a second line within its own pill instead of
-   being cut off; overflow-wrap guards the rare name with no spaces
-   long enough to overflow even that. */
+   being cut off; overflow-wrap guards the rare name with no spaces (or
+   hyphens - a natural break point on its own) long enough to overflow
+   even that. No min-width is set here: a flex item's own automatic
+   minimum width already protects its longest unbreakable word/segment
+   (confirmed live - an explicit min-width: 7ch guess used to override
+   that protection and was too small for an 8-letter word like
+   "Thompson", which is exactly what still split it; removing the guess
+   and trusting the browser's real per-word minimum fixed it). */
 .parent-class-child-name-text {
-  min-width: 0;
   white-space: normal;
   overflow-wrap: break-word;
 }
@@ -8086,6 +8127,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .class-view-register-box h4 .icon { width: 0.95rem; height: 0.95rem; }
   .parent-class-child-row { gap: 0.25rem; }
   .parent-class-child-name { padding: 0.25rem 0.45rem; font-size: 0.78rem; }
+  .parent-class-child-row span.hint.parent-class-child-trailing { font-size: 0.72rem; }
   .class-view-register-box .badge-pill { font-size: 0.58rem; padding: 0.08rem 0.28rem; }
   .class-view-register-box .primary-btn-dark,
   .class-view-register-box .roster-action-btn-danger { padding: 0.28rem 0.4rem; font-size: 0.62rem; }

@@ -16,9 +16,18 @@
       wraps the card's existing content so the photo
       (when this class has one) sits to its left; a
       class with no photo just renders the content
-      div alone, same as before this change. %>
+      div alone, same as before this change.
+      A later real request: "image shouldn't show on the parent dashboard
+      class schedule grids or co-op admin portal class schedule grids -
+      it's only viewable when you click on the class or in class list
+      view" - the image is gated to List view specifically now; the Room
+      x Hour schedule Grid above (view === 'grid', the same shared card)
+      never shows it, keeping each already-narrow grid cell free for just
+      the title/teacher/room text it had before the photo feature. The
+      class detail popup (parent-class-fragment.ejs) already shows the
+      photo on its own, unaffected by this. %>
   <div class="class-card-thumb-row">
-    <% if (cls.classImageUrl) { %>
+    <% if (cls.classImageUrl && view === 'list') { %>
       <img class="class-card-thumb" src="<%= cls.classImageUrl %>" alt="" />
     <% } %>
     <div class="class-card-thumb-content">

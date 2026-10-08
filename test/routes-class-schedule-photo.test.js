@@ -179,20 +179,31 @@ test('a real request: "the class image should show on the left side of the class
     const loginRes = await request(app).post('/login').type('form').send({ email, password: 'testpassword123', next: '/parent' });
     const parentCookie = loginRes.headers['set-cookie'];
 
-    const page = await request(app).get('/parent/classes?day=monday').set('Cookie', parentCookie);
-    assert.equal(page.status, 200);
-    assert.match(page.text, /<img class="class-card-thumb" src="\/uploads\/classes\/room-grid-thumb\.jpg" alt="" \/>/);
+    // A real request: "image shouldn't show on the parent dashboard class
+    // schedule grids... it's only viewable when you click on the class or
+    // in class list view" - the default view (no ?view=list) is the Room
+    // x Hour schedule Grid, which never shows the photo now, even for a
+    // class that has one.
+    const gridPage = await request(app).get('/parent/classes?day=monday').set('Cookie', parentCookie);
+    assert.equal(gridPage.status, 200);
+    assert.doesNotMatch(gridPage.text, /<img class="class-card-thumb"/);
+
+    // List view (?view=list) is the one place besides the class detail
+    // popup that still shows it.
+    const listPage = await request(app).get('/parent/classes?day=monday&view=list').set('Cookie', parentCookie);
+    assert.equal(listPage.status, 200);
+    assert.match(listPage.text, /<img class="class-card-thumb" src="\/uploads\/classes\/room-grid-thumb\.jpg" alt="" \/>/);
 
     // The photo-less class's own card (isolated by plain string search for
     // its own nearest enclosing <button>...</button>, not a regex spanning
     // the whole page - other Monday classes from earlier tests in this
     // same file may also have photos, several buttons before this one)
-    // has no <img> at all.
-    const nameIndex = page.text.indexOf('Room Grid No Photo Class');
+    // has no <img> at all, even in List view.
+    const nameIndex = listPage.text.indexOf('Room Grid No Photo Class');
     assert.ok(nameIndex !== -1, 'expected to find the photo-less class\'s own card');
-    const cardStart = page.text.lastIndexOf('<button', nameIndex);
-    const cardEnd = page.text.indexOf('</button>', nameIndex);
-    const noPhotoCard = page.text.slice(cardStart, cardEnd);
+    const cardStart = listPage.text.lastIndexOf('<button', nameIndex);
+    const cardEnd = listPage.text.indexOf('</button>', nameIndex);
+    const noPhotoCard = listPage.text.slice(cardStart, cardEnd);
     assert.doesNotMatch(noPhotoCard, /<img class="class-card-thumb"/);
   });
 
