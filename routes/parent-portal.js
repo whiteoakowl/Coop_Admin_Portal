@@ -118,6 +118,20 @@ async function parentsForAccount(account) {
   ).sort(byLastName);
 }
 
+// A real request: "under the section for registering teacher or class
+// assistant it should list all parent names in that family and any
+// students 15 years old or older as eligible to register for teacher or
+// class assistant positions" - self-signup used to implicitly mean only
+// the logged-in account's own member. Reuses parentsForAccount/
+// childrenForAccount (both already scoped to the account's own family, not
+// a request-supplied id) rather than a third separate query, so this
+// stays in sync with "which family" the same way those two already do.
+async function staffEligibleFamilyMembers(account) {
+  const [parents, children] = await Promise.all([parentsForAccount(account), childrenForAccount(account)]);
+  const teens = children.filter((c) => c.birthday && ageFromBirthday(c.birthday) >= 15);
+  return [...parents, ...teens].sort(byLastName);
+}
+
 router.get('/', async (req, res) => {
   // Everything in this first batch is independent of everything else in
   // it (none reads a value another produced) - run concurrently instead
@@ -415,24 +429,39 @@ router.get('/classes/:id/fragment', async (req, res) => {
   const waitlistCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM class_registrations WHERE class_id = ? AND status = 'waitlisted'").get(classId)).c);
 
   // A real request: a parent looking at a class that still needs a
-  // teacher/assistant should be able to register THEMSELVES for it right
-  // here, not need a separate 'teacher' portal role - see POST
+  // teacher/assistant should be able to register a FAMILY MEMBER for it
+  // right here, not need a separate 'teacher' portal role - see POST
   // /classes/:id/join below and utils/classRegistration.js's own
   // joinClassAsStaff. This is now the ONLY self-signup path - a follow-up
   // request ("they should be able to signup under parent portal not
   // teacher portal. Teacher portal should not have that feature at
   // all") removed Teacher Portal's own former "Sign Up to Teach" page
   // and its /browse-classes, /classes/:id/join, /classes/:id/leave
-  // routes outright, rather than keeping both. myStaffRole is this
-  // account's own member row, not a child's, same distinction
-  // registerForClass's studentId vs this route's member draws.
-  const member = await memberForAccount(req.portalAccount.id);
-  const myStaffRole = member ? (staff.find((s) => s.id === member.id) || {}).role || null : null;
-  // The SIGNED-IN ACCOUNT's own Sections (never a child's) - who's
-  // actually registering to teach/assist is always the account itself,
-  // same distinction registerForClass's studentId vs this route's member
-  // draws everywhere else.
-  const myStaffSectionIds = member ? [...(await sectionIdsForMember(member.id))] : [];
+  // routes outright, rather than keeping both.
+  // A later real request: "it should list all parent names in that
+  // family and any students 15 years old or older as eligible to
+  // register for teacher or class assistant positions" - this used to be
+  // a single implicit member (the signed-in account's own row); now it's
+  // every staffEligibleFamilyMembers() result, each with their own
+  // current role (if already staffed) and their own per-person window
+  // check, same per-person pattern windowOpenByChild above already uses
+  // for the children section instead of one window shared by everyone.
+  const staffEligibleMembers = await staffEligibleFamilyMembers(req.portalAccount);
+  const staffRoleByMemberId = {};
+  staff.forEach((s) => {
+    staffRoleByMemberId[s.id] = s.role;
+  });
+  const staffMembers = [];
+  for (const person of staffEligibleMembers) {
+    const personSectionIds = [...(await sectionIdsForMember(person.id))];
+    staffMembers.push({
+      id: person.id,
+      name: person.name,
+      role: staffRoleByMemberId[person.id] || null,
+      teacherWindowOpen: await isRegistrationOpenForAccount(req.portalRoles, { classScheduleIds, sectionIds: personSectionIds, actionType: 'parent_teacher' }),
+      assistantWindowOpen: await isRegistrationOpenForAccount(req.portalRoles, { classScheduleIds, sectionIds: personSectionIds, actionType: 'parent_assistant' }),
+    });
+  }
 
   res.render('parent-class-fragment', {
     cls,
@@ -453,10 +482,7 @@ router.get('/classes/:id/fragment', async (req, res) => {
     enrolledIds: [...enrolledIds],
     waitlistPositionByStudentId,
     windowOpenByChild,
-    myStaffRole,
-    myStaffName: member ? member.name : null,
-    teacherWindowOpen: await isRegistrationOpenForAccount(req.portalRoles, { classScheduleIds, sectionIds: myStaffSectionIds, actionType: 'parent_teacher' }),
-    assistantWindowOpen: await isRegistrationOpenForAccount(req.portalRoles, { classScheduleIds, sectionIds: myStaffSectionIds, actionType: 'parent_assistant' }),
+    staffMembers,
   });
 });
 
@@ -464,7 +490,14 @@ router.post('/classes/:id/join', async (req, res) => {
   const classId = parseInt(req.params.id, 10);
   const role = req.body.role === 'assistant' ? 'assistant' : 'teacher';
   const back = classesBackUrl(req.body.day);
-  const member = await memberForAccount(req.portalAccount.id);
+  // A real request opened this up from "always the signed-in account's
+  // own member" to any eligible family member - memberId is request-
+  // supplied now, so it MUST be checked against staffEligibleFamilyMembers
+  // (never trusted outright) the same way /classes/:id/register already
+  // re-derives childrenForAccount instead of trusting a studentId alone.
+  const eligible = await staffEligibleFamilyMembers(req.portalAccount);
+  const member = eligible.find((m) => m.id === parseInt(req.body.memberId, 10));
+  if (!member) return res.redirect(back + 'error=' + encodeURIComponent('You can only register eligible members of your own family.'));
   const result = await joinClassAsStaff({ classId, member, accountId: req.portalAccount.id, portalRoles: req.portalRoles, role });
   if (!result.ok) return res.redirect(back + 'error=' + encodeURIComponent(result.error));
   res.redirect(back + 'notice=' + encodeURIComponent(result.notice));
@@ -473,7 +506,9 @@ router.post('/classes/:id/join', async (req, res) => {
 router.post('/classes/:id/leave', async (req, res) => {
   const classId = parseInt(req.params.id, 10);
   const back = classesBackUrl(req.body.day);
-  const member = await memberForAccount(req.portalAccount.id);
+  const eligible = await staffEligibleFamilyMembers(req.portalAccount);
+  const member = eligible.find((m) => m.id === parseInt(req.body.memberId, 10));
+  if (!member) return res.redirect(back + 'error=' + encodeURIComponent('You can only manage eligible members of your own family.'));
   const result = await leaveClassAsStaff({ classId, member, accountId: req.portalAccount.id });
   if (!result.ok) return res.redirect(back + 'error=' + encodeURIComponent(result.error));
   res.redirect(back + 'notice=' + encodeURIComponent(result.notice));

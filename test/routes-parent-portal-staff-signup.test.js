@@ -118,7 +118,7 @@ test('A parent can register themselves as an assistant directly from Parent Port
     .post(`/parent/classes/${cls.id}/join`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ role: 'assistant', day: 'monday', _csrf: parent.csrfToken });
+    .send({ role: 'assistant', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
   assert.match(decodeURIComponent(res.headers.location), /notice=Signed up as assistant/);
 
   const staffRow = await db.prepare('SELECT * FROM class_staff WHERE class_id = ? AND member_id = ?').get(cls.id, parent.memberId);
@@ -135,7 +135,7 @@ test('Once self-registered, the fragment shows the member\'s own name + role bad
     .post(`/parent/classes/${cls.id}/join`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ role: 'teacher', day: 'monday', _csrf: parent.csrfToken });
+    .send({ role: 'teacher', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
 
   const fragment = await request(app).get(`/parent/classes/${cls.id}/fragment?day=monday`).set('Cookie', parent.cookie);
   const parentMember = await db.prepare('SELECT name FROM members WHERE id = ?').get(parent.memberId);
@@ -159,13 +159,13 @@ test('A real request: "there needs to also be a withdraw button for the teacher 
     .post(`/parent/classes/${cls.id}/join`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ role: 'assistant', day: 'monday', _csrf: parent.csrfToken });
+    .send({ role: 'assistant', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
 
   const leave = await request(app)
     .post(`/parent/classes/${cls.id}/leave`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ day: 'monday', _csrf: parent.csrfToken });
+    .send({ memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
   assert.match(decodeURIComponent(leave.headers.location), /notice=/);
 
   const staffRow = await db.prepare('SELECT * FROM class_staff WHERE class_id = ? AND member_id = ?').get(cls.id, parent.memberId);
@@ -185,7 +185,7 @@ test('Leaving a class you were never staffed on is rejected', async () => {
     .post(`/parent/classes/${cls.id}/leave`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ day: 'monday', _csrf: parent.csrfToken });
+    .send({ memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
   assert.match(decodeURIComponent(leave.headers.location), /You are not signed up for that class/);
 });
 
@@ -198,12 +198,12 @@ test('Registering twice for the same class is rejected', async () => {
     .post(`/parent/classes/${cls.id}/join`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ role: 'assistant', day: 'monday', _csrf: parent.csrfToken });
+    .send({ role: 'assistant', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
   const second = await request(app)
     .post(`/parent/classes/${cls.id}/join`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ role: 'teacher', day: 'monday', _csrf: parent.csrfToken });
+    .send({ role: 'teacher', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
   assert.match(decodeURIComponent(second.headers.location), /already staffed/);
 });
 
@@ -215,7 +215,7 @@ test('Once assistant_slots is full, the Register as Assistant button disappears 
     .post(`/parent/classes/${cls.id}/join`)
     .set('Cookie', firstParent.cookie)
     .type('form')
-    .send({ role: 'assistant', day: 'monday', _csrf: firstParent.csrfToken });
+    .send({ role: 'assistant', memberId: firstParent.memberId, day: 'monday', _csrf: firstParent.csrfToken });
 
   const secondParent = await createParentWithChild();
   const fragment = await request(app).get(`/parent/classes/${cls.id}/fragment?day=monday`).set('Cookie', secondParent.cookie);
@@ -226,7 +226,7 @@ test('Once assistant_slots is full, the Register as Assistant button disappears 
     .post(`/parent/classes/${cls.id}/join`)
     .set('Cookie', secondParent.cookie)
     .type('form')
-    .send({ role: 'assistant', day: 'monday', _csrf: secondParent.csrfToken });
+    .send({ role: 'assistant', memberId: secondParent.memberId, day: 'monday', _csrf: secondParent.csrfToken });
   assert.match(decodeURIComponent(blocked.headers.location), /already has its full 1 assistant/);
 });
 
@@ -243,7 +243,132 @@ test('A registration window scoped to only "parent_register_student" does not bl
     .post(`/parent/classes/${cls.id}/join`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ role: 'assistant', day: 'monday', _csrf: parent.csrfToken });
+    .send({ role: 'assistant', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
   assert.match(decodeURIComponent(res.headers.location), /notice=/);
   await db.prepare('DELETE FROM registration_windows').run();
+});
+
+// Coverage for the follow-up real request: "under the section for
+// registering teacher or class assistant it should list all parent names
+// in that family and any students 15 years old or older as eligible to
+// register for teacher or class assistant positions" - self-signup used
+// to implicitly mean only the logged-in account's own member; now every
+// parent plus every 15+ student in the family can be listed and
+// registered, the same way "Register your children" already lists every
+// child instead of assuming one specific student.
+async function createFamilyWithEligibleMembers() {
+  familyCounter += 1;
+  const familyId = (await db.prepare('INSERT INTO families (name) VALUES (?)').run(`Staff Eligible Family ${familyCounter}`)).lastInsertRowid;
+  const parent1Code = await generateMemberCode();
+  const parent1Info = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, is_primary_parent, active) VALUES (?, ?, ?, 'parent', ?, 1, 1)")
+    .run(`Eligible Parent One ${familyCounter}`, parent1Code, parent1Code, familyId);
+  const parent2Code = await generateMemberCode();
+  const parent2Info = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, is_primary_parent, active) VALUES (?, ?, ?, 'parent', ?, 0, 1)")
+    .run(`Eligible Parent Two ${familyCounter}`, parent2Code, parent2Code, familyId);
+  const teenBirthday = `${new Date().getFullYear() - 16}-01-01`;
+  const teenCode = await generateMemberCode();
+  const teenInfo = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, active, birthday) VALUES (?, ?, ?, 'student', ?, 1, ?)")
+    .run(`Eligible Teen ${familyCounter}`, teenCode, teenCode, familyId, teenBirthday);
+  const youngBirthday = `${new Date().getFullYear() - 10}-01-01`;
+  const youngCode = await generateMemberCode();
+  const youngInfo = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, active, birthday) VALUES (?, ?, ?, 'student', ?, 1, ?)")
+    .run(`Ineligible Young Child ${familyCounter}`, youngCode, youngCode, familyId, youngBirthday);
+
+  const email = `staff-eligible-parent${familyCounter}@example.com`;
+  const accountInfo = await db
+    .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text())")
+    .run(parent1Info.lastInsertRowid, email, hashPassword('testpassword123'));
+  const parentRole = await db.prepare("SELECT id FROM roles WHERE key = 'parent'").get();
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(accountInfo.lastInsertRowid, parentRole.id);
+
+  const loginRes = await request(app).post('/login').type('form').send({ email, password: 'testpassword123', next: '/parent' });
+  const cookie = loginRes.headers['set-cookie'];
+  const homePage = await request(app).get('/parent').set('Cookie', cookie);
+  return {
+    cookie,
+    csrfToken: extractCsrf(homePage.text),
+    parent1Id: parent1Info.lastInsertRowid,
+    parent2Id: parent2Info.lastInsertRowid,
+    teenId: teenInfo.lastInsertRowid,
+    youngId: youngInfo.lastInsertRowid,
+  };
+}
+
+test('The Register as Teacher/Assistant section lists every parent and every 15+ student in the family, but not a younger child', async () => {
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'Family Eligibility Class' });
+  const family = await createFamilyWithEligibleMembers();
+
+  const fragment = await request(app).get(`/parent/classes/${cls.id}/fragment?day=monday`).set('Cookie', family.cookie);
+  const parent1 = await db.prepare('SELECT name FROM members WHERE id = ?').get(family.parent1Id);
+  const parent2 = await db.prepare('SELECT name FROM members WHERE id = ?').get(family.parent2Id);
+  const teen = await db.prepare('SELECT name FROM members WHERE id = ?').get(family.teenId);
+  const young = await db.prepare('SELECT name FROM members WHERE id = ?').get(family.youngId);
+
+  // The younger child correctly still appears in "Register your children"
+  // above (they're a valid student to register for the class itself) -
+  // scope the under-15 exclusion check to just the Teacher/Assistant
+  // section, not the whole fragment.
+  const staffSectionStart = fragment.text.indexOf('Register as Teacher/Assistant');
+  assert.ok(staffSectionStart > -1, 'expected a Register as Teacher/Assistant section');
+  const staffSection = fragment.text.slice(staffSectionStart);
+
+  assert.match(staffSection, new RegExp(parent1.name));
+  assert.match(staffSection, new RegExp(parent2.name));
+  assert.match(staffSection, new RegExp(teen.name));
+  assert.doesNotMatch(staffSection, new RegExp(young.name));
+});
+
+test('A parent can register ANOTHER eligible family member (a second parent, or a 15+ student) as teacher/assistant, not just themselves', async () => {
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'Register Another Family Member Class' });
+  const family = await createFamilyWithEligibleMembers();
+
+  const res = await request(app)
+    .post(`/parent/classes/${cls.id}/join`)
+    .set('Cookie', family.cookie)
+    .type('form')
+    .send({ role: 'teacher', memberId: family.parent2Id, day: 'monday', _csrf: family.csrfToken });
+  assert.match(decodeURIComponent(res.headers.location), /notice=Signed up as teacher/);
+  const parent2Staff = await db.prepare('SELECT * FROM class_staff WHERE class_id = ? AND member_id = ?').get(cls.id, family.parent2Id);
+  assert.ok(parent2Staff, 'expected a class_staff row for the OTHER parent, registered by the logged-in parent');
+  assert.equal(parent2Staff.role, 'teacher');
+
+  const teenRes = await request(app)
+    .post(`/parent/classes/${cls.id}/join`)
+    .set('Cookie', family.cookie)
+    .type('form')
+    .send({ role: 'assistant', memberId: family.teenId, day: 'monday', _csrf: family.csrfToken });
+  assert.match(decodeURIComponent(teenRes.headers.location), /notice=Signed up as assistant/);
+  const teenStaff = await db.prepare('SELECT * FROM class_staff WHERE class_id = ? AND member_id = ?').get(cls.id, family.teenId);
+  assert.ok(teenStaff, 'expected a class_staff row for the 15+ student');
+  assert.equal(teenStaff.role, 'assistant');
+});
+
+test('A parent cannot register a child under 15, or a member of a DIFFERENT family, as teacher/assistant', async () => {
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'Family Boundary Class' });
+  const family = await createFamilyWithEligibleMembers();
+  const otherFamily = await createFamilyWithEligibleMembers();
+
+  const underage = await request(app)
+    .post(`/parent/classes/${cls.id}/join`)
+    .set('Cookie', family.cookie)
+    .type('form')
+    .send({ role: 'teacher', memberId: family.youngId, day: 'monday', _csrf: family.csrfToken });
+  assert.match(decodeURIComponent(underage.headers.location), /You can only register eligible members of your own family/);
+
+  const crossFamily = await request(app)
+    .post(`/parent/classes/${cls.id}/join`)
+    .set('Cookie', family.cookie)
+    .type('form')
+    .send({ role: 'teacher', memberId: otherFamily.parent1Id, day: 'monday', _csrf: family.csrfToken });
+  assert.match(decodeURIComponent(crossFamily.headers.location), /You can only register eligible members of your own family/);
+
+  const noStaffRows = await db.prepare('SELECT COUNT(*) AS c FROM class_staff WHERE class_id = ?').get(cls.id);
+  assert.equal(noStaffRows.c, 0);
 });

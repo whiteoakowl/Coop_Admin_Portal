@@ -8026,6 +8026,30 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    wins. public/js/parent-class-register-withdraw.js removes this very
    attribute to reveal the fallback after a successful withdraw. */
 .parent-class-child-row [data-not-registered-state] { display: none; }
+/* A real request: "list all parent names in that family and any students
+   15 years old or older as eligible to register for teacher or class
+   assistant positions" turned the Teacher/Assistant section's single
+   implicit signup into a per-person list that can need up to TWO action
+   buttons (Register as Teacher AND Register as Assistant) instead of
+   just one Withdraw/Not Eligible - too much for the proven single-row
+   .parent-class-child-row pattern above (name + ONE trailing control)
+   without either button text or the name itself getting squeezed. This
+   wrapper instead stacks the name on its own line with the button(s) in
+   an .actions-btn-row below, inside one shared bubble (same background/
+   radius/padding .parent-class-child-row's own comment already settled
+   on - "keep the white bubble...include the row button"). An already-
+   staffed or Not-Eligible person still renders as a plain single-row
+   .parent-class-child-row (only one control either way), so this only
+   ever applies to the still-open, not-yet-staffed case. */
+.parent-class-staff-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+}
+.parent-class-staff-row .actions-btn-row { margin: 0; }
 
 /* Redesigned class-registration popup (views/parent-class-fragment.ejs) -
    a real request: "click on class to register, the class card should
@@ -8217,6 +8241,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .class-view-register-box h4 { font-size: 0.88rem; gap: 0.35rem; }
   .class-view-register-bullet { width: 0.32rem; height: 0.32rem; }
   .parent-class-child-row { gap: 0.25rem; padding: 0.25rem 0.45rem; }
+  .parent-class-staff-row { gap: 0.35rem; padding: 0.4rem 0.45rem; }
   .parent-class-child-name { font-size: 0.78rem; }
   .parent-class-child-row span.hint.parent-class-child-trailing { font-size: 0.72rem; }
   .class-view-register-box .badge-pill { font-size: 0.58rem; padding: 0.08rem 0.28rem; }

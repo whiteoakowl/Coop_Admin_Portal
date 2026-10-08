@@ -117,7 +117,7 @@ async function createParentWithChild() {
   const loginRes = await request(app).post('/login').type('form').send({ email, password: 'testpassword123', next: '/parent' });
   const cookie = loginRes.headers['set-cookie'];
   const homePage = await request(app).get('/parent').set('Cookie', cookie);
-  return { cookie, csrfToken: extractCsrf(homePage.text), childId: childInfo.lastInsertRowid };
+  return { cookie, csrfToken: extractCsrf(homePage.text), childId: childInfo.lastInsertRowid, memberId: parentInfo.lastInsertRowid };
 }
 
 let teacherCounter = 0;
@@ -380,7 +380,7 @@ test('A registration window scoped to a specific semester\'s Schedule Grid still
     .post(`/parent/classes/${cls.id}/join`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ role: 'teacher', day: 'monday', _csrf: parent.csrfToken });
+    .send({ role: 'teacher', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
   assert.match(decodeURIComponent(joined.headers.location), /notice=/);
 });
 
@@ -405,7 +405,7 @@ test('Parent Portal self-signup to teach/assist is also gated by a registration 
     .post(`/parent/classes/${cls.id}/join`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ role: 'teacher', day: 'monday', _csrf: parent.csrfToken });
+    .send({ role: 'teacher', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
   assert.match(decodeURIComponent(blocked.headers.location), /Registration is not open for your account yet/);
 
   await clearWindows();
@@ -413,7 +413,7 @@ test('Parent Portal self-signup to teach/assist is also gated by a registration 
     .post(`/parent/classes/${cls.id}/join`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ role: 'teacher', day: 'monday', _csrf: parent.csrfToken });
+    .send({ role: 'teacher', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
   assert.match(decodeURIComponent(allowed.headers.location), /notice=/);
 });
 
@@ -466,7 +466,7 @@ test('A window scoped to only "parent_teacher"/"parent_assistant" does not block
     .post(`/parent/classes/${cls.id}/join`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ role: 'teacher', day: 'monday', _csrf: parent.csrfToken });
+    .send({ role: 'teacher', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
   assert.match(decodeURIComponent(teacherAllowed.headers.location), /notice=/);
 
   await db.prepare('DELETE FROM class_staff WHERE class_id = ?').run(cls.id);
@@ -474,7 +474,7 @@ test('A window scoped to only "parent_teacher"/"parent_assistant" does not block
     .post(`/parent/classes/${cls.id}/join`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ role: 'assistant', day: 'monday', _csrf: parent.csrfToken });
+    .send({ role: 'assistant', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
   assert.match(decodeURIComponent(assistantAllowed.headers.location), /notice=/);
 
   // The real bug: a parent registering their own child, an action this
@@ -531,6 +531,6 @@ test('A brand new class defaults to registration_open = 1 (open), so a parent ca
     .post(`/parent/classes/${cls.id}/join`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ role: 'teacher', day: 'monday', _csrf: parent.csrfToken });
+    .send({ role: 'teacher', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
   assert.match(decodeURIComponent(joined.headers.location), /notice=/);
 });
