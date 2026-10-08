@@ -7873,6 +7873,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   flex-wrap: nowrap;
   justify-content: flex-start;
   gap: 0.4rem;
+  /* A real request: "keep the white bubble[,] include the row button in
+     each member name bubble and make the edge less rounded" - the white
+     "bubble" background/radius/padding used to live on .parent-class-
+     child-name alone (just the name+badge), leaving the Register/
+     Withdraw/Not Eligible control floating outside it with no shared
+     background. Moving that chrome up to the ROW itself is what makes
+     the whole row - name, badge, AND its trailing button - read as one
+     bubble; 10px (not the old 999px full pill) is the "less rounded"
+     edge that was asked for. */
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
 }
 /* flex-grow: 0 (not just flex-shrink: 0) - confirmed live this needed to
    reset flex-grow too: the Withdraw button's own base .roster-action-btn
@@ -7923,17 +7935,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    live, auto doesn't reliably size this to its own content once it's
    also display:flex internally. */
 .parent-class-child-name {
-  font-weight: 600;
+  /* A real request: "the names need to be less bold print...to help them
+     stand out better from the bold title" - this used to be font-weight:
+     600, close enough to the section h4's own bold (browser default 700
+     for an h4, never overridden here) that the name and the heading above
+     it read as nearly the same weight. 500 is still a touch heavier than
+     plain body text (keeping the name readable as its own distinct
+     element in the row) but clearly lighter than the h4 beside it. */
+  font-weight: 500;
   color: var(--ink);
-  /* A real request removed .class-view-register-box's own orange fill in
-     favor of a plain white card with a shadow - this pill's own white
-     background would otherwise blend straight into it with no visible
-     edge, so it gets a light neutral tint instead (same #f8fafc the
-     Teacher/Assistant box above already uses) to still read as its own
-     pill against the now-white box. */
-  background: #f8fafc;
-  border-radius: 999px;
-  padding: 0.5rem 0.75rem;
+  /* The white bubble background/radius/padding that used to live here
+     moved up to .parent-class-child-row above - see that rule's own
+     comment ("include the row button in each member name bubble"). This
+     is now just the name+badge's own flex grouping within that shared
+     bubble, no chrome of its own. */
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -8060,25 +8075,75 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 /* A real request: "Remove orange from class registration boxes. Shadow
    the background of the boxes to make them standout" - same white-
    surface-plus-soft-shadow "standout card" pattern already used
-   elsewhere (e.g. the kiosk panel) instead of a solid color fill. */
-.class-view-register-box { background: var(--surface); border-radius: var(--radius); padding: 1.1rem 1rem; margin-top: 1.1rem; box-shadow: 0 4px 24px rgba(0,0,0,0.1); }
+   elsewhere (e.g. the kiosk panel) instead of a solid color fill.
+   A later real request: "shade background of registration card pastel
+   blue" swapped the plain white fill for --brand-soft, the same pastel
+   blue tint already used for other tinted sections (e.g. .alert-info) -
+   the shadow stays, so the card still stands out against the dialog's
+   own white background behind it. */
+.class-view-register-box { background: var(--brand-soft); border-radius: var(--radius); padding: 1.1rem 1rem; margin-top: 1.1rem; box-shadow: 0 4px 24px rgba(0,0,0,0.1); }
 .class-view-register-box h4 { margin: 0 0 0.75rem; display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; white-space: nowrap; }
-.class-view-register-box h4 .icon { width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
+/* A real request: "bullets next to titles for this section should not be
+   hollow outline. Solid black dot and smaller" - these headings used to
+   lead with a hollow/outline person icon (#icon-users/#icon-user,
+   stroke-only per icon-sprite.ejs); swapped for a plain small filled
+   circle instead of any icon at all. */
+.class-view-register-bullet { width: 0.4rem; height: 0.4rem; border-radius: 50%; background: #000; flex-shrink: 0; }
+/* A real request: "the cards for student registration and teach/
+   assistant registration should be one card" - the Teacher/Assistant
+   section now lives inside the SAME .class-view-register-box as the
+   student section instead of its own box right below; this thin rule
+   is what still visually separates the two when both are showing. */
+.class-view-register-divider { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0 0.75rem; }
+/* A real request: "Register, withdraw and not eligible buttons should be
+   the same size" - confirmed live these differed even with matching
+   padding/font-size above: .roster-action-btn's own min-width: 5.5rem
+   (its usual home, a toolbar row) gave Withdraw a floor the other two
+   didn't share, while "Not Eligible" (the longest label) was left to its
+   own content width with no floor at all - the three ended up 78px/88px/
+   100px. A single shared min-width (sized to the widest label, "Not
+   Eligible") plus text-align: center is what makes all three actually
+   match instead of each sizing to its own text. */
 .class-view-register-box .primary-btn-dark,
-.class-view-register-box .roster-action-btn-danger { margin-top: 0; padding: 0.5rem 0.85rem; border-radius: 999px; font-size: 0.8rem; }
-/* A real request: "parent register as an assistant or teacher should be
-   on the same row" - .roster-action-btn's own flex: 1 0 auto grows these
-   two buttons to fill the row, and that same class deliberately allows
-   its label to wrap (its usual home is a toolbar grid where that's fine -
-   see .roster-action-btn's own comment) - so inside this narrow (420px
-   max) dialog "Register as Teacher"/"Register as Assistant" wrapped to
-   two lines inside each stretched button instead of sitting tidily on
-   one row. flex: 1 1 0 with min-width: 0 still lets the two share the
-   row evenly, but white-space: nowrap plus the smaller font/padding below
-   keeps each one's own full label on a single line instead of growing
-   past its text and wrapping. */
+.class-view-register-box .roster-action-btn-danger,
+.class-view-register-box .parent-class-not-eligible-btn {
+  margin-top: 0;
+  padding: 0.5rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  min-width: 6.25rem;
+  text-align: center;
+}
+/* A real request: "if a member is not eligible to register for any
+   reason[,] the button says not eligible, is Grey and not clickable" -
+   registerControl() (views/parent-class-fragment.ejs) used to return one
+   of three different plain hint SPANS depending on which rule was
+   blocking that child (class not open, parent self-register off, or
+   their own registration window not open yet) - collapsed into this one
+   grey, disabled <button> instead so every "can't register" reason reads
+   the same way at a glance. Same pill shape as its Register/Withdraw
+   siblings above (border-radius: 999px there) so it still looks like it
+   belongs in the same row, just visibly inert. */
+.parent-class-not-eligible-btn {
+  background: #e2e8f0;
+  color: var(--muted);
+  border: 1px solid #e2e8f0;
+  font-weight: 600;
+  cursor: not-allowed;
+}
+/* A real request: "class assistant and teacher signup buttons should be
+   the navy blue" - both now share .btn-secondary (the site's solid
+   --btn-blue fill, same navy as the "Register" student button's own
+   .primary-btn-dark above) instead of Teacher using the plain/orange
+   .roster-action-btn it used to.
+   A real request: "parent register as an assistant or teacher should be
+   on the same row" - inside this narrow (420px max) dialog "Register as
+   Teacher"/"Register as Assistant" wrapped to two lines inside each
+   stretched button without this. flex: 1 1 0 with min-width: 0 still lets
+   the two share the row evenly, but white-space: nowrap plus the smaller
+   font/padding below keeps each one's own full label on a single line
+   instead of growing past its text and wrapping. */
 .class-view-register-box .actions-btn-row { flex-wrap: nowrap; }
-.class-view-register-box .actions-btn-row .roster-action-btn,
 .class-view-register-box .actions-btn-row .btn-secondary {
   flex: 1 1 0;
   min-width: 0;
@@ -8126,20 +8191,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      only trim here too alongside tighter name/badge/button sizing. */
   .class-view-register-box { padding: 0.9rem 0.45rem; }
   .class-view-register-box h4 { font-size: 0.88rem; gap: 0.35rem; }
-  .class-view-register-box h4 .icon { width: 0.95rem; height: 0.95rem; }
-  .parent-class-child-row { gap: 0.25rem; }
-  .parent-class-child-name { padding: 0.25rem 0.45rem; font-size: 0.78rem; }
+  .class-view-register-bullet { width: 0.32rem; height: 0.32rem; }
+  .parent-class-child-row { gap: 0.25rem; padding: 0.25rem 0.45rem; }
+  .parent-class-child-name { font-size: 0.78rem; }
   .parent-class-child-row span.hint.parent-class-child-trailing { font-size: 0.72rem; }
   .class-view-register-box .badge-pill { font-size: 0.58rem; padding: 0.08rem 0.28rem; }
   .class-view-register-box .primary-btn-dark,
-  .class-view-register-box .roster-action-btn-danger { padding: 0.28rem 0.4rem; font-size: 0.62rem; }
+  .class-view-register-box .roster-action-btn-danger,
+  .class-view-register-box .parent-class-not-eligible-btn { padding: 0.28rem 0.4rem; font-size: 0.62rem; }
   /* Same narrow-phone trim as the rest of this box - confirmed live the
      "Register as Teacher"/"Register as Assistant" buttons' own desktop
      padding/font (set just above, outside this breakpoint) was still too
      wide for both to share one row on a real ~390px phone without
      wrapping their label again. */
   .class-view-register-box .actions-btn-row { gap: 0.25rem; }
-  .class-view-register-box .actions-btn-row .roster-action-btn,
   .class-view-register-box .actions-btn-row .btn-secondary { padding: 0.38rem 0.25rem; font-size: 0.64rem; }
 }
 

@@ -159,8 +159,14 @@
     <div class="hint forum-editable-display parent-class-description"><%- cls.description %></div>
   <% } %>
 
+  <%# A real request: "the cards for student registration and teacher/
+      assistant registration should be one card" - used to be two
+      separate .class-view-register-box elements stacked back to back;
+      now it's a single box with the Teacher/Assistant section (when
+      registration is open) appended inside it after a divider, instead
+      of starting its own box right below. %>
   <div class="class-view-register-box">
-    <h4><svg class="icon"><use href="#icon-users"/></svg> Register your children</h4>
+    <h4><span class="class-view-register-bullet"></span> Register your children</h4>
     <% if (!hasChildren) { %>
       <p class="hint">No students are linked to your family yet.</p>
     <% } else if (children.length === 0) { %>
@@ -180,16 +186,18 @@
       // uses), so public/js/parent-class-register-withdraw.js can swap
       // straight to it after a successful fetch() instead of needing to
       // reconstruct that markup in JS or re-fetch the whole fragment.
+      // A real request: "if a member is not eligible to register for any
+      // reason[,] the button says not eligible, is Grey and not
+      // clickable" - the class not being open, parent self-register
+      // being off, and the child's own registration window not being
+      // open yet used to each render their own differently-worded hint
+      // text; collapsed into one disabled "Not Eligible" button so every
+      // blocked reason reads the same way instead of three different
+      // messages.
       function registerControl(child, hiddenFallback) {
         var attrs = hiddenFallback ? ' data-not-registered-state hidden' : '';
-        if (!cls.registration_open) {
-          return '<span class="hint parent-class-child-trailing"' + attrs + '>Not open for registration</span>';
-        }
-        if (!cls.allow_parent_register) {
-          return '<span class="hint parent-class-child-trailing"' + attrs + '>Parent registration not open for this class</span>';
-        }
-        if (!windowOpenByChild[child.id]) {
-          return '<span class="hint parent-class-child-trailing"' + attrs + '>Registration window not open yet</span>';
+        if (!cls.registration_open || !cls.allow_parent_register || !windowOpenByChild[child.id]) {
+          return '<button type="button" class="parent-class-not-eligible-btn parent-class-child-trailing" disabled' + attrs + '>Not Eligible</button>';
         }
         return (
           '<form method="POST" action="/parent/classes/' + cls.id + '/register" class="inline-block-form parent-class-child-trailing"' + attrs + '>' +
@@ -231,7 +239,6 @@
         <% children.forEach(function(child) { %><%- childControl(child) %><% }); %>
       </div>
     <% } %>
-  </div>
 
   <%# A real request: a parent viewing a class that still needs a
       teacher/assistant should be able to register THEMSELVES for it
@@ -243,8 +250,8 @@
       its join/leave routes outright, since keeping both only risked
       the two drifting apart. %>
   <% if (cls.registration_open) { %>
-    <div class="class-view-register-box">
-      <h4><svg class="icon"><use href="#icon-user"/></svg> Register as Teacher/Assistant</h4>
+    <hr class="class-view-register-divider" />
+    <h4><span class="class-view-register-bullet"></span> Register as Teacher/Assistant</h4>
       <% if (myStaffRole) { %>
         <%# A real request: "there needs to also be a withdraw button for
             the teacher assistant. The button and name should always fit
@@ -276,7 +283,7 @@
                 <form method="POST" action="/parent/classes/<%= cls.id %>/join" class="inline-block-form">
                   <input type="hidden" name="role" value="teacher" />
                   <input type="hidden" name="day" value="<%= day %>" />
-                  <button type="submit" class="roster-action-btn">Register as Teacher</button>
+                  <button type="submit" class="btn-secondary">Register as Teacher</button>
                 </form>
               <% } else { %>
                 <span class="hint">Teacher registration window not open yet</span>
@@ -296,6 +303,6 @@
           </div>
         <% } %>
       <% } %>
-    </div>
   <% } %>
+  </div>
 </div>
