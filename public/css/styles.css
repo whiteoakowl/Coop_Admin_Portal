@@ -8122,19 +8122,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    is what still visually separates the two when both are showing. */
 .class-view-register-divider { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0 0.75rem; }
 /* A real request: "Register, withdraw and not eligible buttons should be
-   the same size" led to giving all three a shared min-width - a later
-   follow-up ("...should be fit to text, but also similar size") walked
-   that back: a fixed floor sized to the longest label ("Not Eligible")
-   left the short ones ("Register") looking padded and empty instead of
-   snug around their own text. min-width: 0 here is what actually lets
-   Withdraw size to its own text too - .roster-action-btn's own min-
-   width: 5.5rem (its usual home, a toolbar row) would otherwise still
-   floor it wider than Register/Not Eligible even with this rule's
-   matching padding/font-size. With that floor gone, identical padding
-   and font-size across all three is what keeps them reading as
-   consistently-sized siblings - close to each other since "Register"/
-   "Withdraw"/"Not Eligible" aren't wildly different lengths - without
-   forcing an artificial, over-wide common width. */
+   the same size" led to giving all three a shared min-width. A follow-up
+   ("...should be fit to text, but also similar size") walked that back to
+   min-width: 0, then a later request walked it back AGAIN to uniform
+   sizing - so this floor is back for good: sized to the longest label
+   ("Not Eligible") so Register/Withdraw/Not Eligible always render at the
+   same width instead of each hugging its own text. */
 .class-view-register-box .primary-btn-dark,
 .class-view-register-box .roster-action-btn-danger,
 .class-view-register-box .parent-class-not-eligible-btn {
@@ -8142,7 +8135,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   padding: 0.5rem 0.85rem;
   border-radius: 999px;
   font-size: 0.8rem;
-  min-width: 0;
+  min-width: 6.25rem;
   text-align: center;
 }
 /* A real request: "if a member is not eligible to register for any
@@ -8229,7 +8222,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .class-view-register-box .badge-pill { font-size: 0.58rem; padding: 0.08rem 0.28rem; }
   .class-view-register-box .primary-btn-dark,
   .class-view-register-box .roster-action-btn-danger,
-  .class-view-register-box .parent-class-not-eligible-btn { padding: 0.28rem 0.4rem; font-size: 0.62rem; }
+  .class-view-register-box .parent-class-not-eligible-btn { padding: 0.28rem 0.4rem; font-size: 0.62rem; min-width: 4.75rem; }
   /* Same narrow-phone trim as the rest of this box - confirmed live the
      "Register as Teacher"/"Register as Assistant" buttons' own desktop
      padding/font (set just above, outside this breakpoint) was still too
