@@ -421,3 +421,59 @@ test('A parent with no family_id (orphaned by a deleted/merged family) still see
     .send({ role: 'teacher', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
   assert.match(decodeURIComponent(joined.headers.location), /notice=Signed up as teacher/);
 });
+
+// A real request: "if a parent is an admin it should still show them as
+// a possible parent to signup for teaching and assisting in a class" -
+// member_type IN ('parent', 'admin') is the established convention
+// everywhere else this app treats "parent" and "admin" as the same kind
+// of adult (utils/members.js's own parentsAndAdmins, absence lookups,
+// orientation, schedule cards, event visibility...); staffEligibleFamilyMembers
+// and parentsForAccount were the two places still checking member_type
+// = 'parent' alone, silently dropping an admin-type member who is also
+// a parent. The member_type column (not the account's own portal role -
+// an admin member can still log in to Parent Portal with a 'parent' role)
+// is what this checks.
+async function createAdminParentWithChild() {
+  familyCounter += 1;
+  const familyId = (await db.prepare('INSERT INTO families (name) VALUES (?)').run(`Admin Parent Family ${familyCounter}`)).lastInsertRowid;
+  const parentCode = await generateMemberCode();
+  const parentInfo = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, is_primary_parent, active) VALUES (?, ?, ?, 'admin', ?, 1, 1)")
+    .run(`Admin Parent ${familyCounter}`, parentCode, parentCode, familyId);
+  const childCode = await generateMemberCode();
+  const childInfo = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, active) VALUES (?, ?, ?, 'student', ?, 1)")
+    .run(`Admin Parent Child ${familyCounter}`, childCode, childCode, familyId);
+  const email = `admin-parent${familyCounter}@example.com`;
+  const accountInfo = await db
+    .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text())")
+    .run(parentInfo.lastInsertRowid, email, hashPassword('testpassword123'));
+  const parentRole = await db.prepare("SELECT id FROM roles WHERE key = 'parent'").get();
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(accountInfo.lastInsertRowid, parentRole.id);
+
+  const loginRes = await request(app).post('/login').type('form').send({ email, password: 'testpassword123', next: '/parent' });
+  const cookie = loginRes.headers['set-cookie'];
+  const homePage = await request(app).get('/parent').set('Cookie', cookie);
+  return { cookie, csrfToken: extractCsrf(homePage.text), memberId: parentInfo.lastInsertRowid, childId: childInfo.lastInsertRowid };
+}
+
+test('An admin-type member who is also a parent still shows up as eligible to register as teacher/assistant, and can self-register', async () => {
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'Admin Parent Signup Class' });
+  const adminParent = await createAdminParentWithChild();
+
+  const fragment = await request(app).get(`/parent/classes/${cls.id}/fragment?day=monday`).set('Cookie', adminParent.cookie);
+  assert.equal(fragment.status, 200);
+  const staffSectionStart = fragment.text.indexOf('Register as Teacher/Assistant');
+  assert.ok(staffSectionStart > -1);
+  const staffSection = fragment.text.slice(staffSectionStart);
+  const adminParentMember = await db.prepare('SELECT name FROM members WHERE id = ?').get(adminParent.memberId);
+  assert.match(staffSection, new RegExp(adminParentMember.name));
+
+  const joined = await request(app)
+    .post(`/parent/classes/${cls.id}/join`)
+    .set('Cookie', adminParent.cookie)
+    .type('form')
+    .send({ role: 'assistant', memberId: adminParent.memberId, day: 'monday', _csrf: adminParent.csrfToken });
+  assert.match(decodeURIComponent(joined.headers.location), /notice=Signed up as assistant/);
+});

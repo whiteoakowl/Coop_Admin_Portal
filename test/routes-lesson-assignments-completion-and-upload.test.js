@@ -151,7 +151,7 @@ test('Link to Video and Link to File content types accept a description, shown a
     .post(`/admin/class-schedule/assignments/${assignment.id}/content`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ type: 'file', title: 'Worksheet', fileUrl: 'https://example.com/worksheet.pdf', description: 'Print two copies', _csrf: admin.csrfToken });
+    .send({ type: 'file', title: 'Worksheet', fileUrl: 'https://example.com/worksheet.pdf', fileDescription: 'Print two copies', _csrf: admin.csrfToken });
 
   const page = await request(app).get(`/admin/class-schedule/assignments/${assignment.id}`).set('Cookie', admin.cookie);
   assert.match(page.text, /Watch before Wednesday/);
@@ -186,7 +186,7 @@ test('Assignment Upload content type: dropdown option exists, saves rich-text bo
     .set('Cookie', admin.cookie)
     .field('type', 'assignment_upload')
     .field('title', 'Essay Assignment')
-    .field('body', '<p>Write a 500 word essay.</p>')
+    .field('assignmentBody', '<p>Write a 500 word essay.</p>')
     .attach('attachment', tmpFilePath, { filename: 'essay-prompt.pdf', contentType: 'application/pdf' });
   assert.equal(create.status, 302);
   fs.rmSync(tmpFilePath, { force: true });
@@ -225,7 +225,7 @@ test('Assignment Upload content shows up read-only on the Student Portal Lessons
     .post(`/admin/class-schedule/assignments/${assignment.id}/content`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ type: 'assignment_upload', title: 'Read Chapter 1', body: 'Summarize chapter 1 in your own words.', _csrf: admin.csrfToken });
+    .send({ type: 'assignment_upload', title: 'Read Chapter 1', assignmentBody: 'Summarize chapter 1 in your own words.', _csrf: admin.csrfToken });
 
   const loginRes = await request(app).post('/login').type('form').send({ email, password: 'testpassword123', next: '/student' });
   const cookie = loginRes.headers['set-cookie'];

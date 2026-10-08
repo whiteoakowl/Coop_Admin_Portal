@@ -99,6 +99,23 @@
       <label class="member-form-full" data-toggle-field="video">Video URL
         <input type="url" name="videoUrl" placeholder="https://..." />
       </label>
+      <%# A real bug report: "if I add an assignment to a class when I save
+          it says something went wrong." Every one of this form's five
+          content-type sections stays in the DOM at once (CSS display:none
+          hides the ones that don't match the selected Type - see
+          public/js/lesson-content-form.js - rather than the inactive
+          sections' fields being removed), so a plain HTML form submit
+          sends every field, selected type or not. video's and file's
+          "Description" used to share name="description", and text's
+          textarea and assignment_upload's rich-text hidden input used to
+          share name="body" - a browser form submit turns each same-named
+          pair into a 2-element array server-side (Express/body-parser),
+          and routes/admin-class-schedule.js's (and routes/teacher-
+          portal.js's identical) POST handler called .trim() or
+          sanitizePostBody() on that array expecting a string, throwing on
+          every save regardless of which type was actually chosen. Each
+          field now has its own unique name; the route reads the one that
+          matches the selected type. %>
       <label class="member-form-full" data-toggle-field="video" style="display: none;">Description
         <textarea name="description" rows="2"></textarea>
       </label>
@@ -109,7 +126,7 @@
         <input type="url" name="fileUrl" placeholder="https://..." />
       </label>
       <label class="member-form-full" data-toggle-field="file" style="display: none;">Description
-        <textarea name="description" rows="2"></textarea>
+        <textarea name="fileDescription" rows="2"></textarea>
       </label>
       <p class="hint member-form-full" data-toggle-field="quiz" style="display: none;">A blank quiz will be added - add its questions afterward from the "Manage Questions" link.</p>
       <%# A real request: "assignment upload, text box with word count and
@@ -122,7 +139,7 @@
         <label>Assignment Text</label>
         <%- include('forum-editor-toolbar') %>
         <div class="forum-editable" data-forum-editable data-word-count-source contenteditable="true"></div>
-        <input type="hidden" name="body" data-forum-body-input />
+        <input type="hidden" name="assignmentBody" data-forum-body-input />
         <p class="hint"><span data-word-count>0</span> words</p>
       </div>
       <label class="member-form-full" data-toggle-field="assignment_upload" style="display: none;">Attach a File <span class="hint">(doc, pdf, or image)</span>

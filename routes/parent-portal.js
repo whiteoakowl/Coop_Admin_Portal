@@ -108,12 +108,19 @@ async function childrenForAccount(account) {
 // implemented for students (childrenForAccount above). Same re-derive-
 // from-the-account rule as childrenForAccount - never trusts a member id
 // from the request.
+// A real request: "if a parent is an admin it should still show them as
+// a possible parent to signup for teaching and assisting in a class" -
+// member_type IN ('parent', 'admin') is the established convention
+// everywhere else in this app that treats "parent" and "admin" as the
+// same kind of adult (utils/members.js's own parentsAndAdmins, Setup/
+// Cleanup absence lookups, orientation, schedule cards, event
+// visibility...) - this was the one place still checking 'parent' alone.
 async function parentsForAccount(account) {
   const member = await memberForAccount(account.id);
   if (!member || !member.family_id) return [];
   return (
     await db
-      .prepare("SELECT * FROM members WHERE family_id = ? AND member_type = 'parent' AND active = 1")
+      .prepare("SELECT * FROM members WHERE family_id = ? AND member_type IN ('parent', 'admin') AND active = 1")
       .all(member.family_id)
   ).sort(byLastName);
 }
@@ -140,7 +147,12 @@ async function parentsForAccount(account) {
 async function staffEligibleFamilyMembers(account) {
   const family = await familyForAccount(account.id);
   return family
-    .filter((m) => m.member_type === 'parent' || (m.member_type === 'student' && m.birthday && ageFromBirthday(m.birthday) >= 15))
+    .filter(
+      (m) =>
+        m.member_type === 'parent' ||
+        m.member_type === 'admin' ||
+        (m.member_type === 'student' && m.birthday && ageFromBirthday(m.birthday) >= 15)
+    )
     .sort(byLastName);
 }
 

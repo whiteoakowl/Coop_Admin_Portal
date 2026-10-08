@@ -245,14 +245,23 @@ router.post('/assignments/:id/content', uploadLessonAttachment, async (req, res)
     attachmentName = req.file.originalname;
   }
 
+  // A real bug report: "if I add an assignment to a class when I save it
+  // says something went wrong" - views/partials/lesson-content-manage.ejs
+  // (shared with Co-op Admin's own identical route) keeps every content-
+  // type section's fields in the DOM at once (just CSS-hidden, not
+  // removed), and two pairs of them used to share a name (video/file's
+  // "description", text/assignment_upload's "body"), so a real form
+  // submit always sent both as a 2-element array - .trim() or
+  // sanitizePostBody() on that array threw regardless of which type was
+  // actually selected. Each field now has its own unique name.
   await createContentItem({
     assignmentId,
     type,
     title: (req.body.title || '').trim(),
     videoUrl: type === 'video' ? (req.body.videoUrl || '').trim() : null,
-    body: type === 'text' || type === 'assignment_upload' ? sanitizePostBody(req.body.body || '') : null,
+    body: type === 'text' ? sanitizePostBody(req.body.body || '') : type === 'assignment_upload' ? sanitizePostBody(req.body.assignmentBody || '') : null,
     fileUrl: type === 'file' ? (req.body.fileUrl || '').trim() : null,
-    description: type === 'video' || type === 'file' ? (req.body.description || '').trim() : null,
+    description: type === 'video' ? (req.body.description || '').trim() : type === 'file' ? (req.body.fileDescription || '').trim() : null,
     attachmentUrl,
     attachmentName,
   });
