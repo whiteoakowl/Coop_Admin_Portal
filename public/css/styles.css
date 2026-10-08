@@ -7484,6 +7484,32 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    container's own top padding instead of double-spacing it. */
 .class-schedule-hour-label { margin: 0 0 0.6rem; font-size: 1.1rem; color: var(--brand-dark); }
 .class-schedule-hour-label:not(:first-child) { margin-top: 1.5rem; }
+/* Parent Portal's own "Classes Needing a Teacher or Assistant" list
+   (views/parent-classes-needing-staff.ejs) - a real request: "list view
+   by hour. Each row will be class name and next to it will see how many
+   teachers the class needs and how many assistants." Reuses
+   .class-schedule-hour-label above for the hour headings this groups
+   under; each row is a plain link (not a button/form - clicking one
+   navigates straight to the class's own registration card on the main
+   Classes grid, see parent-class-view.js's own openClass helper) styled
+   as a flat card so it reads as a list item, not inline text. */
+.needing-staff-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.needing-staff-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 600;
+}
+.needing-staff-row:hover, .needing-staff-row:focus-visible { box-shadow: 0 0 0 2px var(--brand) inset; }
+.needing-staff-row-badges { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .class-card-row { display: flex; flex-wrap: wrap; gap: 1rem; }
 .class-card {
   flex: 1 1 220px;
@@ -8096,14 +8122,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    is what still visually separates the two when both are showing. */
 .class-view-register-divider { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0 0.75rem; }
 /* A real request: "Register, withdraw and not eligible buttons should be
-   the same size" - confirmed live these differed even with matching
-   padding/font-size above: .roster-action-btn's own min-width: 5.5rem
-   (its usual home, a toolbar row) gave Withdraw a floor the other two
-   didn't share, while "Not Eligible" (the longest label) was left to its
-   own content width with no floor at all - the three ended up 78px/88px/
-   100px. A single shared min-width (sized to the widest label, "Not
-   Eligible") plus text-align: center is what makes all three actually
-   match instead of each sizing to its own text. */
+   the same size" led to giving all three a shared min-width - a later
+   follow-up ("...should be fit to text, but also similar size") walked
+   that back: a fixed floor sized to the longest label ("Not Eligible")
+   left the short ones ("Register") looking padded and empty instead of
+   snug around their own text. min-width: 0 here is what actually lets
+   Withdraw size to its own text too - .roster-action-btn's own min-
+   width: 5.5rem (its usual home, a toolbar row) would otherwise still
+   floor it wider than Register/Not Eligible even with this rule's
+   matching padding/font-size. With that floor gone, identical padding
+   and font-size across all three is what keeps them reading as
+   consistently-sized siblings - close to each other since "Register"/
+   "Withdraw"/"Not Eligible" aren't wildly different lengths - without
+   forcing an artificial, over-wide common width. */
 .class-view-register-box .primary-btn-dark,
 .class-view-register-box .roster-action-btn-danger,
 .class-view-register-box .parent-class-not-eligible-btn {
@@ -8111,7 +8142,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   padding: 0.5rem 0.85rem;
   border-radius: 999px;
   font-size: 0.8rem;
-  min-width: 6.25rem;
+  min-width: 0;
   text-align: center;
 }
 /* A real request: "if a member is not eligible to register for any

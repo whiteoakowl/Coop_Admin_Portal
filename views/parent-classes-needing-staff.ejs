@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle"><a href="/parent/classes?day=<%= day %>">&larr; Class Registration</a></p>
+    <h1>Classes Needing a Teacher or Assistant</h1>
+    <p class="hint">Every class below is still short a teacher and/or assistant. Tap a class to go straight to its
+      registration card and sign up. A class drops off this list once both roles are filled, and comes back if
+      someone later withdraws.</p>
+
+    <div class="filter-row no-print">
+      <%- include('partials/schedule-combo-picker', { combos, selectedComboId, dayQueryUrl: '/parent/classes/needing-staff?day=' }) %>
+    </div>
+
+    <% if (hours.length === 0) { %>
+      <p class="roster-empty">No classes currently need a teacher or assistant for this semester/day.</p>
+    <% } else { %>
+      <% hours.forEach(function(hour) { %>
+        <h2 class="class-schedule-hour-label"><%= hour.label %></h2>
+        <div class="needing-staff-list">
+          <% hour.classes.forEach(function(cls) { %>
+            <a class="needing-staff-row" href="/parent/classes?day=<%= day %>&openClass=<%= cls.id %>">
+              <span class="needing-staff-row-name"><%= cls.class_name %></span>
+              <span class="needing-staff-row-badges">
+                <% if (cls.teacherNeeded > 0) { %><span class="badge-pill badge-pill-absent">Teacher needed<% if (cls.teacherNeeded > 1) { %> (<%= cls.teacherNeeded %>)<% } %></span><% } %>
+                <% if (cls.assistantNeeded > 0) { %><span class="badge-pill badge-pill-absent">Assistant needed<% if (cls.assistantNeeded > 1) { %> (<%= cls.assistantNeeded %>)<% } %></span><% } %>
+              </span>
+            </a>
+          <% }); %>
+        </div>
+      <% }); %>
+    <% } %>
+  </main>
+</body>
+</html>

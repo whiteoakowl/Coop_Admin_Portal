@@ -279,6 +279,58 @@ async function gridForDay(day, semesterId) {
   return hours.map((h) => ({ ...h, classes: byHour[h.position] || [] }));
 }
 
+// A real request: Parent Portal "classes needing a teacher or assistant" -
+// every class on a day (optionally scoped to one semester - same
+// classesForDaySemester leniency as everywhere else: a real semesterId
+// still includes every class that's never been tagged with one) that
+// still has an open teacher and/or assistant seat, grouped by hour. Same
+// needed-minus-filled math utils/substitutes.js's own
+// classVacancyEntriesForClass uses for the (unrelated) day-of Floater
+// board - teacher_slots/assistant_slots null means "no cap set" there
+// too, so that role is simply never counted as needing anyone. This is a
+// standing recruiting list for parents, not a day-of coverage gap for
+// admins, so unlike the Floater board it's never date-scoped and nothing
+// here reads or writes substitute_assignments. A class with both roles
+// fully staffed (or neither role capped at all) simply doesn't appear;
+// it reappears the moment a roster count drops back below its cap (e.g.
+// a teacher/assistant withdraws), since this always computes live off
+// class_staff via gridForDay's own staffForClass call rather than
+// remembering anything of its own.
+// Named distinctly from the existing, unrelated classesNeedingStaffForDay
+// below (that one is date-scoped - "who's missing TODAY," used by the
+// Main/Co-op Admin homepage's own alert log) - confirmed live the two
+// sharing a name silently broke this one: with two top-level
+// `async function classesNeedingStaffForDay` declarations in the same
+// module, the second one simply overwrites the first, so every caller
+// (including this file's own module.exports) ended up with only the
+// unrelated date-scoped version - this one never ran at all.
+async function classesWithOpenStaffSlotsForDay(day, semesterId) {
+  const hours = await hoursForDay(day, semesterId);
+  const grid = await gridForDay(day, semesterId);
+  const classesByHourPosition = {};
+  grid.forEach((h) => { classesByHourPosition[h.position] = h.classes; });
+
+  return hours
+    .map((h) => ({
+      position: h.position,
+      label: h.label,
+      classes: (classesByHourPosition[h.position] || [])
+        .map((cls) => {
+          const teacherCount = cls.staff.filter((s) => s.role === 'teacher').length;
+          const assistantCount = cls.staff.filter((s) => s.role === 'assistant').length;
+          return {
+            id: cls.id,
+            class_name: cls.class_name,
+            teacherNeeded: cls.teacher_slots == null ? 0 : Math.max(0, cls.teacher_slots - teacherCount),
+            assistantNeeded: cls.assistant_slots == null ? 0 : Math.max(0, cls.assistant_slots - assistantCount),
+          };
+        })
+        .filter((cls) => cls.teacherNeeded > 0 || cls.assistantNeeded > 0)
+        .sort((a, b) => a.class_name.localeCompare(b.class_name, undefined, { sensitivity: 'base' })),
+    }))
+    .filter((h) => h.classes.length > 0);
+}
+
 // The admin grid view: classroom locations as rows, hour blocks as
 // columns. Two consecutive classes in the same room sharing a name and
 // color are treated as one class that runs across both blocks, and
@@ -2353,6 +2405,7 @@ module.exports = {
   saveHourLabels,
   saveHourLabel,
   gridForDay,
+  classesWithOpenStaffSlotsForDay,
   roomGridForDay,
   parseClockMinutesLocal,
   roomsForDay,

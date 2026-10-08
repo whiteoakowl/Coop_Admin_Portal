@@ -11,6 +11,16 @@
     <p class="hint">Tap a class below for details, seats, and to register your children. A class shown here isn't
       necessarily open for registration yet - it's still worth seeing what's scheduled.</p>
 
+    <%# A real request: "Add a button at the top that says, classes
+        needing a teacher or assistant" - a standing recruiting list
+        (views/parent-classes-needing-staff.ejs), separate from this
+        grid's own per-class popups, for a parent who just wants to see
+        where help is still needed without opening every class one at a
+        time. %>
+    <div class="roster-btn-row no-print">
+      <a class="roster-action-btn" href="/parent/classes/needing-staff?day=<%= day %>">Classes Needing a Teacher or Assistant</a>
+    </div>
+
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (!hasChildren) { %>

@@ -28,8 +28,12 @@ const {
   GRADE_LEVELS,
   classScheduleIdsForClass,
   parseClockMinutesLocal,
+  classesWithOpenStaffSlotsForDay,
+  listScheduleCombos,
 } = require('../utils/classSchedule');
 const { CLASS_DAY_ORDER } = require('../utils/classDays');
+const { comboSemesterId, findComboId } = require('../utils/scheduleComboLinks');
+const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
 const { getHandbookHtml } = require('../utils/membershipHandbook');
 const { getTemplate, badgeDataForMembers } = require('../utils/nameTagData');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
@@ -288,6 +292,41 @@ router.get('/classes', async (req, res) => {
     nextWindowLabel: nextWindow ? formatTimestamp(nextWindow.opens_at) : null,
     error: req.query.error || null,
     notice: req.query.notice || null,
+  });
+});
+
+// A real request: a button on the Class Registration page leading to a
+// standing "classes needing a teacher or assistant" list - every class on
+// a day/semester with an open teacher and/or assistant seat
+// (classesWithOpenStaffSlotsForDay, utils/classSchedule.js), listed by hour, so
+// a parent browsing for somewhere to volunteer doesn't have to open every
+// single class's own popup to find one that still needs someone. A class
+// drops off the instant both roles are filled, and reappears the moment
+// a roster count dips back below its cap (e.g. a withdrawal) - always
+// computed live, nothing here is stored.
+// Same Semester/Day combo picker (partials/schedule-combo-picker.ejs) the
+// Co-op Admin side of this app already uses everywhere this same
+// "which semester/day" question comes up - resolveSemesterId below
+// mirrors routes/admin-schedule.js's own helper of the same name (kept
+// as a per-route-file copy by established convention here, not a shared
+// export - see that file's own comment on why).
+async function resolveSemesterId(semesterId) {
+  return semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+}
+
+router.get('/classes/needing-staff', async (req, res) => {
+  const activeDays = await listActiveClassDays();
+  const day = activeDays.includes(req.query.day) ? req.query.day : (activeDays[0] || 'monday');
+  const combos = await listScheduleCombos();
+  const resolvedSemesterId = await resolveSemesterId(comboSemesterId(req));
+
+  res.render('parent-classes-needing-staff', {
+    title: 'Classes Needing a Teacher or Assistant',
+    day,
+    dayLabels: CLASS_DAY_LABELS_FULL,
+    combos,
+    selectedComboId: findComboId(combos, day, resolvedSemesterId),
+    hours: await classesWithOpenStaffSlotsForDay(day, resolvedSemesterId),
   });
 });
 

@@ -14,14 +14,34 @@
   const dialog = document.getElementById('parent-class-dialog');
   if (!dialog || !window.loadFragmentIntoDialog) return;
 
-  document.addEventListener('click', (e) => {
-    const card = e.target.closest('[data-view-class]');
-    if (!card) return;
+  function openClass(card) {
     const id = card.getAttribute('data-view-class');
     const day = card.getAttribute('data-view-class-day') || '';
     const url = `/parent/classes/${id}/fragment${day ? `?day=${encodeURIComponent(day)}` : ''}`;
     window.loadFragmentIntoDialog(dialog, url).catch(() => {
       window.location.href = `/parent/classes${day ? `?day=${encodeURIComponent(day)}` : ''}`;
     });
+  }
+
+  document.addEventListener('click', (e) => {
+    const card = e.target.closest('[data-view-class]');
+    if (!card) return;
+    openClass(card);
   });
+
+  // A real request: a "Classes Needing a Teacher or Assistant" list page
+  // (views/parent-classes-needing-staff.ejs) links each row straight to
+  // "so that they can easily sign up" - that page is a flat list, not
+  // this grid, so there's nothing there to open a fragment dialog from
+  // directly. Its own links instead land back here with ?openClass=<id>,
+  // and this is what actually reacts to it: once the grid itself has
+  // rendered, find that same class's card (already on the page, same
+  // data-view-class attribute every other click goes through) and open
+  // it exactly as if it had been clicked - one single code path for
+  // "show me this class's registration controls," not a second one.
+  const openClassId = new URLSearchParams(window.location.search).get('openClass');
+  if (openClassId) {
+    const card = document.querySelector(`[data-view-class="${CSS.escape(openClassId)}"]`);
+    if (card) openClass(card);
+  }
 })();
