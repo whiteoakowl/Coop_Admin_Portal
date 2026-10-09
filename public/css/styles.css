@@ -12526,8 +12526,23 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 /* The album card's own icon row (Edit/Export/Delete, plus Restore on the
    Archive tab) - right-aligned so the icons read as "bottom right of the
    card" per the real request, instead of .roster-btn-row's own default
-   left-aligned flow. */
+   left-aligned flow. .roster-btn-row is already `display: flex` (not a
+   column), so the icons sit side by side in one row by default - no
+   extra rule needed for that part. */
 .photo-album-card-icons { justify-content: flex-end; margin-top: 0.5rem; }
+
+/* A real request: "Main admin portal photo album view should look like
+   parent portal view with cover photos and edit, export and trash icons
+   bottom right." admin-photos-list.ejs now reuses views/photos-list.
+   ejs's own .event-card/.event-card-image markup for the cover photo
+   look; .photo-album-admin-card-link just re-states .event-card's own
+   link styling (color/no-underline/column layout) on the inner <a> that
+   wraps the image+title+description, since the outer .event-card is a
+   plain <div> here (it also holds the icon row's own <a>/<button>
+   elements, which can't nest inside another <a>). The icon row gets the
+   same horizontal padding as .event-card-body so it lines up under it. */
+.photo-album-admin-card-link { display: flex; flex-direction: column; color: inherit; text-decoration: none; }
+.photo-album-admin-card .photo-album-card-icons { padding: 0 1.25rem 1rem; }
 
 /* Parent Portal Accounting (views/accounting-home.ejs) - a real request:
    "shrink to fit on mobile for all tables. Total for payments, invoices
