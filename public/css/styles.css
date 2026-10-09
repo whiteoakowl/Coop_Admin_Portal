@@ -7324,7 +7324,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    nowrap keeps them on one row at any width instead of wrapping onto two
    - the mobile media query below shrinks padding/font so that still fits
    on phone screens instead of overflowing. */
-.class-details-save-row { display: flex; flex-wrap: nowrap; gap: 0.75rem; align-items: stretch; }
+/* A real request: "save details button and duplicate event button...
+   should have adequate space between features rows near the upload
+   photo." Both this row and the Event Image section above it
+   (views/admin-events-builder.ejs) are plain sibling <div>s living
+   OUTSIDE the Details <form> (an HTML form can't nest inside another -
+   see that view's own comments), so neither one is a child of
+   .member-form-grid and its `gap` - they rendered flush against
+   whatever came before with no spacing of their own. */
+.event-details-image-section { margin-top: 1.25rem; }
+.class-details-save-row { display: flex; flex-wrap: nowrap; gap: 0.75rem; align-items: stretch; margin-top: 1.25rem; }
 /* That "each button already sizes to its own text by default" turned out
    false for Duplicate Class specifically: .roster-action-btn's own global
    rule sets flex: 1 0 auto for its usual home (a roster-btn-row toolbar,
@@ -12549,8 +12558,14 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 
 /* Accounts page's own 3rd row - "print icon and export icon should be on
    the same row next to each other," split out from the 2nd row above so
-   neither row wraps awkwardly on mobile. */
-.accounting-accounts-toolbar-3 { align-items: center; }
+   neither row wraps awkwardly on mobile. A real request: "icons at the
+   top should be below the orange buttons" - this row had no margin of
+   its own at all (top or bottom), so it sat flush against the
+   +Invoice/+Payment/+Adjustment row right above it with nothing to read
+   as a clearly separate, later row - same missing-spacing bug class
+   .accounting-list-toolbar/.accounting-accounts-toolbar-2's own margin-
+   bottom above already exists to prevent. */
+.accounting-accounts-toolbar-3 { align-items: center; margin-top: 0.75rem; margin-bottom: 0.75rem; }
 
 /* Both rows' own real children (the Past Due Only checkbox and Email All
    Invoices button each sit inside their own <form>; the Print/Export

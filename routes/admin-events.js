@@ -687,11 +687,15 @@ router.post('/:id', async (req, res) => {
     title,
     description: sanitizePostBody(req.body.description || ''),
     // A real request: "category (legacy text...) and text bar should be
-    // removed, it isn't needed" - views/admin-events-builder.ejs no
-    // longer has this input at all, so there's nothing in req.body to
-    // read here; eventDataFromRow(event)'s own category (spread above)
-    // just passes the existing value through unchanged on every save
-    // instead of blanking it out.
+    // removed, it isn't needed" - that's the retired free-text `category`
+    // column; views/admin-events-builder.ejs no longer has an input for
+    // IT, so eventDataFromRow(event)'s own value (spread above) just
+    // passes through unchanged. categoryId is a different field - the
+    // Details tab's real Category dropdown still submits it, but nothing
+    // here ever read it, so picking a category and saving silently kept
+    // the event's old categoryId forever (a real bug report: "choosing a
+    // category in the dropdown and clicking save doesn't save").
+    categoryId: req.body.categoryId ? parseInt(req.body.categoryId, 10) : null,
     location: (req.body.location || '').trim(),
     locationId: req.body.locationId ? parseInt(req.body.locationId, 10) : null,
     startsAt,

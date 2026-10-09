@@ -278,7 +278,7 @@
             image was never persisted and vanished on the next page load.
             Auto-submitting removes that whole gap - there's no longer a
             "chosen but not yet uploaded" state to get stuck in. %>
-        <div class="member-form-full">
+        <div class="member-form-full event-details-image-section">
           <span class="roster-checkbox-label">Event Image</span>
           <img src="<%= imageUrl || '' %>" alt="" data-event-image-preview style="max-width: 240px; border-radius: var(--radius); display: <%= imageUrl ? 'block' : 'none' %>; margin-bottom: 0.5rem;" />
           <form method="POST" action="/main-admin/events/<%= event.id %>/image" enctype="multipart/form-data" class="roster-btn-row">
