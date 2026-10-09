@@ -100,13 +100,27 @@
               <p class="hint">This post was removed by a moderator.</p>
             <% } %>
             <% if ((canEditThisPost && p.status === 'active') || canModerate) { %>
-              <div class="roster-btn-row" style="margin-top: 0.5rem;">
+              <%# A real request (chat room specifically): "make the delete
+                  button a trash icon and edit button an icon as well,
+                  bottom right corner." Scoped to is_chat_room - a normal
+                  threaded forum reply keeps its original text buttons. %>
+              <div class="roster-btn-row <%= category.is_chat_room ? 'forum-post-actions-icons' : '' %>" style="margin-top: 0.5rem;">
                 <% if (canEditThisPost && p.status === 'active') { %>
-                  <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-post-<%= p.id %>').showModal()">Edit</button>
+                  <% if (category.is_chat_room) { %>
+                    <button type="button" class="icon-btn" onclick="document.getElementById('edit-post-<%= p.id %>').showModal()" aria-label="Edit" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
+                  <% } else { %>
+                    <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-post-<%= p.id %>').showModal()">Edit</button>
+                  <% } %>
                 <% } %>
                 <% if (canModerate) { %>
                   <% if (p.status === 'active') { %>
-                    <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/remove" class="inline-block-form"><button type="submit" class="roster-action-btn roster-action-btn-danger">Remove</button></form>
+                    <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/remove" class="inline-block-form">
+                      <% if (category.is_chat_room) { %>
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      <% } else { %>
+                        <button type="submit" class="roster-action-btn roster-action-btn-danger">Remove</button>
+                      <% } %>
+                    </form>
                   <% } else { %>
                     <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/restore" class="inline-block-form"><button type="submit" class="roster-action-btn">Restore</button></form>
                   <% } %>

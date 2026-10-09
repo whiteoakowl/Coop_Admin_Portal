@@ -10589,6 +10589,21 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
 .forum-post-body blockquote { border-left: 3px solid var(--border); margin: 0.5rem 0; padding-left: 0.75rem; color: var(--muted); }
 .forum-post-body ul, .forum-post-body ol { padding-left: 1.4rem; }
 
+/* A real request (chat room posts specifically): "make the delete
+   button a trash icon and edit button an icon as well. Bottom right
+   corner." justify-content: flex-end puts the icon(s) in the post's own
+   bottom-right corner on desktop; the mobile override below is needed
+   because .roster-btn-row's own unscoped mobile rule (display: grid,
+   centered, one implicit column) only ever gets a real column count
+   from roster-btn-row-grid.js for .roster-action-btn/.btn-secondary
+   children - plain .icon-btn children (like these) are never counted,
+   so without this they'd stack centered instead of sitting side by
+   side in the corner. */
+.forum-post-actions-icons { justify-content: flex-end; }
+@media (max-width: 640px) {
+  .forum-post-actions-icons { display: flex; flex-wrap: nowrap; justify-content: flex-end; }
+}
+
 /* A real request: "add chat room where people can talk to each other in
    a live continuous feed" - a tall, scrollable message panel (vs. a plain
    thread's unbounded page scroll) so the room reads like a chat window,

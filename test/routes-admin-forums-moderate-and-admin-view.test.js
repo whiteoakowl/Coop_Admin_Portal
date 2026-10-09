@@ -354,6 +354,42 @@ test('admin Trash and Edit actually remove/edit a post from the admin thread vie
   assert.equal(thread.status, 'archived');
 });
 
+// A real request: "chat room. On individual chat posts make the delete
+// button a trash icon and edit button an icon as well. Bottom right
+// corner." Main Admin's own chat thread view (views/admin-forums-
+// thread.ejs) is a separate template from the member-facing one
+// (views/forums-thread.ejs, covered in test/routes-forums-chat-room.test.js)
+// and needed the same fix - scoped to is_chat_room only, a normal
+// (non-chat-room) thread/comment here keeps its original Edit/Trash text
+// buttons (covered by the Trash/Edit test above).
+test('Main Admin chat room thread view shows Edit/Delete as icon buttons, right-aligned', async () => {
+  const admin = await loginAsMainAdmin();
+  await request(app)
+    .post('/main-admin/forums')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ name: 'Admin Icon Buttons Room', scope: 'general', isChatRoom: 'on', _csrf: admin.csrfToken });
+  const category = await db.prepare("SELECT * FROM forum_categories WHERE name = 'Admin Icon Buttons Room'").get();
+
+  await request(app)
+    .post(`/main-admin/forums/threads/${category.room_thread_id}/posts`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ body: '<p>A chat room message</p>', _csrf: admin.csrfToken });
+  const post = await db.prepare('SELECT id FROM forum_posts WHERE thread_id = ?').get(category.room_thread_id);
+
+  const threadView = await request(app).get(`/main-admin/forums/threads/${category.room_thread_id}`).set('Cookie', admin.cookie);
+  assert.equal(threadView.status, 200);
+  assert.match(threadView.text, /class="roster-btn-row forum-post-actions-icons"/);
+  assert.match(threadView.text, /<button type="button" class="icon-btn" onclick="document\.getElementById\('edit-post-\d+'\)\.showModal\(\)" aria-label="Edit" title="Edit"><svg class="icon"><use href="#icon-edit"\/><\/svg><\/button>/);
+  assert.match(
+    threadView.text,
+    new RegExp(`<form method="POST" action="/main-admin/forums/threads/${category.room_thread_id}/posts/${post.id}/remove" class="inline-block-form"><button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete" title="Delete"><svg class="icon"><use href="#icon-trash"/><\\/svg></button>`)
+  );
+  assert.doesNotMatch(threadView.text, />Edit<\/button>/);
+  assert.doesNotMatch(threadView.text, />Trash<\/button>/);
+});
+
 // A real request: "next to edit button should be add thread button. A
 // thread or comment could be added by an admin."
 test('Add Thread button opens a dialog that posts a new thread attributed to the Main Admin account', async () => {

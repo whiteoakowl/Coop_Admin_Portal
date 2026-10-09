@@ -335,7 +335,7 @@ test('a chat room message\'s own author no longer sees (or can use) an Edit butt
   const postId = postRes.body.post.id;
 
   const view = await request(app).get(`/forums/threads/${category.room_thread_id}`).set('Cookie', member.cookie);
-  assert.doesNotMatch(view.text, />Edit</, 'the author should not see an Edit button on their own chat room post');
+  assert.doesNotMatch(view.text, /aria-label="Edit"/, 'the author should not see an Edit button on their own chat room post');
 
   const editAttempt = await request(app)
     .post(`/forums/threads/${category.room_thread_id}/posts/${postId}/edit`)
@@ -348,9 +348,12 @@ test('a chat room message\'s own author no longer sees (or can use) an Edit butt
   assert.match(stored.body_html, /Original message/);
   assert.doesNotMatch(stored.body_html, /Trying to self-edit/);
 
-  // An admin/moderator CAN still edit it, and sees the Edit button for it.
+  // An admin/moderator CAN still edit it, and sees the Edit button for it
+  // - a chat room's own posts use an icon button, not a text one (a real
+  // request: "make the delete button a trash icon and edit button an
+  // icon as well").
   const adminView = await request(app).get(`/forums/threads/${category.room_thread_id}`).set('Cookie', admin.cookie);
-  assert.match(adminView.text, />Edit</, 'a moderator should still see an Edit button on someone else\'s chat room post');
+  assert.match(adminView.text, /aria-label="Edit"/, 'a moderator should still see an Edit button on someone else\'s chat room post');
 
   const adminEdit = await request(app)
     .post(`/forums/threads/${category.room_thread_id}/posts/${postId}/edit`)
@@ -360,6 +363,33 @@ test('a chat room message\'s own author no longer sees (or can use) an Edit butt
   assert.equal(adminEdit.status, 302);
   const editedStored = await db.prepare('SELECT body_html FROM forum_posts WHERE id = ?').get(postId);
   assert.match(editedStored.body_html, /Edited by admin/);
+});
+
+// A real request: "chat room. On individual chat posts make the delete
+// button a trash icon and edit button an icon as well. Bottom right
+// corner." Icon-only buttons (via views/partials/icon-sprite.ejs's own
+// #icon-edit/#icon-trash), right-aligned via the forum-post-actions-
+// icons class (public/css/styles.css) - scoped to chat rooms only, a
+// normal threaded forum reply keeps its original text buttons (covered
+// by test/routes-forums.test.js).
+test('chat room posts show Edit/Delete as icon buttons, right-aligned', async () => {
+  const admin = await loginAsMainAdmin();
+  const category = await createChatRoom(admin, 'Icon Buttons Room');
+
+  const postRes = await request(app)
+    .post(`/forums/threads/${category.room_thread_id}/posts`)
+    .set('Cookie', admin.cookie)
+    .set('Accept', 'application/json')
+    .type('form')
+    .send({ body: '<p>A message to moderate</p>', _csrf: admin.csrfToken });
+  const postId = postRes.body.post.id;
+
+  const view = await request(app).get(`/forums/threads/${category.room_thread_id}`).set('Cookie', admin.cookie);
+  assert.match(view.text, /class="roster-btn-row forum-post-actions-icons"/, 'the action row should be right-aligned via forum-post-actions-icons');
+  assert.match(view.text, /<button type="button" class="icon-btn" onclick="document\.getElementById\('edit-post-\d+'\)\.showModal\(\)" aria-label="Edit" title="Edit"><svg class="icon"><use href="#icon-edit"\/><\/svg><\/button>/);
+  assert.match(view.text, new RegExp(`<form method="POST" action="/forums/threads/${category.room_thread_id}/posts/${postId}/remove" class="inline-block-form">\\s*<button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete" title="Delete"><svg class="icon"><use href="#icon-trash"/><\\/svg></button>`));
+  assert.doesNotMatch(view.text, />Edit<\/button>/, 'chat room Edit should never render as a plain text button');
+  assert.doesNotMatch(view.text, />Remove<\/button>/, 'chat room Remove should never render as a plain text button');
 });
 
 // A real request: "if the member has an admin title bubble it should
