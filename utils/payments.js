@@ -24,6 +24,57 @@ async function getCharge(id) {
   return db.prepare('SELECT * FROM payment_charges WHERE id = ?').get(id);
 }
 
+// "Creating an invoice should look exactly like the screenshot" - the
+// extra fields the screenshot's own form carries (Category, Due Date,
+// Admin Notes, Auto-Park/Unpark) beyond what createCharge's own call
+// sites elsewhere (store/event/class registration) ever pass. Kept as a
+// separate call right after createCharge rather than widening that
+// function's own positional signature, so every existing call site
+// (utils/store.js, utils/events.js, utils/classRegistration.js) is
+// untouched.
+async function setChargeDetails(chargeId, { categoryId, invoiceDate, dueDate, adminNotes, autoParkFamily, emailFamily } = {}) {
+  const sets = ['accounting_category_id = ?', 'due_date = ?', 'admin_notes = ?', 'auto_park_family = ?', 'email_family = ?', 'updated_at = now_text()'];
+  const args = [categoryId || null, dueDate || null, adminNotes || null, autoParkFamily ? 1 : 0, emailFamily ? 1 : 0];
+  if (invoiceDate) {
+    sets.push('created_at = ?');
+    args.push(invoiceDate);
+  }
+  await db.prepare(`UPDATE payment_charges SET ${sets.join(', ')} WHERE id = ?`).run(...args, chargeId);
+  await recalculateParkedStatus((await getCharge(chargeId)).member_id);
+}
+
+// Same fields as setChargeDetails, plus description/amount - the Edit
+// Invoice form's own Save (an existing charge, unlike createCharge's own
+// "brand new row" case).
+async function updateCharge(chargeId, { description, amountCents, categoryId, invoiceDate, dueDate, adminNotes, autoParkFamily, emailFamily } = {}) {
+  const sets = ['description = ?', 'amount_cents = ?', 'accounting_category_id = ?', 'due_date = ?', 'admin_notes = ?', 'auto_park_family = ?', 'email_family = ?', 'updated_at = now_text()'];
+  const args = [description, amountCents, categoryId || null, dueDate || null, adminNotes || null, autoParkFamily ? 1 : 0, emailFamily ? 1 : 0];
+  if (invoiceDate) {
+    sets.push('created_at = ?');
+    args.push(invoiceDate);
+  }
+  await db.prepare(`UPDATE payment_charges SET ${sets.join(', ')} WHERE id = ?`).run(...args, chargeId);
+  await recalculateParkedStatus((await getCharge(chargeId)).member_id);
+}
+
+// A real request: the invoice form's own "Auto-Park/Unpark Family if/when
+// Unpaid/Paid?" checkbox. Scoped deliberately small: this only flips a
+// visible badge (members.parked) on Accounting's own Accounts list/
+// Account page - it doesn't block registration or portal access anywhere,
+// which was never asked for. "Parked" means at least one of this
+// member's own auto_park_family charges is still pending (unpaid) past
+// its own due date; paying it off (or deleting/cancelling it) unparks
+// them again, recomputed fresh every time rather than trusting a cached
+// flag to stay right.
+async function recalculateParkedStatus(memberId) {
+  if (!memberId) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const overdue = await db
+    .prepare("SELECT 1 FROM payment_charges WHERE member_id = ? AND status = 'pending' AND auto_park_family = true AND due_date IS NOT NULL AND due_date < ? LIMIT 1")
+    .get(memberId, today);
+  await db.prepare('UPDATE members SET parked = ? WHERE id = ?').run(!!overdue, memberId);
+}
+
 async function amountPaidForCharge(chargeId) {
   return Number((await db.prepare('SELECT COALESCE(SUM(amount_cents), 0) AS s FROM payment_payments WHERE charge_id = ?').get(chargeId)).s);
 }
@@ -47,15 +98,26 @@ async function recalculateStatus(chargeId) {
   else if (paid <= 0) status = hasRefund ? 'refunded' : 'pending';
   else status = hasRefund ? 'partially_refunded' : 'pending';
   await db.prepare('UPDATE payment_charges SET status = ?, updated_at = now_text() WHERE id = ?').run(status, chargeId);
+  await recalculateParkedStatus(charge.member_id);
 }
 
-async function recordPayment(chargeId, amountCents, method, recordedByAccountId, note) {
-  await db.prepare('INSERT INTO payment_payments (charge_id, amount_cents, method, recorded_by_account_id, note) VALUES (?, ?, ?, ?, ?)').run(chargeId, amountCents, method || 'manual', recordedByAccountId, note || null);
+// A real request: "accounting adjustment categories refund, exemption,
+// credit, discount." Only meaningful for a refund-direction row
+// (amount_cents < 0) - null for a plain payment received.
+const ADJUSTMENT_TYPES = ['refund', 'exemption', 'credit', 'discount'];
+
+async function recordPayment(chargeId, amountCents, method, recordedByAccountId, note, adjustmentType) {
+  const type = amountCents < 0 && ADJUSTMENT_TYPES.includes(adjustmentType) ? adjustmentType : null;
+  await db
+    .prepare('INSERT INTO payment_payments (charge_id, amount_cents, method, recorded_by_account_id, note, adjustment_type) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(chargeId, amountCents, method || 'manual', recordedByAccountId, note || null, type);
   await recalculateStatus(chargeId);
 }
 
 async function cancelCharge(chargeId) {
+  const charge = await getCharge(chargeId);
   await db.prepare("UPDATE payment_charges SET status = 'cancelled', updated_at = now_text() WHERE id = ?").run(chargeId);
+  if (charge) await recalculateParkedStatus(charge.member_id);
 }
 
 // A real request: "add a trash icon" to Invoices/Adjustments rows - a
@@ -66,7 +128,9 @@ async function cancelCharge(chargeId) {
 // does so with ON DELETE SET NULL, so deleting a charge here just clears
 // that link rather than breaking anything.
 async function deleteCharge(chargeId) {
+  const charge = await getCharge(chargeId);
   await db.prepare('DELETE FROM payment_charges WHERE id = ?').run(chargeId);
+  if (charge) await recalculateParkedStatus(charge.member_id);
 }
 
 async function getPayment(id) {
@@ -202,8 +266,12 @@ function formatCents(cents) {
 module.exports = {
   createCharge,
   getCharge,
+  setChargeDetails,
+  updateCharge,
+  recalculateParkedStatus,
   amountPaidForCharge,
   recordPayment,
+  ADJUSTMENT_TYPES,
   cancelCharge,
   deleteCharge,
   getPayment,

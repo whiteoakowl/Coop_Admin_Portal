@@ -37,7 +37,7 @@
       <p class="roster-empty">No members yet &mdash; add one above.</p>
     <% } else { %>
       <div class="roster-scroll">
-        <table class="roster-table condensed-table">
+        <table class="roster-table condensed-table committee-members-table">
           <thead><tr><th>Name</th><th>Email</th><th></th></tr></thead>
           <tbody>
             <% members.forEach(function(m) { %>
@@ -83,7 +83,7 @@
             <p class="roster-empty">No one has signed up yet.</p>
           <% } else { %>
             <div class="roster-scroll">
-              <table class="roster-table condensed-table" data-committee-position-table="<%= position.id %>">
+              <table class="roster-table condensed-table committee-position-table" data-committee-position-table="<%= position.id %>">
                 <thead><tr><th></th><th>Name</th><th></th></tr></thead>
                 <tbody>
                   <% position.signups.forEach(function(s) { %>

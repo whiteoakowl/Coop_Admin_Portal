@@ -24,32 +24,33 @@
         dialog for both rather than two, since they lead to the exact
         same place. %>
     <div class="roster-btn-row accounting-list-toolbar no-print">
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('new-invoice-dialog').showModal()">+ Invoice</button>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('goto-invoice-dialog').showModal()">+ Invoice</button>
       <button type="button" class="roster-action-btn" onclick="document.getElementById('goto-member-dialog').showModal()">+ Payment</button>
       <button type="button" class="roster-action-btn" onclick="document.getElementById('goto-member-dialog').showModal()">+ Adjustment</button>
     </div>
 
-    <%# A real request: "past due only should be on the same row as email
-        all invoices. Print icon and export icon should be on the same
-        row next to each other." Two rows instead of the four controls
-        crammed into one - filter here just narrows the table to members
-        who currently owe something; a status filter (paid/pending/etc.)
-        belongs to the Invoices subpage instead, where "status" means a
-        charge's own status, not a member's. %>
-    <div class="roster-btn-row accounting-accounts-toolbar-2 no-print" data-fixed-columns="2">
-      <form method="GET" class="inline-block-form">
-        <input type="hidden" name="q" value="<%= q %>" />
-        <label class="checkbox-option">
-          <input type="checkbox" name="pastDueOnly" value="1" <%= pastDueOnly ? 'checked' : '' %> onchange="this.form.submit()" /> Past Due Only
-        </label>
-      </form>
-      <form method="POST" action="/main-admin/accounting/email-all-invoices" class="inline-block-form" data-confirm="Send a balance-due reminder to every member who currently owes something?">
-        <button type="submit" class="roster-action-btn">Email All Invoices</button>
-      </form>
-    </div>
+    <%# A real request: "print and export icons should be to the left and
+        on the same row next to each other" - moved ahead of the Email
+        buttons row below. %>
     <div class="roster-btn-row accounting-accounts-toolbar-3 no-print" data-fixed-columns="2">
       <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print Preview" title="Print Preview"><svg class="icon"><use href="#icon-printer"/></svg></button>
       <a class="icon-btn" href="/main-admin/accounting/export.csv?q=<%= encodeURIComponent(q) %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+    </div>
+
+    <%# A real request: "past due check box should be a button that says
+        email all past due invoices. Email all invoices button will send
+        all. These two buttons should shrink to fit side by side on one
+        row." Replaces the old Past Due Only filter checkbox (which just
+        narrowed the table) with a real action button of its own, side by
+        side with Email All Invoices (now a genuine "everyone", not the
+        same past-due-only list under a misleading name). %>
+    <div class="roster-btn-row accounting-accounts-toolbar-2 no-print roster-btn-row-fit-text" data-fixed-columns="2">
+      <form method="POST" action="/main-admin/accounting/email-all-past-due-invoices" class="inline-block-form" data-confirm="Send a balance-due reminder to every member who currently owes something?">
+        <button type="submit" class="roster-action-btn roster-action-btn-fit">Email All Past Due Invoices</button>
+      </form>
+      <form method="POST" action="/main-admin/accounting/email-all-invoices" class="inline-block-form" data-confirm="Send an accounting statement to every member with billing on record?">
+        <button type="submit" class="roster-action-btn roster-action-btn-fit">Email All Invoices</button>
+      </form>
     </div>
 
     <%# A real request: "search bar should be just above the member
@@ -62,8 +63,7 @@
       </form>
     </div>
 
-    <% const visibleMembers = pastDueOnly ? members.filter((m) => m.balanceCents > 0) : members; %>
-    <% if (visibleMembers.length === 0) { %>
+    <% if (members.length === 0) { %>
       <p class="roster-empty"><%= q ? 'No active members match that search.' : 'No active members yet.' %></p>
     <% } else { %>
       <div class="roster-scroll">
@@ -77,13 +77,16 @@
             </tr>
           </thead>
           <tbody>
-            <% visibleMembers.forEach(function(m) { %>
+            <% members.forEach(function(m) { %>
               <tr>
                 <%# A real request: "when you click on each member name it
                     shows the full membership profile just like other
                     pages, exactly. When you click the invoice icon it
                     goes to that members full account page." %>
-                <td class="roster-name-col"><a href="/main-admin/members/<%= m.id %>"><%= m.name %></a></td>
+                <td class="roster-name-col">
+                  <a href="/main-admin/members/<%= m.id %>"><%= m.name %></a>
+                  <% if (m.parked) { %> <span class="badge-pill badge-pill-gray" title="Auto-parked: an auto-park invoice is overdue and unpaid">Parked</span><% } %>
+                </td>
                 <td class="roster-btn-row accounting-row-icons">
                   <a class="icon-btn" href="/main-admin/accounting/members/<%= m.id %>?autoprint=1" aria-label="Print statement for <%= m.name %>" title="Print statement"><svg class="icon"><use href="#icon-printer"/></svg></a>
                   <% if (m.email) { %>
@@ -102,24 +105,19 @@
       </div>
     <% } %>
 
-    <dialog id="new-invoice-dialog" class="member-picker-dialog">
-      <form method="POST" action="/main-admin/accounting/invoices">
-        <h3>New Invoice</h3>
+    <dialog id="goto-invoice-dialog" class="member-picker-dialog">
+      <form method="GET" onsubmit="event.preventDefault(); var id = this.memberId.value; if (id) window.location = '/main-admin/accounting/invoices/new?memberId=' + id;">
+        <h3>Which Member?</h3>
+        <p class="hint">Opens a new invoice for that member's own account.</p>
         <label>Member
           <select name="memberId" required>
             <option value="">Select a member&hellip;</option>
             <% allMembers.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
           </select>
         </label>
-        <label>Description
-          <input type="text" name="description" placeholder="e.g. Registration Fee" required />
-        </label>
-        <label>Amount ($)
-          <input type="number" name="amount" min="0.01" step="0.01" required />
-        </label>
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <button type="submit" class="primary-btn">Add</button>
+          <button type="submit" class="primary-btn">Continue</button>
         </div>
       </form>
     </dialog>

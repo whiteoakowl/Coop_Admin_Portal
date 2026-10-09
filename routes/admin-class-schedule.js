@@ -13,6 +13,7 @@ const {
   getAssignment,
   createAssignment,
   updateAssignment,
+  deleteAssignment,
   reorderAssignments,
   gradebookForAssignment,
   saveGrade,
@@ -28,6 +29,8 @@ const {
   deleteQuizQuestion,
   pendingReviewAnswers,
   scoreAnswer,
+  submissionsForContentItem,
+  gradeAssignmentSubmission,
 } = require('../utils/academics');
 const { primaryParentsFor } = require('../utils/scheduleCardData');
 // A real request: "after charge per add a dropdown choice for account
@@ -36,7 +39,7 @@ const { primaryParentsFor } = require('../utils/scheduleCardData');
 const { listAccountingCategories } = require('../utils/events');
 const { adminRemoveStudentFromClass } = require('../utils/classRegistration');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
-const { spreadsheetFileFilter, imageFileFilter } = require('../utils/uploads');
+const { spreadsheetFileFilter, imageFileFilter, lessonAttachmentFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = require('../utils/storage');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const {
@@ -543,7 +546,16 @@ router.get('/class-schedule/assignments/:id', requireFullAdmin, async (req, res)
   if (!assignment) return res.status(404).send('Not found');
   const cls = await getClass(assignment.class_id);
   const { rows } = await gradebookForAssignment(assignmentId);
-  const contentItems = await contentItemsForAssignment(assignmentId, { includeAnswerKey: true });
+  // A real request: "the text is formatted row wise should be how it is
+  // displayed for parent/student portal view" - that view's own Lessons
+  // tab shows each item's own due date (dueDateLabel, via lessonsForStudentView);
+  // this management row never did, even though content items have carried
+  // their own due_date since "due dates should be on the assignments, not
+  // the lesson."
+  const contentItems = (await contentItemsForAssignment(assignmentId, { includeAnswerKey: true })).map((item) => ({
+    ...item,
+    dueDateLabel: item.due_date ? formatDateLabel(item.due_date) : null,
+  }));
   res.render('admin-class-assignment-gradebook', {
     title: assignment.title,
     cls,
@@ -572,30 +584,24 @@ router.post('/class-schedule/assignments/:id/edit', requireFullAdmin, async (req
   res.redirect(back + '?notice=' + encodeURIComponent('Lesson details saved.'));
 });
 
+// A real bug report: "there is no manage or trash button at the end of
+// each class assignment in co-op admin portal" - the Lessons tab row had
+// a Manage link but no way to delete a lesson at all.
+router.post('/class-schedule/assignments/:id/delete', requireFullAdmin, async (req, res) => {
+  const assignmentId = parseInt(req.params.id, 10);
+  const assignment = await getAssignment(assignmentId);
+  if (!assignment) return res.status(404).send('Not found');
+  await deleteAssignment(assignmentId);
+  res.redirect(`/admin/class-schedule/classes/${assignment.class_id}/manage?tab=assignments&notice=` + encodeURIComponent(`"${assignment.title}" deleted.`));
+});
+
 // --- Lesson content items (the "drop down of the different links and
 // activities" - video/text/file/quiz/assignment_upload) ---
 
-// A real request: "assignment upload... also be able to upload a file
-// such as doc, pdf, jpg etc." - same mimetype-plus-extension pairing
-// utils/uploads.js's own imageFileFilter/documentFileFilter each use,
-// just accepting either set for this one field instead of splitting it
-// across two (there's no second "image" field here the way Document
-// upload has).
-const LESSON_ATTACHMENT_MIME_BY_EXT = {
-  '.pdf': 'application/pdf',
-  '.doc': 'application/msword',
-  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.png': 'image/png',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
-};
-function lessonAttachmentFileFilter(req, file, cb) {
-  const ext = path.extname(file.originalname || '').toLowerCase();
-  const expectedType = LESSON_ATTACHMENT_MIME_BY_EXT[ext];
-  cb(null, Boolean(expectedType) && file.mimetype === expectedType);
-}
+// lessonAttachmentFileFilter (utils/uploads.js) - a real request:
+// "assignment upload... also be able to upload a file such as doc, pdf,
+// jpg etc." Shared (not a local copy) so admin/teacher/student/parent
+// uploads all accept exactly the same file types.
 const MAX_LESSON_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const lessonAttachmentUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_LESSON_ATTACHMENT_BYTES }, fileFilter: lessonAttachmentFileFilter });
 
@@ -618,7 +624,7 @@ function uploadLessonAttachment(req, res, next) {
   });
 }
 
-const LESSON_CONTENT_TYPES = ['video', 'text', 'file', 'quiz', 'assignment_upload'];
+const LESSON_CONTENT_TYPES = ['video', 'text', 'file', 'quiz', 'assignment_upload', 'assignment_submission'];
 
 router.post('/class-schedule/assignments/:id/content', requireFullAdmin, uploadLessonAttachment, async (req, res) => {
   const assignmentId = parseInt(req.params.id, 10);
@@ -648,11 +654,25 @@ router.post('/class-schedule/assignments/:id/content', requireFullAdmin, uploadL
     type,
     title: (req.body.title || '').trim(),
     videoUrl: type === 'video' ? (req.body.videoUrl || '').trim() : null,
-    body: type === 'text' ? sanitizePostBody(req.body.body || '') : type === 'assignment_upload' ? sanitizePostBody(req.body.assignmentBody || '') : null,
+    body:
+      type === 'text'
+        ? sanitizePostBody(req.body.body || '')
+        : type === 'assignment_upload'
+        ? sanitizePostBody(req.body.assignmentBody || '')
+        : type === 'assignment_submission'
+        ? sanitizePostBody(req.body.submissionBody || '')
+        : null,
     fileUrl: type === 'file' ? (req.body.fileUrl || '').trim() : null,
     description: type === 'video' ? (req.body.description || '').trim() : type === 'file' ? (req.body.fileDescription || '').trim() : null,
     attachmentUrl,
     attachmentName,
+    // A real request: "there should be a assignment submit option...
+    // title, description, points, grade." The lesson itself no longer
+    // collects points (see deleteAssignment's own sibling comment on
+    // createAssignment/updateAssignment above) - each Assignment
+    // Submission item carries its own instead.
+    pointsPossible: type === 'assignment_submission' && req.body.submissionPointsPossible ? parseInt(req.body.submissionPointsPossible, 10) : null,
+    dueDate: (req.body.contentDueDate || '').trim() || null,
   });
   res.redirect(back + '?notice=' + encodeURIComponent('Assignment added.'));
 });
@@ -662,6 +682,42 @@ router.post('/class-schedule/content/:id/delete', requireFullAdmin, async (req, 
   if (!contentItem) return res.status(404).send('Not found');
   await deleteContentItem(contentItem.id);
   res.redirect(`/admin/class-schedule/assignments/${contentItem.assignment_id}?notice=` + encodeURIComponent('Content removed.'));
+});
+
+// Reviewing an Assignment Submission content item's own per-student
+// uploads - a real request: "the student will see an upload link,"
+// which needs somewhere for a teacher/admin to see what was uploaded and
+// enter points + a letter/percentage grade + feedback.
+router.get('/class-schedule/content/:id/submissions', requireFullAdmin, async (req, res) => {
+  const found = await submissionsForContentItem(parseInt(req.params.id, 10));
+  if (!found || found.contentItem.type !== 'assignment_submission') return res.status(404).send('Not found');
+  const cls = await getClass(found.assignment.class_id);
+  res.render('admin-assignment-submissions', {
+    title: found.contentItem.title || 'Assignment Submission',
+    cls,
+    contentItem: found.contentItem,
+    assignment: found.assignment,
+    rows: found.rows,
+    notice: req.query.notice || null,
+  });
+});
+
+router.post('/class-schedule/content/:id/submissions', requireFullAdmin, async (req, res) => {
+  const contentItemId = parseInt(req.params.id, 10);
+  const found = await submissionsForContentItem(contentItemId);
+  if (!found || found.contentItem.type !== 'assignment_submission') return res.status(404).send('Not found');
+  for (const row of found.rows) {
+    if (!row.submission_id) continue;
+    const pointsField = req.body[`points_${row.student_id}`];
+    await gradeAssignmentSubmission({
+      contentItemId,
+      studentId: row.student_id,
+      pointsEarned: pointsField ? parseFloat(pointsField) : null,
+      gradeLetter: (req.body[`grade_${row.student_id}`] || '').trim(),
+      feedback: (req.body[`feedback_${row.student_id}`] || '').trim(),
+    });
+  }
+  res.redirect(`/admin/class-schedule/content/${contentItemId}/submissions?notice=` + encodeURIComponent('Grades saved.'));
 });
 
 router.post('/class-schedule/assignments/:id/content/reorder', requireFullAdmin, async (req, res) => {

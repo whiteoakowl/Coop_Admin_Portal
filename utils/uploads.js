@@ -46,9 +46,36 @@ function spreadsheetFileFilter(req, file, cb) {
   cb(null, SPREADSHEET_EXTENSIONS.has(ext));
 }
 
+// Lesson/assignment attachments (admin/teacher posting a file WITH a
+// lesson, and now a student/parent UPLOADING one back for an Assignment
+// Submission content item - a real request: "the student will see an
+// upload link"). Same mimetype-plus-extension pairing as above, just
+// accepting either the document set or the image set for this one field
+// instead of splitting it across two. Shared here (not kept as separate
+// copies per route file) so admin/teacher/student/parent uploads all
+// accept exactly the same file types without drifting out of sync.
+const LESSON_ATTACHMENT_MIME_BY_EXT = {
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+};
+
+function lessonAttachmentFileFilter(req, file, cb) {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const expectedType = LESSON_ATTACHMENT_MIME_BY_EXT[ext];
+  cb(null, Boolean(expectedType) && file.mimetype === expectedType);
+}
+
 module.exports = {
   imageFileFilter,
   documentFileFilter,
   DOCUMENT_MIME_BY_EXT,
   spreadsheetFileFilter,
+  LESSON_ATTACHMENT_MIME_BY_EXT,
+  lessonAttachmentFileFilter,
 };

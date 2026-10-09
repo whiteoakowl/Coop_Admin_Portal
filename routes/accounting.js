@@ -24,6 +24,13 @@ router.use(requirePortalAuth);
 // carries a real charge now ("only primary parent is billed... for the
 // entire family"), so there's exactly one account to show here, not one
 // per family member.
+// A real request: "total for payments, invoices and adjustments should
+// be bottom right of each of those sections" - summed over exactly the
+// rows shown (already narrowed to the picked yearFilter).
+function sumCents(rows, field) {
+  return rows.reduce((sum, r) => sum + Math.abs(r[field]), 0);
+}
+
 router.get('/', async (req, res) => {
   const self = await memberForAccount(req.portalAccount.id);
   const member = self ? await db.prepare('SELECT * FROM members WHERE id = ?').get(await primaryParentForBilling(self.id)) : null;
@@ -32,6 +39,9 @@ router.get('/', async (req, res) => {
     title: 'Accounting',
     member,
     ...(overview || {}),
+    invoicesTotalCents: overview ? sumCents(overview.invoices, 'amount_cents') : 0,
+    paymentsTotalCents: overview ? sumCents(overview.paymentRows, 'amount_cents') : 0,
+    adjustmentsTotalCents: overview ? sumCents(overview.refundRows, 'amount_cents') + sumCents(overview.cancelledCharges, 'amount_cents') : 0,
     formatCents: payments.formatCents,
   });
 });

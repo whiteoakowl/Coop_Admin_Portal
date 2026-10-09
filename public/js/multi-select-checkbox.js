@@ -40,13 +40,12 @@
     var allCheckboxes = Array.prototype.slice.call(panel.querySelectorAll('input[type="checkbox"]'));
     var checked = allCheckboxes.filter(function (cb) { return cb.checked; });
     chips.innerHTML = '';
-    if (checked.length === 0) {
-      var placeholder = document.createElement('span');
-      placeholder.className = 'multi-select-placeholder';
-      placeholder.textContent = root.getAttribute('data-multi-select-placeholder') || 'Select…';
-      chips.appendChild(placeholder);
-      return;
-    }
+    // The trigger's own placeholder text is now static (see multi-select-
+    // checkbox.ejs's own comment) - this chips row, a separate element
+    // below the trigger, only ever needs hiding when there's nothing to
+    // show in it.
+    chips.hidden = checked.length === 0;
+    if (checked.length === 0) return;
     checked.forEach(function (cb) {
       var label = cb.closest('label');
       var text = label ? label.textContent.trim() : cb.value;

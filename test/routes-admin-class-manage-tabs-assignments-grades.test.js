@@ -156,7 +156,12 @@ test('Class Manage page: create an assignment from the Assignments tab, then gra
 
   const afterCreate = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage?tab=assignments`).set('Cookie', admin.cookie);
   assert.match(afterCreate.text, /Fractions Worksheet/);
-  assert.match(afterCreate.text, new RegExp(`href="/admin/class-schedule/assignments/${assignment.id}">Manage<`));
+  // A real bug report: "there is no manage or trash button at the end of
+  // each class assignment in co-op admin portal" - Manage is now an icon
+  // link (no "Manage" text) and a Delete icon button/form was added.
+  assert.match(afterCreate.text, new RegExp(`<a class="icon-btn" href="/admin/class-schedule/assignments/${assignment.id}" aria-label="Manage" title="Manage">`));
+  assert.match(afterCreate.text, new RegExp(`<form method="POST" action="/admin/class-schedule/assignments/${assignment.id}/delete"`));
+  assert.match(afterCreate.text, /aria-label="Delete" title="Delete"><svg class="icon"><use href="#icon-trash"\/><\/svg><\/button>/);
 
   const gradesTab = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage?tab=grades`).set('Cookie', admin.cookie);
   assert.match(gradesTab.text, /Fractions Worksheet/);
@@ -179,4 +184,47 @@ test('Class Manage page: create an assignment from the Assignments tab, then gra
 
   const gradesTabAfter = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage?tab=grades`).set('Cookie', admin.cookie);
   assert.match(gradesTabAfter.text, /1 \/ 1/);
+});
+
+// A real bug report: "there is no manage or trash button at the end of
+// each class assignment in co-op admin portal" - there was no way to
+// delete a lesson at all before this.
+test('Lessons tab: the Delete icon button removes a lesson and its content/grades', async () => {
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'Delete Lesson Class' });
+
+  const assignmentsPage = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage?tab=assignments`).set('Cookie', admin.cookie);
+  const csrf = extractCsrf(assignmentsPage.text);
+  await request(app)
+    .post(`/admin/class-schedule/classes/${cls.id}/assignments`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Doomed Lesson', _csrf: csrf });
+  const assignment = await db.prepare('SELECT * FROM class_assignments WHERE class_id = ? AND title = ?').get(cls.id, 'Doomed Lesson');
+  assert.ok(assignment, 'the lesson should be created');
+
+  const lessonPage = await request(app).get(`/admin/class-schedule/assignments/${assignment.id}`).set('Cookie', admin.cookie);
+  const lessonCsrf = extractCsrf(lessonPage.text);
+  await request(app)
+    .post(`/admin/class-schedule/assignments/${assignment.id}/content`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ type: 'text', title: 'Reading', body: '<p>Read chapter 1.</p>', _csrf: lessonCsrf });
+  const contentItem = await db.prepare('SELECT * FROM lesson_content_items WHERE assignment_id = ?').get(assignment.id);
+  assert.ok(contentItem, 'the content item should be created');
+
+  const deleteRes = await request(app)
+    .post(`/admin/class-schedule/assignments/${assignment.id}/delete`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: lessonCsrf });
+  assert.equal(deleteRes.status, 302);
+  assert.match(deleteRes.headers.location, new RegExp(`^/admin/class-schedule/classes/${cls.id}/manage\\?tab=assignments&notice=`));
+
+  assert.equal(await db.prepare('SELECT * FROM class_assignments WHERE id = ?').get(assignment.id), undefined);
+  assert.equal(await db.prepare('SELECT * FROM lesson_content_items WHERE id = ?').get(contentItem.id), undefined, 'content items should cascade-delete with the lesson');
+
+  const afterDelete = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage?tab=assignments`).set('Cookie', admin.cookie);
+  assert.doesNotMatch(afterDelete.text, /Doomed Lesson/);
+  assert.match(afterDelete.text, /No lessons yet/);
 });

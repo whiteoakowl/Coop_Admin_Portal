@@ -28,6 +28,8 @@ const {
   getContentItem,
   getQuizAttempt,
   submitQuizAttempt,
+  submitAssignment,
+  saveLessonAttachment,
   contentItemsForAssignment,
   markLessonItemComplete,
 } = require('../utils/academics');
@@ -46,7 +48,7 @@ const gameStats = require('../utils/gameStats');
 const natureNews = require('../utils/natureNews');
 const wordOfWeek = require('../utils/wordOfWeek');
 const spellingBee = require('../utils/spellingBee');
-const { imageFileFilter } = require('../utils/uploads');
+const { imageFileFilter, lessonAttachmentFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, generateKey } = require('../utils/storage');
 const { getTemplate, badgeDataForMembers } = require('../utils/nameTagData');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
@@ -305,6 +307,36 @@ router.get('/classes/:id', async (req, res) => {
   res.render('student-class-detail', { title: cls.class_name, cls, tab, assignments, lessons, attendance, forumCategory, notice: req.query.notice || null });
 });
 
+// A real request: "Each assignment should be another sub bar under the
+// assignment title... When you click on the assignment it opens it to
+// another page with a back button link to view the assignment and
+// complete it." The generic (non-quiz - that already has its own GET
+// /content/:id/quiz page below) content item detail page. Reuses
+// lessonsForStudentView's own already-computed per-item completion
+// state (dueDateLabel/completed/submission/attempt) instead of
+// re-deriving it here, so this page can never show a different
+// "complete" answer than the Lessons tab it was reached from.
+router.get('/content/:id', async (req, res) => {
+  const contentItemId = parseInt(req.params.id, 10);
+  const member = await memberForAccount(req.portalAccount.id);
+  const contentItem = await getContentItem(contentItemId);
+  if (!contentItem) return res.status(404).render('404', { title: 'Not Found' });
+  const assignment = await db.prepare('SELECT * FROM class_assignments WHERE id = ?').get(contentItem.assignment_id);
+  const classes = await classesForStudent(member);
+  const cls = assignment ? classes.find((c) => c.id === assignment.class_id) : null;
+  if (!cls) return res.status(404).render('404', { title: 'Not Found' });
+  const lessons = await lessonsForStudentView(cls.id, member.id);
+  const lesson = lessons.find((l) => l.id === assignment.id);
+  const item = lesson ? lesson.contentItems.find((i) => i.id === contentItemId) : null;
+  if (!lesson || !item) return res.status(404).render('404', { title: 'Not Found' });
+  // A quiz already has its own dedicated take/review page - redirect
+  // there instead of rendering a body this page's own partial has no
+  // quiz branch for (reachable only by typing the URL directly; every
+  // real link to a quiz item already points straight at it).
+  if (item.type === 'quiz') return res.redirect(`/student/content/${item.id}/quiz`);
+  res.render('student-lesson-content', { title: item.title || 'Assignment', cls, lesson, item });
+});
+
 // Quiz-taking - student-only, per the confirmed access model (a parent
 // can view a child's own attempt on the same Lessons tab, but never
 // submit one - see routes/parent-portal.js's own Lessons tab, which has
@@ -365,6 +397,28 @@ router.post('/content/:id/complete', async (req, res) => {
   if (assignment.open_date && assignment.open_date > todayISO()) return res.status(404).render('404', { title: 'Not Found' });
   await markLessonItemComplete(contentItem.id, member.id);
   res.redirect(`/student/classes/${assignment.class_id}?tab=lessons`);
+});
+
+// Assignment Submission upload - a real request: "there should be a
+// assignment submit option... the student will see an upload link."
+// Re-uploading replaces the file and resets grading (see
+// utils/academics.js's own submitAssignment comment).
+const MAX_ASSIGNMENT_SUBMISSION_BYTES = 10 * 1024 * 1024;
+const uploadAssignmentSubmission = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_ASSIGNMENT_SUBMISSION_BYTES }, fileFilter: lessonAttachmentFileFilter });
+
+router.post('/content/:id/submit', uploadAssignmentSubmission.single('submissionFile'), async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const contentItem = await getContentItem(parseInt(req.params.id, 10));
+  if (!contentItem || contentItem.type !== 'assignment_submission') return res.status(404).render('404', { title: 'Not Found' });
+  const assignment = await db.prepare('SELECT * FROM class_assignments WHERE id = ?').get(contentItem.assignment_id);
+  const classes = await classesForStudent(member);
+  const cls = assignment ? classes.find((c) => c.id === assignment.class_id) : null;
+  if (!cls) return res.status(404).render('404', { title: 'Not Found' });
+  if (assignment.open_date && assignment.open_date > todayISO()) return res.status(404).render('404', { title: 'Not Found' });
+  if (!req.file) return res.redirect(`/student/classes/${assignment.class_id}?tab=lessons&error=` + encodeURIComponent('Choose a file to upload.'));
+  const fileKey = await saveLessonAttachment(req.file);
+  await submitAssignment({ contentItemId: contentItem.id, studentId: member.id, fileUrl: fileKey, fileName: req.file.originalname });
+  res.redirect(`/student/classes/${assignment.class_id}?tab=lessons&notice=` + encodeURIComponent('Assignment submitted.'));
 });
 
 router.get('/assignments', async (req, res) => {

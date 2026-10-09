@@ -45,20 +45,20 @@
           Members can add photos
         </label>
         <div class="member-form-full">
-          <%# A real request: "delete albums button should be clean next
-              to save. Archive button added next to it in the same
-              row." Same roster-btn-row-nowrap fit-to-content fix used
-              elsewhere in this app, so Save/Archive/Delete each size to
-              their own text instead of stretching evenly. %>
-          <div class="roster-btn-row roster-btn-row-nowrap">
-            <button type="submit" class="primary-btn">Save</button>
+          <%# A real request: "edit, save archive delete should be the
+              same size buttons on the same row, shrink to fit on mobile
+              properly... Remove trashcan button from edit page" - Delete
+              moved to the album's own card (views/admin-photos-list.ejs),
+              so Save/Archive are the only two left, same size via
+              .photo-album-save-row instead of the mismatched primary-btn/
+              roster-action-btn pairing this used to be. %>
+          <div class="roster-btn-row photo-album-save-row">
+            <button type="submit" class="roster-action-btn">Save</button>
             <button type="submit" form="archive-album-form" class="roster-action-btn">Archive</button>
-            <button type="submit" form="delete-album-form" class="roster-action-btn roster-action-btn-danger">Delete</button>
           </div>
         </div>
       </form>
       <form method="POST" id="archive-album-form" action="/main-admin/photos/<%= album.id %>/archive" data-confirm="Archive &quot;<%= album.title %>&quot;? Members will no longer be able to view or add to it."></form>
-      <form method="POST" id="delete-album-form" action="/main-admin/photos/<%= album.id %>/delete" data-confirm="Delete &quot;<%= album.title %>&quot; and all its photos? This cannot be undone."></form>
     </div>
 
     <div class="manage-section">

@@ -70,7 +70,6 @@
                 <th>Title</th>
                 <th>Open</th>
                 <th>Due</th>
-                <th>Points</th>
                 <th></th>
               </tr>
             </thead>
@@ -81,7 +80,6 @@
                   <td class="roster-name-col"><%= a.title %></td>
                   <td><%= a.open_date ? a.open_date : '—' %></td>
                   <td><%= a.dueDateLabel || '—' %></td>
-                  <td><%= a.points_possible != null ? a.points_possible : '—' %></td>
                   <td><a class="roster-action-btn" href="/teacher/assignments/<%= a.id %>">Manage</a></td>
                 </tr>
               <% }); %>
@@ -101,12 +99,6 @@
           </label>
           <label>Open Date
             <input type="date" name="openDate" />
-          </label>
-          <label>Due Date
-            <input type="date" name="dueDate" />
-          </label>
-          <label>Points Possible
-            <input type="number" name="pointsPossible" min="0" />
           </label>
           <div class="member-form-full">
             <button type="submit" class="primary-btn">Add Assignment</button>

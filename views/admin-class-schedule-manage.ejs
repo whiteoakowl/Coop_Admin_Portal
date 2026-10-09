@@ -327,7 +327,7 @@
           <div class="roster-scroll">
             <table class="roster-table members-table condensed-table">
               <thead>
-                <tr><th></th><th>Title</th><th>Open</th><th>Due</th><th>Points</th><th>Completed</th><th></th></tr>
+                <tr><th></th><th>Title</th><th>Open</th><th>Due</th><th>Completed</th><th></th></tr>
               </thead>
               <tbody data-lesson-reorder-tbody data-class-id="<%= cls.id %>">
                 <% assignments.forEach(function(a) { %>
@@ -336,7 +336,6 @@
                     <td class="roster-name-col"><%= a.title %></td>
                     <td><%= a.open_date ? a.open_date : '—' %></td>
                     <td><%= a.dueDateLabel || '—' %></td>
-                    <td><%= a.points_possible != null ? a.points_possible : '—' %></td>
                     <%# A real request: "On lesson list show percentage of
                         how many people in the class completed the
                         assignments" - see completionStatsForAssignments'
@@ -344,7 +343,18 @@
                         "completed" means here; "—" for a lesson with no
                         quiz content to complete at all. %>
                     <td><%= a.completionPercent != null ? a.completionPercent + '%' : '—' %></td>
-                    <td><a class="roster-action-btn" href="/admin/class-schedule/assignments/<%= a.id %>">Manage</a></td>
+                    <%# A real bug report: "there is no manage or trash
+                        button at the end of each class assignment in
+                        co-op admin portal" - the row only had a Manage
+                        text link and no delete at all; both are now
+                        icon buttons, matching the site-wide row-action
+                        convention. %>
+                    <td class="roster-btn-row accounting-row-icons">
+                      <a class="icon-btn" href="/admin/class-schedule/assignments/<%= a.id %>" aria-label="Manage" title="Manage"><svg class="icon"><use href="#icon-wrench"/></svg></a>
+                      <form method="POST" action="/admin/class-schedule/assignments/<%= a.id %>/delete" data-confirm="Delete the lesson &quot;<%= a.title %>&quot;? This also removes its content, grades, and quiz results. This cannot be undone.">
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    </td>
                   </tr>
                 <% }); %>
               </tbody>
@@ -369,12 +379,6 @@
             </label>
             <label>Open Date
               <input type="date" name="openDate" />
-            </label>
-            <label>Due Date
-              <input type="date" name="dueDate" />
-            </label>
-            <label>Points Possible
-              <input type="number" name="pointsPossible" min="0" />
             </label>
             <div class="member-form-full">
               <button type="submit" class="primary-btn">Add Lesson</button>

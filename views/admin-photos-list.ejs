@@ -64,13 +64,23 @@
             <h3 class="team-info-title"><a href="/main-admin/photos/<%= a.id %>/edit"><%= a.title %></a></h3>
             <span class="badge-pill badge-pill-<%= a.visibility === 'public' ? 'orange' : 'gray' %>"><%= a.visibility === 'public' ? 'Public' : 'Members Only' %></span>
             <% if (a.description) { %><p class="hint"><%= a.description %></p><% } %>
-            <div class="roster-btn-row">
-              <a class="roster-action-btn" href="/main-admin/photos/<%= a.id %>/edit">Manage</a>
+            <%# A real request: "Manage button becomes edit icon... add
+                export icon on each album card... icons should be bottom
+                right. Also trash icon. Remove trashcan button from edit
+                page." The card's own icon row replaces both the old
+                "Manage" text button and the edit page's own Delete
+                button (moved here instead). %>
+            <div class="roster-btn-row photo-album-card-icons">
               <% if (activeTab === 'archive') { %>
                 <form method="POST" action="/main-admin/photos/<%= a.id %>/unarchive" class="inline-block-form">
-                  <button type="submit" class="roster-action-btn">Restore</button>
+                  <button type="submit" class="roster-action-btn roster-action-btn-fit">Restore</button>
                 </form>
               <% } %>
+              <a class="icon-btn" href="/main-admin/photos/<%= a.id %>/edit" aria-label="Edit <%= a.title %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></a>
+              <a class="icon-btn" href="/photos/<%= a.id %>/download" aria-label="Export <%= a.title %>" title="Export"><svg class="icon"><use href="#icon-download"/></svg></a>
+              <form method="POST" action="/main-admin/photos/<%= a.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= a.title %>&quot; and all its photos? This cannot be undone.">
+                <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= a.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+              </form>
             </div>
           </div>
         </div>

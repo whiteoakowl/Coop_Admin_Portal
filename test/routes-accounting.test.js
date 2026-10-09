@@ -130,6 +130,37 @@ test('a refund after full payment flips a charge to refunded without re-billing 
   assert.equal(await payments.balanceForMember(parent.memberId), 0);
 });
 
+// Coverage for a real request: "parent portal accounting page, shrink to
+// fit on mobile for all tables. Total for payments, invoices and
+// adjustments should be bottom right of each of those sections."
+test('member Accounting page: tables are shrink-to-fit and each section shows its own Total', async () => {
+  const admin = await loginAsMainAdmin();
+  const parent = await createParentAccount();
+  await request(app)
+    .post(`/main-admin/accounting/members/${parent.memberId}/charges`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ description: 'Yearbook', amount: '12.00', _csrf: admin.csrfToken });
+  await request(app)
+    .post(`/main-admin/accounting/members/${parent.memberId}/charges`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ description: 'Field Day', amount: '8.00', _csrf: admin.csrfToken });
+  const charges = await db.prepare('SELECT * FROM payment_charges WHERE member_id = ? ORDER BY id').all(parent.memberId);
+  await request(app).post(`/main-admin/accounting/charges/${charges[0].id}/payments`).set('Cookie', admin.cookie).type('form').send({ direction: 'payment', amount: '12.00', _csrf: admin.csrfToken });
+  await request(app).post(`/main-admin/accounting/charges/${charges[0].id}/payments`).set('Cookie', admin.cookie).type('form').send({ direction: 'refund', amount: '5.00', note: 'Partial refund', _csrf: admin.csrfToken });
+
+  const memberView = await request(app).get('/accounting').set('Cookie', parent.cookie);
+  assert.equal(memberView.status, 200);
+  assert.match(memberView.text, /accounting-table-mobile-fit/);
+  // Invoices total: $12.00 + $8.00 = $20.00
+  assert.match(memberView.text, /Total: \$20\.00/);
+  // Payments total: $12.00 (the one payment recorded)
+  assert.match(memberView.text, /Total: \$12\.00/);
+  // Adjustments total: $5.00 refund
+  assert.match(memberView.text, /Total: \$5\.00/);
+});
+
 test('a cancelled charge no longer counts toward balance and its status never changes back', async () => {
   const admin = await loginAsMainAdmin();
   const parent = await createParentAccount();

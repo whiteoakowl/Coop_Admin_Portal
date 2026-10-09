@@ -348,17 +348,35 @@ async function listAccountingCategories() {
   return db.prepare('SELECT * FROM event_accounting_categories ORDER BY position, name').all();
 }
 
-async function createAccountingCategory(name) {
+async function createAccountingCategory(name, code) {
   const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM event_accounting_categories').get()).p) + 1;
-  await db.prepare('INSERT INTO event_accounting_categories (name, position) VALUES (?, ?)').run(name, position);
+  await db.prepare('INSERT INTO event_accounting_categories (name, code, position) VALUES (?, ?, ?)').run(name, code || null, position);
 }
 
-async function updateAccountingCategory(id, name) {
-  await db.prepare('UPDATE event_accounting_categories SET name = ? WHERE id = ?').run(name, id);
+async function updateAccountingCategory(id, name, code) {
+  await db.prepare('UPDATE event_accounting_categories SET name = ?, code = ? WHERE id = ?').run(name, code || null, id);
 }
 
 async function deleteAccountingCategory(id) {
   await db.prepare('DELETE FROM event_accounting_categories WHERE id = ?').run(id);
+}
+
+// --- Fiscal Years - a real request: "button for add a fiscal year asking
+// start and end date. Appears on the fiscal year table," on the same
+// subpage as Accounting Categories above (now "Category/Fiscal Year").
+// Deliberately just a plain list - nothing else in this app scopes
+// anything BY fiscal year yet, so there's no "current" concept to resolve
+// here, only the add/delete the request actually asked for. ---
+async function listFiscalYears() {
+  return db.prepare('SELECT * FROM fiscal_years ORDER BY start_date DESC').all();
+}
+
+async function createFiscalYear(startDate, endDate) {
+  await db.prepare('INSERT INTO fiscal_years (start_date, end_date) VALUES (?, ?)').run(startDate, endDate);
+}
+
+async function deleteFiscalYear(id) {
+  await db.prepare('DELETE FROM fiscal_years WHERE id = ?').run(id);
 }
 
 // --- Extra Fields (Volunteers tab's pill toggle) - a real request:
@@ -1887,6 +1905,9 @@ module.exports = {
   createAccountingCategory,
   updateAccountingCategory,
   deleteAccountingCategory,
+  listFiscalYears,
+  createFiscalYear,
+  deleteFiscalYear,
   EXTRA_FIELD_TYPES,
   addExtraField,
   updateExtraField,

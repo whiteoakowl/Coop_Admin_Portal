@@ -1,0 +1,65 @@
+<%# Shared body for a single lesson content item's own detail page (views/
+    student-lesson-content.ejs / parent-lesson-content.ejs) - a real
+    request: "Each assignment should be another sub bar under the lesson
+    title. Each assignment says title and due date and a check mark. When
+    you click on the assignment it opens it to another page with a back
+    button link to view the assignment and complete it." A quiz already
+    had its own dedicated page (views/student-quiz-take.ejs/parent-quiz-
+    take.ejs, with its own back link) before this request, so this partial
+    only ever renders for the other types - lessons-view.ejs's own bar
+    links straight to the quiz page instead of here for those.
+
+    Reuses the exact same per-type body/completion markup lessons-view.ejs
+    used to render inline, just promoted to its own page; canTakeQuiz/
+    quizBasePathLocal/quizQueryLocal are the same three params that
+    partial already threads through to partials/lesson-item-complete. %>
+<p class="hint">Part of: <%= lesson.title %></p>
+<h1><%= item.title || 'Assignment' %></h1>
+<% if (item.dueDateLabel) { %><p class="hint">Due <%= item.dueDateLabel %></p><% } %>
+
+<div class="manage-section">
+  <% if (item.type === 'video') { %>
+    <% if (item.description) { %><p><%= item.description %></p><% } %>
+    <% if (item.video_url) { %><p><a href="<%= item.video_url %>" target="_blank" rel="noopener">Watch Video</a></p><% } %>
+  <% } else if (item.type === 'text') { %>
+    <% if (item.body) { %><div class="forum-editable-display"><%- item.body %></div><% } %>
+  <% } else if (item.type === 'file') { %>
+    <% if (item.description) { %><p><%= item.description %></p><% } %>
+    <% if (item.file_url) { %><p><a href="<%= item.file_url %>" target="_blank" rel="noopener">Open File</a></p><% } %>
+  <% } else if (item.type === 'assignment_upload') { %>
+    <% if (item.body) { %><div class="forum-editable-display"><%- item.body %></div><% } %>
+    <% if (item.attachmentUrl) { %><p><a href="<%= item.attachmentUrl %>" target="_blank" rel="noopener"><%= item.attachment_name || 'Download Attachment' %></a></p><% } %>
+  <% } else if (item.type === 'assignment_submission') { %>
+    <% if (item.body) { %><div class="forum-editable-display"><%- item.body %></div><% } %>
+    <% if (item.points_possible != null) { %><p class="hint"><%= item.points_possible %> points</p><% } %>
+  <% } %>
+</div>
+
+<% if (item.type === 'assignment_submission') { %>
+  <div class="lesson-item-complete">
+    <% if (item.submission) { %>
+      <span class="lesson-complete-check lesson-complete-check-done" aria-label="Submitted">
+        <svg class="icon"><use href="#icon-check-circle"/></svg>
+        <span class="lesson-complete-label">Submitted</span>
+      </span>
+      <% if (item.submission.status === 'graded') { %>
+        <p class="hint">
+          <% if (item.submission.points_earned != null) { %>Score: <%= item.submission.points_earned %><% if (item.points_possible != null) { %> / <%= item.points_possible %><% } %><% } %>
+          <% if (item.submission.grade_letter) { %> (<%= item.submission.grade_letter %>)<% } %>
+          <% if (item.submission.feedback) { %><br />Feedback: <%= item.submission.feedback %><% } %>
+        </p>
+      <% } %>
+      <% if (canTakeQuiz) { %><p class="hint">Uploading again replaces your submission and resets grading.</p><% } %>
+    <% } %>
+    <% if (canTakeQuiz) { %>
+      <form method="POST" action="<%= quizBasePathLocal %>/content/<%= item.id %>/submit<%= quizQueryLocal %>" enctype="multipart/form-data" class="lesson-submit-form">
+        <input type="file" name="submissionFile" required accept=".doc,.docx,.pdf,.jpg,.jpeg,.png,.gif,.webp" />
+        <button type="submit" class="roster-action-btn roster-action-btn-small"><%= item.submission ? 'Re-upload' : 'Upload' %></button>
+      </form>
+    <% } else if (!item.submission) { %>
+      <span class="hint">Not submitted yet</span>
+    <% } %>
+  </div>
+<% } else { %>
+  <%- include('lesson-item-complete', { item, canTakeQuiz, quizBasePathLocal, quizQueryLocal }) %>
+<% } %>

@@ -1,13 +1,27 @@
-<%# "Mark Complete" action for a non-quiz content item - see lessons-
-    view.ejs's own header comment for the real request this answers.
-    Reuses canTakeQuiz/quizBasePathLocal/quizQueryLocal exactly as the
-    quiz branch does: same portal/per-class gate, same base path. %>
+<%# "Mark Complete" action for a non-quiz/non-assignment-submission
+    content item - see lessons-view.ejs's own header comment for the real
+    request this answers. Reuses canTakeQuiz/quizBasePathLocal/
+    quizQueryLocal exactly as the quiz branch does: same portal/per-class
+    gate, same base path.
+
+    A real request: "Marking complete on an assignment shouldn't be an
+    orange button. It should be a green check mark circle that you can
+    click to mark complete and it will say complete very small under the
+    check mark." icon-circle (an empty ring) for the clickable not-yet-
+    done state, icon-check-circle (filled) once done - both already exist
+    in the site's icon sprite. %>
 <div class="lesson-item-complete">
   <% if (item.completed) { %>
-    <span class="status-badge status-badge-present">Completed</span>
+    <span class="lesson-complete-check lesson-complete-check-done" aria-label="Completed">
+      <svg class="icon"><use href="#icon-check-circle"/></svg>
+      <span class="lesson-complete-label">Complete</span>
+    </span>
   <% } else if (canTakeQuiz) { %>
     <form method="POST" action="<%= quizBasePathLocal %>/content/<%= item.id %>/complete<%= quizQueryLocal %>" class="inline-block-form">
-      <button type="submit" class="roster-action-btn roster-action-btn-small">Mark Complete</button>
+      <button type="submit" class="lesson-complete-check" aria-label="Mark complete">
+        <svg class="icon"><use href="#icon-circle"/></svg>
+        <span class="lesson-complete-label">Mark Complete</span>
+      </button>
     </form>
   <% } else { %>
     <span class="hint">Not completed yet</span>

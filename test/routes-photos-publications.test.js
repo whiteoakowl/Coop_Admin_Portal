@@ -239,17 +239,27 @@ test('Archive/Restore moves an album between the Photos and Archive tabs, hiding
   assert.match(photosTabRestored.text, new RegExp(`/main-admin/photos/${albumId}/edit`));
 });
 
-// A real request: "edit albums button should fit properly... delete
-// albums button should be clean next to save. Archive button added
-// next to it in the same row."
-test('album edit page: Save/Archive/Delete sit in one row, each sized to its own text', async () => {
+// A real request: "edit, save archive delete should be the same size
+// buttons on the same row, shrink to fit on mobile properly... Remove
+// trashcan button from edit page" - Delete moved to the album's own card
+// (views/admin-photos-list.ejs) as a trash icon, leaving just Save/
+// Archive here, same size, one row.
+test('album edit page: Save/Archive sit in one row, same size, and there is no Delete button here any more', async () => {
   const admin = await loginAsMainAdmin();
   const albumId = await createAlbum(admin, 'members');
   const page = await request(app).get(`/main-admin/photos/${albumId}/edit`).set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /class="roster-btn-row roster-btn-row-nowrap"/);
+  assert.match(page.text, /class="roster-btn-row photo-album-save-row"/);
+  assert.match(page.text, /<button type="submit" class="roster-action-btn">Save<\/button>/);
   assert.match(page.text, /<button type="submit" form="archive-album-form" class="roster-action-btn">Archive<\/button>/);
-  assert.match(page.text, /<button type="submit" form="delete-album-form" class="roster-action-btn roster-action-btn-danger">Delete<\/button>/);
+  assert.doesNotMatch(page.text, /form="delete-album-form"/);
+
+  // The card on the Photos list now carries Edit/Export/Delete icons
+  // instead (bottom-right, "Manage" renamed to an Edit icon).
+  const listPage = await request(app).get('/main-admin/photos').set('Cookie', admin.cookie);
+  assert.match(listPage.text, new RegExp(`href="/main-admin/photos/${albumId}/edit" aria-label="Edit`));
+  assert.match(listPage.text, new RegExp(`href="/photos/${albumId}/download" aria-label="Export`));
+  assert.match(listPage.text, new RegExp(`action="/main-admin/photos/${albumId}/delete"`));
 });
 
 test('a draft publication 404s even by direct URL; publishing makes it visible', async () => {

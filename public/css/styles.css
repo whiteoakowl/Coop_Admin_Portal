@@ -4929,6 +4929,37 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   }
 }
 
+/* A real request: "Committees, shrink to fit table in mobile view" -
+   same shrink-table-for-mobile convention as .committees-table above,
+   applied to the two other Committees tables that were still relying on
+   .roster-scroll's horizontal scroll instead of actually fitting: the
+   member-facing sign-up table (views/committees.ejs) and the Main Admin
+   committee detail page's own Members/Position-signups tables (views/
+   main-admin-committee-detail.ejs). */
+@media (max-width: 640px) {
+  .committee-signup-table,
+  .committee-members-table,
+  .committee-position-table {
+    font-size: 0.78rem;
+  }
+  .committee-signup-table th, .committee-signup-table td,
+  .committee-members-table th, .committee-members-table td,
+  .committee-position-table th, .committee-position-table td {
+    padding: 0.3rem 0.4rem;
+  }
+  .committee-signup-table .roster-name-col,
+  .committee-members-table .roster-name-col,
+  .committee-position-table .roster-name-col {
+    max-width: 7.5rem;
+    white-space: normal;
+  }
+  /* Each Position row's action cell can hold one Sign Up/Cancel button
+     per family member - stack them instead of forcing a horizontal
+     scroll so every button stays reachable without widening the row. */
+  .committee-signup-table .roster-btn-row { flex-direction: column; align-items: stretch; }
+  .committee-signup-table .roster-action-btn { font-size: 0.72rem; padding: 0.3rem 0.45rem; }
+}
+
 .settings-account-grid { display: flex; gap: 1.5rem; flex-wrap: wrap; }
 .settings-account-grid .stack-form-narrow {
   flex: 1 1 260px;
@@ -7192,7 +7223,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    button already sizes to its own text by default, this just keeps them
    on one row with even spacing instead of Save Changes' old full-width
    member-form-full stretch. */
-.class-details-save-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+/* A follow-up real request: "save changes and duplicate class buttons
+   should be on the same row... same size buttons... check mobile and
+   make sure it shrinks to fit properly together side by side." Equal
+   flex: 1 1 0 makes both buttons genuinely the same width (not just the
+   same padding/font, which still left "Save Changes" narrower than
+   "Duplicate Class" since each sized to its own text) and flex-wrap:
+   nowrap keeps them on one row at any width instead of wrapping onto two
+   - the mobile media query below shrinks padding/font so that still fits
+   on phone screens instead of overflowing. */
+.class-details-save-row { display: flex; flex-wrap: nowrap; gap: 0.75rem; align-items: stretch; }
 /* That "each button already sizes to its own text by default" turned out
    false for Duplicate Class specifically: .roster-action-btn's own global
    rule sets flex: 1 0 auto for its usual home (a roster-btn-row toolbar,
@@ -7200,12 +7240,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    that grew Duplicate Class to fill all the row's remaining space while
    Save Changes (a plain .primary-btn, no flex-grow of its own) stayed its
    natural width, confirmed live as a lopsided wide-button-next-to-narrow-
-   button row. A real request: "duplicate class button should be the same
-   size as save changes button" - flex: 0 1 auto stops the growth, and
-   matching .primary-btn's own padding/font-size directly (rather than
-   .roster-action-btn's smaller toolbar-button sizing) makes the two
-   genuinely the same size, not just similarly shaped. */
-.class-details-save-row .roster-action-btn { flex: 0 1 auto; min-width: 0; padding: 0.85rem 1.5rem; font-size: 1rem; }
+   button row. matching .primary-btn's own padding/font-size directly
+   (rather than .roster-action-btn's smaller toolbar-button sizing) makes
+   the two the same shape; flex: 1 1 0 (below, shared with .primary-btn in
+   this row) is what actually makes them the same WIDTH. */
+.class-details-save-row .primary-btn,
+.class-details-save-row .roster-action-btn { flex: 1 1 0; min-width: 0; padding: 0.85rem 1.5rem; font-size: 1rem; margin-top: 0; text-align: center; }
+@media (max-width: 480px) {
+  .class-details-save-row { gap: 0.5rem; }
+  .class-details-save-row .primary-btn,
+  .class-details-save-row .roster-action-btn { padding: 0.65rem 0.4rem; font-size: 0.85rem; }
+}
 
 /* Circular color swatches, selected one ringed + checkmarked - replaces a
    plain native color input. */
@@ -8339,6 +8384,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .multi-select-trigger {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
   width: 100%;
   min-height: 2.4rem;
@@ -8353,7 +8399,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .multi-select-trigger:hover { border-color: var(--btn-blue); }
 .multi-select-trigger[aria-expanded="true"] { border-color: var(--btn-blue); }
-.multi-select-chips { flex: 1; display: flex; flex-wrap: wrap; gap: 0.3rem; min-width: 0; }
+/* The chosen chips - a real request: "when grade levels or ages are
+   selected the blue bubble should appear outside of the dropdown menu,
+   under the title." Its own row below the trigger (not inside it
+   anymore - see the partial's own comment), hidden entirely via the
+   `hidden` attribute (both server-rendered and JS-toggled) when nothing
+   is selected so it never takes up blank space. */
+.multi-select-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.5rem; }
+.multi-select-chips[hidden] { display: none; }
 .multi-select-placeholder { color: var(--muted); }
 .multi-select-chip {
   display: inline-flex;
@@ -9820,6 +9873,97 @@ tr[data-task-list-item].task-list-item-dragging { opacity: 0.55; background: var
 tr[data-lesson-reorder-row].lesson-row-dragging,
 tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: var(--brand-soft); }
 
+/* Parent/Student Lessons tab redesign (views/partials/lessons-view.ejs,
+   public/js/lesson-accordion.js) - a real request: "Each lesson should be
+   a bar with the lesson title and description. Should show number of
+   assignments. As you mark assignments complete the lesson bar shows
+   1/5... When all lessons are completed it says done... When you click
+   the lesson title bar the assignment list expands below. If you click
+   on another assignment bar the previous one closes." */
+.lesson-accordion { display: flex; flex-direction: column; gap: 0.6rem; }
+.lesson-accordion-item { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+.lesson-accordion-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+.lesson-accordion-trigger:hover { background: var(--surface-alt, #f7f8fa); }
+.lesson-accordion-info { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+.lesson-accordion-title { font-weight: 700; color: var(--ink); }
+.lesson-accordion-desc { font-size: 0.85rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lesson-accordion-meta { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
+.lesson-accordion-chevron { width: 1.1rem; height: 1.1rem; color: var(--muted); transition: transform 0.15s ease; flex-shrink: 0; }
+.lesson-accordion-trigger[aria-expanded="true"] .lesson-accordion-chevron { transform: rotate(180deg); }
+.lesson-accordion-panel { border-top: 1px solid var(--border); padding: 0.25rem 1rem 0.75rem; }
+.lesson-item-list { list-style: none; margin: 0; padding: 0; }
+.lesson-item-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border);
+}
+.lesson-item-row:first-child { border-top: none; }
+.lesson-item-main { min-width: 0; flex: 1; }
+
+/* A real request: "Each assignment should be another sub bar under the
+   assignment title. Each assignment says title and due date and a check
+   mark. When you click on the assignment it opens it to another page
+   with a back button link to view the assignment and complete it." -
+   replaces the old always-expanded .lesson-item-row (full body + the
+   actual completion control, both inline) with a plain clickable bar;
+   the body/completion control moved to their own page (views/student-
+   lesson-content.ejs/parent-lesson-content.ejs via partials/lesson-
+   content-detail). */
+.lesson-item-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0.25rem;
+  border-top: 1px solid var(--border);
+  color: var(--ink);
+  text-decoration: none;
+}
+.lesson-item-list li:first-child .lesson-item-bar { border-top: none; }
+.lesson-item-bar:hover { background: var(--surface-alt, #f7f8fa); }
+.lesson-item-bar-title { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lesson-item-bar-meta { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+.lesson-item-bar-meta .lesson-complete-check { flex-direction: row; cursor: default; }
+.lesson-item-bar-meta .lesson-complete-check .icon { width: 1.3rem; height: 1.3rem; }
+.lesson-item-complete { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; flex-shrink: 0; }
+/* A real request: "Marking complete on an assignment shouldn't be an
+   orange button. It should be a green check mark circle that you can
+   click to mark complete and it will say complete very small under the
+   check mark." */
+.lesson-complete-check {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: inherit;
+}
+.lesson-complete-check .icon { width: 1.6rem; height: 1.6rem; }
+.lesson-complete-check:hover { color: var(--green); }
+.lesson-complete-check-done { color: var(--green); cursor: default; }
+.lesson-complete-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
+.lesson-submit-form { display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; }
+.lesson-submit-form input[type="file"] { font-size: 0.75rem; max-width: 10rem; }
+
 /* ---------- Sitewide delete confirmation popup (partials/confirm-dialog.ejs) ---------- */
 .confirm-dialog {
   width: min(360px, 90vw);
@@ -10486,6 +10630,22 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
    every dropdown to the row's full width and forcing Paragraph/Font/Size
    into three stacked rows instead of sitting side by side. */
 .forum-editor-toolbar select { border: 1px solid var(--border); background-color: var(--surface); border-radius: 5px; padding: 0.22rem 1.5rem 0.22rem 0.5rem; background-position: right 0.45rem center; background-size: 0.6rem; font-size: 0.72rem; font-weight: 600; color: var(--ink); cursor: pointer; line-height: 1.2; width: auto; min-width: 5.5rem; flex: 0 0 auto; }
+/* A real request: "the description box editing features have a scroll
+   bar now for some of their features" - min-width alone lets each select
+   size to fit its OWN longest option text ("Preformatted", "Times New
+   Roman", ...), not just its 5.5rem floor, so all three together could
+   run well past a phone's available width (confirmed live: 365px of
+   select content in a 281px-wide row at 375px viewport) and trip
+   .forum-editor-toolbar-row's horizontal scrollbar. A capped width below
+   forces every select back to one fixed, predictable size at phone
+   widths - the closed dropdown's own text truncates with an ellipsis
+   (standard <select> rendering once its box is narrower than its
+   selected option's text), and the full option list still shows
+   untruncated when opened. */
+@media (max-width: 480px) {
+  .forum-editor-toolbar-row-dropdowns { gap: 0.2rem; }
+  .forum-editor-toolbar select { min-width: 0; width: 4.3rem; max-width: 4.3rem; }
+}
 .forum-editor-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 0.1rem; flex: 0 0 auto; }
 /* label.forum-editor-color (element+class, not just .forum-editor-color)
    - on the event/class edit forms this toolbar lives inside a
@@ -12315,6 +12475,11 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
      icon cell vertically instead of keeping it "a balanced row" per the
      real request. */
   .accounting-row-icons { display: flex; flex-wrap: nowrap; justify-content: flex-start; }
+  /* The "Parked" badge (an auto-park invoice gone overdue unpaid) sits
+     right next to the member's own name in this column - wrap instead of
+     forcing the row wide, same .roster-name-col treatment as every other
+     shrunk table in this app. */
+  .accounting-accounts-table-fit .roster-name-col { white-space: normal; }
 }
 
 /* Invoices/Payments/Adjustments/Logs run 6-9 real columns (Invoice #,
@@ -12329,7 +12494,45 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 @media (max-width: 640px) {
   .accounting-table-mobile-fit-tighter { font-size: 0.68rem; }
   .accounting-table-mobile-fit-tighter th, .accounting-table-mobile-fit-tighter td { padding: 0.25rem 0.3rem; }
+  /* A real request: "when you click the invoice icon next to each member
+     on the accounts page the table should shrink to fit" - the member
+     Account page's own Record Payment/Cancel buttons were still each
+     paying .roster-action-btn's min-width: 5.5rem even inside this
+     already-tightened table, the single widest thing driving the
+     overflow .roster-scroll otherwise has to handle sideways.
+     .roster-action-btn-fit (already added to both buttons) drops that
+     min-width; this flex:nowrap keeps them stacked side by side rather
+     than one per line (same ".roster-btn-row's own shared mobile rule
+     would otherwise stack them" fix used for .accounting-row-icons just
+     above). */
+  .member-invoice-actions { display: flex; flex-wrap: nowrap; gap: 0.3rem; }
+  .member-invoice-actions .roster-action-btn-fit { font-size: 0.66rem; padding: 0.3rem 0.4rem; }
 }
+
+/* Photo Albums (views/admin-photos-edit.ejs / admin-photos-list.ejs) - a
+   real request: "edit, save archive delete should be the same size
+   buttons on the same row, shrink to fit on mobile properly... Manage
+   button becomes edit icon... icons should be bottom right... Remove
+   trashcan button from edit page." Save/Archive now match
+   .roster-action-btn's own shared size instead of Save being a wider
+   .primary-btn, and shrink to fit side by side on mobile the same way
+   every other same-row button pair in this app already does. */
+.photo-album-save-row .roster-action-btn { flex: 1 1 0; }
+@media (max-width: 480px) {
+  .photo-album-save-row { gap: 0.5rem; }
+  .photo-album-save-row .roster-action-btn { font-size: 0.78rem; padding: 0.5rem 0.4rem; }
+}
+
+/* The album card's own icon row (Edit/Export/Delete, plus Restore on the
+   Archive tab) - right-aligned so the icons read as "bottom right of the
+   card" per the real request, instead of .roster-btn-row's own default
+   left-aligned flow. */
+.photo-album-card-icons { justify-content: flex-end; margin-top: 0.5rem; }
+
+/* Parent Portal Accounting (views/accounting-home.ejs) - a real request:
+   "shrink to fit on mobile for all tables. Total for payments, invoices
+   and adjustments should be bottom right of each of those sections." */
+.accounting-section-total { text-align: right; font-weight: 700; margin-top: 0.4rem; }
 
 /* A real request: "shrink the accounts table on desktop to bring the
    columns much closer together for better viewing. Tables should not
@@ -12343,4 +12546,31 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 @media (min-width: 641px) {
   .accounting-accounts-table-fit { width: auto; }
   .accounting-accounts-table-fit th, .accounting-accounts-table-fit td { padding: 0.45rem 0.9rem; }
+}
+
+/* New/Edit Invoice (views/admin-accounting-invoice-form.ejs) - a real
+   request: "Creating an invoice should look exactly like the screenshot."
+   A full page (not a dialog, given how many fields the reference carries)
+   reusing the same .member-form-grid/.member-form-full fields-row
+   convention every other admin form in this app already uses. */
+.accounting-invoice-form .member-form-full { margin-top: 1rem; }
+.accounting-invoice-form input[readonly] { background: var(--surface-alt, #f3f3f3); color: var(--muted); }
+.accounting-email-family-row { display: flex; flex-direction: column; gap: 0.35rem; }
+.accounting-email-family-row .icon { width: 16px; height: 16px; vertical-align: text-bottom; color: var(--muted); }
+.accounting-split-invoice-row { display: flex; gap: 1rem; align-items: flex-end; margin-top: 0.75rem; flex-wrap: wrap; }
+.accounting-split-invoice-row label { flex: 1 1 160px; }
+@media (max-width: 480px) {
+  .accounting-split-invoice-row { gap: 0.6rem; }
+}
+
+/* A real request: "Signup lists, main admin portal, shrink table to
+   mobile view" - the Sign-Up List detail page's own Items table had no
+   mobile shrink treatment at all (the Sign-Up Lists list page's own
+   table already gets this via .committees-table). Same .roster-name-col
+   wrap/font-size/padding convention as .committees-table, plus wrapping
+   the "Claimed By" column (a comma-joined name list, same overflow risk)
+   instead of letting it force the row wide. */
+@media (max-width: 640px) {
+  .signup-list-items-table .roster-name-col { max-width: 7rem; white-space: normal; }
+  .signup-list-items-table td:nth-child(4) { max-width: 6.5rem; white-space: normal; }
 }

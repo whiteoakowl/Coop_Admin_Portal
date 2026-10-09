@@ -4760,3 +4760,108 @@ create table if not exists lesson_item_completions (
   unique (content_item_id, student_id)
 );
 create index if not exists idx_lesson_item_completions_student on lesson_item_completions(student_id);
+
+
+
+-- ===== 20261115010000_assignment_submissions.sql =====
+-- A real request: "When creating assignments for classes there should be
+-- a assignment submit option. Where i can add a title, description,
+-- points, grade and the student will see an upload link. The lesson
+-- itself should not have points. Points can be attached to each
+-- assignment instead." A new lesson_content_items type
+-- ('assignment_submission', distinct from the existing 'assignment_upload'
+-- type which is ADMIN posting materials TO students - this one is a
+-- STUDENT uploading their own work back) carries its own points_possible;
+-- the lesson (class_assignments) itself keeps its own points_possible
+-- column for any already-created lesson that still has one, but the
+-- Lesson Details/New Lesson forms no longer collect it.
+
+alter table lesson_content_items add column if not exists points_possible integer;
+
+alter table lesson_content_items drop constraint if exists lesson_content_items_type_check;
+alter table lesson_content_items add constraint lesson_content_items_type_check
+  check (type in ('video', 'text', 'file', 'quiz', 'assignment_upload', 'assignment_submission'));
+
+-- A real request: "Due dates should be on the assignments, not on the
+-- lesson." The lesson (class_assignments) keeps its own due_date column
+-- for any already-created lesson that still has one, but new/edited
+-- lessons no longer collect it - each content item ("assignment" in the
+-- Parent/Student portal's own wording) carries its own instead.
+alter table lesson_content_items add column if not exists due_date text;
+
+-- One row per student per assignment_submission content item - re-
+-- uploading replaces the file and resets grading (status back to
+-- 'submitted', grade fields cleared) so the teacher/admin knows to
+-- re-review. "a letter/percentage grade field for after review" (a real
+-- clarification) - grade_letter is free text (e.g. "A-", "92%"), separate
+-- from the numeric points_earned.
+create table if not exists assignment_submissions (
+  id serial primary key,
+  content_item_id integer not null references lesson_content_items(id) on delete cascade,
+  student_id integer not null references members(id) on delete cascade,
+  file_url text,
+  file_name text,
+  submitted_at timestamptz not null default now(),
+  status text not null default 'submitted' check (status in ('submitted', 'graded')),
+  points_earned numeric,
+  grade_letter text,
+  feedback text,
+  graded_at timestamptz,
+  unique (content_item_id, student_id)
+);
+
+create index if not exists idx_assignment_submissions_content_item on assignment_submissions(content_item_id);
+create index if not exists idx_assignment_submissions_student on assignment_submissions(student_id);
+
+-- ===== 20261116010000_accounting_categories_fiscal_years_invoices.sql =====
+-- Several real requests bundled together under Accounting:
+-- "Add an accounting category... pop up that asks for title and code" -
+-- event_accounting_categories gets a short `code` alongside its existing
+-- name (e.g. "RR" for "Registration & Renewals", matching the reference
+-- screenshot's own Category dropdown wording).
+alter table event_accounting_categories add column if not exists code text;
+
+-- "Category subpage to say category/fiscal year... button for add a
+-- fiscal year asking start and end date... appears on the fiscal year
+-- table." A fiscal year is just a named date range an admin tracks
+-- alongside accounting categories - nothing else in this app currently
+-- scopes anything BY fiscal year, so this is deliberately just the list/
+-- CRUD the request asked for, same shape as any other simple admin-
+-- managed list (e.g. event_accounting_categories itself).
+create table if not exists fiscal_years (
+  id integer generated always as identity primary key,
+  start_date text not null,
+  end_date text not null,
+  created_at text not null default now_text()
+);
+
+-- "Creating an invoice should look exactly like the screenshot" - the
+-- screenshot's own fields that payment_charges didn't yet carry: a
+-- Category dropdown (the same event_accounting_categories list Events'
+-- own Finance tab already uses), a Due Date separate from the charge's
+-- created_at "Date", Admin Notes, and the "Auto-Park/Unpark Family if/
+-- when Unpaid/Paid?" checkbox. `email_family` just remembers the last
+-- choice shown on the form - the actual "send or don't" decision happens
+-- once at save time (routes/admin-accounting.js), not on every later view
+-- of the invoice.
+alter table payment_charges add column if not exists accounting_category_id integer references event_accounting_categories(id) on delete set null;
+alter table payment_charges add column if not exists due_date text;
+alter table payment_charges add column if not exists admin_notes text;
+alter table payment_charges add column if not exists auto_park_family boolean not null default false;
+alter table payment_charges add column if not exists email_family boolean not null default false;
+
+-- "Accounting adjustment categories refund, exemption, credit, discount" -
+-- Record Payment's own "Refund issued" direction (already payment_
+-- payments.amount_cents < 0) now also picks which of these four a given
+-- refund-direction row actually is, for Adjustments' own Type column.
+-- Null for a plain payment - this only ever applies to a refund-direction
+-- row.
+alter table payment_payments add column if not exists adjustment_type text check (adjustment_type in ('refund', 'exemption', 'credit', 'discount'));
+
+-- Backs the Auto-Park/Unpark checkbox above: recalculateParkedStatus
+-- (utils/payments.js) flips this on for a member once any of their own
+-- auto_park_family charges goes overdue unpaid, and back off once none
+-- do - surfaced as a "Parked" badge on Accounting's own Accounts list/
+-- Account page (the only place this flag changes anything - it doesn't
+-- block registration/portal access, which was never asked for here).
+alter table members add column if not exists parked boolean not null default false;

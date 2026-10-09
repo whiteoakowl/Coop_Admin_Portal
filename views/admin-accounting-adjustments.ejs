@@ -22,6 +22,7 @@
             <thead>
               <tr>
                 <th>Member</th>
+                <th>Type</th>
                 <th>For</th>
                 <th>Amount</th>
                 <th>Note</th>
@@ -33,6 +34,7 @@
               <% refunds.forEach(function(p) { %>
                 <tr>
                   <td><a href="/main-admin/accounting/members/<%= p.member_id %>"><%= p.memberName %></a></td>
+                  <td><span class="badge-pill badge-pill-gray"><%= p.adjustment_type ? p.adjustment_type.charAt(0).toUpperCase() + p.adjustment_type.slice(1) : 'Refund' %></span></td>
                   <td><%= p.chargeDescription %></td>
                   <td><%= formatCents(p.amount_cents) %></td>
                   <td><%= p.note || '' %></td>

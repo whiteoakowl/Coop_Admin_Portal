@@ -88,7 +88,11 @@ test('Lesson list shows a Completed percentage column - "—" with no quiz conte
 
   const listBefore = await request(app).get(`/admin/class-schedule/classes/${classId}/manage?tab=assignments`).set('Cookie', admin.cookie);
   // No quiz content at all - not measurable, so "—" not a misleading 0%.
-  assert.match(listBefore.text, /—<\/td>\s*<td><a class="roster-action-btn"/);
+  // The row's trailing action cell is now a pair of icon buttons (Manage/
+  // Delete), not a plain "Manage" text link - see the real bug report
+  // "there is no manage or trash button at the end of each class
+  // assignment in co-op admin portal."
+  assert.match(listBefore.text, /—<\/td>\s*<td class="roster-btn-row accounting-row-icons">\s*<a class="icon-btn"/);
 
   await request(app)
     .post(`/admin/class-schedule/classes/${classId}/assignments`)
@@ -110,7 +114,7 @@ test('Lesson list shows a Completed percentage column - "—" with no quiz conte
     .run(quizItem.id, student2);
 
   const listAfter = await request(app).get(`/admin/class-schedule/classes/${classId}/manage?tab=assignments`).set('Cookie', admin.cookie);
-  assert.match(listAfter.text, /50%<\/td>\s*<td><a class="roster-action-btn"/);
+  assert.match(listAfter.text, /50%<\/td>\s*<td class="roster-btn-row accounting-row-icons">\s*<a class="icon-btn"/);
 });
 
 test('Content page renames: "Add Assignments" (was Add Content), "Assignments (N)" heading (was Lesson Content)', async () => {
@@ -232,5 +236,13 @@ test('Assignment Upload content shows up read-only on the Student Portal Lessons
   const page = await request(app).get(`/student/classes/${classId}?tab=lessons`).set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /Read Chapter 1/);
-  assert.match(page.text, /Summarize chapter 1 in your own words/);
+
+  // The item's own body/instructions live on its own detail page now (a
+  // real request redesigned the Lessons tab into clickable title/due-
+  // date/check-mark bars - see partials/lessons-view.ejs).
+  const contentItem = await db.prepare("SELECT id FROM lesson_content_items WHERE assignment_id = ? AND type = 'assignment_upload'").get(assignment.id);
+  assert.match(page.text, new RegExp(`href="/student/content/${contentItem.id}"`));
+  const detail = await request(app).get(`/student/content/${contentItem.id}`).set('Cookie', cookie);
+  assert.equal(detail.status, 200);
+  assert.match(detail.text, /Summarize chapter 1 in your own words/);
 });

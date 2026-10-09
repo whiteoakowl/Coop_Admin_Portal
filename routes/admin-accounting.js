@@ -79,7 +79,7 @@ async function billedMemberIds() {
 
 async function accountRows(q) {
   const eligibleIds = await billedMemberIds();
-  let members = (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).filter((m) => eligibleIds.has(m.id)).sort(byLastName);
+  let members = (await db.prepare('SELECT id, name, parked FROM members WHERE active = 1').all()).filter((m) => eligibleIds.has(m.id)).sort(byLastName);
   if (q) {
     members = members.filter((m) => m.name.toLowerCase().includes(q));
   }
@@ -102,13 +102,22 @@ router.get('/', async (req, res) => {
     title: 'Accounts',
     members: await accountRows(q),
     q: req.query.q || '',
-    pastDueOnly: req.query.pastDueOnly === '1',
     allMembers: await billableMembers(),
     notice: req.query.notice || null,
     error: req.query.error || null,
     formatCents: payments.formatCents,
   });
 });
+
+async function recipientAccountIdsForMembers(memberIds) {
+  const accounts = await db.prepare("SELECT id, member_id FROM member_accounts WHERE status IN ('active', 'pending')").all();
+  const accountIdsByMember = new Map();
+  for (const a of accounts) {
+    if (!accountIdsByMember.has(a.member_id)) accountIdsByMember.set(a.member_id, []);
+    accountIdsByMember.get(a.member_id).push(a.id);
+  }
+  return memberIds.flatMap((id) => accountIdsByMember.get(id) || []);
+}
 
 router.get('/export.csv', async (req, res) => {
   const q = (req.query.q || '').trim().toLowerCase();
@@ -120,20 +129,13 @@ router.get('/export.csv', async (req, res) => {
   sendCsv(res, 'accounting-accounts.csv', lines);
 });
 
-// A real request: "email all invoices" - a one-click reminder to every
-// member who currently owes something, reusing utils/emailComposer.js's
-// own createAndSend (the SAME "no real outbound SMTP, just an in-app
-// notification + a logged campaign" abstraction every other email/text
-// feature in this app already uses - see that module's own header).
-router.post('/email-all-invoices', async (req, res) => {
+// A real request: "past due check box should be a button that says email
+// all past due invoices" - the old "Email All Invoices" button's own
+// behavior (only members who currently owe something), just renamed to
+// say what it actually does and no longer tied to a filter checkbox.
+router.post('/email-all-past-due-invoices', async (req, res) => {
   const rows = (await accountRows('')).filter((m) => m.balanceCents > 0);
-  const accounts = await db.prepare('SELECT id, member_id FROM member_accounts WHERE status IN (\'active\', \'pending\')').all();
-  const accountIdsByMember = new Map();
-  for (const a of accounts) {
-    if (!accountIdsByMember.has(a.member_id)) accountIdsByMember.set(a.member_id, []);
-    accountIdsByMember.get(a.member_id).push(a.id);
-  }
-  const recipientAccountIds = rows.flatMap((m) => accountIdsByMember.get(m.id) || []);
+  const recipientAccountIds = await recipientAccountIdsForMembers(rows.map((m) => m.id));
   if (!recipientAccountIds.length) {
     return res.redirect('/main-admin/accounting?notice=' + encodeURIComponent('No members currently have a balance due - nothing to send.'));
   }
@@ -147,14 +149,34 @@ router.post('/email-all-invoices', async (req, res) => {
   res.redirect('/main-admin/accounting?notice=' + encodeURIComponent(`Sent a balance-due reminder to ${recipientAccountIds.length} account(s).`));
 });
 
+// A real request: "Email all invoices button will send all" - genuinely
+// every billable member on the Accounts list below, not just the ones
+// currently past due (that's Email All Past Due Invoices' own job now).
+router.post('/email-all-invoices', async (req, res) => {
+  const rows = await accountRows('');
+  const recipientAccountIds = await recipientAccountIdsForMembers(rows.map((m) => m.id));
+  if (!recipientAccountIds.length) {
+    return res.redirect('/main-admin/accounting?notice=' + encodeURIComponent('No billable members yet - nothing to send.'));
+  }
+  await emailComposer.createAndSend({
+    subject: 'Accounting Statement',
+    bodyHtml: '<p>Visit the Accounting page in your portal for a full breakdown of your account.</p>',
+    recipientAccountIds,
+    sentByAccountId: req.portalAccount.id,
+    sentByPortal: 'main_admin',
+  });
+  res.redirect('/main-admin/accounting?notice=' + encodeURIComponent(`Sent an accounting statement to ${recipientAccountIds.length} account(s).`));
+});
+
 // --- Categories (moved here from a modal dialog so it's a real subpage,
 // same event_accounting_categories table/functions (utils/events.js) the
 // Events Finance tab's own dropdown still reads from). ---
 
 router.get('/categories', async (req, res) => {
   res.render('admin-accounting-categories', {
-    title: 'Accounting Categories',
+    title: 'Category/Fiscal Year',
     accountingCategories: await events.listAccountingCategories(),
+    fiscalYears: await events.listFiscalYears(),
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
@@ -162,15 +184,17 @@ router.get('/categories', async (req, res) => {
 
 router.post('/accounting-categories', async (req, res) => {
   const name = (req.body.name || '').trim();
-  if (!name) return res.redirect('/main-admin/accounting/categories?error=' + encodeURIComponent('Accounting category name is required.'));
-  await events.createAccountingCategory(name);
+  const code = (req.body.code || '').trim();
+  if (!name) return res.redirect('/main-admin/accounting/categories?error=' + encodeURIComponent('Category title is required.'));
+  await events.createAccountingCategory(name, code);
   res.redirect('/main-admin/accounting/categories?notice=' + encodeURIComponent('Accounting category added.'));
 });
 
 router.post('/accounting-categories/:id/update', async (req, res) => {
   const name = (req.body.name || '').trim();
-  if (!name) return res.redirect('/main-admin/accounting/categories?error=' + encodeURIComponent('Accounting category name is required.'));
-  await events.updateAccountingCategory(req.params.id, name);
+  const code = (req.body.code || '').trim();
+  if (!name) return res.redirect('/main-admin/accounting/categories?error=' + encodeURIComponent('Category title is required.'));
+  await events.updateAccountingCategory(req.params.id, name, code);
   res.redirect('/main-admin/accounting/categories?notice=' + encodeURIComponent('Accounting category updated.'));
 });
 
@@ -179,10 +203,109 @@ router.post('/accounting-categories/:id/delete', async (req, res) => {
   res.redirect('/main-admin/accounting/categories?notice=' + encodeURIComponent('Accounting category removed.'));
 });
 
+// --- Fiscal Years (same subpage - "Category/Fiscal Year"). ---
+
+router.post('/fiscal-years', async (req, res) => {
+  const startDate = (req.body.startDate || '').trim();
+  const endDate = (req.body.endDate || '').trim();
+  if (!startDate || !endDate) return res.redirect('/main-admin/accounting/categories?error=' + encodeURIComponent('Start date and end date are both required.'));
+  await events.createFiscalYear(startDate, endDate);
+  res.redirect('/main-admin/accounting/categories?notice=' + encodeURIComponent('Fiscal year added.'));
+});
+
+router.post('/fiscal-years/:id/delete', async (req, res) => {
+  await events.deleteFiscalYear(req.params.id);
+  res.redirect('/main-admin/accounting/categories?notice=' + encodeURIComponent('Fiscal year removed.'));
+});
+
 // --- Invoices (one row per existing payment_charges row - the answered
 // design question). ---
 
 const INVOICE_STATUSES = ['pending', 'paid', 'cancelled', 'refunded', 'partially_refunded'];
+
+// "Family (read-only, 'Kalna, Kara')" (the reference screenshot) - the
+// billed member's own name, "Last, First" rather than this app's usual
+// stored "First Last", matching that screenshot exactly.
+function familyLabel(name) {
+  const parts = (name || '').trim().split(/\s+/);
+  if (parts.length < 2) return name || '';
+  const last = parts[parts.length - 1];
+  const first = parts.slice(0, -1).join(' ');
+  return `${last}, ${first}`;
+}
+
+async function accountIdsForMember(memberId) {
+  return (await db.prepare("SELECT id FROM member_accounts WHERE member_id = ? AND status IN ('active', 'pending')").all(memberId)).map((a) => a.id);
+}
+
+// "Email Family?" (the reference screenshot) - a real notification, not
+// just a form choice that goes nowhere, reusing the same in-app
+// notification abstraction every other email feature in this app already
+// uses (utils/emailComposer.js).
+async function emailFamilyAboutInvoice(memberId, description, amountCents, sentByAccountId) {
+  const recipientAccountIds = await accountIdsForMember(memberId);
+  if (!recipientAccountIds.length) return;
+  await emailComposer.createAndSend({
+    subject: 'New Invoice - ' + description,
+    bodyHtml: `<p>A new invoice has been added to your account: <strong>${description}</strong> &mdash; ${payments.formatCents(amountCents)}. Visit the Accounting page in your portal for details.</p>`,
+    recipientAccountIds,
+    sentByAccountId,
+    sentByPortal: 'main_admin',
+  });
+}
+
+// "Creating an invoice should look exactly like the screenshot" - a real
+// full page now (Family/Category/Date/Due Date/Auto-Park/Description/
+// Admin Notes/Amount/+Split Invoice/Email Family), reached by picking a
+// member first (same "which member?" pattern +Payment/+Adjustment on the
+// Accounts page already use) rather than the old small "New Invoice"
+// dialog (member+description+amount only).
+router.get('/invoices/new', async (req, res) => {
+  const memberId = Number(req.query.memberId);
+  const member = memberId ? await db.prepare('SELECT id, name FROM members WHERE id = ?').get(memberId) : null;
+  if (!member) return res.redirect('/main-admin/accounting/invoices?error=' + encodeURIComponent('Pick a member first.'));
+  res.render('admin-accounting-invoice-form', {
+    title: 'New Invoice',
+    charge: null,
+    member,
+    familyLabel: familyLabel(member.name),
+    categories: await events.listAccountingCategories(),
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+router.get('/invoices/:id/edit', async (req, res) => {
+  const charge = await payments.getCharge(req.params.id);
+  if (!charge) return res.status(404).render('404', { title: 'Not Found' });
+  const member = await db.prepare('SELECT id, name FROM members WHERE id = ?').get(charge.member_id);
+  res.render('admin-accounting-invoice-form', {
+    title: `Edit Invoice #${charge.id}`,
+    charge,
+    member,
+    familyLabel: familyLabel(member.name),
+    categories: await events.listAccountingCategories(),
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+// "+ Split Invoice" (the reference screenshot) - one or more additional
+// description/amount line items beyond the form's own primary Description/
+// Amount fields, all sharing the same member/category/dates/notes/auto-
+// park/email choice. splitDescription[]/splitAmount[] are parallel arrays
+// from the repeatable rows public/js/accounting-invoice-form.js adds.
+function splitLineItems(body) {
+  const descriptions = [].concat(body.splitDescription || []);
+  const amounts = [].concat(body.splitAmount || []);
+  const items = [];
+  for (let i = 0; i < descriptions.length; i++) {
+    const description = (descriptions[i] || '').trim();
+    const amountCents = toCents(amounts[i]);
+    if (description && amountCents > 0) items.push({ description, amountCents });
+  }
+  return items;
+}
 
 router.get('/invoices', async (req, res) => {
   const status = INVOICE_STATUSES.includes(req.query.status) ? req.query.status : '';
@@ -206,10 +329,54 @@ router.post('/invoices', async (req, res) => {
   const description = (req.body.description || '').trim();
   const amountCents = toCents(req.body.amount);
   if (!memberId || !description || amountCents <= 0) {
-    return res.redirect('/main-admin/accounting/invoices?error=' + encodeURIComponent('Member, description, and a positive amount are required.'));
+    return res.redirect(`/main-admin/accounting/invoices/new?memberId=${memberId}&error=` + encodeURIComponent('Description and a positive amount are required.'));
   }
-  await payments.createCharge(memberId, req.portalAccount.id, 'manual', null, description, amountCents);
-  res.redirect('/main-admin/accounting/invoices?notice=' + encodeURIComponent('Invoice added.'));
+  const details = {
+    categoryId: req.body.categoryId ? Number(req.body.categoryId) : null,
+    invoiceDate: (req.body.date || '').trim() || null,
+    dueDate: (req.body.dueDate || '').trim() || null,
+    adminNotes: (req.body.adminNotes || '').trim() || null,
+    autoParkFamily: req.body.autoParkFamily === '1',
+    emailFamily: req.body.emailFamily === 'yes',
+  };
+  const lineItems = [{ description, amountCents }, ...splitLineItems(req.body)];
+  for (const item of lineItems) {
+    const chargeId = await payments.createCharge(memberId, req.portalAccount.id, 'manual', null, item.description, item.amountCents);
+    await payments.setChargeDetails(chargeId, details);
+  }
+  if (details.emailFamily) {
+    const totalCents = lineItems.reduce((sum, i) => sum + i.amountCents, 0);
+    await emailFamilyAboutInvoice(memberId, description, totalCents, req.portalAccount.id);
+  }
+  res.redirect('/main-admin/accounting/invoices?notice=' + encodeURIComponent(lineItems.length > 1 ? `${lineItems.length} invoices added.` : 'Invoice added.'));
+});
+
+router.post('/invoices/:id/update', async (req, res) => {
+  const charge = await payments.getCharge(req.params.id);
+  if (!charge) return res.status(404).render('404', { title: 'Not Found' });
+  const description = (req.body.description || '').trim();
+  const amountCents = toCents(req.body.amount);
+  if (!description || amountCents <= 0) {
+    return res.redirect(`/main-admin/accounting/invoices/${charge.id}/edit?error=` + encodeURIComponent('Description and a positive amount are required.'));
+  }
+  const details = {
+    categoryId: req.body.categoryId ? Number(req.body.categoryId) : null,
+    invoiceDate: (req.body.date || '').trim() || null,
+    dueDate: (req.body.dueDate || '').trim() || null,
+    adminNotes: (req.body.adminNotes || '').trim() || null,
+    autoParkFamily: req.body.autoParkFamily === '1',
+    emailFamily: req.body.emailFamily === 'yes',
+  };
+  await payments.updateCharge(charge.id, { description, amountCents, ...details });
+  const extraItems = splitLineItems(req.body);
+  for (const item of extraItems) {
+    const chargeId = await payments.createCharge(charge.member_id, req.portalAccount.id, 'manual', null, item.description, item.amountCents);
+    await payments.setChargeDetails(chargeId, details);
+  }
+  if (details.emailFamily) {
+    await emailFamilyAboutInvoice(charge.member_id, description, amountCents, req.portalAccount.id);
+  }
+  res.redirect('/main-admin/accounting/invoices?notice=' + encodeURIComponent('Invoice updated.'));
 });
 
 // A real request: "add a trash icon at the end of each row" (Invoices),
@@ -318,7 +485,7 @@ router.post('/settings/payment-methods', async (req, res) => {
 // years for accounting." year is 'current' (default, this calendar
 // year), 'all', or a 4-digit year string from payments.yearsForMember.
 router.get('/members/:memberId', async (req, res) => {
-  const member = await db.prepare('SELECT id, name FROM members WHERE id = ?').get(req.params.memberId);
+  const member = await db.prepare('SELECT id, name, parked FROM members WHERE id = ?').get(req.params.memberId);
   if (!member) return res.status(404).render('404', { title: 'Not Found' });
   const overview = await payments.accountOverviewForMember(member.id, req.query.year || 'current');
 
@@ -361,7 +528,7 @@ router.post('/charges/:id/payments', async (req, res) => {
   // what amounts to a label on the same note field.
   const methodLabel = (req.body.method || '').trim();
   const note = [methodLabel, (req.body.note || '').trim()].filter(Boolean).join(' - ');
-  await payments.recordPayment(charge.id, amountCents, 'manual', req.portalAccount.id, note);
+  await payments.recordPayment(charge.id, amountCents, 'manual', req.portalAccount.id, note, isRefund ? req.body.adjustmentType : null);
   await auditLog.record(req.portalAccount.id, isRefund ? 'refund_recorded' : 'payment_recorded', 'payment_charge', charge.id, `${payments.formatCents(Math.abs(amountCents))}${note ? ' - ' + note : ''}`);
   res.redirect(`/main-admin/accounting/members/${charge.member_id}?notice=` + encodeURIComponent(isRefund ? 'Refund recorded.' : 'Payment recorded.'));
 });

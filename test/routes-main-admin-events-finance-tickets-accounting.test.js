@@ -119,7 +119,7 @@ test('Accounting Categories: manage from the Accounting tab (not Events Settings
   // A later real request moved this off a modal dialog on the Accounts
   // list and onto its own Accounting > Categories subpage.
   const categoriesPage = await request(app).get('/main-admin/accounting/categories').set('Cookie', admin.cookie);
-  assert.match(categoriesPage.text, /Accounting Categories/);
+  assert.match(categoriesPage.text, /Category\/Fiscal Year/);
   assert.doesNotMatch(categoriesPage.text, /id="manage-accounting-categories-dialog"/);
 
   const csrf = extractCsrf(categoriesPage.text);

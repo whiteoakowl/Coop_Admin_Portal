@@ -185,17 +185,18 @@ test('Categories subpage: lives at its own URL (not a modal on Accounts), and st
   const admin = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/accounting/categories').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /Accounting Categories/);
+  assert.match(page.text, /Category\/Fiscal Year/);
   const csrf = extractCsrf(page.text);
 
   await request(app)
     .post('/main-admin/accounting/accounting-categories')
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ name: 'Subpage Test Category', _csrf: csrf });
+    .send({ name: 'Subpage Test Category', code: 'STC', _csrf: csrf });
 
   const after = await request(app).get('/main-admin/accounting/categories').set('Cookie', admin.cookie);
   assert.match(after.text, /Subpage Test Category/);
+  assert.match(after.text, /value="STC"/);
 });
 
 // Coverage for a real request: "add a trash icon at the end of each

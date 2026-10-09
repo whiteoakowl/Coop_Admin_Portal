@@ -17,12 +17,6 @@
     <label>Open Date
       <input type="date" name="openDate" value="<%= assignment.open_date || '' %>" />
     </label>
-    <label>Due Date
-      <input type="date" name="dueDate" value="<%= assignment.due_date || '' %>" />
-    </label>
-    <label>Points Possible
-      <input type="number" name="pointsPossible" min="0" value="<%= assignment.points_possible != null ? assignment.points_possible : '' %>" />
-    </label>
     <div class="member-form-full">
       <button type="submit" class="primary-btn">Save Lesson Details</button>
     </div>
@@ -53,6 +47,11 @@
               <td><span class="status-badge status-badge-active"><%= item.type %></span></td>
               <td class="roster-name-col">
                 <%= item.title || '(untitled)' %>
+                <%# A real request: "the text is formatted row wise should
+                    be how it is displayed for parent/student portal
+                    view" - that view's own Lessons tab already shows
+                    "Due {label}" next to each item's title. %>
+                <% if (item.dueDateLabel) { %><div class="hint">Due <%= item.dueDateLabel %></div><% } %>
                 <% if (item.type === 'video' && item.video_url) { %><div class="hint"><a href="<%= item.video_url %>" target="_blank" rel="noopener">Video link</a></div><% } %>
                 <% if (item.type === 'video' && item.description) { %><div class="hint"><%= item.description %></div><% } %>
                 <% if (item.type === 'file' && item.file_url) { %><div class="hint"><a href="<%= item.file_url %>" target="_blank" rel="noopener">File link</a></div><% } %>
@@ -63,10 +62,17 @@
                   <% if (item.body) { %><div class="hint forum-editable-display"><%- item.body %></div><% } %>
                   <% if (item.attachmentUrl) { %><div class="hint"><a href="<%= item.attachmentUrl %>" target="_blank" rel="noopener"><%= item.attachment_name || 'Attachment' %></a></div><% } %>
                 <% } %>
+                <% if (item.type === 'assignment_submission') { %>
+                  <% if (item.body) { %><div class="hint forum-editable-display"><%- item.body %></div><% } %>
+                  <div class="hint"><% if (item.points_possible != null) { %><%= item.points_possible %> points<% } %></div>
+                <% } %>
               </td>
               <td>
                 <% if (item.type === 'quiz') { %>
                   <a class="roster-action-btn" href="<%= basePath %>/content/<%= item.id %>/questions">Manage Questions</a>
+                <% } %>
+                <% if (item.type === 'assignment_submission') { %>
+                  <a class="roster-action-btn" href="<%= basePath %>/content/<%= item.id %>/submissions">Review Submissions</a>
                 <% } %>
               </td>
               <td>
@@ -91,10 +97,24 @@
           <option value="file">Link to File</option>
           <option value="quiz">Quiz (with scoring)</option>
           <option value="assignment_upload">Assignment Upload</option>
+          <%# A real request: "there should be a assignment submit option.
+              Where i can add a title, description, points, grade and the
+              student will see an upload link." Distinct from Assignment
+              Upload above (admin posting materials TO students) - this
+              one is a student uploading their OWN file back, graded
+              afterward from its own Review Submissions page. %>
+          <option value="assignment_submission">Assignment Submission</option>
         </select>
       </label>
       <label class="member-form-full">Title
         <input type="text" name="title" />
+      </label>
+      <%# A real request: "Due dates should be on the assignments, not on
+          the lesson" - shared across every content type (not just
+          Assignment Submission), so it's outside any data-toggle-field
+          block. %>
+      <label class="member-form-full">Due Date <span class="hint">(optional)</span>
+        <input type="date" name="contentDueDate" />
       </label>
       <label class="member-form-full" data-toggle-field="video">Video URL
         <input type="url" name="videoUrl" placeholder="https://..." />
@@ -144,6 +164,15 @@
       </div>
       <label class="member-form-full" data-toggle-field="assignment_upload" style="display: none;">Attach a File <span class="hint">(doc, pdf, or image)</span>
         <input type="file" name="attachment" accept=".doc,.docx,.pdf,.jpg,.jpeg,.png,.gif,.webp" />
+      </label>
+      <div class="member-form-full" data-toggle-field="assignment_submission" style="display: none;" data-forum-editor>
+        <label>Description</label>
+        <%- include('forum-editor-toolbar') %>
+        <div class="forum-editable" data-forum-editable contenteditable="true"></div>
+        <input type="hidden" name="submissionBody" data-forum-body-input />
+      </div>
+      <label class="member-form-full" data-toggle-field="assignment_submission" style="display: none;">Points Possible
+        <input type="number" name="submissionPointsPossible" min="0" />
       </label>
       <div class="member-form-full">
         <button type="submit" class="primary-btn">Add Assignments</button>

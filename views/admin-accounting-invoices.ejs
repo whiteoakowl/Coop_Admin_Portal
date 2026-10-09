@@ -16,7 +16,7 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <div class="roster-btn-row accounting-list-toolbar no-print">
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('new-invoice-dialog').showModal()">+ Invoice</button>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('goto-invoice-dialog').showModal()">+ Invoice</button>
     </div>
 
     <form method="GET" action="/main-admin/accounting/invoices" class="roster-btn-row no-print" style="margin-bottom: 1rem;">
@@ -49,7 +49,6 @@
               <th>Status</th>
               <th>Date</th>
               <th></th>
-              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -62,8 +61,9 @@
                 <td><%= formatCents(c.amountPaid) %></td>
                 <td><span class="badge-pill badge-pill-<%= c.status === 'paid' ? 'green' : c.status === 'cancelled' || c.status === 'refunded' ? 'gray' : 'orange' %>"><%= c.status.replace('_', ' ') %></span></td>
                 <td><%= c.created_at %></td>
-                <td><a class="icon-btn" href="/main-admin/accounting/members/<%= c.member_id %>?autoprint=1" aria-label="Print invoice #<%= c.id %>" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a></td>
-                <td>
+                <td class="roster-btn-row accounting-row-icons">
+                  <a class="icon-btn" href="/main-admin/accounting/invoices/<%= c.id %>/edit" aria-label="Edit invoice #<%= c.id %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></a>
+                  <a class="icon-btn" href="/main-admin/accounting/members/<%= c.member_id %>?autoprint=1" aria-label="Print invoice #<%= c.id %>" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
                   <form method="POST" action="/main-admin/accounting/invoices/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete invoice #<%= c.id %> for <%= c.memberName %>? This also removes any payments recorded against it.">
                     <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete invoice #<%= c.id %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                   </form>
@@ -75,24 +75,19 @@
       </div>
     <% } %>
 
-    <dialog id="new-invoice-dialog" class="member-picker-dialog">
-      <form method="POST" action="/main-admin/accounting/invoices">
-        <h3>New Invoice</h3>
+    <dialog id="goto-invoice-dialog" class="member-picker-dialog">
+      <form method="GET" onsubmit="event.preventDefault(); var id = this.memberId.value; if (id) window.location = '/main-admin/accounting/invoices/new?memberId=' + id;">
+        <h3>Which Member?</h3>
+        <p class="hint">Opens a new invoice for that member's own account.</p>
         <label>Member
           <select name="memberId" required>
             <option value="">Select a member&hellip;</option>
             <% allMembers.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
           </select>
         </label>
-        <label>Description
-          <input type="text" name="description" placeholder="e.g. Registration Fee" required />
-        </label>
-        <label>Amount ($)
-          <input type="number" name="amount" min="0.01" step="0.01" required />
-        </label>
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <button type="submit" class="primary-btn">Add</button>
+          <button type="submit" class="primary-btn">Continue</button>
         </div>
       </form>
     </dialog>

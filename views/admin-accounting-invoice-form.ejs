@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <%
+    const isEdit = !!charge;
+    const actionUrl = isEdit ? `/main-admin/accounting/invoices/${charge.id}/update` : '/main-admin/accounting/invoices';
+    const invoiceDateValue = (isEdit ? charge.created_at : new Date().toISOString()).slice(0, 10);
+  %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1><%= isEdit ? `Edit Invoice #${charge.id}` : 'New Invoice' %></h1>
+    <p><a href="/main-admin/accounting/invoices">&larr; All Invoices</a></p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <form method="POST" action="<%= actionUrl %>" class="manage-section accounting-invoice-form" data-split-invoice-form>
+      <% if (!isEdit) { %><input type="hidden" name="memberId" value="<%= member.id %>" /><% } %>
+
+      <div class="member-form-grid">
+        <label>Family
+          <input type="text" value="<%= familyLabel %>" readonly disabled />
+        </label>
+        <label>Category
+          <select name="categoryId">
+            <option value="">No category</option>
+            <% categories.forEach(function(c) { %>
+              <option value="<%= c.id %>" <%= isEdit && charge.accounting_category_id === c.id ? 'selected' : '' %>><%= c.code ? `${c.code} - ${c.name}` : c.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label>Date
+          <input type="date" name="date" value="<%= invoiceDateValue %>" />
+        </label>
+        <label>Due Date
+          <input type="date" name="dueDate" value="<%= isEdit && charge.due_date ? charge.due_date : '' %>" />
+        </label>
+      </div>
+
+      <%# A real request (the reference screenshot): "Auto-Park/Unpark
+          Family if/when Unpaid/Paid?" - see utils/payments.js's own
+          recalculateParkedStatus for what this actually does (a visible
+          "Parked" badge on Accounts/the Account page once this invoice
+          goes overdue unpaid, cleared again once it's paid). %>
+      <label class="checkbox-option">
+        <input type="checkbox" name="autoParkFamily" value="1" <%= isEdit && charge.auto_park_family ? 'checked' : '' %> />
+        Auto-Park/Unpark Family if/when Unpaid/Paid?
+      </label>
+
+      <div class="member-form-full">
+        <label>Description <span class="hint">(Maximum 255 Characters)</span></label>
+        <div class="class-form-textarea-wrap">
+          <textarea name="description" rows="3" maxlength="255" required oninput="this.nextElementSibling.textContent = (255 - this.value.length) + ' Characters Left'"><%= isEdit ? charge.description : '' %></textarea>
+          <span class="class-form-char-count"><%= 255 - (isEdit ? charge.description.length : 0) %> Characters Left</span>
+        </div>
+      </div>
+
+      <label class="member-form-full">Admin Notes
+        <textarea name="adminNotes" rows="3"><%= isEdit && charge.admin_notes ? charge.admin_notes : '' %></textarea>
+      </label>
+
+      <label>Amount ($)
+        <input type="number" name="amount" min="0.01" step="0.01" value="<%= isEdit ? (charge.amount_cents / 100).toFixed(2) : '' %>" required />
+      </label>
+
+      <%# "+ Split Invoice" (the reference screenshot) - one or more
+          additional description/amount line items, all billed to the
+          same family alongside the primary Description/Amount above.
+          public/js/accounting-invoice-form.js adds a row per click. %>
+      <div data-split-invoice-rows></div>
+      <button type="button" class="link-btn" data-split-invoice-add>+ Split Invoice</button>
+
+      <div class="member-form-full accounting-email-family-row">
+        <span class="class-form-field-label">Email Family? <svg class="icon" title="Sends a one-time notification about this invoice to the family's own portal account."><use href="#icon-info-circle"/></svg></span>
+        <div class="checkbox-group">
+          <label class="checkbox-option"><input type="radio" name="emailFamily" value="yes" /> Yes</label>
+          <label class="checkbox-option"><input type="radio" name="emailFamily" value="no" checked /> No</label>
+        </div>
+      </div>
+
+      <div class="member-form-full">
+        <button type="submit" class="primary-btn"><%= isEdit ? 'Update Invoice' : 'Create Invoice' %></button>
+      </div>
+    </form>
+  </main>
+  <template data-split-invoice-template>
+    <div class="accounting-split-invoice-row">
+      <label>Description
+        <input type="text" name="splitDescription" placeholder="e.g. Materials Fee" />
+      </label>
+      <label>Amount ($)
+        <input type="number" name="splitAmount" min="0.01" step="0.01" />
+      </label>
+      <button type="button" class="icon-btn icon-btn-danger" data-split-invoice-remove aria-label="Remove line item" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+    </div>
+  </template>
+  <script src="/js/accounting-invoice-form.js"></script>
+</body>
+</html>

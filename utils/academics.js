@@ -40,6 +40,17 @@ async function updateAssignment(id, { title, description, dueDate, openDate, poi
     .run(title, description || null, dueDate || null, openDate || null, pointsPossible || null, id);
 }
 
+// A real bug report: "there is no manage or trash button at the end of
+// each class assignment in co-op admin portal" - the Lessons tab's own
+// delete action didn't exist at all yet. lesson_content_items,
+// assignment_grades, and (transitively) quiz_questions/choices/attempts
+// and lesson_item_completions all reference class_assignments with
+// "on delete cascade" (see the lesson_content_and_quizzes and
+// academic_records migrations), so one delete here is enough.
+async function deleteAssignment(id) {
+  await db.prepare('DELETE FROM class_assignments WHERE id = ?').run(id);
+}
+
 // Drag-and-drop reorder (public/js/lesson-drag-reorder.js) - same
 // "trust only the final on-screen order, scoped to one class" shape as
 // utils/taskList.js's own section reorder.
@@ -305,15 +316,22 @@ async function contentItemsForAssignment(assignmentId, { includeAnswerKey = fals
   );
 }
 
-async function createContentItem({ assignmentId, type, title, videoUrl, body, fileUrl, description, attachmentUrl, attachmentName }) {
+// pointsPossible: only ever set for the 'assignment_submission' type - a
+// real request: "the lesson itself should not have points. Points can be
+// attached to each assignment instead." (every other type passes
+// undefined/null here, same as before).
+// dueDate: a real request: "Due dates should be on the assignments, not
+// on the lesson" - every content item (any type) can carry its own now,
+// instead of only the parent lesson having one.
+async function createContentItem({ assignmentId, type, title, videoUrl, body, fileUrl, description, attachmentUrl, attachmentName, pointsPossible, dueDate }) {
   const { next_position: nextPosition } = await db
     .prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM lesson_content_items WHERE assignment_id = ?')
     .get(assignmentId);
   const info = await db
     .prepare(
-      'INSERT INTO lesson_content_items (assignment_id, type, position, title, video_url, body, file_url, description, attachment_url, attachment_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO lesson_content_items (assignment_id, type, position, title, video_url, body, file_url, description, attachment_url, attachment_name, points_possible, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )
-    .run(assignmentId, type, nextPosition, title || null, videoUrl || null, body || null, fileUrl || null, description || null, attachmentUrl || null, attachmentName || null);
+    .run(assignmentId, type, nextPosition, title || null, videoUrl || null, body || null, fileUrl || null, description || null, attachmentUrl || null, attachmentName || null, pointsPossible != null ? pointsPossible : null, dueDate || null);
   return info.lastInsertRowid;
 }
 
@@ -325,6 +343,70 @@ async function updateContentItem(id, { title, videoUrl, body, fileUrl, descripti
 
 async function deleteContentItem(id) {
   await db.prepare('DELETE FROM lesson_content_items WHERE id = ?').run(id);
+}
+
+// --- Assignment Submission (a real request: "there should be a
+// assignment submit option... the student will see an upload link") -
+// distinct from the pre-existing 'assignment_upload' type, which is an
+// admin/teacher posting materials TO students (read-only on the student
+// side). This is the reverse: the student uploads their OWN file back,
+// and a teacher/admin reviews it with points + a letter/percentage grade
+// + feedback (a real clarification on what "grade" meant here). ---
+
+async function getAssignmentSubmission(contentItemId, studentId) {
+  return db.prepare('SELECT * FROM assignment_submissions WHERE content_item_id = ? AND student_id = ?').get(contentItemId, studentId);
+}
+
+// Re-uploading replaces the file and resets grading back to 'submitted'
+// with every grade field cleared, so a teacher/admin reviewing the queue
+// knows this one needs a fresh look rather than showing a stale grade
+// against a file that's no longer what was graded.
+async function submitAssignment({ contentItemId, studentId, fileUrl, fileName }) {
+  await db
+    .prepare(
+      `INSERT INTO assignment_submissions (content_item_id, student_id, file_url, file_name, submitted_at, status, points_earned, grade_letter, feedback, graded_at)
+       VALUES (?, ?, ?, ?, now(), 'submitted', NULL, NULL, NULL, NULL)
+       ON CONFLICT (content_item_id, student_id) DO UPDATE SET
+         file_url = excluded.file_url, file_name = excluded.file_name, submitted_at = now(),
+         status = 'submitted', points_earned = NULL, grade_letter = NULL, feedback = NULL, graded_at = NULL`
+    )
+    .run(contentItemId, studentId, fileUrl, fileName);
+}
+
+// Every enrolled student for the content item's own class, left-joined to
+// whatever submission (if any) already exists - same "one row per
+// student even before they've done anything" shape gradebookForAssignment
+// above uses for the whole-lesson gradebook.
+async function submissionsForContentItem(contentItemId) {
+  const contentItem = await getContentItem(contentItemId);
+  if (!contentItem) return null;
+  const assignment = await getAssignment(contentItem.assignment_id);
+  if (!assignment) return null;
+  const rawRows = (
+    await db
+      .prepare(
+        `SELECT m.id AS student_id, m.name AS student_name, s.id AS submission_id, s.file_url, s.file_name, s.submitted_at, s.status, s.points_earned, s.grade_letter, s.feedback
+         FROM class_enrollments ce
+         JOIN members m ON m.id = ce.student_id
+         LEFT JOIN assignment_submissions s ON s.content_item_id = ? AND s.student_id = m.id
+         WHERE ce.class_id = ? AND m.active = 1`
+      )
+      .all(contentItemId, assignment.class_id)
+  ).sort((a, b) => lastNameOf(a.student_name).localeCompare(lastNameOf(b.student_name), undefined, { sensitivity: 'base' }) || a.student_name.localeCompare(b.student_name, undefined, { sensitivity: 'base' }));
+  // file_url in the DB is actually the storage KEY (same convention
+  // lesson_content_items.attachment_url already uses) - resolved to a
+  // real URL here the same way lessonAttachmentUrl() does for that column.
+  const rows = rawRows.map((r) => ({ ...r, fileUrl: lessonAttachmentUrl(r.file_url) }));
+  return { contentItem, assignment, rows };
+}
+
+async function gradeAssignmentSubmission({ contentItemId, studentId, pointsEarned, gradeLetter, feedback }) {
+  await db
+    .prepare(
+      `UPDATE assignment_submissions SET status = 'graded', points_earned = ?, grade_letter = ?, feedback = ?, graded_at = now()
+       WHERE content_item_id = ? AND student_id = ?`
+    )
+    .run(pointsEarned != null ? pointsEarned : null, gradeLetter || null, feedback || null, contentItemId, studentId);
 }
 
 async function reorderContentItems(assignmentId, orderedIds) {
@@ -511,17 +593,34 @@ async function lessonsForStudentView(classId, studentId) {
     assignments.map(async (a) => {
       const isOpen = !a.open_date || a.open_date <= today;
       const contentItems = isOpen ? await contentItemsForAssignment(a.id, { includeAnswerKey: false }) : [];
+      // A real request: "Due dates should be on the assignments, not on
+      // the lesson" - each content item ("assignment" in the Parent/
+      // Student portal's own wording) carries its own due_date now, not
+      // just the parent lesson. "Marking complete on an assignment...
+      // Each lesson should be a bar... shows number of assignments. As
+      // you mark assignments complete the lesson bar shows 1/5" - a quiz
+      // counts done once attempted (its own existing semantics - see
+      // lessons-view.ejs's own quiz branch), an Assignment Submission
+      // counts done once the student has uploaded a file (that upload IS
+      // the completion action for this type), everything else via the
+      // pre-existing Mark Complete click.
       const withAttempts = await Promise.all(
         contentItems.map(async (item) => {
+          const dueDateLabel = item.due_date ? formatDateLabel(item.due_date) : null;
           if (item.type === 'quiz') {
             const attempt = await getQuizAttempt(item.id, studentId);
-            return { ...item, attempt: attempt || null };
+            return { ...item, dueDateLabel, attempt: attempt || null, completed: !!attempt };
+          }
+          if (item.type === 'assignment_submission') {
+            const submission = await getAssignmentSubmission(item.id, studentId);
+            return { ...item, dueDateLabel, submission: submission || null, completed: !!submission };
           }
           const completion = await getLessonItemCompletion(item.id, studentId);
-          return { ...item, completed: !!completion };
+          return { ...item, dueDateLabel, completed: !!completion };
         })
       );
-      return { ...a, dueDateLabel: a.due_date ? formatDateLabel(a.due_date) : null, isOpen, contentItems: withAttempts };
+      const completedCount = withAttempts.filter((item) => item.completed).length;
+      return { ...a, isOpen, contentItems: withAttempts, completedCount, totalCount: withAttempts.length };
     })
   );
 }
@@ -587,6 +686,7 @@ module.exports = {
   getAssignment,
   createAssignment,
   updateAssignment,
+  deleteAssignment,
   reorderAssignments,
   gradebookForAssignment,
   saveGrade,
@@ -604,6 +704,10 @@ module.exports = {
   createContentItem,
   updateContentItem,
   deleteContentItem,
+  getAssignmentSubmission,
+  submitAssignment,
+  submissionsForContentItem,
+  gradeAssignmentSubmission,
   reorderContentItems,
   lessonAttachmentUrl,
   saveLessonAttachment,

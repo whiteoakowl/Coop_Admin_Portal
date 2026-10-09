@@ -126,10 +126,20 @@ test('Student Portal: a video lesson shows a Mark Complete button, and clicking 
   const loginRes = await request(app).post('/login').type('form').send({ email: student.email, password: 'testpassword123', next: '/student' });
   const cookie = loginRes.headers['set-cookie'];
 
-  const before = await request(app).get(`/student/classes/${cls.id}?tab=lessons`).set('Cookie', cookie);
+  // "Each assignment should be another sub bar under the assignment
+  // title... When you click on the assignment it opens it to another
+  // page" - the Lessons tab itself only shows a bar (title/due date/
+  // check icon) linking out; Mark Complete now lives on that other page.
+  const lessonsBefore = await request(app).get(`/student/classes/${cls.id}?tab=lessons`).set('Cookie', cookie);
+  assert.equal(lessonsBefore.status, 200);
+  assert.match(lessonsBefore.text, new RegExp(`href="/student/content/${contentItem.id}"`));
+  assert.match(lessonsBefore.text, /aria-label="Not complete"/);
+  assert.doesNotMatch(lessonsBefore.text, /Mark Complete/);
+
+  const before = await request(app).get(`/student/content/${contentItem.id}`).set('Cookie', cookie);
   assert.equal(before.status, 200);
   assert.match(before.text, /Mark Complete/);
-  assert.doesNotMatch(before.text, />Completed</);
+  assert.doesNotMatch(before.text, /lesson-complete-label">Complete</);
   const csrf = extractCsrf(before.text);
 
   const complete = await request(app)
@@ -139,9 +149,12 @@ test('Student Portal: a video lesson shows a Mark Complete button, and clicking 
     .send({ _csrf: csrf });
   assert.equal(complete.status, 302);
 
-  const after = await request(app).get(`/student/classes/${cls.id}?tab=lessons`).set('Cookie', cookie);
-  assert.match(after.text, />Completed</);
+  const after = await request(app).get(`/student/content/${contentItem.id}`).set('Cookie', cookie);
+  assert.match(after.text, /lesson-complete-label">Complete</);
   assert.doesNotMatch(after.text, /Mark Complete/);
+
+  const lessonsAfter = await request(app).get(`/student/classes/${cls.id}?tab=lessons`).set('Cookie', cookie);
+  assert.match(lessonsAfter.text, /aria-label="Complete"/);
 
   const row = await db.prepare('SELECT * FROM lesson_item_completions WHERE content_item_id = ? AND student_id = ?').get(contentItem.id, student.studentId);
   assert.ok(row, 'expected a lesson_item_completions row');
@@ -159,7 +172,11 @@ test('Parent Portal: Mark Complete for a non-quiz item is gated by allow_parent_
   const beforeToggle = await request(app).get(`/parent/classes/dashboard/${cls.id}?tab=lessons&studentId=${parent.childId}`).set('Cookie', cookie);
   assert.equal(beforeToggle.status, 200);
   assert.doesNotMatch(beforeToggle.text, /Mark Complete/);
-  const csrfBefore = extractCsrf(beforeToggle.text);
+
+  const detailBefore = await request(app).get(`/parent/content/${contentItem.id}?studentId=${parent.childId}`).set('Cookie', cookie);
+  assert.equal(detailBefore.status, 200);
+  assert.doesNotMatch(detailBefore.text, /Mark Complete/);
+  const csrfBefore = extractCsrf(detailBefore.text);
 
   const blockedPost = await request(app)
     .post(`/parent/content/${contentItem.id}/complete?studentId=${parent.childId}`)
@@ -171,8 +188,11 @@ test('Parent Portal: Mark Complete for a non-quiz item is gated by allow_parent_
   await db.prepare('UPDATE classes SET allow_parent_complete_lessons = 1 WHERE id = ?').run(cls.id);
 
   const afterToggle = await request(app).get(`/parent/classes/dashboard/${cls.id}?tab=lessons&studentId=${parent.childId}`).set('Cookie', cookie);
-  assert.match(afterToggle.text, /Mark Complete/);
-  const csrfAfter = extractCsrf(afterToggle.text);
+  assert.doesNotMatch(afterToggle.text, /Mark Complete/);
+
+  const detailAfter = await request(app).get(`/parent/content/${contentItem.id}?studentId=${parent.childId}`).set('Cookie', cookie);
+  assert.match(detailAfter.text, /Mark Complete/);
+  const csrfAfter = extractCsrf(detailAfter.text);
 
   const allowedPost = await request(app)
     .post(`/parent/content/${contentItem.id}/complete?studentId=${parent.childId}`)

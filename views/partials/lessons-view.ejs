@@ -1,76 +1,94 @@
-<%# Lessons view - video/text/file/quiz content per lesson, shared
-    between Student Portal (canTakeQuiz: true, quizBasePath: '/student',
-    always allowed) and Parent Portal (canTakeQuiz: !!cls.
+<%# Lessons view - video/text/file/quiz/assignment content per lesson,
+    shared between Student Portal (canTakeQuiz: true, quizBasePath:
+    '/student', always allowed) and Parent Portal (canTakeQuiz: !!cls.
     allow_parent_complete_lessons, quizBasePath: '/parent' - a real
     request: "allow parents to complete lessons for student... turned on
     or off for different classes"). `lessons` comes from utils/
     academics.js's lessonsForStudentView. quizBasePath defaults to
     '/student' so existing callers that only ever passed canTakeQuiz
     don't need to change. canTakeQuiz also gates the plain "Mark
-    Complete" button below for non-quiz content - a real request:
-    "Student and parent portal you can't click on class lessons to
-    complete them" - video/text/file items had no completion action of
-    their own at all before this. %>
+    Complete"/Upload actions below for non-quiz content.
+
+    A real request, redesigning this whole view: "Each lesson should be a
+    bar with the lesson title and description. Should show number of
+    assignments. As you mark assignments complete the lesson bar shows
+    1/5... When all lessons are completed it says done. Due dates should
+    be on the assignments, not on the lesson. When you click the lesson
+    title bar the assignment list expands below. If you click on another
+    assignment bar the previous one closes." Each lesson is now a
+    collapsible accordion bar (public/js/lesson-accordion.js, only one
+    open at a time) instead of an always-expanded card; its own due date
+    moved off the lesson and onto each content item
+    (lessonsForStudentView's own dueDateLabel, now per item). %>
 <% var quizBasePathLocal = typeof quizBasePath !== 'undefined' ? quizBasePath : '/student'; %>
 <% var quizQueryLocal = typeof quizQuery !== 'undefined' ? quizQuery : ''; %>
 <% if (lessons.length === 0) { %>
   <p class="roster-empty">No lessons yet.</p>
 <% } else { %>
-  <% lessons.forEach(function(lesson) { %>
-    <div class="portal-dashboard-card portal-dashboard-card-wide" style="margin-bottom: 1rem;">
-      <h3><%= lesson.title %></h3>
-      <p class="hint">
-        <% if (lesson.open_date) { %>Opens <%= lesson.open_date %><% } %>
-        <% if (lesson.dueDateLabel) { %> &middot; Due <%= lesson.dueDateLabel %><% } %>
-      </p>
-      <% if (lesson.description) { %><p class="hint"><%= lesson.description %></p><% } %>
-      <% if (!lesson.isOpen) { %>
-        <p class="roster-empty">This lesson opens <%= lesson.open_date %>.</p>
-      <% } else if (lesson.contentItems.length === 0) { %>
-        <p class="roster-empty">No content added yet.</p>
-      <% } else { %>
-        <ul style="list-style: none; padding: 0; margin: 0;">
-          <% lesson.contentItems.forEach(function(item) { %>
-            <li style="padding: 0.6rem 0; border-top: 1px solid var(--border);">
-              <% if (item.type === 'video') { %>
-                <strong><%= item.title || 'Video' %></strong>
-                <% if (item.description) { %><div class="hint"><%= item.description %></div><% } %>
-                <% if (item.video_url) { %><div><a href="<%= item.video_url %>" target="_blank" rel="noopener">Watch Video</a></div><% } %>
-                <%- include('lesson-item-complete', { item, canTakeQuiz, quizBasePathLocal, quizQueryLocal }) %>
-              <% } else if (item.type === 'text') { %>
-                <strong><%= item.title || 'Description' %></strong>
-                <% if (item.body) { %><div class="forum-editable-display"><%- item.body %></div><% } %>
-                <%- include('lesson-item-complete', { item, canTakeQuiz, quizBasePathLocal, quizQueryLocal }) %>
-              <% } else if (item.type === 'file') { %>
-                <strong><%= item.title || 'File' %></strong>
-                <% if (item.description) { %><div class="hint"><%= item.description %></div><% } %>
-                <% if (item.file_url) { %><div><a href="<%= item.file_url %>" target="_blank" rel="noopener">Open File</a></div><% } %>
-                <%- include('lesson-item-complete', { item, canTakeQuiz, quizBasePathLocal, quizQueryLocal }) %>
-              <% } else if (item.type === 'assignment_upload') { %>
-                <strong><%= item.title || 'Assignment' %></strong>
-                <% if (item.body) { %><div class="forum-editable-display"><%- item.body %></div><% } %>
-                <% if (item.attachmentUrl) { %><div><a href="<%= item.attachmentUrl %>" target="_blank" rel="noopener"><%= item.attachment_name || 'Download Attachment' %></a></div><% } %>
-                <%- include('lesson-item-complete', { item, canTakeQuiz, quizBasePathLocal, quizQueryLocal }) %>
-              <% } else if (item.type === 'quiz') { %>
-                <strong><%= item.title || 'Quiz' %></strong>
-                <div>
-                  <% if (item.attempt) { %>
-                    <% if (item.attempt.status === 'graded') { %>
-                      <span class="hint">Score: <strong><%= item.attempt.score_points %> / <%= item.attempt.points_possible %></strong></span>
-                    <% } else { %>
-                      <span class="hint">Submitted - awaiting teacher review</span>
-                    <% } %>
-                  <% } else if (canTakeQuiz) { %>
-                    <a class="roster-action-btn" href="<%= quizBasePathLocal %>/content/<%= item.id %>/quiz<%= quizQueryLocal %>">Take Quiz</a>
-                  <% } else { %>
-                    <span class="hint">Not taken yet</span>
-                  <% } %>
-                </div>
-              <% } %>
-            </li>
-          <% }); %>
-        </ul>
-      <% } %>
-    </div>
-  <% }); %>
+  <div class="lesson-accordion" data-lesson-accordion>
+    <% lessons.forEach(function(lesson, lessonIdx) { %>
+      <div class="lesson-accordion-item">
+        <button type="button" class="lesson-accordion-trigger" data-lesson-accordion-trigger aria-expanded="false">
+          <span class="lesson-accordion-info">
+            <span class="lesson-accordion-title"><%= lesson.title %></span>
+            <% if (lesson.description) { %><span class="lesson-accordion-desc"><%= lesson.description %></span><% } %>
+          </span>
+          <span class="lesson-accordion-meta">
+            <% if (!lesson.isOpen) { %>
+              <span class="hint">Opens <%= lesson.open_date %></span>
+            <% } else if (lesson.totalCount === 0) { %>
+              <span class="hint">No content</span>
+            <% } else if (lesson.completedCount === lesson.totalCount) { %>
+              <span class="status-badge status-badge-present">Done</span>
+            <% } else { %>
+              <span class="status-badge status-badge-active"><%= lesson.completedCount %>/<%= lesson.totalCount %></span>
+            <% } %>
+            <svg class="icon lesson-accordion-chevron"><use href="#icon-chevron-down"/></svg>
+          </span>
+        </button>
+        <% if (lesson.isOpen && lesson.totalCount > 0) { %>
+          <div class="lesson-accordion-panel" data-lesson-accordion-panel hidden>
+            <%# A real request: "Each assignment should be another sub
+                bar under the assignment title. Each assignment says
+                title and due date and a check mark. When you click on
+                the assignment it opens it to another page with a back
+                button link to view the assignment and complete it." A
+                quiz already has its own dedicated take/review page
+                (views/student-quiz-take.ejs/parent-quiz-take.ejs); every
+                other type links to the new generic detail page
+                (views/student-lesson-content.ejs/parent-lesson-
+                content.ejs, both via partials/lesson-content-detail). %>
+            <ul class="lesson-item-list">
+              <% lesson.contentItems.forEach(function(item) {
+                   // A quiz's own detail page 404s unless canTakeQuiz (no
+                   // read-only review page exists for it yet, unlike every
+                   // other type's new generic detail page) - only make the
+                   // bar a real link when it won't just dead-end.
+                   var isLinkable = item.type !== 'quiz' || canTakeQuiz;
+                   var tag = isLinkable ? 'a' : 'div';
+              %>
+                <li>
+                  <<%= tag %> class="lesson-item-bar"<% if (isLinkable) { %> href="<%= quizBasePathLocal %>/content/<%= item.id %><%= item.type === 'quiz' ? '/quiz' : '' %><%= quizQueryLocal %>"<% } %>>
+                    <span class="lesson-item-bar-title"><%= item.title || 'Assignment' %></span>
+                    <span class="lesson-item-bar-meta">
+                      <% if (item.dueDateLabel) { %><span class="hint">Due <%= item.dueDateLabel %></span><% } %>
+                      <% if (item.type === 'quiz' && item.attempt && item.attempt.status !== 'graded') { %>
+                        <span class="hint">Awaiting review</span>
+                      <% } %>
+                      <% if (item.completed) { %>
+                        <span class="lesson-complete-check lesson-complete-check-done" aria-label="Complete"><svg class="icon"><use href="#icon-check-circle"/></svg></span>
+                      <% } else { %>
+                        <span class="lesson-complete-check" aria-label="Not complete"><svg class="icon"><use href="#icon-circle"/></svg></span>
+                      <% } %>
+                    </span>
+                  </<%= tag %>>
+                </li>
+              <% }); %>
+            </ul>
+          </div>
+        <% } %>
+      </div>
+    <% }); %>
+  </div>
 <% } %>
+<script src="/js/lesson-accordion.js"></script>

@@ -50,7 +50,7 @@
           <p class="roster-empty">No invoices for this period.</p>
         <% } else { %>
           <div class="roster-scroll">
-            <table class="roster-table members-table condensed-table">
+            <table class="roster-table members-table condensed-table accounting-table-mobile-fit">
               <thead>
                 <tr>
                   <th>Description</th>
@@ -73,6 +73,7 @@
               </tbody>
             </table>
           </div>
+          <p class="accounting-section-total">Total: <%= formatCents(invoicesTotalCents) %></p>
         <% } %>
       </div>
 
@@ -82,7 +83,7 @@
           <p class="roster-empty">No payments for this period.</p>
         <% } else { %>
           <div class="roster-scroll">
-            <table class="roster-table members-table condensed-table">
+            <table class="roster-table members-table condensed-table accounting-table-mobile-fit">
               <thead>
                 <tr>
                   <th>For</th>
@@ -103,6 +104,7 @@
               </tbody>
             </table>
           </div>
+          <p class="accounting-section-total">Total: <%= formatCents(paymentsTotalCents) %></p>
         <% } %>
       </div>
 
@@ -112,7 +114,7 @@
           <p class="roster-empty">No adjustments for this period.</p>
         <% } else { %>
           <div class="roster-scroll">
-            <table class="roster-table members-table condensed-table">
+            <table class="roster-table members-table condensed-table accounting-table-mobile-fit">
               <thead>
                 <tr>
                   <th>Type</th>
@@ -141,6 +143,7 @@
               </tbody>
             </table>
           </div>
+          <p class="accounting-section-total">Total: <%= formatCents(adjustmentsTotalCents) %></p>
         <% } %>
       </div>
     <% } %>

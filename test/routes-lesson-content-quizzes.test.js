@@ -111,7 +111,7 @@ async function enrollChildOfParent(classId, parentEmail) {
   return { childId, cookie: loginRes.headers['set-cookie'] };
 }
 
-test('Co-op Admin: add a lesson with open/due dates, add content items, reorder both, manage quiz questions', async () => {
+test('Co-op Admin: add a lesson with an open date, add content items (each with its own due date), reorder both, manage quiz questions', async () => {
   const admin = await loginAsAdmin();
   const classId = (await db.prepare("INSERT INTO classes (class_name, day, hour_position) VALUES ('Admin Lesson Class', 'monday', 1) RETURNING id").get()).id;
 
@@ -119,20 +119,24 @@ test('Co-op Admin: add a lesson with open/due dates, add content items, reorder 
     .post(`/admin/class-schedule/classes/${classId}/assignments`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ _csrf: admin.csrfToken, title: 'Week 1', openDate: '2026-09-25', dueDate: '2026-10-01' });
+    .send({ _csrf: admin.csrfToken, title: 'Week 1', openDate: '2026-09-25' });
   assert.equal(addLesson.status, 302);
 
   const assignmentId = (await db.prepare('SELECT id FROM class_assignments WHERE class_id = ?').get(classId)).id;
   const lessonPage = await request(app).get(`/admin/class-schedule/assignments/${assignmentId}`).set('Cookie', admin.cookie);
   assert.equal(lessonPage.status, 200);
   assert.match(lessonPage.text, /value="2026-09-25"/);
-  assert.match(lessonPage.text, /value="2026-10-01"/);
+  // A real request: "Due dates should be on the assignments, not on the
+  // lesson" - the Lesson Details form no longer has its own Due Date
+  // field at all; the Add Assignments form below has one instead (see
+  // the video content item's own dueDate assertion further down).
+  assert.doesNotMatch(lessonPage.text, /name="dueDate"/);
 
   await request(app)
     .post(`/admin/class-schedule/assignments/${assignmentId}/content`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ _csrf: admin.csrfToken, type: 'video', title: 'Intro Video', videoUrl: 'https://example.com/video' });
+    .send({ _csrf: admin.csrfToken, type: 'video', title: 'Intro Video', videoUrl: 'https://example.com/video', contentDueDate: '2026-10-01' });
   await request(app)
     .post(`/admin/class-schedule/assignments/${assignmentId}/content`)
     .set('Cookie', admin.cookie)
@@ -143,7 +147,15 @@ test('Co-op Admin: add a lesson with open/due dates, add content items, reorder 
   assert.equal(items.length, 2);
   const [videoItem, quizItem] = items;
   assert.equal(videoItem.type, 'video');
+  assert.equal(videoItem.due_date, '2026-10-01');
   assert.equal(quizItem.type, 'quiz');
+
+  // A real request: "the text is formatted row wise should be how it is
+  // displayed for parent/student portal view" - that view's own Lessons
+  // tab shows "Due {label}" next to each item; this management row now
+  // does too (it never did, even once due dates moved to content items).
+  const lessonPageWithItems = await request(app).get(`/admin/class-schedule/assignments/${assignmentId}`).set('Cookie', admin.cookie);
+  assert.match(lessonPageWithItems.text, /Due Thu 10\/1/);
 
   const reorderContent = await request(app)
     .post(`/admin/class-schedule/assignments/${assignmentId}/content/reorder`)
@@ -291,7 +303,10 @@ test('A lesson gated by a future open date hides its content on the Lessons tab'
   const lessonsTab = await request(app).get(`/student/classes/${teacher.classId}?tab=lessons`).set('Cookie', student.cookie);
   assert.equal(lessonsTab.status, 200);
   assert.doesNotMatch(lessonsTab.text, /Should not be visible yet\./);
-  assert.match(lessonsTab.text, /This lesson opens 2099-01-01/);
+  // The Lessons tab redesign (accordion bars, a real request) shows a
+  // future lesson's open date in its own collapsed bar now, not a
+  // "This lesson opens ..." sentence inside an expanded card.
+  assert.match(lessonsTab.text, /Opens 2099-01-01/);
 });
 
 test('Teacher Portal: a teacher cannot manage lesson content on a class they do not teach', async () => {
@@ -340,8 +355,11 @@ test('Parent Portal Lessons tab is read-only: shows quiz status but has no reach
     .set('Cookie', parent.cookie);
   assert.equal(lessonsTab.status, 200);
   assert.match(lessonsTab.text, /Parent View Quiz/);
-  assert.match(lessonsTab.text, /Not taken yet/);
-  assert.doesNotMatch(lessonsTab.text, /Take Quiz/);
+  // A real request redesigned the Lessons tab into clickable title/due-
+  // date/check-mark bars; a quiz bar only ever links out once allow_
+  // parent_complete_lessons is on (its own detail page 404s otherwise -
+  // see the direct GET below), so it's a plain, non-clickable bar here.
+  assert.doesNotMatch(lessonsTab.text, new RegExp(`href="/parent/content/${quizItemId}/quiz`));
 
   const noQuizRoute = await request(app).get(`/parent/content/${quizItemId}/quiz`).set('Cookie', parent.cookie);
   assert.equal(noQuizRoute.status, 404);

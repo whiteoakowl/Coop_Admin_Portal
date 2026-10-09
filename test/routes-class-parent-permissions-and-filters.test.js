@@ -170,14 +170,18 @@ test('Parent Portal quiz completion: hidden/unreachable until allow_parent_compl
 
   const before = await request(app).get(`/parent/content/${quizItemId}/quiz?studentId=${parent.childId}`).set('Cookie', parent.cookie);
   assert.equal(before.status, 404);
+  // A real request redesigned the Lessons tab into clickable sub-bars
+  // (title/due date/check mark) - a quiz bar only becomes a real link
+  // once allow_parent_complete_lessons is on (its own detail page 404s
+  // otherwise, same gate the direct GET above just confirmed).
   const lessonsBefore = await request(app).get(`/parent/classes/dashboard/${classId}?tab=lessons&studentId=${parent.childId}`).set('Cookie', parent.cookie);
-  assert.doesNotMatch(lessonsBefore.text, /Take Quiz/);
-  assert.match(lessonsBefore.text, /Not taken yet/);
+  assert.doesNotMatch(lessonsBefore.text, new RegExp(`href="/parent/content/${quizItemId}/quiz`));
+  assert.match(lessonsBefore.text, /Parent Quiz/);
 
   await setClassSetting(admin, classId, 'allowParentCompleteLessons', '1');
 
   const lessonsAfter = await request(app).get(`/parent/classes/dashboard/${classId}?tab=lessons&studentId=${parent.childId}`).set('Cookie', parent.cookie);
-  assert.match(lessonsAfter.text, /Take Quiz/);
+  assert.match(lessonsAfter.text, new RegExp(`href="/parent/content/${quizItemId}/quiz\\?studentId=${parent.childId}"`));
 
   const quizPage = await request(app).get(`/parent/content/${quizItemId}/quiz?studentId=${parent.childId}`).set('Cookie', parent.cookie);
   assert.equal(quizPage.status, 200);

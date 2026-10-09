@@ -27,6 +27,17 @@
 // that's what the reference image itself uses at those spots too.
 %>
 <div class="forum-editor-toolbar">
+  <%# A real request: "the description box editing features have a
+      scroll bar now for some of their features. Make a new row for them
+      or shrink to fit them in one row better." This row (Source, utility
+      icons, clipboard icons, direction/spellcheck) was the one wide
+      enough to overflow its own fit-content container and trigger
+      .forum-editor-toolbar-row's horizontal scrollbar (overflow-x: auto)
+      on an ordinary phone width - confirmed live at 375px (scrollWidth
+      380 > clientWidth 281). Splitting it into the two halves its own
+      separators already implied as sub-groups keeps every button at its
+      existing size (no further shrinking) while fitting both resulting
+      rows well under that width, so the scrollbar no longer triggers. %>
   <div class="forum-editor-toolbar-row">
     <button type="button" class="forum-editor-btn-text" data-forum-cmd="toggleSource" title="Source">&lt;/&gt; Source</button>
     <span class="forum-editor-sep"></span>
@@ -34,7 +45,9 @@
     <button type="button" data-forum-cmd="toggleFullscreen" title="Fullscreen"><svg class="icon"><use href="#icon-maximize"/></svg></button>
     <button type="button" data-forum-cmd="undo" title="Undo"><svg class="icon"><use href="#icon-undo"/></svg></button>
     <button type="button" data-forum-cmd="redo" title="Redo"><svg class="icon"><use href="#icon-redo"/></svg></button>
-    <span class="forum-editor-sep"></span>
+  </div>
+
+  <div class="forum-editor-toolbar-row">
     <button type="button" data-forum-cmd="duplicate" title="Duplicate"><svg class="icon"><use href="#icon-duplicate"/></svg></button>
     <button type="button" data-forum-cmd="cut" title="Cut"><svg class="icon"><use href="#icon-scissors"/></svg></button>
     <button type="button" data-forum-cmd="copy" title="Copy"><svg class="icon"><use href="#icon-copy"/></svg></button>

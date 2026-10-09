@@ -56,6 +56,8 @@ const {
   getContentItem,
   getQuizAttempt,
   submitQuizAttempt,
+  submitAssignment,
+  saveLessonAttachment,
   contentItemsForAssignment,
   markLessonItemComplete,
 } = require('../utils/academics');
@@ -64,7 +66,7 @@ const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = req
 const { registerForClass, unregisterFromClass, joinClassAsStaff, leaveClassAsStaff } = require('../utils/classRegistration');
 const events = require('../utils/events');
 const babysitters = require('../utils/babysitters');
-const { imageFileFilter } = require('../utils/uploads');
+const { imageFileFilter, lessonAttachmentFileFilter } = require('../utils/uploads');
 const { jsonScriptSafe } = require('../utils/json');
 const { createStorageClient, uploadFile, generateKey } = require('../utils/storage');
 const reading = require('../utils/reading');
@@ -864,6 +866,59 @@ router.post('/classes/dashboard/:id/chat', async (req, res) => {
   res.redirect(back);
 });
 
+// A real request: "Each assignment should be another sub bar under the
+// assignment title... When you click on the assignment it opens it to
+// another page with a back button link to view the assignment and
+// complete it." The parent-side counterpart to routes/student-portal.js's
+// own GET /content/:id above - same two viewer modes as /classes/
+// dashboard/:id above (a child's enrollment via ?studentId=, or this
+// account's own teaching/assisting role via ?viewer=parent-<id>, read-
+// only since there's no specific child to complete anything for in that
+// mode - lessons-view.ejs's own canTakeQuiz: !selectedParent && ...
+// already keeps the completion controls here working out to the same
+// read-only result via partials/lesson-content-detail).
+router.get('/content/:id', async (req, res) => {
+  const contentItemId = parseInt(req.params.id, 10);
+  const contentItem = await getContentItem(contentItemId);
+  if (!contentItem) return res.status(404).render('404', { title: 'Not Found' });
+  const assignment = await db.prepare('SELECT * FROM class_assignments WHERE id = ?').get(contentItem.assignment_id);
+  if (!assignment) return res.status(404).render('404', { title: 'Not Found' });
+  const staffViewerMatch = /^parent-(\d+)$/.exec(req.query.viewer || '');
+
+  let cls;
+  let selectedChild = null;
+  let selectedParent = null;
+  let viewerQuery;
+  let canTakeQuiz;
+  if (staffViewerMatch) {
+    const parents = await parentsForAccount(req.portalAccount);
+    selectedParent = parents.find((p) => p.id === parseInt(staffViewerMatch[1], 10));
+    if (!selectedParent) return res.status(404).render('404', { title: 'Not Found' });
+    const staffedClasses = await classesStaffedByMember(selectedParent.id);
+    cls = staffedClasses.find((c) => c.id === assignment.class_id);
+    viewerQuery = `viewer=parent-${selectedParent.id}`;
+    canTakeQuiz = false;
+  } else {
+    const children = await childrenForAccount(req.portalAccount);
+    const selectedId = parseInt(req.query.studentId, 10);
+    selectedChild = children.find((c) => c.id === selectedId) || children[0] || null;
+    if (!selectedChild) return res.status(404).render('404', { title: 'Not Found' });
+    const classes = await classesForChild(selectedChild.id);
+    cls = classes.find((c) => c.id === assignment.class_id);
+    viewerQuery = `studentId=${selectedChild.id}`;
+    canTakeQuiz = !!cls && !!cls.allow_parent_complete_lessons;
+  }
+  if (!cls) return res.status(404).render('404', { title: 'Not Found' });
+
+  const lessons = await lessonsForStudentView(cls.id, selectedChild ? selectedChild.id : null);
+  const lesson = lessons.find((l) => l.id === assignment.id);
+  const item = lesson ? lesson.contentItems.find((i) => i.id === contentItemId) : null;
+  if (!lesson || !item) return res.status(404).render('404', { title: 'Not Found' });
+  // Same quiz redirect as routes/student-portal.js's own GET /content/:id.
+  if (item.type === 'quiz') return res.redirect(`/parent/content/${item.id}/quiz?${viewerQuery}`);
+  res.render('parent-lesson-content', { title: item.title || 'Assignment', cls, lesson, item, selectedChild, viewerQuery, canTakeQuiz });
+});
+
 // A real request: "allow parents to complete lessons for student...
 // turned on or off for different classes" - the parent-side counterpart
 // to routes/student-portal.js's own quiz-taking routes, submitting on
@@ -927,6 +982,24 @@ router.post('/content/:id/complete', async (req, res) => {
   if (assignment.open_date && assignment.open_date > todayISO()) return res.status(404).render('404', { title: 'Not Found' });
   await markLessonItemComplete(contentItem.id, selectedChild.id);
   res.redirect(`/parent/classes/dashboard/${assignment.class_id}?tab=lessons&studentId=${selectedChild.id}`);
+});
+
+// Assignment Submission upload, on behalf of a gated child - the parent-
+// side counterpart to routes/student-portal.js's own /content/:id/submit,
+// same allow_parent_complete_lessons gate contentItemForParent already
+// enforces for the complete/quiz routes above.
+const MAX_ASSIGNMENT_SUBMISSION_BYTES = 10 * 1024 * 1024;
+const uploadAssignmentSubmission = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_ASSIGNMENT_SUBMISSION_BYTES }, fileFilter: lessonAttachmentFileFilter });
+
+router.post('/content/:id/submit', uploadAssignmentSubmission.single('submissionFile'), async (req, res) => {
+  const found = await contentItemForParent(req, parseInt(req.params.id, 10), { requireQuiz: false });
+  if (!found || found.contentItem.type !== 'assignment_submission') return res.status(404).render('404', { title: 'Not Found' });
+  const { contentItem, assignment, selectedChild } = found;
+  if (assignment.open_date && assignment.open_date > todayISO()) return res.status(404).render('404', { title: 'Not Found' });
+  if (!req.file) return res.redirect(`/parent/classes/dashboard/${assignment.class_id}?tab=lessons&studentId=${selectedChild.id}&error=` + encodeURIComponent('Choose a file to upload.'));
+  const fileKey = await saveLessonAttachment(req.file);
+  await submitAssignment({ contentItemId: contentItem.id, studentId: selectedChild.id, fileUrl: fileKey, fileName: req.file.originalname });
+  res.redirect(`/parent/classes/dashboard/${assignment.class_id}?tab=lessons&studentId=${selectedChild.id}&notice=` + encodeURIComponent('Assignment submitted.'));
 });
 
 // A real request: "Policy Handbook" as one of the Classes tab's

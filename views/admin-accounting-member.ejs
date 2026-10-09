@@ -12,6 +12,7 @@
     <div class="grid-box-header">
       <h1><%= member.name %></h1>
       <span class="badge-pill badge-pill-<%= balanceCents > 0 ? 'orange' : 'green' %>"><%= formatCents(balanceCents) %> due</span>
+      <% if (member.parked) { %><span class="badge-pill badge-pill-gray" title="Auto-parked: an auto-park invoice is overdue and unpaid">Parked</span><% } %>
     </div>
     <p><a href="/main-admin/accounting">&larr; All Accounts</a></p>
 
@@ -68,15 +69,16 @@
                   <td><%= formatCents(c.amountPaid) %></td>
                   <td><span class="badge-pill badge-pill-<%= c.status === 'paid' ? 'green' : c.status === 'cancelled' || c.status === 'refunded' ? 'gray' : 'orange' %>"><%= c.status.replace('_', ' ') %></span></td>
                   <td><%= c.created_at %></td>
-                  <td class="roster-btn-row">
+                  <td class="roster-btn-row member-invoice-actions">
                     <% if (c.status !== 'cancelled') { %>
-                      <button type="button" class="roster-action-btn" onclick="document.getElementById('payment-dialog-<%= c.id %>').showModal()">Record Payment</button>
+                      <button type="button" class="roster-action-btn roster-action-btn-fit" onclick="document.getElementById('payment-dialog-<%= c.id %>').showModal()">Record Payment</button>
                       <form method="POST" action="/main-admin/accounting/charges/<%= c.id %>/cancel" class="inline-block-form" data-confirm="Cancel this charge?">
-                        <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>
+                        <button type="submit" class="roster-action-btn roster-action-btn-danger roster-action-btn-fit">Cancel</button>
                       </form>
                     <% } %>
                   </td>
-                  <td>
+                  <td class="roster-btn-row accounting-row-icons">
+                    <a class="icon-btn" href="/main-admin/accounting/invoices/<%= c.id %>/edit" aria-label="Edit invoice #<%= c.id %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></a>
                     <form method="POST" action="/main-admin/accounting/invoices/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete invoice #<%= c.id %>? This also removes any payments recorded against it.">
                       <input type="hidden" name="back" value="member" />
                       <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete invoice #<%= c.id %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
@@ -146,7 +148,7 @@
             <tbody>
               <% refundRows.forEach(function(p) { %>
                 <tr>
-                  <td><span class="badge-pill badge-pill-gray">Refund</span></td>
+                  <td><span class="badge-pill badge-pill-gray"><%= p.adjustment_type ? p.adjustment_type.charAt(0).toUpperCase() + p.adjustment_type.slice(1) : 'Refund' %></span></td>
                   <td><%= p.chargeDescription %></td>
                   <td><%= formatCents(p.amount_cents) %></td>
                   <td><%= p.created_at %></td>
@@ -197,12 +199,26 @@
     <% invoices.forEach(function(c) { %>
       <% if (c.status !== 'cancelled') { %>
         <dialog id="payment-dialog-<%= c.id %>" class="member-picker-dialog">
-          <form method="POST" action="/main-admin/accounting/charges/<%= c.id %>/payments">
+          <form method="POST" action="/main-admin/accounting/charges/<%= c.id %>/payments" data-toggle-form>
             <h3>Record Payment &mdash; <%= c.description %></h3>
             <label>Direction
-              <select name="direction">
+              <select name="direction" data-toggle-select>
                 <option value="payment">Payment received</option>
                 <option value="refund">Refund issued</option>
+              </select>
+            </label>
+            <%# A real request: "accounting adjustment categories refund,
+                exemption, credit, discount" - only meaningful once
+                Direction above is "Refund issued"; data-toggle-select/
+                data-toggle-field (public/js/lesson-content-form.js's own
+                generic field-visibility toggle, reused here) hides this
+                field entirely for a plain payment. %>
+            <label data-toggle-field="refund" style="display: none;">Adjustment Type
+              <select name="adjustmentType">
+                <option value="refund">Refund</option>
+                <option value="exemption">Exemption</option>
+                <option value="credit">Credit</option>
+                <option value="discount">Discount</option>
               </select>
             </label>
             <label>Amount ($)
@@ -225,5 +241,6 @@
       <% } %>
     <% }); %>
   </main>
+  <script src="/js/lesson-content-form.js"></script>
 </body>
 </html>
