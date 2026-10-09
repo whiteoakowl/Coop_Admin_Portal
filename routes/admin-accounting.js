@@ -34,6 +34,7 @@ const events = require('../utils/events');
 const emailComposer = require('../utils/emailComposer');
 const { appSetting, setAppSetting } = require('../utils/appSettings');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { formatTimestamp } = require('../utils/dates');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_finances'));
 
@@ -447,9 +448,15 @@ router.get('/adjustments', async (req, res) => {
 // target_type). ---
 
 router.get('/logs', async (req, res) => {
+  const entries = await auditLog.list({ targetType: 'payment_charge' });
+  // A real request: "make sure all accounting dates are 9/12/2026,
+  // 12:15pm" - same formatTimestamp label every other Accounting page now
+  // uses (utils/payments.js's own dateLabel), applied here too since this
+  // page reads audit_log rows directly rather than through that file.
+  for (const e of entries) e.dateLabel = formatTimestamp(e.created_at);
   res.render('admin-accounting-logs', {
     title: 'Accounting Logs',
-    entries: await auditLog.list({ targetType: 'payment_charge' }),
+    entries,
   });
 });
 

@@ -67,7 +67,12 @@ function ageReferenceDateForClass(cls, settings) {
 async function chargeForConfirmedRegistration(tx, cls, student, accountId) {
   if (cls.price_cents == null) return null;
   const billedMemberId = await primaryParentForBilling(student.id, tx);
-  return createCharge(billedMemberId, accountId, 'class_registration', cls.id, `${cls.class_name} - class registration`, cls.price_cents, tx);
+  // A real request: "the list of invoices or payments can just say the
+  // event or classes or invoice title. It doesn't need to say event
+  // registration" - the class's own name is enough; source_type already
+  // records 'class_registration' for anything that still needs to tell
+  // charge types apart.
+  return createCharge(billedMemberId, accountId, 'class_registration', cls.id, cls.class_name, cls.price_cents, tx);
 }
 
 async function staffCountsForClass(classId) {
@@ -133,7 +138,7 @@ async function joinClassAsStaff({ classId, member, accountId, portalRoles, role 
     // Same primary-parent billing as chargeForConfirmedRegistration above -
     // a teacher/assistant's own self-signup charge is still family billing.
     const billedMemberId = await primaryParentForBilling(member.id);
-    const chargeId = await createCharge(billedMemberId, accountId, 'class_registration', cls.id, `${cls.class_name} - class registration`, cls.price_cents);
+    const chargeId = await createCharge(billedMemberId, accountId, 'class_registration', cls.id, cls.class_name, cls.price_cents);
     await db.prepare('UPDATE class_staff SET charge_id = ? WHERE class_id = ? AND member_id = ?').run(chargeId, classId, member.id);
     notice += ` A charge of $${(cls.price_cents / 100).toFixed(2)} has been added to ${billedMemberId === member.id ? 'your' : "your family's"} account.`;
   }

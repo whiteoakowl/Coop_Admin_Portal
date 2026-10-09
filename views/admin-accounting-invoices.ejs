@@ -60,7 +60,7 @@
                 <td><%= formatCents(c.amount_cents) %></td>
                 <td><%= formatCents(c.amountPaid) %></td>
                 <td><span class="badge-pill badge-pill-<%= c.status === 'paid' ? 'green' : c.status === 'cancelled' || c.status === 'refunded' ? 'gray' : 'orange' %>"><%= c.status.replace('_', ' ') %></span></td>
-                <td><%= c.created_at %></td>
+                <td><%= c.dateLabel %></td>
                 <td class="roster-btn-row accounting-row-icons">
                   <a class="icon-btn" href="/main-admin/accounting/invoices/<%= c.id %>/edit" aria-label="Edit invoice #<%= c.id %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></a>
                   <a class="icon-btn" href="/main-admin/accounting/members/<%= c.member_id %>?autoprint=1" aria-label="Print invoice #<%= c.id %>" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>

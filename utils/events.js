@@ -1149,7 +1149,12 @@ async function chargeForConfirmedRegistration(tx, event, member, accountId, tick
   // for the same event now resolves to the exact same billed member
   // regardless of registration order, not just the same event+family.
   const billedMemberId = await primaryParentForBilling(member.id, tx);
-  return createCharge(billedMemberId, accountId, 'event_registration', event.id, `${event.title}${ticketLabel} - event registration`, priceCents, tx);
+  // A real request: "the list of invoices or payments can just say the
+  // event or classes or invoice title. It doesn't need to say event
+  // registration" - the event's own title (plus ticket type, when there
+  // is one) is enough; source_type already records 'event_registration'
+  // for anything that still needs to tell charge types apart.
+  return createCharge(billedMemberId, accountId, 'event_registration', event.id, `${event.title}${ticketLabel}`, priceCents, tx);
 }
 
 // Shared by registerForEvent (below, member self-service, full eligibility

@@ -68,7 +68,7 @@
                   <td><%= formatCents(c.amount_cents) %></td>
                   <td><%= formatCents(c.amountPaid) %></td>
                   <td><span class="badge-pill badge-pill-<%= c.status === 'paid' ? 'green' : c.status === 'cancelled' || c.status === 'refunded' ? 'gray' : 'orange' %>"><%= c.status.replace('_', ' ') %></span></td>
-                  <td><%= c.created_at %></td>
+                  <td><%= c.dateLabel %></td>
                   <td class="roster-btn-row member-invoice-actions">
                     <% if (c.status !== 'cancelled') { %>
                       <button type="button" class="roster-action-btn roster-action-btn-fit" onclick="document.getElementById('payment-dialog-<%= c.id %>').showModal()">Record Payment</button>
@@ -114,7 +114,7 @@
                   <td><%= p.chargeDescription %></td>
                   <td><%= formatCents(p.amount_cents) %></td>
                   <td><%= p.note || '' %></td>
-                  <td><%= p.created_at %></td>
+                  <td><%= p.dateLabel %></td>
                   <td>
                     <form method="POST" action="/main-admin/accounting/payments/<%= p.id %>/delete" class="inline-block-form" data-confirm="Delete this payment of <%= formatCents(p.amount_cents) %>?">
                       <input type="hidden" name="back" value="member" />
@@ -151,7 +151,7 @@
                   <td><span class="badge-pill badge-pill-gray"><%= p.adjustment_type ? p.adjustment_type.charAt(0).toUpperCase() + p.adjustment_type.slice(1) : 'Refund' %></span></td>
                   <td><%= p.chargeDescription %></td>
                   <td><%= formatCents(p.amount_cents) %></td>
-                  <td><%= p.created_at %></td>
+                  <td><%= p.dateLabel %></td>
                   <td>
                     <form method="POST" action="/main-admin/accounting/payments/<%= p.id %>/delete" class="inline-block-form" data-confirm="Delete this refund of <%= formatCents(Math.abs(p.amount_cents)) %>?">
                       <input type="hidden" name="back" value="member" />
@@ -165,7 +165,7 @@
                   <td><span class="badge-pill badge-pill-gray">Cancelled Charge</span></td>
                   <td><%= c.description %></td>
                   <td><%= formatCents(c.amount_cents) %></td>
-                  <td><%= c.created_at %></td>
+                  <td><%= c.dateLabel %></td>
                   <td>
                     <form method="POST" action="/main-admin/accounting/invoices/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete this cancelled charge?">
                       <input type="hidden" name="back" value="member" />

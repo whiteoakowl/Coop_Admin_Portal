@@ -67,7 +67,7 @@
                     <td data-label="Amount"><%= formatCents(c.amount_cents) %></td>
                     <td data-label="Paid"><%= formatCents(c.amountPaid) %></td>
                     <td data-label="Status"><span class="badge-pill badge-pill-<%= c.status === 'paid' ? 'green' : c.status === 'cancelled' || c.status === 'refunded' ? 'gray' : 'orange' %>"><%= c.status.replace('_', ' ') %></span></td>
-                    <td data-label="Date"><%= c.created_at %></td>
+                    <td data-label="Date"><%= c.dateLabel %></td>
                   </tr>
                 <% }); %>
               </tbody>
@@ -98,7 +98,7 @@
                     <td class="table-stack-heading"><%= p.chargeDescription %></td>
                     <td data-label="Amount"><%= formatCents(p.amount_cents) %></td>
                     <td data-label="Note"><%= p.note || '' %></td>
-                    <td data-label="Date"><%= p.created_at %></td>
+                    <td data-label="Date"><%= p.dateLabel %></td>
                   </tr>
                 <% }); %>
               </tbody>
@@ -129,7 +129,7 @@
                     <td class="table-stack-heading"><span class="badge-pill badge-pill-gray">Refund</span></td>
                     <td data-label="For"><%= p.chargeDescription %></td>
                     <td data-label="Amount"><%= formatCents(p.amount_cents) %></td>
-                    <td data-label="Date"><%= p.created_at %></td>
+                    <td data-label="Date"><%= p.dateLabel %></td>
                   </tr>
                 <% }); %>
                 <% cancelledCharges.forEach(function(c) { %>
@@ -137,7 +137,7 @@
                     <td class="table-stack-heading"><span class="badge-pill badge-pill-gray">Cancelled Charge</span></td>
                     <td data-label="For"><%= c.description %></td>
                     <td data-label="Amount"><%= formatCents(c.amount_cents) %></td>
-                    <td data-label="Date"><%= c.created_at %></td>
+                    <td data-label="Date"><%= c.dateLabel %></td>
                   </tr>
                 <% }); %>
               </tbody>

@@ -5,6 +5,7 @@
 // optional registration fee both create a charge through createCharge()
 // rather than inventing their own "did they pay" flag.
 const db = require('../db');
+const { formatTimestamp } = require('./dates');
 
 // `dbHandle` defaults to the module-level connection but must be passed
 // explicitly as the transaction handle (`tx`) when called from inside
@@ -150,9 +151,20 @@ async function deletePayment(id) {
   return payment;
 }
 
+// A real request: "make sure all accounting dates are 9/12/2026, 12:15pm"
+// - every Accounting page used to print created_at's own raw
+// now_text()-shaped string ("2026-09-12 16:15:00", UTC, no AM/PM) straight
+// through with no formatting at all. dateLabel reuses the same Eastern-
+// zoned M/D/YYYY, h:mm AM/PM shape formatTimestamp already gives every
+// other timestamp in this app (class registration windows, etc.), so
+// Accounting's own invoices/payments/adjustments/logs all read the same
+// way instead of each view rolling (or skipping) its own formatting.
 async function chargesForMember(memberId) {
   const charges = await db.prepare('SELECT * FROM payment_charges WHERE member_id = ? ORDER BY created_at DESC').all(memberId);
-  for (const c of charges) c.amountPaid = await amountPaidForCharge(c.id);
+  for (const c of charges) {
+    c.amountPaid = await amountPaidForCharge(c.id);
+    c.dateLabel = formatTimestamp(c.created_at);
+  }
   return charges;
 }
 
@@ -182,7 +194,10 @@ async function allCharges(status) {
   const charges = status
     ? await db.prepare('SELECT c.*, m.name AS "memberName" FROM payment_charges c JOIN members m ON m.id = c.member_id WHERE c.status = ? ORDER BY c.created_at DESC').all(status)
     : await db.prepare('SELECT c.*, m.name AS "memberName" FROM payment_charges c JOIN members m ON m.id = c.member_id ORDER BY c.created_at DESC').all();
-  for (const c of charges) c.amountPaid = await amountPaidForCharge(c.id);
+  for (const c of charges) {
+    c.amountPaid = await amountPaidForCharge(c.id);
+    c.dateLabel = formatTimestamp(c.created_at);
+  }
   return charges;
 }
 
@@ -194,7 +209,7 @@ async function allCharges(status) {
 // tell a refund apart from a payment.
 async function allPayments(direction) {
   const cmp = direction === 'refund' ? '<' : '>';
-  return db
+  const rows = await db
     .prepare(
       `SELECT p.*, c.member_id AS "member_id", m.name AS "memberName", c.description AS "chargeDescription" FROM payment_payments p
        JOIN payment_charges c ON c.id = p.charge_id
@@ -202,6 +217,8 @@ async function allPayments(direction) {
        WHERE p.amount_cents ${cmp} 0 ORDER BY p.created_at DESC`
     )
     .all();
+  for (const p of rows) p.dateLabel = formatTimestamp(p.created_at);
+  return rows;
 }
 
 // Every calendar year (newest first) a member has any charge or payment
@@ -219,13 +236,15 @@ async function yearsForMember(memberId) {
 }
 
 async function receiptHistoryForMember(memberId) {
-  return db
+  const rows = await db
     .prepare(
       `SELECT p.*, c.description AS "chargeDescription" FROM payment_payments p
        JOIN payment_charges c ON c.id = p.charge_id
        WHERE c.member_id = ? ORDER BY p.created_at DESC`
     )
     .all(memberId);
+  for (const p of rows) p.dateLabel = formatTimestamp(p.created_at);
+  return rows;
 }
 
 // The one member-level Account view (Invoices / Payments / Adjustments,
