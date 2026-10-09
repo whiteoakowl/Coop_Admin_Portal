@@ -8,12 +8,15 @@
     orange button. It should be a green check mark circle that you can
     click to mark complete and it will say complete very small under the
     check mark." icon-circle (an empty ring) for the clickable not-yet-
-    done state, icon-check-circle (filled) once done - both already exist
-    in the site's icon sprite. %>
+    done state; the done state is a plain checkmark (icon-check) inside
+    its own filled green circle (.lesson-complete-badge) - a real
+    follow-up request: "marking an assignment complete should be a filled
+    in green circle with a check mark," rather than icon-check-circle's
+    own outline-circle-plus-outline-check look. %>
 <div class="lesson-item-complete">
   <% if (item.completed) { %>
     <span class="lesson-complete-check lesson-complete-check-done" aria-label="Completed">
-      <svg class="icon"><use href="#icon-check-circle"/></svg>
+      <span class="lesson-complete-badge"><svg class="icon"><use href="#icon-check"/></svg></span>
       <span class="lesson-complete-label">Complete</span>
     </span>
   <% } else if (canTakeQuiz) { %>

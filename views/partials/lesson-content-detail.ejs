@@ -13,6 +13,21 @@
     used to render inline, just promoted to its own page; canTakeQuiz/
     quizBasePathLocal/quizQueryLocal are the same three params that
     partial already threads through to partials/lesson-item-complete. %>
+<%
+  // A real request: "If the lesson is a video it should show video and
+  // play without having to go to YouTube, or you can click and go to
+  // YouTube if you want." video_url is a plain "https://..." field (see
+  // lesson-content-manage.ejs's own Video URL input) with no stored
+  // "is this YouTube" flag, so detect it here the same way any plain
+  // YouTube link is recognized - watch/embed/shorts URLs and the short
+  // youtu.be form, each ending in the same 11-character video id.
+  function youtubeEmbedUrl(url) {
+    if (!url) return null;
+    var m = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/.exec(url);
+    return m ? 'https://www.youtube.com/embed/' + m[1] : null;
+  }
+  var videoEmbedUrl = item.type === 'video' ? youtubeEmbedUrl(item.video_url) : null;
+%>
 <p class="hint">Part of: <%= lesson.title %></p>
 <h1><%= item.title || 'Assignment' %></h1>
 <% if (item.dueDateLabel) { %><p class="hint">Due <%= item.dueDateLabel %></p><% } %>
@@ -20,7 +35,12 @@
 <div class="manage-section">
   <% if (item.type === 'video') { %>
     <% if (item.description) { %><p><%= item.description %></p><% } %>
-    <% if (item.video_url) { %><p><a href="<%= item.video_url %>" target="_blank" rel="noopener">Watch Video</a></p><% } %>
+    <% if (videoEmbedUrl) { %>
+      <div class="lesson-video-embed">
+        <iframe src="<%= videoEmbedUrl %>" title="<%= item.title || 'Video' %>" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+      </div>
+    <% } %>
+    <% if (item.video_url) { %><p><a href="<%= item.video_url %>" target="_blank" rel="noopener"><%= videoEmbedUrl ? 'Watch on YouTube' : 'Watch Video' %></a></p><% } %>
   <% } else if (item.type === 'text') { %>
     <% if (item.body) { %><div class="forum-editable-display"><%- item.body %></div><% } %>
   <% } else if (item.type === 'file') { %>
@@ -39,7 +59,7 @@
   <div class="lesson-item-complete">
     <% if (item.submission) { %>
       <span class="lesson-complete-check lesson-complete-check-done" aria-label="Submitted">
-        <svg class="icon"><use href="#icon-check-circle"/></svg>
+        <span class="lesson-complete-badge"><svg class="icon"><use href="#icon-check"/></svg></span>
         <span class="lesson-complete-label">Submitted</span>
       </span>
       <% if (item.submission.status === 'graded') { %>

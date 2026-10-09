@@ -129,3 +129,52 @@ test('GET /student/content/:id 404s for a content item outside this student\'s o
   const detail = await request(app).get(`/student/content/${contentItem.id}`).set('Cookie', cookie);
   assert.equal(detail.status, 404);
 });
+
+// A real request: "If the lesson is a video it should show video and
+// play without having to go to YouTube, or you can click and go to
+// YouTube if you want."
+test('A video content item with a YouTube URL embeds a player and also keeps a plain "Watch on YouTube" link', async () => {
+  const admin = await loginAsAdmin();
+  n += 1;
+  const className = `Video Embed Class ${n}`;
+  await request(app)
+    .post('/admin/class-schedule/classes/new')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ day: 'monday', className, hourPosition: '3', room: 'Room A', color: '#EE9A4D', startTime: '9:00 AM', endTime: '9:45 AM', _csrf: admin.csrfToken });
+  const cls = await db.prepare('SELECT * FROM classes WHERE class_name = ?').get(className);
+  const student = await createStudentAccount('Video Embed Student');
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(cls.id, student.studentId);
+
+  const manage = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage`).set('Cookie', admin.cookie);
+  const manageCsrf = extractCsrf(manage.text);
+  await request(app).post(`/admin/class-schedule/classes/${cls.id}/assignments`).set('Cookie', admin.cookie).type('form').send({ title: 'Video Lesson', _csrf: manageCsrf });
+  const assignment = await db.prepare('SELECT * FROM class_assignments WHERE class_id = ?').get(cls.id);
+  await request(app)
+    .post(`/admin/class-schedule/assignments/${assignment.id}/content`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ type: 'video', title: 'YouTube Clip', videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', _csrf: manageCsrf });
+  const youtubeItem = await db.prepare("SELECT * FROM lesson_content_items WHERE assignment_id = ? AND title = 'YouTube Clip'").get(assignment.id);
+  await request(app)
+    .post(`/admin/class-schedule/assignments/${assignment.id}/content`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ type: 'video', title: 'Plain Video', videoUrl: 'https://example.com/clip.mp4', _csrf: manageCsrf });
+  const plainItem = await db.prepare("SELECT * FROM lesson_content_items WHERE assignment_id = ? AND title = 'Plain Video'").get(assignment.id);
+
+  const loginRes = await request(app).post('/login').type('form').send({ email: student.email, password: 'testpassword123', next: '/student' });
+  const cookie = loginRes.headers['set-cookie'];
+
+  const youtubePage = await request(app).get(`/student/content/${youtubeItem.id}`).set('Cookie', cookie);
+  assert.equal(youtubePage.status, 200);
+  assert.match(youtubePage.text, /<iframe src="https:\/\/www\.youtube\.com\/embed\/dQw4w9WgXcQ"/);
+  assert.match(youtubePage.text, /href="https:\/\/www\.youtube\.com\/watch\?v=dQw4w9WgXcQ"/);
+  assert.match(youtubePage.text, />Watch on YouTube</);
+
+  const plainPage = await request(app).get(`/student/content/${plainItem.id}`).set('Cookie', cookie);
+  assert.equal(plainPage.status, 200);
+  assert.doesNotMatch(plainPage.text, /<iframe/);
+  assert.match(plainPage.text, /href="https:\/\/example\.com\/clip\.mp4"/);
+  assert.match(plainPage.text, />Watch Video</);
+});

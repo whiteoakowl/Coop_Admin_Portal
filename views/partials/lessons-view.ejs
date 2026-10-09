@@ -19,7 +19,15 @@
     collapsible accordion bar (public/js/lesson-accordion.js, only one
     open at a time) instead of an always-expanded card; its own due date
     moved off the lesson and onto each content item
-    (lessonsForStudentView's own dueDateLabel, now per item). %>
+    (lessonsForStudentView's own dueDateLabel, now per item).
+
+    A real request: "If no dates are added, it still won't let you go to
+    the next lesson until the first one is complete. Add lock and unlock
+    icon ... for when its open to complete." lesson.locked (computed by
+    lessonsForStudentView) combines the pre-existing open_date gate with a
+    new "the lesson before this one must be finished first" rule - shown
+    here as a lock/unlock icon next to the chevron, and also hides the
+    content list the same way an unopened lesson's already did. %>
 <% var quizBasePathLocal = typeof quizBasePath !== 'undefined' ? quizBasePath : '/student'; %>
 <% var quizQueryLocal = typeof quizQuery !== 'undefined' ? quizQuery : ''; %>
 <% if (lessons.length === 0) { %>
@@ -36,6 +44,8 @@
           <span class="lesson-accordion-meta">
             <% if (!lesson.isOpen) { %>
               <span class="hint">Opens <%= lesson.open_date %></span>
+            <% } else if (lesson.locked) { %>
+              <span class="hint">Complete the previous lesson to unlock</span>
             <% } else if (lesson.totalCount === 0) { %>
               <span class="hint">No content</span>
             <% } else if (lesson.completedCount === lesson.totalCount) { %>
@@ -43,10 +53,15 @@
             <% } else { %>
               <span class="status-badge status-badge-active"><%= lesson.completedCount %>/<%= lesson.totalCount %></span>
             <% } %>
+            <% if (lesson.locked) { %>
+              <span class="lesson-lock-icon" aria-label="Locked"><svg class="icon"><use href="#icon-lock"/></svg></span>
+            <% } else { %>
+              <span class="lesson-lock-icon lesson-lock-icon-open" aria-label="Open to complete"><svg class="icon"><use href="#icon-unlock"/></svg></span>
+            <% } %>
             <svg class="icon lesson-accordion-chevron"><use href="#icon-chevron-down"/></svg>
           </span>
         </button>
-        <% if (lesson.isOpen && lesson.totalCount > 0) { %>
+        <% if (!lesson.locked && lesson.totalCount > 0) { %>
           <div class="lesson-accordion-panel" data-lesson-accordion-panel hidden>
             <%# A real request: "Each assignment should be another sub
                 bar under the assignment title. Each assignment says
@@ -68,17 +83,24 @@
                    var tag = isLinkable ? 'a' : 'div';
               %>
                 <li>
+                  <%# A real request: "the circle for marking complete
+                      should be next to the title on the same row" - moved
+                      from the meta cluster (due date/awaiting review) on
+                      the right into its own title-group with the title,
+                      on the left. %>
                   <<%= tag %> class="lesson-item-bar"<% if (isLinkable) { %> href="<%= quizBasePathLocal %>/content/<%= item.id %><%= item.type === 'quiz' ? '/quiz' : '' %><%= quizQueryLocal %>"<% } %>>
-                    <span class="lesson-item-bar-title"><%= item.title || 'Assignment' %></span>
+                    <span class="lesson-item-bar-title-group">
+                      <% if (item.completed) { %>
+                        <span class="lesson-complete-check lesson-complete-check-done" aria-label="Complete"><span class="lesson-complete-badge"><svg class="icon"><use href="#icon-check"/></svg></span></span>
+                      <% } else { %>
+                        <span class="lesson-complete-check" aria-label="Not complete"><svg class="icon"><use href="#icon-circle"/></svg></span>
+                      <% } %>
+                      <span class="lesson-item-bar-title"><%= item.title || 'Assignment' %></span>
+                    </span>
                     <span class="lesson-item-bar-meta">
                       <% if (item.dueDateLabel) { %><span class="hint">Due <%= item.dueDateLabel %></span><% } %>
                       <% if (item.type === 'quiz' && item.attempt && item.attempt.status !== 'graded') { %>
                         <span class="hint">Awaiting review</span>
-                      <% } %>
-                      <% if (item.completed) { %>
-                        <span class="lesson-complete-check lesson-complete-check-done" aria-label="Complete"><svg class="icon"><use href="#icon-check-circle"/></svg></span>
-                      <% } else { %>
-                        <span class="lesson-complete-check" aria-label="Not complete"><svg class="icon"><use href="#icon-circle"/></svg></span>
                       <% } %>
                     </span>
                   </<%= tag %>>

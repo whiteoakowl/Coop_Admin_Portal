@@ -589,7 +589,7 @@ async function scoreAnswer({ answerId, isCorrect, pointsEarned, gradedByAccountI
 async function lessonsForStudentView(classId, studentId) {
   const assignments = await assignmentsForClass(classId);
   const today = todayISO();
-  return Promise.all(
+  const lessons = await Promise.all(
     assignments.map(async (a) => {
       const isOpen = !a.open_date || a.open_date <= today;
       const contentItems = isOpen ? await contentItemsForAssignment(a.id, { includeAnswerKey: false }) : [];
@@ -623,6 +623,36 @@ async function lessonsForStudentView(classId, studentId) {
       return { ...a, isOpen, contentItems: withAttempts, completedCount, totalCount: withAttempts.length };
     })
   );
+  // A real request: "If no dates are added, it still won't let you go to
+  // the next lesson until the first one is complete" - lessons must be
+  // worked in order regardless of whether open_date gating alone would
+  // already separate them. A lesson with no content (totalCount === 0,
+  // including one that isn't open yet) can't be "completed" by the
+  // student, so it's treated as satisfied for this purpose rather than
+  // permanently blocking every lesson after it. Skipped entirely in the
+  // generic/no-student review mode (studentId null - Parent Portal's own
+  // ?viewer=parent-<id> staff mode, which isn't tracking any one
+  // student's progress to sequence against) so that read-only view keeps
+  // showing every lesson's content, same as before this feature existed.
+  if (!studentId) return lessons.map((lesson) => ({ ...lesson, locked: false }));
+  let previousComplete = true;
+  return lessons.map((lesson) => {
+    const locked = !lesson.isOpen || !previousComplete;
+    previousComplete = lesson.isOpen && (lesson.totalCount === 0 || lesson.completedCount === lesson.totalCount);
+    return { ...lesson, locked };
+  });
+}
+
+// Whether a lesson is currently off-limits to a given student - the same
+// combined open_date + "previous lesson complete" gate lessonsForStudentView
+// computes for the Lessons tab, reused by the content-item routes below so
+// a student/parent can't bypass "complete lessons in order" by just
+// visiting a content item's URL directly once it's no longer the one at
+// the front of the line.
+async function isLessonLockedForStudent(classId, studentId, assignmentId) {
+  const lessons = await lessonsForStudentView(classId, studentId);
+  const lesson = lessons.find((l) => l.id === assignmentId);
+  return !lesson || lesson.locked;
 }
 
 // A real request: "On lesson list show percentage of how many people in
@@ -722,4 +752,5 @@ module.exports = {
   pendingReviewAnswers,
   scoreAnswer,
   lessonsForStudentView,
+  isLessonLockedForStudent,
 };

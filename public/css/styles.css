@@ -9902,6 +9902,13 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
 .lesson-accordion-meta { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
 .lesson-accordion-chevron { width: 1.1rem; height: 1.1rem; color: var(--muted); transition: transform 0.15s ease; flex-shrink: 0; }
 .lesson-accordion-trigger[aria-expanded="true"] .lesson-accordion-chevron { transform: rotate(180deg); }
+/* A real request: "Add lock and unlock icon ... for when its open to
+   complete" - lesson.locked already combines the open_date gate with the
+   new "finish the previous lesson first" rule (see utils/academics.js's
+   own lessonsForStudentView comment), shown here next to the chevron. */
+.lesson-lock-icon { display: flex; color: var(--muted); }
+.lesson-lock-icon .icon { width: 1rem; height: 1rem; }
+.lesson-lock-icon-open { color: var(--green); }
 .lesson-accordion-panel { border-top: 1px solid var(--border); padding: 0.25rem 1rem 0.75rem; }
 .lesson-item-list { list-style: none; margin: 0; padding: 0; }
 .lesson-item-row {
@@ -9936,10 +9943,17 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
 }
 .lesson-item-list li:first-child .lesson-item-bar { border-top: none; }
 .lesson-item-bar:hover { background: var(--surface-alt, #f7f8fa); }
+/* A real request: "the circle for marking complete should be next to the
+   title on the same row" - title-group holds the check + title together
+   on the left; lesson-item-bar-meta (due date/awaiting review) stays on
+   the right. */
+.lesson-item-bar-title-group { display: flex; align-items: center; gap: 0.5rem; min-width: 0; flex: 1; }
 .lesson-item-bar-title { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lesson-item-bar-meta { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
-.lesson-item-bar-meta .lesson-complete-check { flex-direction: row; cursor: default; }
-.lesson-item-bar-meta .lesson-complete-check .icon { width: 1.3rem; height: 1.3rem; }
+.lesson-item-bar-title-group .lesson-complete-check { flex-direction: row; cursor: default; flex-shrink: 0; }
+.lesson-item-bar-title-group .lesson-complete-check .icon { width: 1.3rem; height: 1.3rem; }
+.lesson-item-bar-title-group .lesson-complete-badge { width: 1.3rem; height: 1.3rem; }
+.lesson-item-bar-title-group .lesson-complete-badge .icon { width: 0.8rem; height: 0.8rem; }
 .lesson-item-complete { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; flex-shrink: 0; }
 /* A real request: "Marking complete on an assignment shouldn't be an
    orange button. It should be a green check mark circle that you can
@@ -9960,9 +9974,22 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
 .lesson-complete-check .icon { width: 1.6rem; height: 1.6rem; }
 .lesson-complete-check:hover { color: var(--green); }
 .lesson-complete-check-done { color: var(--green); cursor: default; }
+/* A real follow-up request: "marking an assignment complete should be a
+   filled in green circle with a check mark" - a plain checkmark
+   (icon-check) centered in its own solid circle, rather than icon-check-
+   circle's outline-circle-plus-outline-check look. */
+.lesson-complete-badge { display: flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--green); color: #fff; flex-shrink: 0; }
+.lesson-complete-badge .icon { width: 1rem; height: 1rem; }
 .lesson-complete-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
 .lesson-submit-form { display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; }
 .lesson-submit-form input[type="file"] { font-size: 0.75rem; max-width: 10rem; }
+
+/* A real request: "If the lesson is a video it should show video and
+   play without having to go to YouTube, or you can click and go to
+   YouTube if you want" - a responsive 16:9 embed (views/partials/lesson-
+   content-detail.ejs's own youtubeEmbedUrl()). */
+.lesson-video-embed { position: relative; aspect-ratio: 16 / 9; border-radius: var(--radius); overflow: hidden; margin-bottom: 0.75rem; background: #000; }
+.lesson-video-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
 
 /* ---------- Sitewide delete confirmation popup (partials/confirm-dialog.ejs) ---------- */
 .confirm-dialog {
@@ -12526,9 +12553,9 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 /* The album card's own icon row (Edit/Export/Delete, plus Restore on the
    Archive tab) - right-aligned so the icons read as "bottom right of the
    card" per the real request, instead of .roster-btn-row's own default
-   left-aligned flow. .roster-btn-row is already `display: flex` (not a
-   column), so the icons sit side by side in one row by default - no
-   extra rule needed for that part. */
+   left-aligned flow. .roster-btn-row is `display: flex` on desktop, so
+   the icons sit side by side there already; see the @media block below
+   for why mobile needs its own override too. */
 .photo-album-card-icons { justify-content: flex-end; margin-top: 0.5rem; }
 
 /* A real request: "Main admin portal photo album view should look like
@@ -12543,6 +12570,21 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    same horizontal padding as .event-card-body so it lines up under it. */
 .photo-album-admin-card-link { display: flex; flex-direction: column; color: inherit; text-decoration: none; }
 .photo-album-admin-card .photo-album-card-icons { padding: 0 1.25rem 1rem; }
+/* A real request: "Members only bubble should fit to text and be on the
+   same row as the album name... icons are in a row, not column" - the
+   title bar pairs the <h3> and the visibility badge-pill on one line
+   (.event-card-body's own column layout would otherwise stack them). */
+.photo-album-admin-card-title-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.photo-album-admin-card-title-row h3 { margin: 0; }
+@media (max-width: 640px) {
+  /* Same bug class as .accounting-row-icons's own comment just above -
+     .roster-btn-row's shared mobile rule (display: grid, one implicit
+     column) only counts .roster-action-btn/.btn-secondary children when
+     sizing its columns; this row's real children are .icon-btn
+     links/buttons, so it would stack them in a column instead of
+     keeping them "in a row, not column, next to each other." */
+  .photo-album-card-icons { display: flex; flex-wrap: nowrap; justify-content: flex-end; }
+}
 
 /* Parent Portal Accounting (views/accounting-home.ejs) - a real request:
    "shrink to fit on mobile for all tables. Total for payments, invoices

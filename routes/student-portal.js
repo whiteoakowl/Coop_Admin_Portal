@@ -18,13 +18,14 @@ const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth')
 const { memberForAccount } = require('../utils/portalAuth');
 const { allClassesList, attendanceHistoryForRoster, CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
 const { CLASS_DAY_ORDER } = require('../utils/classDays');
-const { formatFriendlyTimestamp, formatTimestamp, todayISO } = require('../utils/dates');
+const { formatFriendlyTimestamp, formatTimestamp } = require('../utils/dates');
 const {
   assignmentsForStudent,
   assignmentsForStudentInClass,
   diplomaForStudent,
   transcriptForStudent,
   lessonsForStudentView,
+  isLessonLockedForStudent,
   getContentItem,
   getQuizAttempt,
   submitQuizAttempt,
@@ -329,6 +330,12 @@ router.get('/content/:id', async (req, res) => {
   const lesson = lessons.find((l) => l.id === assignment.id);
   const item = lesson ? lesson.contentItems.find((i) => i.id === contentItemId) : null;
   if (!lesson || !item) return res.status(404).render('404', { title: 'Not Found' });
+  // A real request: "If no dates are added, it still won't let you go to
+  // the next lesson until the first one is complete" - lesson.locked
+  // already covers both that and the open_date gate (see
+  // lessonsForStudentView's own comment), so a locked lesson's content
+  // 404s the same way an unopened one already did, not just link to it.
+  if (lesson.locked) return res.status(404).render('404', { title: 'Not Found' });
   // A quiz already has its own dedicated take/review page - redirect
   // there instead of rendering a body this page's own partial has no
   // quiz branch for (reachable only by typing the URL directly; every
@@ -358,7 +365,7 @@ router.get('/content/:id/quiz', async (req, res) => {
   const found = await contentItemForStudent(req, parseInt(req.params.id, 10));
   if (!found) return res.status(404).render('404', { title: 'Not Found' });
   const { member, contentItem, assignment, cls } = found;
-  if (assignment.open_date && assignment.open_date > todayISO()) return res.status(404).render('404', { title: 'Not Found' });
+  if (await isLessonLockedForStudent(cls.id, member.id, assignment.id)) return res.status(404).render('404', { title: 'Not Found' });
   const attempt = await getQuizAttempt(contentItem.id, member.id);
   const items = await contentItemsForAssignment(assignment.id, { includeAnswerKey: false });
   const questions = items.find((i) => i.id === contentItem.id).questions;
@@ -368,7 +375,8 @@ router.get('/content/:id/quiz', async (req, res) => {
 router.post('/content/:id/quiz', async (req, res) => {
   const found = await contentItemForStudent(req, parseInt(req.params.id, 10));
   if (!found) return res.status(404).render('404', { title: 'Not Found' });
-  const { member, contentItem, assignment } = found;
+  const { member, contentItem, assignment, cls } = found;
+  if (await isLessonLockedForStudent(cls.id, member.id, assignment.id)) return res.status(404).render('404', { title: 'Not Found' });
   const items = await contentItemsForAssignment(assignment.id, { includeAnswerKey: false });
   const questions = items.find((i) => i.id === contentItem.id).questions;
   const answers = questions.map((q) => {
@@ -394,7 +402,7 @@ router.post('/content/:id/complete', async (req, res) => {
   const classes = await classesForStudent(member);
   const cls = assignment ? classes.find((c) => c.id === assignment.class_id) : null;
   if (!cls) return res.status(404).render('404', { title: 'Not Found' });
-  if (assignment.open_date && assignment.open_date > todayISO()) return res.status(404).render('404', { title: 'Not Found' });
+  if (await isLessonLockedForStudent(cls.id, member.id, assignment.id)) return res.status(404).render('404', { title: 'Not Found' });
   await markLessonItemComplete(contentItem.id, member.id);
   res.redirect(`/student/classes/${assignment.class_id}?tab=lessons`);
 });
@@ -414,7 +422,7 @@ router.post('/content/:id/submit', uploadAssignmentSubmission.single('submission
   const classes = await classesForStudent(member);
   const cls = assignment ? classes.find((c) => c.id === assignment.class_id) : null;
   if (!cls) return res.status(404).render('404', { title: 'Not Found' });
-  if (assignment.open_date && assignment.open_date > todayISO()) return res.status(404).render('404', { title: 'Not Found' });
+  if (await isLessonLockedForStudent(cls.id, member.id, assignment.id)) return res.status(404).render('404', { title: 'Not Found' });
   if (!req.file) return res.redirect(`/student/classes/${assignment.class_id}?tab=lessons&error=` + encodeURIComponent('Choose a file to upload.'));
   const fileKey = await saveLessonAttachment(req.file);
   await submitAssignment({ contentItemId: contentItem.id, studentId: member.id, fileUrl: fileKey, fileName: req.file.originalname });
