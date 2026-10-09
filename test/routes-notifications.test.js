@@ -200,16 +200,20 @@ test("turning a type's auto-send off stops email/sms but keeps the in-app notifi
 });
 
 test('sending a newsletter issue notifies every active member account', async () => {
-  const admin = await loginAsMainAdmin();
   const parent = await createParentAccount();
 
   // A real request moved newsletter admin to a single always-current
   // issue (GET /main-admin/newsletter auto-creates one, no more POST /
   // creation route) - seeded directly here the same way a real draft
-  // would exist by the time someone sends it.
+  // would exist by the time it goes out. A later real request ("the
+  // newsletter being sent out is controlled by the newsletter schedule
+  // settings already built on the page") removed the manual Mark Sent
+  // HTTP route entirely - markSent() itself is unchanged, just no longer
+  // reachable directly over HTTP, so this calls it the same way
+  // advanceIfDue/the "Send newsletter immediately" checkbox do now.
   const mainAdminAccount = await db.prepare('SELECT id FROM member_accounts WHERE email = ?').get(process.env.MAIN_ADMIN_EMAIL);
   const issueId = await newsletterUtil.createDraft('Notify Everyone', mainAdminAccount.id);
-  await request(app).post(`/main-admin/newsletter/${issueId}/send`).set('Cookie', admin.cookie).type('form').send({ _csrf: admin.csrfToken });
+  await newsletterUtil.markSent(issueId);
 
   const items = await notifications.listForAccount(parent.accountId);
   assert.ok(items.some((i) => i.type_key === 'newsletter_sent' && i.link_url === `/newsletter/${issueId}`));

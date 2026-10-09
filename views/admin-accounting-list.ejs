@@ -67,7 +67,7 @@
       <p class="roster-empty"><%= q ? 'No active members match that search.' : 'No active members yet.' %></p>
     <% } else { %>
       <div class="roster-scroll">
-        <table class="roster-table members-table condensed-table accounting-table-mobile-fit accounting-accounts-table-fit">
+        <table class="roster-table members-table condensed-table accounting-table-mobile-fit accounting-accounts-table-fit table-stack-mobile">
           <thead>
             <tr>
               <th>Member</th>
@@ -83,11 +83,11 @@
                     shows the full membership profile just like other
                     pages, exactly. When you click the invoice icon it
                     goes to that members full account page." %>
-                <td class="roster-name-col">
+                <td class="roster-name-col table-stack-heading">
                   <a href="/main-admin/members/<%= m.id %>"><%= m.name %></a>
                   <% if (m.parked) { %> <span class="badge-pill badge-pill-gray" title="Auto-parked: an auto-park invoice is overdue and unpaid">Parked</span><% } %>
                 </td>
-                <td class="roster-btn-row accounting-row-icons">
+                <td class="roster-btn-row accounting-row-icons table-stack-full">
                   <a class="icon-btn" href="/main-admin/accounting/members/<%= m.id %>?autoprint=1" aria-label="Print statement for <%= m.name %>" title="Print statement"><svg class="icon"><use href="#icon-printer"/></svg></a>
                   <% if (m.email) { %>
                     <a class="icon-btn" href="mailto:<%= m.email %>" aria-label="Email <%= m.name %>" title="Email <%= m.name %>"><svg class="icon"><use href="#icon-mail"/></svg></a>
@@ -96,8 +96,8 @@
                   <% } %>
                   <a class="icon-btn" href="/main-admin/accounting/members/<%= m.id %>" aria-label="View account for <%= m.name %>" title="View account"><svg class="icon"><use href="#icon-file-text"/></svg></a>
                 </td>
-                <td><span class="badge-pill badge-pill-<%= m.balanceCents > 0 ? 'orange' : 'green' %>"><%= formatCents(m.balanceCents) %></span></td>
-                <td><% if (m.balanceCents > 0) { %><span class="badge-pill badge-pill-orange">Past Due</span><% } else { %>&mdash;<% } %></td>
+                <td data-label="Balance"><span class="badge-pill badge-pill-<%= m.balanceCents > 0 ? 'orange' : 'green' %>"><%= formatCents(m.balanceCents) %></span></td>
+                <td data-label="Past Due"><% if (m.balanceCents > 0) { %><span class="badge-pill badge-pill-orange">Past Due</span><% } else { %>&mdash;<% } %></td>
               </tr>
             <% }); %>
           </tbody>

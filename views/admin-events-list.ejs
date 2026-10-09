@@ -48,15 +48,15 @@
           <p class="roster-empty">No published events this month.</p>
         <% } else { %>
           <div class="roster-scroll">
-            <table class="roster-table condensed-table">
+            <table class="roster-table condensed-table table-stack-mobile">
               <thead><tr><th>Title</th><th>Starts</th><th>Location</th><th>Category</th></tr></thead>
               <tbody>
                 <% calendarList.forEach(function(e) { %>
                   <tr>
-                    <td class="roster-name-col"><a href="/main-admin/events/<%= e.id %>/builder" class="<%= e.status === 'cancelled' ? 'event-title-cancelled' : '' %>"><%= e.title %><% if (e.status === 'cancelled') { %> CANCELED<% } %></a></td>
-                    <td><%= e.startsLabel %></td>
-                    <td><%= e.location || '—' %></td>
-                    <td><% if (e.categoryColor) { %><span class="badge-pill" style="background:<%= e.categoryColor %>;color:#fff;"><%= e.categoryName || '' %></span><% } else { %>—<% } %></td>
+                    <td class="roster-name-col table-stack-heading"><a href="/main-admin/events/<%= e.id %>/builder" class="<%= e.status === 'cancelled' ? 'event-title-cancelled' : '' %>"><%= e.title %><% if (e.status === 'cancelled') { %> CANCELED<% } %></a></td>
+                    <td data-label="Starts"><%= e.startsLabel %></td>
+                    <td data-label="Location"><%= e.location || '—' %></td>
+                    <td data-label="Category"><% if (e.categoryColor) { %><span class="badge-pill" style="background:<%= e.categoryColor %>;color:#fff;"><%= e.categoryName || '' %></span><% } else { %>—<% } %></td>
                   </tr>
                 <% }); %>
               </tbody>
@@ -100,15 +100,15 @@
         <p class="roster-empty">Nothing waiting on approval right now.</p>
       <% } else { %>
         <div class="roster-scroll">
-          <table class="roster-table condensed-table">
+          <table class="roster-table condensed-table table-stack-mobile">
             <thead><tr><th>Title</th><th>Starts</th><th>Location</th><th></th></tr></thead>
             <tbody>
               <% requests.forEach(function(e) { %>
                 <tr>
-                  <td class="roster-name-col"><a href="/main-admin/events/<%= e.id %>/builder"><%= e.title %></a></td>
-                  <td><%= e.startsLabel %></td>
-                  <td><%= e.location || '—' %></td>
-                  <td>
+                  <td class="roster-name-col table-stack-heading"><a href="/main-admin/events/<%= e.id %>/builder"><%= e.title %></a></td>
+                  <td data-label="Starts"><%= e.startsLabel %></td>
+                  <td data-label="Location"><%= e.location || '—' %></td>
+                  <td class="table-stack-full">
                     <div class="roster-btn-row">
                       <form method="POST" action="/main-admin/events/<%= e.id %>/decide" class="inline-block-form">
                         <input type="hidden" name="decision" value="approve" />
@@ -131,12 +131,12 @@
         <p class="roster-empty">No published events yet.</p>
       <% } else { %>
         <div class="roster-scroll">
-          <table class="roster-table condensed-table event-attendance-table">
+          <table class="roster-table condensed-table event-attendance-table table-stack-mobile">
             <thead><tr><th>Title</th><th>Starts</th><th>Registered</th><th></th></tr></thead>
             <tbody>
               <% attendance.forEach(function(e) { %>
                 <tr>
-                  <td class="roster-name-col">
+                  <td class="roster-name-col table-stack-heading">
                     <button
                       type="button"
                       class="link-btn event-quick-edit-trigger"
@@ -151,8 +151,8 @@
                       data-capacity="<%= e.capacity ?? '' %>"
                     ><%= e.title %></button>
                   </td>
-                  <td><%= e.startsLabel %></td>
-                  <td><%= e.registrationCount || 0 %></td>
+                  <td data-label="Starts"><%= e.startsLabel %></td>
+                  <td data-label="Registered"><%= e.registrationCount || 0 %></td>
                   <td><a class="roster-action-btn" href="/main-admin/events/<%= e.id %>/registrations">Attendance</a></td>
                 </tr>
               <% }); %>

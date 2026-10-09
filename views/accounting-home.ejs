@@ -50,7 +50,7 @@
           <p class="roster-empty">No invoices for this period.</p>
         <% } else { %>
           <div class="roster-scroll">
-            <table class="roster-table members-table condensed-table accounting-table-mobile-fit">
+            <table class="roster-table members-table condensed-table accounting-table-mobile-fit table-stack-mobile">
               <thead>
                 <tr>
                   <th>Description</th>
@@ -63,11 +63,11 @@
               <tbody>
                 <% invoices.forEach(function(c) { %>
                   <tr>
-                    <td><%= c.description %></td>
-                    <td><%= formatCents(c.amount_cents) %></td>
-                    <td><%= formatCents(c.amountPaid) %></td>
-                    <td><span class="badge-pill badge-pill-<%= c.status === 'paid' ? 'green' : c.status === 'cancelled' || c.status === 'refunded' ? 'gray' : 'orange' %>"><%= c.status.replace('_', ' ') %></span></td>
-                    <td><%= c.created_at %></td>
+                    <td class="table-stack-heading"><%= c.description %></td>
+                    <td data-label="Amount"><%= formatCents(c.amount_cents) %></td>
+                    <td data-label="Paid"><%= formatCents(c.amountPaid) %></td>
+                    <td data-label="Status"><span class="badge-pill badge-pill-<%= c.status === 'paid' ? 'green' : c.status === 'cancelled' || c.status === 'refunded' ? 'gray' : 'orange' %>"><%= c.status.replace('_', ' ') %></span></td>
+                    <td data-label="Date"><%= c.created_at %></td>
                   </tr>
                 <% }); %>
               </tbody>
@@ -83,7 +83,7 @@
           <p class="roster-empty">No payments for this period.</p>
         <% } else { %>
           <div class="roster-scroll">
-            <table class="roster-table members-table condensed-table accounting-table-mobile-fit">
+            <table class="roster-table members-table condensed-table accounting-table-mobile-fit table-stack-mobile">
               <thead>
                 <tr>
                   <th>For</th>
@@ -95,10 +95,10 @@
               <tbody>
                 <% paymentRows.forEach(function(p) { %>
                   <tr>
-                    <td><%= p.chargeDescription %></td>
-                    <td><%= formatCents(p.amount_cents) %></td>
-                    <td><%= p.note || '' %></td>
-                    <td><%= p.created_at %></td>
+                    <td class="table-stack-heading"><%= p.chargeDescription %></td>
+                    <td data-label="Amount"><%= formatCents(p.amount_cents) %></td>
+                    <td data-label="Note"><%= p.note || '' %></td>
+                    <td data-label="Date"><%= p.created_at %></td>
                   </tr>
                 <% }); %>
               </tbody>
@@ -114,7 +114,7 @@
           <p class="roster-empty">No adjustments for this period.</p>
         <% } else { %>
           <div class="roster-scroll">
-            <table class="roster-table members-table condensed-table accounting-table-mobile-fit">
+            <table class="roster-table members-table condensed-table accounting-table-mobile-fit table-stack-mobile">
               <thead>
                 <tr>
                   <th>Type</th>
@@ -126,18 +126,18 @@
               <tbody>
                 <% refundRows.forEach(function(p) { %>
                   <tr>
-                    <td><span class="badge-pill badge-pill-gray">Refund</span></td>
-                    <td><%= p.chargeDescription %></td>
-                    <td><%= formatCents(p.amount_cents) %></td>
-                    <td><%= p.created_at %></td>
+                    <td class="table-stack-heading"><span class="badge-pill badge-pill-gray">Refund</span></td>
+                    <td data-label="For"><%= p.chargeDescription %></td>
+                    <td data-label="Amount"><%= formatCents(p.amount_cents) %></td>
+                    <td data-label="Date"><%= p.created_at %></td>
                   </tr>
                 <% }); %>
                 <% cancelledCharges.forEach(function(c) { %>
                   <tr>
-                    <td><span class="badge-pill badge-pill-gray">Cancelled Charge</span></td>
-                    <td><%= c.description %></td>
-                    <td><%= formatCents(c.amount_cents) %></td>
-                    <td><%= c.created_at %></td>
+                    <td class="table-stack-heading"><span class="badge-pill badge-pill-gray">Cancelled Charge</span></td>
+                    <td data-label="For"><%= c.description %></td>
+                    <td data-label="Amount"><%= formatCents(c.amount_cents) %></td>
+                    <td data-label="Date"><%= c.created_at %></td>
                   </tr>
                 <% }); %>
               </tbody>

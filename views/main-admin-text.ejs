@@ -46,7 +46,7 @@
       <p class="hint" id="email-select-count"></p>
 
       <div class="roster-scroll">
-        <table class="roster-table condensed-table" id="email-candidate-table">
+        <table class="roster-table condensed-table table-stack-mobile" id="email-candidate-table">
           <thead>
             <tr><th class="no-print"><span class="sr-only">Select</span></th><th>Name</th><th>Email</th><th>Grade</th><th>Section(s)</th><th>Registered for Classes</th></tr>
           </thead>
@@ -61,11 +61,11 @@
                 data-registered="<%= c.registeredForClasses ? 'yes' : 'no' %>"
               >
                 <td><input type="checkbox" name="recipientIds" value="<%= c.accountId %>" data-email-checkbox /></td>
-                <td><%= c.name %></td>
-                <td><%= c.email || '' %></td>
-                <td><%= c.gradeLevel || '' %></td>
-                <td><%= c.sections.join(', ') %></td>
-                <td><%= c.registeredForClasses ? 'Yes' : 'No' %></td>
+                <td class="table-stack-heading"><%= c.name %></td>
+                <td data-label="Email"><%= c.email || '' %></td>
+                <td data-label="Grade"><%= c.gradeLevel || '' %></td>
+                <td data-label="Section(s)"><%= c.sections.join(', ') %></td>
+                <td data-label="Registered"><%= c.registeredForClasses ? 'Yes' : 'No' %></td>
               </tr>
             <% }); %>
           </tbody>
@@ -120,16 +120,16 @@
       <p class="roster-empty">No texts sent yet.</p>
     <% } else { %>
       <div class="roster-scroll">
-        <table class="roster-table condensed-table">
+        <table class="roster-table condensed-table table-stack-mobile">
           <thead><tr><th>Message</th><th>Status</th><th>Recipients</th><th>Scheduled</th><th>Sent</th><th></th></tr></thead>
           <tbody>
             <% campaigns.forEach(function(c) { %>
               <tr>
-                <td class="roster-name-col"><%= c.body %></td>
-                <td><span class="badge-pill badge-pill-<%= c.status === 'sent' ? 'green' : 'orange' %>"><%= c.status.charAt(0).toUpperCase() + c.status.slice(1) %></span></td>
-                <td><%= c.recipient_count %></td>
-                <td><%= c.scheduled_at || '' %></td>
-                <td><%= c.sent_at || '' %></td>
+                <td class="roster-name-col table-stack-heading"><%= c.body %></td>
+                <td data-label="Status"><span class="badge-pill badge-pill-<%= c.status === 'sent' ? 'green' : 'orange' %>"><%= c.status.charAt(0).toUpperCase() + c.status.slice(1) %></span></td>
+                <td data-label="Recipients"><%= c.recipient_count %></td>
+                <td data-label="Scheduled"><%= c.scheduled_at || '' %></td>
+                <td data-label="Sent"><%= c.sent_at || '' %></td>
                 <td>
                   <% if (c.status === 'scheduled') { %>
                     <form method="POST" action="/main-admin/announcements/text/<%= c.id %>/send" data-confirm="Send this text now?">

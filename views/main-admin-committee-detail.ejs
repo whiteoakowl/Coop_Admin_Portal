@@ -37,13 +37,13 @@
       <p class="roster-empty">No members yet &mdash; add one above.</p>
     <% } else { %>
       <div class="roster-scroll">
-        <table class="roster-table condensed-table committee-members-table">
+        <table class="roster-table condensed-table committee-members-table table-stack-mobile">
           <thead><tr><th>Name</th><th>Email</th><th></th></tr></thead>
           <tbody>
             <% members.forEach(function(m) { %>
               <tr>
-                <td class="roster-name-col"><%= m.name %></td>
-                <td><%= m.email || '—' %></td>
+                <td class="roster-name-col table-stack-heading"><%= m.name %></td>
+                <td data-label="Email"><%= m.email || '—' %></td>
                 <td>
                   <form method="POST" action="/main-admin/volunteers/committees/<%= committee.id %>/members/<%= m.memberId %>/delete" class="inline-block-form" data-confirm="Remove <%= m.name %> from this committee?">
                     <button type="submit" class="roster-action-btn roster-action-btn-danger"><svg class="icon"><use href="#icon-trash"/></svg></button>
@@ -83,13 +83,13 @@
             <p class="roster-empty">No one has signed up yet.</p>
           <% } else { %>
             <div class="roster-scroll">
-              <table class="roster-table condensed-table committee-position-table" data-committee-position-table="<%= position.id %>">
+              <table class="roster-table condensed-table committee-position-table table-stack-mobile" data-committee-position-table="<%= position.id %>">
                 <thead><tr><th></th><th>Name</th><th></th></tr></thead>
                 <tbody>
                   <% position.signups.forEach(function(s) { %>
                     <tr>
                       <td><input type="checkbox" class="committee-member-checkbox" data-email="<%= s.memberEmail || '' %>" /></td>
-                      <td class="roster-name-col"><%= s.memberName %></td>
+                      <td class="roster-name-col table-stack-heading"><%= s.memberName %></td>
                       <td><% if (s.memberEmail) { %><a class="roster-action-btn" href="mailto:<%= s.memberEmail %>">Email</a><% } %></td>
                     </tr>
                   <% }); %>

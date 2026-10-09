@@ -31,7 +31,15 @@ const EASTERN_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
 });
 
 function todayISO() {
-  return EASTERN_DATE_FORMATTER.format(new Date());
+  return easternISODateOf(new Date());
+}
+
+// Same Eastern-calendar-date reading as todayISO, for an arbitrary
+// instant rather than always "right now" - utils/newsletter.js's own
+// schedule-due check needs "what Eastern calendar date did this
+// timestamp fall on" for a stored created_at, not just today.
+function easternISODateOf(date) {
+  return EASTERN_DATE_FORMATTER.format(date);
 }
 
 // A real bug, the same underlying mistake todayISO's own comment above
@@ -400,4 +408,5 @@ module.exports = {
   closestUpcomingDate,
   easternInputToUtcText,
   utcTextToEasternInput,
+  easternISODateOf,
 };

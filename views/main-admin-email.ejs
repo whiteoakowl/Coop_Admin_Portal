@@ -53,7 +53,7 @@
           the table itself; the Filter dialog below still filters by all
           of those, it just no longer needs its own column here to do it. %>
       <div class="roster-scroll">
-        <table class="roster-table condensed-table" id="email-candidate-table">
+        <table class="roster-table condensed-table table-stack-mobile" id="email-candidate-table">
           <thead>
             <tr><th class="no-print"><span class="sr-only">Select</span></th><th>Name</th><th>Email</th><th>Student or Parent</th></tr>
           </thead>
@@ -68,9 +68,9 @@
                 data-registered="<%= c.registeredForClasses ? 'yes' : 'no' %>"
               >
                 <td><input type="checkbox" name="recipientIds" value="<%= c.accountId %>" data-email-checkbox /></td>
-                <td><%= c.name %></td>
-                <td><%= c.email || '' %></td>
-                <td><%= c.memberType === 'student' ? 'Student' : 'Parent' %></td>
+                <td class="table-stack-heading"><%= c.name %></td>
+                <td data-label="Email"><%= c.email || '' %></td>
+                <td data-label="Student or Parent"><%= c.memberType === 'student' ? 'Student' : 'Parent' %></td>
               </tr>
             <% }); %>
           </tbody>
@@ -125,16 +125,16 @@
       <p class="roster-empty">No emails sent yet.</p>
     <% } else { %>
       <div class="roster-scroll">
-        <table class="roster-table condensed-table">
+        <table class="roster-table condensed-table table-stack-mobile">
           <thead><tr><th>Subject</th><th>Status</th><th>Recipients</th><th>Scheduled</th><th>Sent</th><th></th></tr></thead>
           <tbody>
             <% campaigns.forEach(function(c) { %>
               <tr>
-                <td class="roster-name-col"><%= c.subject %></td>
-                <td><span class="badge-pill badge-pill-<%= c.status === 'sent' ? 'green' : 'orange' %>"><%= c.status.charAt(0).toUpperCase() + c.status.slice(1) %></span></td>
-                <td><%= c.recipient_count %></td>
-                <td><%= c.scheduled_at || '' %></td>
-                <td><%= c.sent_at || '' %></td>
+                <td class="roster-name-col table-stack-heading"><%= c.subject %></td>
+                <td data-label="Status"><span class="badge-pill badge-pill-<%= c.status === 'sent' ? 'green' : 'orange' %>"><%= c.status.charAt(0).toUpperCase() + c.status.slice(1) %></span></td>
+                <td data-label="Recipients"><%= c.recipient_count %></td>
+                <td data-label="Scheduled"><%= c.scheduled_at || '' %></td>
+                <td data-label="Sent"><%= c.sent_at || '' %></td>
                 <td>
                   <% if (c.status === 'scheduled') { %>
                     <form method="POST" action="/main-admin/announcements/email/<%= c.id %>/send" data-confirm="Send this email now?">

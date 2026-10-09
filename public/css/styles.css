@@ -3237,6 +3237,74 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .roster-name-col { text-align: left !important; position: sticky; left: 0; background: var(--surface); font-weight: 600; }
 .roster-table thead .roster-name-col { background: var(--brand-soft); }
 
+/* A real request, repeated across several tables: "shrink to fit on
+   mobile - no side to side scroll." Shrinking font/padding alone (the
+   .*-mobile-fit convention used elsewhere) still needs a real
+   .roster-scroll horizontal scroll once a table has more real columns
+   than a phone has width for - accepted as a fallback for a dense
+   spreadsheet-shaped table (e.g. Accounts), but not what this class is
+   for. .table-stack-mobile instead drops the <table> layout entirely
+   below 640px: each row becomes its own bordered card, and each cell
+   becomes a "Label: value" line via its own data-label attribute (set in
+   the view, same text as that column's <th>) - nothing left to scroll
+   sideways because nothing is laid out in columns any more. Opt-in
+   (added alongside .roster-table, not baked into it) since plenty of
+   tables genuinely want the real columns-with-horizontal-scroll
+   behavior instead (e.g. .roster-table-detailed's own grid charts). */
+@media (max-width: 640px) {
+  .table-stack-mobile thead { display: none; }
+  .table-stack-mobile, .table-stack-mobile tbody { display: block; width: 100%; }
+  .table-stack-mobile tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.65rem;
+    margin-bottom: 0.5rem;
+  }
+  .table-stack-mobile tr:last-child { margin-bottom: 0; }
+  .table-stack-mobile td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.3rem 0;
+    border: none;
+    white-space: normal;
+    text-align: right;
+  }
+  .table-stack-mobile td:empty { display: none; }
+  .table-stack-mobile td[data-label]::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--muted);
+    text-align: left;
+    flex-shrink: 0;
+  }
+  /* A cell with no real label (an icon-only action column, say) just
+     right-aligns its own content instead of printing an empty label. */
+  .table-stack-mobile td:not([data-label]) { justify-content: flex-end; }
+  /* A name/title cell reads better as the card's own heading - full
+     width, left-aligned, no label repeating what's already obvious. */
+  .table-stack-mobile td.table-stack-heading {
+    display: block;
+    text-align: left;
+    font-weight: 700;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.4rem;
+    margin-bottom: 0.2rem;
+  }
+  .table-stack-mobile td.table-stack-heading::before { content: none; }
+  /* An action cell (a button row, an upload form, ...) needs its own
+     full-width block instead of being squeezed into "label: value" -
+     same idea as .table-stack-heading, just without the heading look. */
+  .table-stack-mobile td.table-stack-full { display: block; text-align: left; }
+  .table-stack-mobile td.table-stack-full::before { content: none; }
+  /* This class takes over the "no overflow" job itself, so the shared
+     .roster-scroll wrapper around it shouldn't still reserve a
+     horizontal scrollbar/track. */
+  .roster-scroll:has(> .table-stack-mobile) { overflow-x: visible; border: none; background: none; }
+}
+
 /* The "Add/Edit Semester" list's own rename row (partials/semester-
    manager.ejs) - a text input + Save button sitting inline inside a
    table cell, same small-gap-inline-flex shape as every other compact

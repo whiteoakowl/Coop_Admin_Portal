@@ -91,6 +91,29 @@ async function freshCurrentIssue(admin) {
   return { id, page };
 }
 
+// A real request: "the newsletter being sent out is controlled by the
+// newsletter schedule settings already built on the page." Pure date
+// math (utils/newsletter.js's own nextScheduledOccurrence) - no mocked
+// clock needed, every input/output here is an explicit timestamp.
+test('nextScheduledOccurrence finds the next Eastern day/time on or after a given instant', () => {
+  // Monday, Jan 6 2025, 10:00 AM Eastern (EST, UTC-5 - no DST in January).
+  const sinceMonday10amEastern = '2025-01-06 15:00:00';
+
+  // The 8:00 AM Eastern slot on the issue's OWN day already passed by
+  // the time it was created (10am) - the next Monday 8am is a full week
+  // out, not "later today".
+  const dueMonday8am = newsletterUtil.nextScheduledOccurrence(sinceMonday10amEastern, { day: 'Monday', time: '08:00' });
+  assert.equal(dueMonday8am.toISOString(), '2025-01-13T13:00:00.000Z');
+
+  // Wednesday 8am is still ahead within the same week.
+  const dueWednesday8am = newsletterUtil.nextScheduledOccurrence(sinceMonday10amEastern, { day: 'Wednesday', time: '08:00' });
+  assert.equal(dueWednesday8am.toISOString(), '2025-01-08T13:00:00.000Z');
+
+  // A slot later the same day (Monday, 2pm) as the 10am "since" instant.
+  const dueMondayAfternoon = newsletterUtil.nextScheduledOccurrence(sinceMonday10amEastern, { day: 'Monday', time: '14:00' });
+  assert.equal(dueMondayAfternoon.toISOString(), '2025-01-06T19:00:00.000Z');
+});
+
 test('newsletter admin requires sign-in', async () => {
   const res = await request(app).get('/main-admin/newsletter');
   assert.equal(res.status, 302);
@@ -132,19 +155,34 @@ test('the old per-issue edit URL redirects to the single newsletter page', async
   assert.equal(res.headers.location, '/main-admin/newsletter');
 });
 
-test('marking the current issue sent leaves a brand new draft to edit next', async () => {
+// A real request: "the newsletter being sent out is controlled by the
+// newsletter schedule settings already built on the page" - replaced the
+// old manual Mark Sent button with this automatic, schedule-driven
+// advance (utils/newsletter.js's own advanceIfDue/nextScheduledOccurrence),
+// checked on every GET of either the admin editor or the member archive.
+test('an issue past its scheduled send time flips to sent automatically, leaving a brand new draft to edit next', async () => {
   const admin = await loginAsMainAdmin();
-  const { id: sentId } = await freshCurrentIssue(admin);
+  const { id: pendingId } = await freshCurrentIssue(admin);
 
-  await request(app).post(`/main-admin/newsletter/${sentId}/send`).set('Cookie', admin.cookie).type('form').send({ _csrf: admin.csrfToken });
-  const sent = await db.prepare('SELECT * FROM newsletter_issues WHERE id = ?').get(sentId);
-  assert.equal(sent.status, 'sent');
+  // A day/time (and a created_at) safely in the past, so the very next
+  // page load finds this issue already overdue.
+  await newsletterUtil.saveSendSchedule({ day: 'Monday', time: '00:00', enabled: true });
+  await db.prepare('UPDATE newsletter_issues SET created_at = ? WHERE id = ?').run('2020-01-01 00:00:00', pendingId);
 
   const page = await request(app).get('/main-admin/newsletter').set('Cookie', admin.cookie);
+  const sent = await db.prepare('SELECT * FROM newsletter_issues WHERE id = ?').get(pendingId);
+  assert.equal(sent.status, 'sent');
+  assert.ok(sent.sent_at);
+
   const current = await db.prepare("SELECT * FROM newsletter_issues WHERE status IN ('draft', 'scheduled') ORDER BY created_at DESC, id DESC LIMIT 1").get();
-  assert.ok(current, 'a fresh draft should exist after the previous one was sent');
-  assert.notEqual(current.id, sentId);
+  assert.ok(current, 'a fresh draft should exist after the previous one went out');
+  assert.notEqual(current.id, pendingId);
   assert.match(page.text, new RegExp(`action="/main-admin/newsletter/${current.id}"`));
+
+  // Leave automatic sending off again so later tests in this file (which
+  // don't expect their own fresh drafts to go out mid-test) aren't
+  // affected by this one's schedule.
+  await newsletterUtil.saveSendSchedule({ day: 'Monday', time: '08:00', enabled: false });
 });
 
 test('deleting the current draft leaves a brand new one to edit next', async () => {
@@ -218,11 +256,15 @@ test('scheduling and unscheduling toggles status without losing the draft', asyn
   assert.equal(issue.scheduled_at, null);
 });
 
+// markSent() itself (utils/newsletter.js) is unchanged - there's just no
+// HTTP route left that calls it directly any more (see the schedule-
+// driven advanceIfDue test above and the "Send newsletter immediately"
+// one below, the two real callers left).
 test('marking sent records a real recipient snapshot and flips status', async () => {
   const admin = await loginAsMainAdmin();
   const { id } = await freshCurrentIssue(admin);
 
-  await request(app).post(`/main-admin/newsletter/${id}/send`).set('Cookie', admin.cookie).type('form').send({ _csrf: admin.csrfToken });
+  await newsletterUtil.markSent(id);
 
   const issue = await db.prepare('SELECT * FROM newsletter_issues WHERE id = ?').get(id);
   assert.equal(issue.status, 'sent');
@@ -347,16 +389,17 @@ test('the bottom Actions row has no per-issue Schedule button or dialog any more
 // delete should all be on the same row, mobile" - schedule dropped out
 // of this row by a later request (see test above); Save/Mark Sent/
 // Delete/View Newsletter stay together.
-test('Save/Mark Sent/Delete/View Newsletter all sit in one toolbar row', async () => {
+test('Save/Delete/View Newsletter all sit in one toolbar row', async () => {
   const admin = await loginAsMainAdmin();
   const { page } = await freshCurrentIssue(admin);
   const rowMatch = /<div class="roster-btn-row roster-btn-row-nowrap">([\s\S]*?)<\/div>/.exec(page.text);
   assert.ok(rowMatch, 'expected the actions toolbar row');
   const row = rowMatch[1];
   assert.match(row, /form="newsletter-edit-form" class="roster-action-btn">Save</);
-  assert.match(row, />Mark Sent</);
   assert.match(row, />Delete</);
   assert.match(row, />View Newsletter</);
+  // The old manual Mark Sent button is gone - sending is schedule-driven now.
+  assert.doesNotMatch(page.text, />Mark Sent</);
 });
 
 // A real request: "weekly schedule should also be an orange buttons and

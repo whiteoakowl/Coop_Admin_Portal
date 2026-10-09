@@ -40,15 +40,15 @@
               <p class="hint">No open positions yet.</p>
             <% } else { %>
               <div class="roster-scroll">
-                <table class="roster-table condensed-table committee-signup-table">
+                <table class="roster-table condensed-table committee-signup-table table-stack-mobile">
                   <thead><tr><th>Position</th><th>Volunteers</th><th></th></tr></thead>
                   <tbody>
                     <% committee.positions.forEach(function(position) { %>
                       <% var mySignups = position.signups.filter(function(s) { return familyIds.indexOf(s.member_id) !== -1; }); %>
                       <tr>
-                        <td class="roster-name-col"><%= position.position_name %><% if (position.slots_needed) { %> <span class="hint">(<%= position.signups.length %>/<%= position.slots_needed %>)</span><% } %></td>
-                        <td><%= position.signups.map(function(s) { return s.memberName; }).join(', ') || '—' %></td>
-                        <td>
+                        <td class="roster-name-col table-stack-heading"><%= position.position_name %><% if (position.slots_needed) { %> <span class="hint">(<%= position.signups.length %>/<%= position.slots_needed %>)</span><% } %></td>
+                        <td data-label="Volunteers"><%= position.signups.map(function(s) { return s.memberName; }).join(', ') || '—' %></td>
+                        <td class="table-stack-full">
                           <div class="roster-btn-row">
                             <% family.forEach(function(m) { %>
                               <% if (mySignups.some(function(s) { return s.member_id === m.id; })) { %>

@@ -80,6 +80,15 @@
           'scheduled' status from before this change can still be moved
           back to draft below, but nothing in this UI can schedule a new
           one that way any more. %>
+      <%# A real request: "the newsletter being sent out is controlled by
+          the newsletter schedule settings already built on the page" -
+          replaces the old manual "Mark Sent" button entirely. Whether
+          this issue is actually visible to members yet is now purely a
+          function of Edit Weekly Schedule's own day/time/enabled
+          settings (utils/newsletter.js's own advanceIfDue/
+          nextScheduledOccurrence), checked automatically on every visit
+          to this page or the member-facing archive - nothing to click
+          here any more. %>
       <div class="manage-section">
         <div class="grid-box-header"><h2>Actions</h2></div>
         <div class="roster-btn-row roster-btn-row-nowrap">
@@ -89,15 +98,19 @@
               <button type="submit" class="roster-action-btn">Move Back to Draft</button>
             </form>
           <% } %>
-          <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/send" class="inline-block-form">
-            <button type="submit" class="roster-action-btn" onclick="return confirm('Mark this issue sent? This records who it reached and can\'t be undone.')">Mark Sent</button>
-          </form>
           <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/delete" class="inline-block-form">
             <button type="submit" class="roster-action-btn roster-action-btn-danger" onclick="return confirm('Delete this draft?')">Delete</button>
           </form>
           <a class="roster-action-btn" href="/main-admin/newsletter/<%= issue.id %>/preview" target="_blank">View Newsletter</a>
         </div>
         <% if (issue.status === 'scheduled') { %><p class="hint">Scheduled for <%= issue.scheduled_at %>.</p><% } %>
+        <p class="hint">
+          <% if (schedule.enabled) { %>
+            Automatically goes out to members every <%= schedule.day %> at <%= schedule.time %> - see Edit Weekly Schedule below.
+          <% } else { %>
+            Automatic sending is turned off - turn it on under Edit Weekly Schedule below, or use its "Send newsletter immediately" option.
+          <% } %>
+        </p>
       </div>
 
       <%# Edit Weekly Schedule - moved here from the old list page's own
@@ -106,9 +119,9 @@
         <form method="POST" action="/main-admin/newsletter/settings">
           <h3>Edit Weekly Schedule</h3>
           <p class="hint">
-            Controls when the newsletter would go out automatically once a real email provider is connected - no email
-            provider is configured yet, so nothing sends automatically regardless of this setting. The current
-            newsletter can still be marked sent manually below.
+            There's no real email provider connected (see the Notification Center for the in-app substitute every
+            member gets instead), but the current newsletter still becomes visible to members right on this schedule -
+            automatically, the moment the day/time below arrives, once "Send automatically every week" is checked.
           </p>
           <label class="checkbox-option">
             <input type="checkbox" name="enabled" value="1" <%= schedule.enabled ? 'checked' : '' %> />

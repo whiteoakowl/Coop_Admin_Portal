@@ -10,7 +10,9 @@ const db = require('../db');
 const { sanitizePostBody } = require('./sanitizeHtml');
 const notifications = require('./notifications');
 const { listActiveClassDays, classesWithOpenStaffSlotsForDay } = require('./classSchedule');
+const { appSetting, setAppSetting } = require('./appSettings');
 const { getActiveKioskSemesterId } = require('./kioskSettings');
+const { addDays, weekdayOf, easternISODateOf, easternInputToUtcText } = require('./dates');
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -121,6 +123,67 @@ async function listIssues() {
   return db.prepare('SELECT * FROM newsletter_issues ORDER BY created_at DESC').all();
 }
 
+// A real request: "the newsletter being sent out is controlled by the
+// newsletter schedule settings already built on the page" - replaces the
+// old manual "Mark Sent" button. day/time/enabled stored in app_settings,
+// same single-row-of-scalars convention routes/admin-newsletter.js's own
+// class day/room settings already use.
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const SEND_DAY_KEY = 'newsletter_send_day';
+const SEND_TIME_KEY = 'newsletter_send_time';
+const SEND_ENABLED_KEY = 'newsletter_send_enabled';
+
+async function loadSendSchedule() {
+  return {
+    day: await appSetting(SEND_DAY_KEY, 'Monday'),
+    time: await appSetting(SEND_TIME_KEY, '08:00'),
+    enabled: (await appSetting(SEND_ENABLED_KEY, '0')) === '1',
+  };
+}
+
+async function saveSendSchedule({ day, time, enabled }) {
+  await setAppSetting(SEND_DAY_KEY, WEEKDAYS.includes(day) ? day : 'Monday');
+  await setAppSetting(SEND_TIME_KEY, /^([01]\d|2[0-3]):[0-5]\d$/.test(time || '') ? time : '08:00');
+  await setAppSetting(SEND_ENABLED_KEY, enabled ? '1' : '0');
+}
+
+function parseUtcText(text) {
+  return new Date(`${text.replace(' ', 'T')}Z`);
+}
+
+// The next real UTC instant, on or after `sinceUtcText`, that schedule.
+// day/schedule.time (an Eastern wall-clock day-of-week + time, same as
+// every other admin-facing day/time setting in this app) next falls on -
+// pure compute-on-read, same philosophy as utils/wordOfWeek.js's own
+// header comment ("no cron job to advance it"). Reuses dates.js's own
+// easternInputToUtcText (built for exactly this "Eastern local date/time
+// -> real UTC instant" conversion, including DST) instead of re-deriving
+// an Eastern offset here.
+function nextScheduledOccurrence(sinceUtcText, schedule) {
+  const since = parseUtcText(sinceUtcText);
+  let isoDate = easternISODateOf(since);
+  const diff = (WEEKDAYS.indexOf(schedule.day) - weekdayOf(isoDate) + 7) % 7;
+  isoDate = addDays(isoDate, diff);
+  let occursAt = parseUtcText(easternInputToUtcText(`${isoDate}T${schedule.time}`));
+  if (occursAt < since) occursAt = parseUtcText(easternInputToUtcText(`${addDays(isoDate, 7)}T${schedule.time}`));
+  return occursAt;
+}
+
+// Checked on every admin and member-facing newsletter page load (both
+// routers call this before reading anything) rather than on a timer -
+// the moment anyone visits after the scheduled day/time has passed, the
+// current issue goes out (markSent's own real notifications fire) and
+// the next visit to the admin editor finds nothing unsent, so
+// currentIssue() there auto-creates a fresh draft for the new cycle.
+// A no-op whenever automatic sending is off or there's nothing pending.
+async function advanceIfDue() {
+  const schedule = await loadSendSchedule();
+  if (!schedule.enabled) return;
+  const issue = await mostRecentUnsentIssue();
+  if (!issue) return;
+  if (new Date() >= nextScheduledOccurrence(issue.created_at, schedule)) await markSent(issue.id);
+}
+
 // A real request: "check box under send automatically every week for
 // send newsletter immediately for a quick one time send out off
 // schedule." There's no issue selected on the schedule page itself, so
@@ -187,4 +250,9 @@ module.exports = {
   unschedule,
   markSent,
   deleteIssue,
+  WEEKDAYS,
+  loadSendSchedule,
+  saveSendSchedule,
+  advanceIfDue,
+  nextScheduledOccurrence,
 };
