@@ -40,7 +40,7 @@
     <% } else { %>
       <form method="POST" action="/teacher/assignments/<%= assignment.id %>/grades">
         <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
+          <table class="roster-table members-table condensed-table table-stack-mobile">
             <thead>
               <tr>
                 <th>Student</th>
@@ -51,11 +51,11 @@
             <tbody>
               <% rows.forEach(function(r) { %>
                 <tr>
-                  <td class="roster-name-col"><%= r.student_name %></td>
-                  <td>
+                  <td class="roster-name-col table-stack-heading"><%= r.student_name %></td>
+                  <td data-label="Points Earned">
                     <input type="number" name="points_<%= r.student_id %>" min="0" step="0.5" value="<%= r.points_earned != null ? r.points_earned : '' %>" style="width: 6rem;" />
                   </td>
-                  <td>
+                  <td data-label="Feedback">
                     <input type="text" name="feedback_<%= r.student_id %>" value="<%= r.feedback || '' %>" />
                   </td>
                 </tr>

@@ -3318,6 +3318,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      .roster-scroll wrapper around it shouldn't still reserve a
      horizontal scrollbar/track. */
   .roster-scroll:has(> .table-stack-mobile) { overflow-x: visible; border: none; background: none; }
+  /* A real request: "list of members with grade box and feedback shrink
+     to fit on mobile the whole table" (the Grades table on a lesson's
+     own edit page) - Feedback's free-text input otherwise keeps its own
+     intrinsic width (a handful of characters) instead of using the room
+     next to its label, same as any plain <input> in a flex row. Scoped
+     to text inputs only - Points Earned's own number input already has
+     a deliberately narrow inline width (set on the input itself) and a
+     flex item's default flex-grow: 0 already leaves that alone. */
+  .table-stack-mobile td input[type="text"] { flex: 1 1 auto; min-width: 0; }
 }
 
 /* The "Add/Edit Semester" list's own rename row (partials/semester-
@@ -12678,13 +12687,23 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    bold text while staying a real, focusable, keyboard-operable button. */
 .content-item-title-trigger { background: none; border: none; padding: 0; font: inherit; font-weight: inherit; color: inherit; text-align: left; cursor: pointer; }
 .content-item-title-trigger:hover { text-decoration: underline; }
+/* A real request: "manage questions button falls off the page on
+   mobile... Type of Assignment: Quiz or Type of Assignment: Upload
+   should be on the same row as the icons edit and trash. Shrink text to
+   fit." The earlier fix forced this row flex-wrap: nowrap (to beat the
+   same roster-btn-row-grid.js column-counting bug .photo-album-card-icons
+   has its own comment on, below) - nowrap is exactly what let Manage
+   Questions/Review Submissions run off the right edge of a phone screen
+   instead of wrapping. flex-wrap: wrap fixes both: still a real row (not
+   the grid bug's stacked column) and no longer forced onto one
+   unbreakable line. */
+.content-item-row-icons { flex-wrap: wrap; align-items: center; row-gap: 0.4rem; }
+.content-item-type-label { font-weight: 600; color: var(--muted); font-size: 0.85rem; }
+.content-item-row-icons .content-item-manage-link { flex: 0 1 auto; min-width: 0; white-space: normal; }
 @media (max-width: 640px) {
-  /* Same bug class as .photo-album-card-icons's own comment just above -
-     this row's real children are .icon-btn buttons/forms, not
-     .roster-action-btn/.btn-secondary, so roster-btn-row-grid.js never
-     sets a column count and the icons would stack into a column instead
-     of staying "in a row." */
-  .content-item-row-icons { display: flex; flex-wrap: nowrap; justify-content: flex-end; }
+  .content-item-row-icons { display: flex; flex-wrap: wrap; justify-content: flex-start; row-gap: 0.4rem; }
+  .content-item-type-label { font-size: 0.72rem; }
+  .content-item-row-icons .content-item-manage-link { font-size: 0.72rem; padding: 0.35rem 0.5rem; }
 }
 
 /* Parent Portal Accounting (views/accounting-home.ejs) - a real request:

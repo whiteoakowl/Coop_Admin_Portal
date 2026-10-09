@@ -49,16 +49,27 @@
         change from its own separate Manage Questions page. table-stack-
         mobile (same pattern as every other "no side to side scroll"
         table in this app) replaces the plain .roster-scroll fallback. %>
+    <%
+      // A real request: "on each assignment card while editing the
+      // class, the title and description should be at the top. Type of
+      // Assignment: Quiz or Type of Assignment: Upload should be on the
+      // same row as the icons edit and trash." Readable labels for the
+      // "Type of Assignment:" line - item.type's own raw DB value
+      // ('assignment_upload') isn't something to show an admin as-is.
+      var CONTENT_TYPE_LABELS = {
+        video: 'Video', text: 'Text', file: 'File', quiz: 'Quiz',
+        assignment_upload: 'Upload', assignment_submission: 'Submission',
+      };
+    %>
     <div class="roster-scroll">
       <table class="roster-table members-table condensed-table table-stack-mobile">
         <thead>
-          <tr><th></th><th>Type</th><th>Content</th><th></th></tr>
+          <tr><th></th><th>Content</th><th></th></tr>
         </thead>
         <tbody data-content-reorder-tbody data-assignment-id="<%= assignment.id %>" data-reorder-url="<%= basePath %>/assignments/<%= assignment.id %>/content/reorder">
           <% contentItems.forEach(function(item) { %>
             <tr data-content-reorder-row="<%= item.id %>">
               <td class="roster-drag-col"><span data-content-reorder-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span></td>
-              <td data-label="Type"><span class="status-badge status-badge-active"><%= item.type %></span></td>
               <td class="roster-name-col table-stack-heading">
                 <button type="button" class="link-btn content-item-title-trigger" onclick="document.getElementById('edit-content-dialog-<%= item.id %>').showModal()"><%= item.title || '(untitled)' %></button>
                 <%# A real request: "the text is formatted row wise should
@@ -82,12 +93,19 @@
                 <% } %>
               </td>
               <td data-label="" class="table-stack-full">
+                <%# Manage Questions/Review Submissions used to sit in this
+                    same nowrap row as the icons and the type label, and
+                    ran the whole row off the right edge of the screen on
+                    mobile - flex-wrap (below) plus letting it size to its
+                    own text instead of .roster-action-btn's usual
+                    min-width fixes that. %>
                 <div class="roster-btn-row content-item-row-icons">
+                  <span class="content-item-type-label">Type of Assignment: <%= CONTENT_TYPE_LABELS[item.type] || item.type %></span>
                   <% if (item.type === 'quiz') { %>
-                    <a class="roster-action-btn" href="<%= basePath %>/content/<%= item.id %>/questions">Manage Questions</a>
+                    <a class="roster-action-btn content-item-manage-link" href="<%= basePath %>/content/<%= item.id %>/questions">Manage Questions</a>
                   <% } %>
                   <% if (item.type === 'assignment_submission') { %>
-                    <a class="roster-action-btn" href="<%= basePath %>/content/<%= item.id %>/submissions">Review Submissions</a>
+                    <a class="roster-action-btn content-item-manage-link" href="<%= basePath %>/content/<%= item.id %>/submissions">Review Submissions</a>
                   <% } %>
                   <button type="button" class="icon-btn" onclick="document.getElementById('edit-content-dialog-<%= item.id %>').showModal()" aria-label="Edit <%= item.title || 'assignment' %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
                   <form method="POST" action="<%= basePath %>/content/<%= item.id %>/delete" onsubmit="return confirm('Remove this assignment?');" class="inline-block-form">
