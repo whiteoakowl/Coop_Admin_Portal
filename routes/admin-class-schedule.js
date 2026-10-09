@@ -677,6 +677,50 @@ router.post('/class-schedule/assignments/:id/content', requireFullAdmin, uploadL
   res.redirect(back + '?notice=' + encodeURIComponent('Assignment added.'));
 });
 
+// A real bug report: "edit lesson, there should be an edit and trash
+// icon on all assignments... I have zero way of managing the quizzes or
+// any other created assignments" - updateContentItem already existed
+// (imported, unused) but nothing ever called it, so a content item's own
+// fields could only be set once, at creation. Same per-type field shape
+// as the Add Assignments form above; a quiz's own questions still only
+// ever change from its separate Manage Questions page (content/:id/
+// questions below) - this is for the item's own title/body/url/due date/
+// points, not its questions. Replacing the file is optional - leaving the
+// input blank keeps whatever attachment is already there.
+router.post('/class-schedule/content/:id/edit', requireFullAdmin, uploadLessonAttachment, async (req, res) => {
+  const contentItem = await getContentItem(parseInt(req.params.id, 10));
+  if (!contentItem) return res.status(404).send('Not found');
+  const back = `/admin/class-schedule/assignments/${contentItem.assignment_id}`;
+  const type = contentItem.type;
+
+  let attachmentUrl = contentItem.attachment_url;
+  let attachmentName = contentItem.attachment_name;
+  if (type === 'assignment_upload' && req.file) {
+    attachmentUrl = await saveLessonAttachment(req.file);
+    attachmentName = req.file.originalname;
+  }
+
+  await updateContentItem(contentItem.id, {
+    title: (req.body.title || '').trim(),
+    videoUrl: type === 'video' ? (req.body.videoUrl || '').trim() : contentItem.video_url,
+    body:
+      type === 'text'
+        ? sanitizePostBody(req.body.body || '')
+        : type === 'assignment_upload'
+        ? sanitizePostBody(req.body.assignmentBody || '')
+        : type === 'assignment_submission'
+        ? sanitizePostBody(req.body.submissionBody || '')
+        : contentItem.body,
+    fileUrl: type === 'file' ? (req.body.fileUrl || '').trim() : contentItem.file_url,
+    description: type === 'video' ? (req.body.description || '').trim() : type === 'file' ? (req.body.fileDescription || '').trim() : contentItem.description,
+    attachmentUrl,
+    attachmentName,
+    pointsPossible: type === 'assignment_submission' && req.body.submissionPointsPossible ? parseInt(req.body.submissionPointsPossible, 10) : null,
+    dueDate: (req.body.contentDueDate || '').trim() || null,
+  });
+  res.redirect(back + '?notice=' + encodeURIComponent('Assignment updated.'));
+});
+
 router.post('/class-schedule/content/:id/delete', requireFullAdmin, async (req, res) => {
   const contentItem = await getContentItem(parseInt(req.params.id, 10));
   if (!contentItem) return res.status(404).send('Not found');

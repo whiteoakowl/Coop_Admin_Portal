@@ -2675,12 +2675,27 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
    grid's own rule cleanly. Events' General Settings and per-event
    Settings tab (admin-events-list.ejs/admin-events-builder.ejs) are the
    two places this combination is actually used. */
+/* A real request: "settings subpage, checkboxes start on the first row
+   next to each question, lined up perfectly with the first letter of
+   each question." align-items: center (right above) is fine for a short
+   one-line question, but several of these questions are full sentences
+   that wrap to 2-3 lines on a narrower screen - centering then lands the
+   checkbox next to the MIDDLE line instead of the first, same bug class
+   already fixed for .class-settings-form's own checkbox-option (see that
+   rule's comment above). flex-start plus a small top nudge (to match the
+   question text's own line-height rather than sitting glued to its very
+   top) keeps a one-line question looking exactly as before while fixing
+   the wrapped case. */
 .member-form-grid label.checkbox-option {
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   font-weight: 500;
   font-size: 0.95rem;
   color: inherit;
+}
+.member-form-grid label.checkbox-option input[type="checkbox"],
+.member-form-grid label.checkbox-option input[type="radio"] {
+  margin-top: 0.2rem;
 }
 .member-form-grid input,
 .member-form-grid select,
@@ -12652,6 +12667,24 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
      links/buttons, so it would stack them in a column instead of
      keeping them "in a row, not column, next to each other." */
   .photo-album-card-icons { display: flex; flex-wrap: nowrap; justify-content: flex-end; }
+}
+
+/* Lesson content items (views/partials/lesson-content-manage.ejs) - a real
+   bug report: "there should be an edit and trash icon on all assignments.
+   Should be able to click on the assignments." The clickable title is a
+   plain .link-btn (site-wide small blue-link styling) by default, which
+   read as a stray link instead of the row's own bold heading text it
+   used to be before this became a button - reset to look like ordinary
+   bold text while staying a real, focusable, keyboard-operable button. */
+.content-item-title-trigger { background: none; border: none; padding: 0; font: inherit; font-weight: inherit; color: inherit; text-align: left; cursor: pointer; }
+.content-item-title-trigger:hover { text-decoration: underline; }
+@media (max-width: 640px) {
+  /* Same bug class as .photo-album-card-icons's own comment just above -
+     this row's real children are .icon-btn buttons/forms, not
+     .roster-action-btn/.btn-secondary, so roster-btn-row-grid.js never
+     sets a column count and the icons would stack into a column instead
+     of staying "in a row." */
+  .content-item-row-icons { display: flex; flex-wrap: nowrap; justify-content: flex-end; }
 }
 
 /* Parent Portal Accounting (views/accounting-home.ejs) - a real request:

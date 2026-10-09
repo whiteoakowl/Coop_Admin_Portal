@@ -556,6 +556,118 @@ async function createEvent(data, accountId, { submittedByAccountId = null, statu
   return info.lastInsertRowid;
 }
 
+// A real request: "editing event, at the bottom there should be a
+// duplicate event button next to save." Same "copy every detail/setting,
+// never the registrations/attendance" shape as the existing Class
+// duplicate feature (routes/admin-class-schedule.js's own POST .../
+// duplicate) - copies the core event row (Details/Finance/Settings),
+// Sections, Organizers, Ticket Types, Extra Fields, Volunteer Roles,
+// Donation Items, and Food Items onto a brand new draft event.
+// Registrations, guest registrations, waitlist entries, and attendance
+// are never copied - a duplicate is a fresh, empty offering, same
+// reasoning the class duplicate's own comment gives for never copying
+// enrollment. The image_key is reused as-is rather than re-uploaded -
+// deleteEvent never removes the underlying storage file (see its own
+// comment just below), so two events safely sharing one image key is
+// never a dangling reference.
+async function duplicateEvent(id, accountId) {
+  const event = await getEventWithDetails(id);
+  if (!event) return null;
+
+  const newId = await createEvent(
+    {
+      title: `${event.title} (Copy)`,
+      description: event.description,
+      category: event.category,
+      categoryId: event.category_id,
+      location: event.location,
+      locationId: event.location_id,
+      startsAt: event.starts_at,
+      endsAt: event.ends_at,
+      visibility: event.visibility,
+      capacity: event.capacity,
+      familyCapacity: event.family_capacity,
+      ageGroup: event.age_group,
+      registrationOpensAt: event.registration_opens_at,
+      registrationClosesAt: event.registration_closes_at,
+      allowAdultRegister: !!event.allow_adult_register,
+      allowChildRegister: !!event.allow_child_register,
+      allowGuestRegister: !!event.allow_guest_register,
+      priceCents: event.price_cents,
+      pricePer: event.price_per,
+      // slug deliberately left blank - the original's own slug (or its
+      // auto-derived-from-title fallback) can't be reused by a second
+      // event without colliding on the public URL.
+      slug: null,
+      eventType: event.event_type,
+      shortDescription: event.short_description,
+      language: event.language,
+      organizedBy: event.organized_by,
+      tags: event.tags,
+      volunteersEnabled: !!event.volunteers_enabled,
+      donationsEnabled: !!event.donations_enabled,
+      foodEnabled: !!event.food_enabled,
+      volunteerSelectionCount: event.volunteer_selection_count,
+      donationSelectionCount: event.donation_selection_count,
+      foodSelectionCount: event.food_selection_count,
+      volunteerRequirementScope: event.volunteer_requirement_scope,
+      donationRequirementScope: event.donation_requirement_scope,
+      foodRequirementScope: event.food_requirement_scope,
+      isClosed: !!event.is_closed,
+      allowRegistrationCancellations: !!event.allow_registration_cancellations,
+      allowRefundOnCancel: !!event.allow_refund_on_cancel,
+      showRegistrantsToMembers: !!event.show_registrants_to_members,
+      trackParticipantsOnly: !!event.track_participants_only,
+      lockRegistrationToGrade: !!event.lock_registration_to_grade,
+      lockRegistrationToAge: !!event.lock_registration_to_age,
+      ageGroupRestriction: event.age_group_restriction,
+      lockRegistrationToSection: !!event.lock_registration_to_section,
+      registrationSectionId: event.registration_section_id,
+      lockVisibilityToSection: !!event.lock_visibility_to_section,
+      visibilitySectionId: event.visibility_section_id,
+      accountingCategoryId: event.accounting_category_id,
+      allowWaitlistSignups: !!event.allow_waitlist_signups,
+      allowSignupForOthersInGroup: !!event.allow_signup_for_others_in_group,
+      paymentInstructionsTitle: event.payment_instructions_title,
+      paymentInstructionsText: event.payment_instructions_text,
+      activityInfo: event.activity_info,
+      includeActivityInfo: !!event.include_activity_info,
+      meetupParkingInfo: event.meetup_parking_info,
+      includeMeetupParkingInfo: !!event.include_meetup_parking_info,
+      whatToBring: event.what_to_bring,
+      includeWhatToBring: !!event.include_what_to_bring,
+      extraNotes: event.extra_notes,
+      includeExtraNotes: !!event.include_extra_notes,
+    },
+    accountId,
+    { status: 'draft' }
+  );
+
+  if (event.image_key) await setEventImage(newId, event.image_key);
+  await setEventSections(newId, event.sectionIds);
+  await setEventOrganizers(
+    newId,
+    (await organizersForEvent(id)).map((o) => (o.memberId ? `member:${o.memberId}` : 'org'))
+  );
+  for (const t of event.ticketTypes) {
+    await addTicketType(newId, t.title, t.price_cents, t.price_per, !!t.includes_physical_ticket);
+  }
+  for (const f of event.extraFields) {
+    await addExtraField(newId, { label: f.label, fieldType: f.field_type, options: f.options, required: !!f.required, scope: f.scope });
+  }
+  for (const r of event.volunteerRoles) {
+    await addVolunteerRole(newId, { roleName: r.role_name, slotsNeeded: r.slots_needed, timeLabel: r.time_label, location: r.location, description: r.description });
+  }
+  for (const d of event.donationItems) {
+    await addDonationItem(newId, { itemName: d.item_name, quantityNeeded: d.quantity_needed, deadline: d.deadline, notes: d.notes });
+  }
+  for (const fo of event.foodItems) {
+    await addFoodItem(newId, { itemName: fo.item_name, quantityNeeded: fo.quantity_needed, deadline: fo.deadline, notes: fo.notes });
+  }
+
+  return newId;
+}
+
 async function updateEvent(id, data) {
   await db
     .prepare(
@@ -1888,6 +2000,7 @@ module.exports = {
   registrationCountForEvent,
   getEventWithDetails,
   createEvent,
+  duplicateEvent,
   updateEvent,
   updateEventQuickFields,
   setEventSections,

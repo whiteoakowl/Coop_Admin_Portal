@@ -70,5 +70,9 @@
     <% } %>
     </div>
   </main>
+  <%# Same fix as views/admin-class-assignment-gradebook.ejs's own - this
+      page never loaded forum-editor.js either, so an Assignment Upload/
+      Assignment Submission's rich-text body got wiped to blank on save. %>
+  <script src="/js/forum-editor.js"></script>
 </body>
 </html>

@@ -35,18 +35,32 @@
   <% if (contentItems.length === 0) { %>
     <p class="roster-empty">No assignments added yet.</p>
   <% } else { %>
+    <%# A real bug report: "there should be an edit and trash icon on all
+        assignments. Should be able to click on the assignments... I have
+        zero way of managing the quizzes or any other created
+        assignments" - updateContentItem (utils/academics.js) already
+        existed but no route ever called it, so a content item's own
+        title/url/body/due date/points could only be set once, at
+        creation. Clicking the title (same .training-lesson-row
+        convention admin-events-builder.ejs's own ticket-type-row/extra-
+        field-row already use) opens the same per-item edit dialog the
+        new Edit icon does - two ways into the one dialog, not two
+        separate features - and a quiz's own questions still only ever
+        change from its own separate Manage Questions page. table-stack-
+        mobile (same pattern as every other "no side to side scroll"
+        table in this app) replaces the plain .roster-scroll fallback. %>
     <div class="roster-scroll">
-      <table class="roster-table members-table condensed-table">
+      <table class="roster-table members-table condensed-table table-stack-mobile">
         <thead>
-          <tr><th></th><th>Type</th><th>Content</th><th></th><th></th></tr>
+          <tr><th></th><th>Type</th><th>Content</th><th></th></tr>
         </thead>
         <tbody data-content-reorder-tbody data-assignment-id="<%= assignment.id %>" data-reorder-url="<%= basePath %>/assignments/<%= assignment.id %>/content/reorder">
           <% contentItems.forEach(function(item) { %>
             <tr data-content-reorder-row="<%= item.id %>">
               <td class="roster-drag-col"><span data-content-reorder-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span></td>
-              <td><span class="status-badge status-badge-active"><%= item.type %></span></td>
-              <td class="roster-name-col">
-                <%= item.title || '(untitled)' %>
+              <td data-label="Type"><span class="status-badge status-badge-active"><%= item.type %></span></td>
+              <td class="roster-name-col table-stack-heading">
+                <button type="button" class="link-btn content-item-title-trigger" onclick="document.getElementById('edit-content-dialog-<%= item.id %>').showModal()"><%= item.title || '(untitled)' %></button>
                 <%# A real request: "the text is formatted row wise should
                     be how it is displayed for parent/student portal
                     view" - that view's own Lessons tab already shows
@@ -67,24 +81,90 @@
                   <div class="hint"><% if (item.points_possible != null) { %><%= item.points_possible %> points<% } %></div>
                 <% } %>
               </td>
-              <td>
-                <% if (item.type === 'quiz') { %>
-                  <a class="roster-action-btn" href="<%= basePath %>/content/<%= item.id %>/questions">Manage Questions</a>
-                <% } %>
-                <% if (item.type === 'assignment_submission') { %>
-                  <a class="roster-action-btn" href="<%= basePath %>/content/<%= item.id %>/submissions">Review Submissions</a>
-                <% } %>
-              </td>
-              <td>
-                <form method="POST" action="<%= basePath %>/content/<%= item.id %>/delete" onsubmit="return confirm('Remove this assignment?');">
-                  <button type="submit" class="btn-secondary">Delete</button>
-                </form>
+              <td data-label="" class="table-stack-full">
+                <div class="roster-btn-row content-item-row-icons">
+                  <% if (item.type === 'quiz') { %>
+                    <a class="roster-action-btn" href="<%= basePath %>/content/<%= item.id %>/questions">Manage Questions</a>
+                  <% } %>
+                  <% if (item.type === 'assignment_submission') { %>
+                    <a class="roster-action-btn" href="<%= basePath %>/content/<%= item.id %>/submissions">Review Submissions</a>
+                  <% } %>
+                  <button type="button" class="icon-btn" onclick="document.getElementById('edit-content-dialog-<%= item.id %>').showModal()" aria-label="Edit <%= item.title || 'assignment' %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
+                  <form method="POST" action="<%= basePath %>/content/<%= item.id %>/delete" onsubmit="return confirm('Remove this assignment?');" class="inline-block-form">
+                    <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= item.title || 'assignment' %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                  </form>
+                </div>
               </td>
             </tr>
           <% }); %>
         </tbody>
       </table>
     </div>
+    <%# Dialogs live outside the <table> entirely (not as a stray extra
+        child of <tbody>/<tr>, which the HTML parser would just hoist out
+        on its own anyway, landing the dialog somewhere unpredictable and
+        breaking any :scope-based CSS/JS relying on real table structure -
+        same bug class this codebase's own comments call out elsewhere
+        for stray nested elements inside a table). %>
+    <% contentItems.forEach(function(item) { %>
+      <dialog id="edit-content-dialog-<%= item.id %>" class="member-picker-dialog dialog-label-stack">
+        <form method="POST" action="<%= basePath %>/content/<%= item.id %>/edit" enctype="multipart/form-data">
+          <h3>Edit Assignment</h3>
+          <label>Title
+            <input type="text" name="title" value="<%= item.title || '' %>" />
+          </label>
+          <label>Due Date <span class="hint">(optional)</span>
+            <input type="date" name="contentDueDate" value="<%= item.due_date || '' %>" />
+          </label>
+          <% if (item.type === 'video') { %>
+            <label>Video URL
+              <input type="url" name="videoUrl" value="<%= item.video_url || '' %>" placeholder="https://..." />
+            </label>
+            <label>Description
+              <textarea name="description" rows="2"><%= item.description || '' %></textarea>
+            </label>
+          <% } else if (item.type === 'text') { %>
+            <label>Description
+              <textarea name="body" rows="3"><%= item.body || '' %></textarea>
+            </label>
+          <% } else if (item.type === 'file') { %>
+            <label>File URL
+              <input type="url" name="fileUrl" value="<%= item.file_url || '' %>" placeholder="https://..." />
+            </label>
+            <label>Description
+              <textarea name="fileDescription" rows="2"><%= item.description || '' %></textarea>
+            </label>
+          <% } else if (item.type === 'quiz') { %>
+            <p class="hint">A quiz's own questions are edited from its "Manage Questions" link, not here.</p>
+          <% } else if (item.type === 'assignment_upload') { %>
+            <div data-forum-editor>
+              <label>Assignment Text</label>
+              <%- include('forum-editor-toolbar') %>
+              <div class="forum-editable" data-forum-editable contenteditable="true"><%- item.body || '' %></div>
+              <input type="hidden" name="assignmentBody" data-forum-body-input />
+            </div>
+            <% if (item.attachmentUrl) { %><p class="hint">Current file: <a href="<%= item.attachmentUrl %>" target="_blank" rel="noopener"><%= item.attachment_name || 'Attachment' %></a></p><% } %>
+            <label>Replace File <span class="hint">(optional - leave blank to keep the current one)</span>
+              <input type="file" name="attachment" accept=".doc,.docx,.pdf,.jpg,.jpeg,.png,.gif,.webp" />
+            </label>
+          <% } else if (item.type === 'assignment_submission') { %>
+            <div data-forum-editor>
+              <label>Description</label>
+              <%- include('forum-editor-toolbar') %>
+              <div class="forum-editable" data-forum-editable contenteditable="true"><%- item.body || '' %></div>
+              <input type="hidden" name="submissionBody" data-forum-body-input />
+            </div>
+            <label>Points Possible
+              <input type="number" name="submissionPointsPossible" min="0" value="<%= item.points_possible != null ? item.points_possible : '' %>" />
+            </label>
+          <% } %>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Save Changes</button>
+          </div>
+        </form>
+      </dialog>
+    <% }); %>
   <% } %>
 
   <div class="portal-dashboard-card portal-dashboard-card-wide">

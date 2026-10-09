@@ -297,8 +297,23 @@
             guard.js's own dirty-tracking listens on the <form> element
             itself, not this button, so it isn't affected by the button
             no longer being a DOM descendant. %>
-        <div class="member-form-full">
+        <%# A real request: "editing event, at the bottom there should be a
+            duplicate event button next to save. Same row. Shrink to fit
+            nicely next to each other" - same .class-details-save-row
+            pattern already used for Class edit's own Save Changes +
+            Duplicate Class row (task #313). Duplicate Event is a plain
+            form POST (no dialog to ask anything first, unlike Duplicate
+            Class's teacher-copy/target-combo questions - an event has no
+            such choice to make), so it's a sibling form's submit button
+            right here rather than its own dialog-opener. Main-Admin-only,
+            same as Delete/Cancel in the toolbar above. %>
+        <div class="member-form-full class-details-save-row">
           <button type="submit" form="details-form" class="primary-btn primary-btn-dark">Save Event Details</button>
+          <% if (!organizerView) { %>
+            <form method="POST" action="/main-admin/events/<%= event.id %>/duplicate" class="inline-block-form">
+              <button type="submit" class="roster-action-btn">Duplicate Event</button>
+            </form>
+          <% } %>
         </div>
       </div>
     <% } else if (activeTab === 'finance') { %>

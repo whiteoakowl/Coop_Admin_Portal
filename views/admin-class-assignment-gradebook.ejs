@@ -58,5 +58,14 @@
     <% } %>
     </div>
   </main>
+  <%# A real bug report: editing or adding an Assignment Upload/Assignment
+      Submission's own rich-text body wiped it to blank on save - this
+      page never loaded forum-editor.js (public/js/forum-editor.js), the
+      script that syncs the contenteditable div into the hidden input a
+      form submit actually reads; views/partials/lesson-content-manage.ejs's
+      own Add/Edit Assignments forms rely on it exactly like every other
+      rich-text field in the app (chat posts, announcements, event
+      descriptions, ...) already does. %>
+  <script src="/js/forum-editor.js"></script>
 </body>
 </html>

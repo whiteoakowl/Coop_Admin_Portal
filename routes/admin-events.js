@@ -166,6 +166,19 @@ function wizardFieldsFromBody(body) {
     // `tags` fields from the wizard's own chip input (public/js/tag-
     // input.js), one per chip, same shape a checkbox-grid submits.
     tags: [].concat(body.tags || []).map((t) => t.trim()).filter(Boolean).join(', '),
+    // A real request: "New event creation. Add the activity information,
+    // Meet-up and parking information, what to bring and extra notes" -
+    // same 4 optional sections the builder's own Details tab already
+    // saves (see the POST /:id/details route below), now also settable at
+    // creation time instead of only after the draft exists.
+    activityInfo: (body.activityInfo || '').trim(),
+    includeActivityInfo: body.includeActivityInfo === '1',
+    meetupParkingInfo: (body.meetupParkingInfo || '').trim(),
+    includeMeetupParkingInfo: body.includeMeetupParkingInfo === '1',
+    whatToBring: (body.whatToBring || '').trim(),
+    includeWhatToBring: body.includeWhatToBring === '1',
+    extraNotes: (body.extraNotes || '').trim(),
+    includeExtraNotes: body.includeExtraNotes === '1',
   };
 }
 
@@ -928,6 +941,16 @@ router.post('/:id/delete', async (req, res) => {
   await events.deleteEvent(req.params.id);
   await auditLog.record(req.portalAccount.id, 'event_deleted', 'event', req.params.id, event?.title);
   res.redirect('/main-admin/events?notice=' + encodeURIComponent('Event deleted.'));
+});
+
+// A real request: "editing event, at the bottom there should be a
+// duplicate event button next to save." See utils/events.js's own
+// duplicateEvent for exactly what gets copied - lands straight on the new
+// draft's own builder page, same as a brand-new Create Draft would.
+router.post('/:id/duplicate', async (req, res) => {
+  const newId = await events.duplicateEvent(req.params.id, req.portalAccount.id);
+  if (!newId) return res.status(404).render('404', { title: 'Not Found' });
+  res.redirect(`/main-admin/events/${newId}/builder?notice=` + encodeURIComponent('Event duplicated as a new draft.'));
 });
 
 router.post('/:id/image', uploadEventImage((req) => `/main-admin/events/${req.params.id}/builder`), async (req, res) => {

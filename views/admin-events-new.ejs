@@ -150,6 +150,28 @@
             whatever a future admin-facing attach flow looks like) are
             managed from now on, same as every other section. %>
 
+        <%# A real request: "New event creation. Add the activity
+            information, Meet-up and parking information, what to bring
+            and extra notes." Same 4 optional sections + "Include this
+            section?" checkbox the builder's own Details tab already has
+            (see admin-events-builder.ejs's own infoSections loop) - the
+            names match exactly so wizardFieldsFromBody in routes/admin-
+            events.js reads them the same way either page submits them. %>
+        <% [
+          { key: 'activityInfo', label: 'Activity Information' },
+          { key: 'meetupParkingInfo', label: 'Meetup and Parking Information' },
+          { key: 'whatToBring', label: 'What to Bring' },
+          { key: 'extraNotes', label: 'Extra Notes' },
+        ].forEach(function(section) { %>
+          <div class="member-form-full">
+            <label class="checkbox-option event-info-section-checkbox">
+              <input type="checkbox" name="include<%= section.key.charAt(0).toUpperCase() + section.key.slice(1) %>" value="1" />
+              <span><%= section.label %> <span class="hint">&mdash; Include this section?</span></span>
+            </label>
+            <textarea name="<%= section.key %>" rows="3"></textarea>
+          </div>
+        <% }); %>
+
         <h3 class="event-wizard-subheading">Event Image</h3>
         <label class="member-form-full">Choose an Image <span class="hint">(optional)</span>
           <input type="file" name="image" accept="image/*" />

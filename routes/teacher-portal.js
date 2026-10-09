@@ -23,6 +23,7 @@ const {
   contentItemsForAssignment,
   getContentItem,
   createContentItem,
+  updateContentItem,
   deleteContentItem,
   reorderContentItems,
   saveLessonAttachment,
@@ -270,6 +271,45 @@ router.post('/assignments/:id/content', uploadLessonAttachment, async (req, res)
     dueDate: (req.body.contentDueDate || '').trim() || null,
   });
   res.redirect(back + '?notice=' + encodeURIComponent('Assignment added.'));
+});
+
+// Mirrors routes/admin-class-schedule.js's own content/:id/edit route - a
+// real bug report: "I have zero way of managing the quizzes or any other
+// created assignments" applied here too, since this page shares the same
+// views/partials/lesson-content-manage.ejs form.
+router.post('/content/:id/edit', uploadLessonAttachment, async (req, res) => {
+  const found = await contentItemForTeacher(req, parseInt(req.params.id, 10));
+  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  const contentItem = found.contentItem;
+  const back = `/teacher/assignments/${found.assignment.id}`;
+  const type = contentItem.type;
+
+  let attachmentUrl = contentItem.attachment_url;
+  let attachmentName = contentItem.attachment_name;
+  if (type === 'assignment_upload' && req.file) {
+    attachmentUrl = await saveLessonAttachment(req.file);
+    attachmentName = req.file.originalname;
+  }
+
+  await updateContentItem(contentItem.id, {
+    title: (req.body.title || '').trim(),
+    videoUrl: type === 'video' ? (req.body.videoUrl || '').trim() : contentItem.video_url,
+    body:
+      type === 'text'
+        ? sanitizePostBody(req.body.body || '')
+        : type === 'assignment_upload'
+        ? sanitizePostBody(req.body.assignmentBody || '')
+        : type === 'assignment_submission'
+        ? sanitizePostBody(req.body.submissionBody || '')
+        : contentItem.body,
+    fileUrl: type === 'file' ? (req.body.fileUrl || '').trim() : contentItem.file_url,
+    description: type === 'video' ? (req.body.description || '').trim() : type === 'file' ? (req.body.fileDescription || '').trim() : contentItem.description,
+    attachmentUrl,
+    attachmentName,
+    pointsPossible: type === 'assignment_submission' && req.body.submissionPointsPossible ? parseInt(req.body.submissionPointsPossible, 10) : null,
+    dueDate: (req.body.contentDueDate || '').trim() || null,
+  });
+  res.redirect(back + '?notice=' + encodeURIComponent('Assignment updated.'));
 });
 
 router.post('/content/:id/delete', async (req, res) => {

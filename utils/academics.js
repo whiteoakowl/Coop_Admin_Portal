@@ -335,10 +335,32 @@ async function createContentItem({ assignmentId, type, title, videoUrl, body, fi
   return info.lastInsertRowid;
 }
 
-async function updateContentItem(id, { title, videoUrl, body, fileUrl, description, attachmentUrl, attachmentName }) {
+// A real bug report: "I have zero way of managing the quizzes or any
+// other created assignments" - this function already existed but was
+// never called from any route (routes/admin-class-schedule.js and
+// routes/teacher-portal.js each imported it, unused), so a content
+// item's own title/url/body/due date/points could never be changed once
+// added - only deleted and recreated from scratch. attachmentUrl/
+// attachmentName are passed through as whatever the caller already has
+// (the existing stored one, or a freshly uploaded replacement) rather
+// than cleared, since not every edit replaces the file.
+async function updateContentItem(id, { title, videoUrl, body, fileUrl, description, attachmentUrl, attachmentName, pointsPossible, dueDate }) {
   await db
-    .prepare('UPDATE lesson_content_items SET title = ?, video_url = ?, body = ?, file_url = ?, description = ?, attachment_url = ?, attachment_name = ? WHERE id = ?')
-    .run(title || null, videoUrl || null, body || null, fileUrl || null, description || null, attachmentUrl || null, attachmentName || null, id);
+    .prepare(
+      'UPDATE lesson_content_items SET title = ?, video_url = ?, body = ?, file_url = ?, description = ?, attachment_url = ?, attachment_name = ?, points_possible = ?, due_date = ? WHERE id = ?'
+    )
+    .run(
+      title || null,
+      videoUrl || null,
+      body || null,
+      fileUrl || null,
+      description || null,
+      attachmentUrl || null,
+      attachmentName || null,
+      pointsPossible != null ? pointsPossible : null,
+      dueDate || null,
+      id
+    );
 }
 
 async function deleteContentItem(id) {
