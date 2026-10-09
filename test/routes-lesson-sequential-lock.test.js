@@ -106,9 +106,12 @@ test('A class with two dateless lessons locks the second until the first is full
   // Lesson One: open (unlock icon), its content item bar is a real link.
   assert.match(lessonsBefore.text, /aria-label="Open to complete"/);
   assert.match(lessonsBefore.text, new RegExp(`href="/student/content/${itemOne.id}"`));
-  // Lesson Two: locked (lock icon), hint shown, no link to its own item.
+  // Lesson Two: locked (lock icon only - a real request: "it doesn't need
+  // to say complete the previous lesson to unlock, it stretches out the
+  // whole row and ruins it" removed the redundant text hint), no link to
+  // its own item.
   assert.match(lessonsBefore.text, /aria-label="Locked"/);
-  assert.match(lessonsBefore.text, /Complete the previous lesson to unlock/);
+  assert.doesNotMatch(lessonsBefore.text, /Complete the previous lesson to unlock/);
   assert.doesNotMatch(lessonsBefore.text, new RegExp(`href="/student/content/${itemTwo.id}"`));
 
   // Direct URL access to the still-locked lesson's own content item 404s -

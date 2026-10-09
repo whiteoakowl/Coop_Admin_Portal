@@ -42,10 +42,15 @@
             <% if (lesson.description) { %><span class="lesson-accordion-desc"><%= lesson.description %></span><% } %>
           </span>
           <span class="lesson-accordion-meta">
+            <%# A real request: "it doesn't need to say complete the
+                previous lesson to unlock, it stretches out the whole row
+                and ruins it" - the lock icon just below already says
+                this; removed the redundant text entirely rather than
+                shortening it, so a locked lesson just falls through to
+                the ordinary count/No-content badge below like any other
+                lesson. %>
             <% if (!lesson.isOpen) { %>
               <span class="hint">Opens <%= lesson.open_date %></span>
-            <% } else if (lesson.locked) { %>
-              <span class="hint">Complete the previous lesson to unlock</span>
             <% } else if (lesson.totalCount === 0) { %>
               <span class="hint">No content</span>
             <% } else if (lesson.completedCount === lesson.totalCount) { %>
