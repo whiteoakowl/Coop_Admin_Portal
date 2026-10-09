@@ -24,6 +24,7 @@ const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
 const auditLog = require('../utils/auditLog');
+const newsletterUtil = require('../utils/newsletter');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -111,8 +112,12 @@ test('deleting a store product creates an audit entry with the product name', as
 
 test('deleting a newsletter issue creates an audit entry', async () => {
   const admin = await loginAsMainAdmin();
-  const createRes = await request(app).post('/main-admin/newsletter').set('Cookie', admin.cookie).type('form').send({ subject: 'Audit Test Issue', _csrf: admin.csrfToken });
-  const issueId = /\/main-admin\/newsletter\/(\d+)\/edit/.exec(createRes.headers.location)[1];
+  const mainAdminAccount = await db.prepare('SELECT id FROM member_accounts WHERE email = ?').get(process.env.MAIN_ADMIN_EMAIL);
+  // A real request moved newsletter admin to a single always-current
+  // issue (GET /main-admin/newsletter auto-creates one, no more POST /
+  // creation route) - seeded directly here the same way a real draft
+  // would exist by the time someone deletes it.
+  const issueId = await newsletterUtil.createDraft('Audit Test Issue', mainAdminAccount.id);
 
   await request(app).post(`/main-admin/newsletter/${issueId}/delete`).set('Cookie', admin.cookie).type('form').send({ _csrf: admin.csrfToken });
 

@@ -20,18 +20,34 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Accounting</h1>
-    <p class="hint">Charges and payment history for you and your family. Payments are recorded by a Main Admin after money is received - there's no online payment here.</p>
+    <% if (!member) { %>
+      <h1>Accounting</h1>
+      <p class="hint">No account on file yet.</p>
+    <% } else { %>
+      <div class="grid-box-header">
+        <h1>Accounting</h1>
+        <span class="badge-pill badge-pill-<%= balanceCents > 0 ? 'orange' : 'green' %>"><%= balanceCents > 0 ? formatCents(balanceCents) + ' due' : 'Paid in full' %></span>
+      </div>
+      <p class="hint">Charges and payment history for your family's account (<%= member.name %>). Payments are recorded by a Main Admin after money is received - there's no online payment here.</p>
 
-    <% members.forEach(function(row) { %>
+      <%# Same year filter as the Main Admin Account page - "current,
+          all or the individual years for accounting." %>
+      <form method="GET" class="roster-btn-row no-print" style="margin-bottom: 1rem;">
+        <label>Account Year
+          <select name="year" onchange="this.form.submit()">
+            <option value="current" <%= yearFilter === 'current' ? 'selected' : '' %>>Current Year</option>
+            <option value="all" <%= yearFilter === 'all' ? 'selected' : '' %>>All Years</option>
+            <% years.forEach(function(y) { %>
+              <option value="<%= y %>" <%= yearFilter === y ? 'selected' : '' %>><%= y %></option>
+            <% }); %>
+          </select>
+        </label>
+      </form>
+
       <div class="manage-section">
-        <div class="grid-box-header">
-          <h2><%= row.member.name %></h2>
-          <span class="badge-pill badge-pill-<%= row.balanceCents > 0 ? 'orange' : 'green' %>"><%= row.balanceCents > 0 ? formatCents(row.balanceCents) + ' due' : 'Paid in full' %></span>
-        </div>
-
-        <% if (row.charges.length === 0) { %>
-          <p class="roster-empty">No charges on record.</p>
+        <div class="grid-box-header"><h2>Invoices</h2></div>
+        <% if (invoices.length === 0) { %>
+          <p class="roster-empty">No invoices for this period.</p>
         <% } else { %>
           <div class="roster-scroll">
             <table class="roster-table members-table condensed-table">
@@ -45,7 +61,7 @@
                 </tr>
               </thead>
               <tbody>
-                <% row.charges.forEach(function(c) { %>
+                <% invoices.forEach(function(c) { %>
                   <tr>
                     <td><%= c.description %></td>
                     <td><%= formatCents(c.amount_cents) %></td>
@@ -58,26 +74,30 @@
             </table>
           </div>
         <% } %>
+      </div>
 
-        <% if (row.receipts.length > 0) { %>
-          <h3 class="hint" style="margin-top: 1rem;">Receipt History</h3>
+      <div class="manage-section">
+        <div class="grid-box-header"><h2>Payments</h2></div>
+        <% if (paymentRows.length === 0) { %>
+          <p class="roster-empty">No payments for this period.</p>
+        <% } else { %>
           <div class="roster-scroll">
             <table class="roster-table members-table condensed-table">
               <thead>
                 <tr>
                   <th>For</th>
                   <th>Amount</th>
-                  <th>Date</th>
                   <th>Note</th>
+                  <th>Date</th>
                 </tr>
               </thead>
               <tbody>
-                <% row.receipts.forEach(function(r) { %>
+                <% paymentRows.forEach(function(p) { %>
                   <tr>
-                    <td><%= r.chargeDescription %></td>
-                    <td><%= formatCents(r.amount_cents) %></td>
-                    <td><%= r.created_at %></td>
-                    <td><%= r.note || '' %></td>
+                    <td><%= p.chargeDescription %></td>
+                    <td><%= formatCents(p.amount_cents) %></td>
+                    <td><%= p.note || '' %></td>
+                    <td><%= p.created_at %></td>
                   </tr>
                 <% }); %>
               </tbody>
@@ -85,7 +105,45 @@
           </div>
         <% } %>
       </div>
-    <% }); %>
+
+      <div class="manage-section">
+        <div class="grid-box-header"><h2>Adjustments, Credits &amp; Refunds</h2></div>
+        <% if (refundRows.length === 0 && cancelledCharges.length === 0) { %>
+          <p class="roster-empty">No adjustments for this period.</p>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>For</th>
+                  <th>Amount</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% refundRows.forEach(function(p) { %>
+                  <tr>
+                    <td><span class="badge-pill badge-pill-gray">Refund</span></td>
+                    <td><%= p.chargeDescription %></td>
+                    <td><%= formatCents(p.amount_cents) %></td>
+                    <td><%= p.created_at %></td>
+                  </tr>
+                <% }); %>
+                <% cancelledCharges.forEach(function(c) { %>
+                  <tr>
+                    <td><span class="badge-pill badge-pill-gray">Cancelled Charge</span></td>
+                    <td><%= c.description %></td>
+                    <td><%= formatCents(c.amount_cents) %></td>
+                    <td><%= c.created_at %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+    <% } %>
   </main>
 </body>
 </html>

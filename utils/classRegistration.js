@@ -23,6 +23,7 @@ const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = req
 const { ageGroupList, classGlobalSettings, classScheduleIdsForClass } = require('./classSchedule');
 const { ageAsOfDate, todayISO } = require('./dates');
 const { createCharge, amountPaidForCharge, cancelCharge, recordPayment } = require('./payments');
+const { primaryParentForBilling } = require('./members');
 const { isRegistrationOpenForAccount } = require('./registrationWindows');
 const notifications = require('./notifications');
 
@@ -57,9 +58,16 @@ function ageReferenceDateForClass(cls, settings) {
 // controls whether a teacher/assistant who signs up ALSO gets charged
 // (see routes/teacher-portal.js's own join route) - 'students' vs
 // 'students_and_staff'.
+// A real request: "only primary parent is billed for all event signups
+// and class registrations for the entire family" - the charge still
+// records which class/student it's for in its own description, but the
+// payment_charges row itself (the thing an Accounts page balance and a
+// Record Payment actually attach to) now always belongs to the family's
+// own primaryParentForBilling, never the enrolled student directly.
 async function chargeForConfirmedRegistration(tx, cls, student, accountId) {
   if (cls.price_cents == null) return null;
-  return createCharge(student.id, accountId, 'class_registration', cls.id, `${cls.class_name} - class registration`, cls.price_cents, tx);
+  const billedMemberId = await primaryParentForBilling(student.id, tx);
+  return createCharge(billedMemberId, accountId, 'class_registration', cls.id, `${cls.class_name} - class registration`, cls.price_cents, tx);
 }
 
 async function staffCountsForClass(classId) {
@@ -122,9 +130,12 @@ async function joinClassAsStaff({ classId, member, accountId, portalRoles, role 
   // classes still priced 'students'-only never charge staff at all.
   let notice = `Signed up as ${role} for "${cls.class_name}".`;
   if (cls.price_per === 'students_and_staff' && cls.price_cents != null) {
-    const chargeId = await createCharge(member.id, accountId, 'class_registration', cls.id, `${cls.class_name} - class registration`, cls.price_cents);
+    // Same primary-parent billing as chargeForConfirmedRegistration above -
+    // a teacher/assistant's own self-signup charge is still family billing.
+    const billedMemberId = await primaryParentForBilling(member.id);
+    const chargeId = await createCharge(billedMemberId, accountId, 'class_registration', cls.id, `${cls.class_name} - class registration`, cls.price_cents);
     await db.prepare('UPDATE class_staff SET charge_id = ? WHERE class_id = ? AND member_id = ?').run(chargeId, classId, member.id);
-    notice += ` A charge of $${(cls.price_cents / 100).toFixed(2)} has been added to your account.`;
+    notice += ` A charge of $${(cls.price_cents / 100).toFixed(2)} has been added to ${billedMemberId === member.id ? 'your' : "your family's"} account.`;
   }
   return { ok: true, notice };
 }

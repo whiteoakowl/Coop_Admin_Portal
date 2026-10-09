@@ -3703,6 +3703,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    shared default). */
 .members-search-filter-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; margin-bottom: 1rem; }
 .members-search-filter-row .category-filter { margin: 0; }
+/* A real request (Main Admin Members, Archive tab): "shrink filter
+   button to fit to text." The only .roster-action-btn ever inside this
+   row (partials/members-type-filter.ejs's own Filter button, Archive
+   tab's own copy - the Members tab keeps its own Filter in the button
+   toolbar above instead) otherwise inherits that class's shared flex: 1
+   0 auto (meant for several buttons sharing leftover space in a toolbar)
+   and stretches to fill whatever the search bar beside it doesn't use. */
+.members-search-filter-row .roster-action-btn { flex: 0 0 auto; width: auto; }
 
 .members-search-bar {
   position: relative;
@@ -4216,8 +4224,25 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    kept its own base padding/font-size AND its flex: 1 0 auto (meant for
    an even-width multi-button toolbar row elsewhere), growing it wider
    than its text next to the fit-to-text Send button. Matched to the same
-   padding/font-size and flex-grow: 0 here so the two read as one pair. */
-.member-form-footer-edit .roster-action-btn { flex: 0 0 auto; min-width: 0; padding: 0.55rem 0.9rem; font-size: 0.9rem; }
+   padding/font-size and flex-grow: 0 here so the two read as one pair.
+   A real request: "shrink buttons to fit nicely on the same row
+   mobile" - width: auto added since the mobile-only `.roster-action-btn
+   { width: 100% }` rule (this same file's own @media max-width: 640px
+   block) sets a DIFFERENT property than flex-basis, so flex: 0 0 auto
+   alone never stopped that from still stretching this button the full
+   row width and wrapping Schedule for Later onto its own line below. */
+.member-form-footer-edit .roster-action-btn { flex: 0 0 auto; width: auto; min-width: 0; padding: 0.55rem 0.9rem; font-size: 0.9rem; }
+
+/* Even fit-to-text, "Send Announcements Now" + "Schedule for Later"
+   together still run wider than a phone's own content column at their
+   shared desktop padding/font-size above - shrunk further here,
+   mobile-only, to genuinely both fit "nicely on the same row" per the
+   real request, rather than wrapping to two rows despite already being
+   fit-to-text. */
+@media (max-width: 640px) {
+  .member-form-footer-edit .primary-btn,
+  .member-form-footer-edit .roster-action-btn { font-size: 0.7rem; padding: 0.4rem 0.5rem; }
+}
 
 /* The whole Membership Form (header, fields, Family/Team boxes, footer)
    sits in one white card - same shape/chrome as the Create Class dialog
@@ -4448,11 +4473,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 /* Same request, mobile: "shrink email member table to see the whole
    table in mobile view" - same shrink-table-for-mobile convention as
-   .admins-table/.registrations-table/.committees-table elsewhere. */
+   .admins-table/.registrations-table/.committees-table elsewhere. A
+   real email address is long enough that the first pass here still ran
+   wider than a phone screen, so this gets a second, tighter pass, same
+   as #main-admin-pets-table's own precedent for a table that's still too
+   wide even shrunk once - .roster-scroll (already wrapping this table)
+   keeps handling whatever's still too wide after this, a real horizontal
+   scroll rather than a cut-off. */
 @media (max-width: 640px) {
-  #email-candidate-table { font-size: 0.78rem; }
+  #email-candidate-table { font-size: 0.68rem; }
   #email-candidate-table th,
-  #email-candidate-table td { padding: 0.35rem 0.4rem; }
+  #email-candidate-table td { padding: 0.25rem 0.3rem; }
 }
 
 /* A real request (Committees' Edit Committee page): "edit button, add
@@ -12201,6 +12232,15 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    instead of centered since this page's own toolbar stays left-aligned
    (the site-wide search+filter convention, see .members-search-filter-row). */
 .accounting-list-toolbar .roster-action-btn { flex: 0 0 auto; }
+/* A real request: "accounts page, there should be adequate spacing
+   between button rows and features." .roster-btn-row carries no margin
+   of its own (most of its other callers are a single row with nothing
+   stacked directly below), so the Accounts page's own 3 toolbar rows
+   (+Invoice/+Payment/+Adjustment, Past Due Only/Email All Invoices,
+   Print/Export) ran edge to edge with nothing but their own internal
+   button gap between them. */
+.accounting-list-toolbar,
+.accounting-accounts-toolbar-2 { margin-bottom: 0.75rem; }
 
 /* Accounts page's own 2nd button row ("filters, email all invoices,
    print preview icon, export icon") - same fit-to-text fix as
@@ -12212,3 +12252,80 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    the gap this mismatch would create). */
 .accounting-accounts-toolbar-2 { align-items: center; }
 .accounting-accounts-toolbar-2 .roster-action-btn { flex: 0 0 auto; }
+
+/* Accounts page's own 3rd row - "print icon and export icon should be on
+   the same row next to each other," split out from the 2nd row above so
+   neither row wraps awkwardly on mobile. */
+.accounting-accounts-toolbar-3 { align-items: center; }
+
+/* Both rows' own real children (the Past Due Only checkbox and Email All
+   Invoices button each sit inside their own <form>; the Print/Export
+   icons are .icon-btn, not .roster-action-btn) are invisible to
+   public/js/roster-btn-row-grid.js's own ":scope > .roster-action-btn"
+   column-sizer, so on mobile each row would default to one implicit
+   column and stack its two real controls instead of keeping them "on the
+   same row" per the real request - the same class of bug that script's
+   own header comment already documents for Floater Assignments/Events,
+   fixed there the same way: their own data-fixed-columns="2" (set on
+   these rows in admin-accounting-list.ejs) tells that script to force a
+   2-column grid regardless of what it finds inside. */
+
+/* A real request: "go button should be in the search bar, attached" -
+   scoped to the Accounts page's own search form rather than changing
+   .members-search-bar/.members-search-go-btn's shared look everywhere
+   else that convention is already used (Members pages, site-wide). Flat,
+   touching inner edges make the input and button read as one control. */
+.accounting-search-attached input[type="search"] { border-radius: 999px 0 0 999px !important; border-right: none !important; }
+.accounting-search-attached .members-search-go-btn { margin-left: 0; border-radius: 0 999px 999px 0; }
+
+/* Accounts table's own icon column, moved "after the member name and
+   before balance" per a real request - same icon-row gap as every other
+   .roster-btn-row of icon-only buttons, just without its own margin/flex
+   grow since it now sits inside a narrow table cell instead of a full
+   toolbar row. */
+.accounting-row-icons { flex-wrap: nowrap; gap: 0.3rem; }
+
+/* A real request: "shrink to fit mobile" across every Accounting
+   subpage's table (Accounts/Invoices/Payments/Adjustments/Logs) - same
+   shrink-table-for-mobile convention as .fun-admin-table elsewhere. */
+.accounting-table-mobile-fit th, .accounting-table-mobile-fit td { padding: 0.5rem 0.65rem; }
+@media (max-width: 640px) {
+  .accounting-table-mobile-fit { font-size: 0.74rem; }
+  .accounting-table-mobile-fit th, .accounting-table-mobile-fit td { padding: 0.3rem 0.4rem; }
+  .accounting-table-mobile-fit .icon-btn { width: 1.6rem; height: 1.6rem; }
+  .accounting-table-mobile-fit .icon-btn .icon { width: 14px; height: 14px; }
+  /* .roster-btn-row's own shared mobile rule (display: grid, one
+     implicit column since this row's children are .icon-btn, never
+     .roster-action-btn) would otherwise stack the Accounts table's own
+     icon cell vertically instead of keeping it "a balanced row" per the
+     real request. */
+  .accounting-row-icons { display: flex; flex-wrap: nowrap; justify-content: flex-start; }
+}
+
+/* Invoices/Payments/Adjustments/Logs run 6-9 real columns (Invoice #,
+   Member, Description, Amount, Paid, Status, Date, Print, Delete) -
+   .accounting-table-mobile-fit's own shrink alone still doesn't get
+   those down to a 390px phone's width, same as #main-admin-pets-table's
+   own "second, tighter pass" elsewhere for the identical reason (a wide
+   table with real per-row data, not padding, driving the overflow).
+   .roster-scroll (already wrapping every one of these tables) keeps
+   handling whatever's still too wide even after this - a real horizontal
+   scroll, not a cut-off - same accepted answer as Pets' own table. */
+@media (max-width: 640px) {
+  .accounting-table-mobile-fit-tighter { font-size: 0.68rem; }
+  .accounting-table-mobile-fit-tighter th, .accounting-table-mobile-fit-tighter td { padding: 0.25rem 0.3rem; }
+}
+
+/* A real request: "shrink the accounts table on desktop to bring the
+   columns much closer together for better viewing. Tables should not
+   expand the whole screen on desktop." Desktop only - mobile keeps its
+   own fit classes above, including .roster-scroll's real horizontal
+   scroll fallback. .roster-table's own base width: 100% stretched every
+   column (Member/icons/Balance/Past Due) out to fill the viewport even
+   though none of that content needs the room; width: auto lets the
+   table shrink to its real content width instead, which alone pulls the
+   columns back together. */
+@media (min-width: 641px) {
+  .accounting-accounts-table-fit { width: auto; }
+  .accounting-accounts-table-fit th, .accounting-accounts-table-fit td { padding: 0.45rem 0.9rem; }
+}

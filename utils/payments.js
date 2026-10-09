@@ -58,6 +58,34 @@ async function cancelCharge(chargeId) {
   await db.prepare("UPDATE payment_charges SET status = 'cancelled', updated_at = now_text() WHERE id = ?").run(chargeId);
 }
 
+// A real request: "add a trash icon" to Invoices/Adjustments rows - a
+// genuine delete, not another way to cancel. Safe to remove outright:
+// payment_payments.charge_id is ON DELETE CASCADE (its own rows go with
+// it), and every source record that can point at a charge
+// (store_orders/class_registrations/event_registrations/class_staff)
+// does so with ON DELETE SET NULL, so deleting a charge here just clears
+// that link rather than breaking anything.
+async function deleteCharge(chargeId) {
+  await db.prepare('DELETE FROM payment_charges WHERE id = ?').run(chargeId);
+}
+
+async function getPayment(id) {
+  return db.prepare('SELECT * FROM payment_payments WHERE id = ?').get(id);
+}
+
+// A real request: "add a trash button" to Payments/Adjustments rows -
+// removing a mis-recorded payment or refund. recalculateStatus afterward
+// puts the charge's own status back to whatever its remaining real
+// payment rows say it should be (e.g. a charge goes back to 'pending'
+// once the payment that made it 'paid' is deleted).
+async function deletePayment(id) {
+  const payment = await getPayment(id);
+  if (!payment) return null;
+  await db.prepare('DELETE FROM payment_payments WHERE id = ?').run(id);
+  await recalculateStatus(payment.charge_id);
+  return payment;
+}
+
 async function chargesForMember(memberId) {
   const charges = await db.prepare('SELECT * FROM payment_charges WHERE member_id = ? ORDER BY created_at DESC').all(memberId);
   for (const c of charges) c.amountPaid = await amountPaidForCharge(c.id);
@@ -112,6 +140,20 @@ async function allPayments(direction) {
     .all();
 }
 
+// Every calendar year (newest first) a member has any charge or payment
+// recorded in - backs the Account page's own "Current / All / a given
+// year" filter dropdown (a real request). created_at is always
+// now_text()'s own 'YYYY-MM-DD HH:MM:SS' shape, so slicing the first 4
+// characters is a real year, not a guess.
+async function yearsForMember(memberId) {
+  const chargeYears = await db.prepare('SELECT DISTINCT substr(created_at, 1, 4) AS y FROM payment_charges WHERE member_id = ?').all(memberId);
+  const paymentYears = await db
+    .prepare('SELECT DISTINCT substr(p.created_at, 1, 4) AS y FROM payment_payments p JOIN payment_charges c ON c.id = p.charge_id WHERE c.member_id = ?')
+    .all(memberId);
+  const years = new Set([...chargeYears, ...paymentYears].map((r) => r.y));
+  return [...years].sort((a, b) => b.localeCompare(a));
+}
+
 async function receiptHistoryForMember(memberId) {
   return db
     .prepare(
@@ -120,6 +162,34 @@ async function receiptHistoryForMember(memberId) {
        WHERE c.member_id = ? ORDER BY p.created_at DESC`
     )
     .all(memberId);
+}
+
+// The one member-level Account view (Invoices / Payments / Adjustments,
+// Credits & Refunds, each narrowed by `yearFilter`) - shared by the Main
+// Admin Account page and the member-facing /accounting page (a real
+// request: "this will be the same account view on parent portal too"),
+// so the two never drift. `yearFilter` is 'current' (default, this
+// calendar year), 'all', or a 4-digit year string from yearsForMember.
+async function accountOverviewForMember(memberId, yearFilter = 'current') {
+  const currentYear = String(new Date().getFullYear());
+  const inYear = (createdAt) => (yearFilter === 'all' ? true : createdAt.slice(0, 4) === (yearFilter === 'current' ? currentYear : yearFilter));
+
+  const allCharges = await chargesForMember(memberId);
+  const invoices = allCharges.filter((c) => inYear(c.created_at));
+  const history = await receiptHistoryForMember(memberId);
+  const paymentRows = history.filter((p) => p.amount_cents > 0 && inYear(p.created_at));
+  const refundRows = history.filter((p) => p.amount_cents < 0 && inYear(p.created_at));
+  const cancelledCharges = allCharges.filter((c) => c.status === 'cancelled' && inYear(c.created_at));
+
+  return {
+    invoices,
+    paymentRows,
+    refundRows,
+    cancelledCharges,
+    years: await yearsForMember(memberId),
+    yearFilter,
+    balanceCents: await balanceForMember(memberId),
+  };
 }
 
 // The one place this app formats a cents integer as a dollar string -
@@ -135,10 +205,15 @@ module.exports = {
   amountPaidForCharge,
   recordPayment,
   cancelCharge,
+  deleteCharge,
+  getPayment,
+  deletePayment,
   chargesForMember,
   balanceForMember,
   allCharges,
   allPayments,
+  yearsForMember,
   receiptHistoryForMember,
+  accountOverviewForMember,
   formatCents,
 };

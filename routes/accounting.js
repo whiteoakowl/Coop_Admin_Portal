@@ -8,24 +8,32 @@
 // fee, a store order).
 const express = require('express');
 const router = express.Router();
+const db = require('../db');
 const { requirePortalAuth } = require('../middleware/portalAuth');
-const { familyForAccount } = require('../utils/portalAuth');
+const { memberForAccount } = require('../utils/portalAuth');
+const { primaryParentForBilling } = require('../utils/members');
 const payments = require('../utils/payments');
 
 router.use(requirePortalAuth);
 
+// A real request: "this will be the same account view on parent portal
+// too" - same Invoices/Payments/Adjustments tables and year filter as
+// the Main Admin Account page (utils/payments.js's own
+// accountOverviewForMember), just read-only and always scoped to this
+// account's own family. Only the family's primaryParentForBilling ever
+// carries a real charge now ("only primary parent is billed... for the
+// entire family"), so there's exactly one account to show here, not one
+// per family member.
 router.get('/', async (req, res) => {
-  const family = await familyForAccount(req.portalAccount.id);
-  const members = [];
-  for (const m of family) {
-    members.push({
-      member: m,
-      balanceCents: await payments.balanceForMember(m.id),
-      charges: await payments.chargesForMember(m.id),
-      receipts: await payments.receiptHistoryForMember(m.id),
-    });
-  }
-  res.render('accounting-home', { title: 'Accounting', members, formatCents: payments.formatCents });
+  const self = await memberForAccount(req.portalAccount.id);
+  const member = self ? await db.prepare('SELECT * FROM members WHERE id = ?').get(await primaryParentForBilling(self.id)) : null;
+  const overview = member ? await payments.accountOverviewForMember(member.id, req.query.year || 'current') : null;
+  res.render('accounting-home', {
+    title: 'Accounting',
+    member,
+    ...(overview || {}),
+    formatCents: payments.formatCents,
+  });
 });
 
 module.exports = router;

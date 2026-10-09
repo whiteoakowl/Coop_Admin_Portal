@@ -18,7 +18,7 @@
         <p class="roster-empty">No refunds recorded yet.</p>
       <% } else { %>
         <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
+          <table class="roster-table members-table condensed-table accounting-table-mobile-fit accounting-table-mobile-fit-tighter">
             <thead>
               <tr>
                 <th>Member</th>
@@ -26,6 +26,7 @@
                 <th>Amount</th>
                 <th>Note</th>
                 <th>Date</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -36,6 +37,12 @@
                   <td><%= formatCents(p.amount_cents) %></td>
                   <td><%= p.note || '' %></td>
                   <td><%= p.created_at %></td>
+                  <td>
+                    <form method="POST" action="/main-admin/accounting/payments/<%= p.id %>/delete" class="inline-block-form" data-confirm="Delete this refund of <%= formatCents(Math.abs(p.amount_cents)) %> for <%= p.memberName %>?">
+                      <input type="hidden" name="back" value="adjustments" />
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete refund" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </td>
                 </tr>
               <% }); %>
             </tbody>
@@ -50,13 +57,14 @@
         <p class="roster-empty">No cancelled charges.</p>
       <% } else { %>
         <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
+          <table class="roster-table members-table condensed-table accounting-table-mobile-fit accounting-table-mobile-fit-tighter">
             <thead>
               <tr>
                 <th>Member</th>
                 <th>Description</th>
                 <th>Amount</th>
                 <th>Date</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -66,6 +74,12 @@
                   <td><%= c.description %></td>
                   <td><%= formatCents(c.amount_cents) %></td>
                   <td><%= c.created_at %></td>
+                  <td>
+                    <form method="POST" action="/main-admin/accounting/invoices/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete this cancelled charge for <%= c.memberName %>?">
+                      <input type="hidden" name="back" value="adjustments" />
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete cancelled charge" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </td>
                 </tr>
               <% }); %>
             </tbody>

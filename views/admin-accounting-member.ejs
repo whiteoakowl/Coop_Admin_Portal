@@ -21,65 +21,161 @@
       <script>window.addEventListener('load', () => window.print());</script>
     <% } %>
 
+    <%# A real request: "filter dropdown to view which account year.
+        Current, all or the individual years for accounting." Filters
+        all three tables below at once - a plain GET so the page (and
+        any Print/Autoprint) always reflects exactly what's in the URL. %>
+    <form method="GET" class="roster-btn-row no-print" style="margin-bottom: 1rem;">
+      <label>Account Year
+        <select name="year" onchange="this.form.submit()">
+          <option value="current" <%= yearFilter === 'current' ? 'selected' : '' %>>Current Year</option>
+          <option value="all" <%= yearFilter === 'all' ? 'selected' : '' %>>All Years</option>
+          <% years.forEach(function(y) { %>
+            <option value="<%= y %>" <%= yearFilter === y ? 'selected' : '' %>><%= y %></option>
+          <% }); %>
+        </select>
+      </label>
+    </form>
+
     <div class="manage-section">
       <div class="grid-box-header">
-        <h2>Charges</h2>
+        <h2>Invoices</h2>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-charge-dialog').showModal()">+ Add Charge</button>
       </div>
-
-      <% if (charges.length === 0) { %>
-        <p class="roster-empty">No charges yet.</p>
+      <% if (invoices.length === 0) { %>
+        <p class="roster-empty">No invoices for this period.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table accounting-table-mobile-fit accounting-table-mobile-fit-tighter">
+            <thead>
+              <tr>
+                <th>Invoice #</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Paid</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% invoices.forEach(function(c) { %>
+                <tr>
+                  <td>#<%= c.id %></td>
+                  <td><%= c.description %></td>
+                  <td><%= formatCents(c.amount_cents) %></td>
+                  <td><%= formatCents(c.amountPaid) %></td>
+                  <td><span class="badge-pill badge-pill-<%= c.status === 'paid' ? 'green' : c.status === 'cancelled' || c.status === 'refunded' ? 'gray' : 'orange' %>"><%= c.status.replace('_', ' ') %></span></td>
+                  <td><%= c.created_at %></td>
+                  <td class="roster-btn-row">
+                    <% if (c.status !== 'cancelled') { %>
+                      <button type="button" class="roster-action-btn" onclick="document.getElementById('payment-dialog-<%= c.id %>').showModal()">Record Payment</button>
+                      <form method="POST" action="/main-admin/accounting/charges/<%= c.id %>/cancel" class="inline-block-form" data-confirm="Cancel this charge?">
+                        <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>
+                      </form>
+                    <% } %>
+                  </td>
+                  <td>
+                    <form method="POST" action="/main-admin/accounting/invoices/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete invoice #<%= c.id %>? This also removes any payments recorded against it.">
+                      <input type="hidden" name="back" value="member" />
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete invoice #<%= c.id %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
       <% } %>
+    </div>
 
-      <div class="training-lesson-list">
-        <% charges.forEach(function(c) { %>
-          <div class="training-lesson-row">
-            <div class="training-lesson-row-main">
-              <svg class="icon"><use href="#icon-file-text"/></svg>
-              <div class="training-lesson-info">
-                <strong><%= c.description %></strong>
-                <span class="badge-pill badge-pill-<%= c.status === 'paid' ? 'green' : c.status === 'cancelled' || c.status === 'refunded' ? 'gray' : 'orange' %>"><%= c.status.replace('_', ' ') %></span>
-                <span class="hint"><%= formatCents(c.amountPaid) %> of <%= formatCents(c.amount_cents) %> paid &middot; <%= c.created_at %></span>
-              </div>
-              <div class="training-lesson-actions roster-btn-row">
-                <% if (c.status !== 'cancelled') { %>
-                  <button type="button" class="roster-action-btn" onclick="document.getElementById('payment-dialog-<%= c.id %>').showModal()">Record Payment</button>
-                  <form method="POST" action="/main-admin/accounting/charges/<%= c.id %>/cancel" class="inline-block-form" data-confirm="Cancel this charge?">
-                    <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>
-                  </form>
-                <% } %>
-              </div>
-            </div>
-          </div>
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Payments</h2></div>
+      <% if (paymentRows.length === 0) { %>
+        <p class="roster-empty">No payments for this period.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table accounting-table-mobile-fit accounting-table-mobile-fit-tighter">
+            <thead>
+              <tr>
+                <th>For</th>
+                <th>Amount</th>
+                <th>Note</th>
+                <th>Date</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% paymentRows.forEach(function(p) { %>
+                <tr>
+                  <td><%= p.chargeDescription %></td>
+                  <td><%= formatCents(p.amount_cents) %></td>
+                  <td><%= p.note || '' %></td>
+                  <td><%= p.created_at %></td>
+                  <td>
+                    <form method="POST" action="/main-admin/accounting/payments/<%= p.id %>/delete" class="inline-block-form" data-confirm="Delete this payment of <%= formatCents(p.amount_cents) %>?">
+                      <input type="hidden" name="back" value="member" />
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete payment" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
 
-          <dialog id="payment-dialog-<%= c.id %>" class="member-picker-dialog">
-            <form method="POST" action="/main-admin/accounting/charges/<%= c.id %>/payments">
-              <h3>Record Payment &mdash; <%= c.description %></h3>
-              <label>Direction
-                <select name="direction">
-                  <option value="payment">Payment received</option>
-                  <option value="refund">Refund issued</option>
-                </select>
-              </label>
-              <label>Amount ($)
-                <input type="number" name="amount" min="0.01" step="0.01" required />
-              </label>
-              <label>Method
-                <select name="method">
-                  <% methods.forEach(function(meth) { %><option value="<%= meth %>"><%= meth %></option><% }); %>
-                </select>
-              </label>
-              <label>Note
-                <input type="text" name="note" placeholder="e.g. Check #123, Venmo @handle" />
-              </label>
-              <div class="notes-dialog-actions">
-                <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-                <button type="submit" class="primary-btn">Record</button>
-              </div>
-            </form>
-          </dialog>
-        <% }); %>
-      </div>
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Adjustments, Credits &amp; Refunds</h2></div>
+      <% if (refundRows.length === 0 && cancelledCharges.length === 0) { %>
+        <p class="roster-empty">No adjustments for this period.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table accounting-table-mobile-fit accounting-table-mobile-fit-tighter">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>For</th>
+                <th>Amount</th>
+                <th>Date</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% refundRows.forEach(function(p) { %>
+                <tr>
+                  <td><span class="badge-pill badge-pill-gray">Refund</span></td>
+                  <td><%= p.chargeDescription %></td>
+                  <td><%= formatCents(p.amount_cents) %></td>
+                  <td><%= p.created_at %></td>
+                  <td>
+                    <form method="POST" action="/main-admin/accounting/payments/<%= p.id %>/delete" class="inline-block-form" data-confirm="Delete this refund of <%= formatCents(Math.abs(p.amount_cents)) %>?">
+                      <input type="hidden" name="back" value="member" />
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete refund" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+              <% cancelledCharges.forEach(function(c) { %>
+                <tr>
+                  <td><span class="badge-pill badge-pill-gray">Cancelled Charge</span></td>
+                  <td><%= c.description %></td>
+                  <td><%= formatCents(c.amount_cents) %></td>
+                  <td><%= c.created_at %></td>
+                  <td>
+                    <form method="POST" action="/main-admin/accounting/invoices/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete this cancelled charge?">
+                      <input type="hidden" name="back" value="member" />
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete cancelled charge" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
     </div>
 
     <dialog id="add-charge-dialog" class="member-picker-dialog">
@@ -97,6 +193,37 @@
         </div>
       </form>
     </dialog>
+
+    <% invoices.forEach(function(c) { %>
+      <% if (c.status !== 'cancelled') { %>
+        <dialog id="payment-dialog-<%= c.id %>" class="member-picker-dialog">
+          <form method="POST" action="/main-admin/accounting/charges/<%= c.id %>/payments">
+            <h3>Record Payment &mdash; <%= c.description %></h3>
+            <label>Direction
+              <select name="direction">
+                <option value="payment">Payment received</option>
+                <option value="refund">Refund issued</option>
+              </select>
+            </label>
+            <label>Amount ($)
+              <input type="number" name="amount" min="0.01" step="0.01" required />
+            </label>
+            <label>Method
+              <select name="method">
+                <% methods.forEach(function(meth) { %><option value="<%= meth %>"><%= meth %></option><% }); %>
+              </select>
+            </label>
+            <label>Note
+              <input type="text" name="note" placeholder="e.g. Check #123, Venmo @handle" />
+            </label>
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Record</button>
+            </div>
+          </form>
+        </dialog>
+      <% } %>
+    <% }); %>
   </main>
 </body>
 </html>

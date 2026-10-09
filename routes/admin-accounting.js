@@ -29,7 +29,7 @@ const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const payments = require('../utils/payments');
 const auditLog = require('../utils/auditLog');
-const { byLastName } = require('../utils/members');
+const { byLastName, primaryParentForBilling } = require('../utils/members');
 const events = require('../utils/events');
 const emailComposer = require('../utils/emailComposer');
 const { appSetting, setAppSetting } = require('../utils/appSettings');
@@ -54,24 +54,34 @@ async function paymentMethods() {
   }
 }
 
-// --- Accounts (the original list - every member with a balance/charge
-// history, plus a typed search that widens it to any active member). ---
+// --- Accounts (the original list - every member who could actually be
+// billed, plus a typed search that widens it to any of them). ---
 
-// Every active member with a nonzero balance or any charge history at
-// all - a member who's never had a charge doesn't clutter this list by
-// default. A real request: "same row as search member there is a search
-// bar for typing member name" - typing a name here (q) widens the list to
-// every active member matching it, charge history or not, since the
-// whole point of searching is also "to add a first charge for someone
-// new" (the old version of this used a <select> of every member just for
-// that; a typed search bar finds them the same way the rest of the site
-// already searches members).
+// A real request: "primary parent is the only member listed on all
+// account pages. Only primary parent is billed for all event signups and
+// class registrations for the entire family." Every charge now resolves
+// to a member's own primaryParentForBilling (utils/members.js), so a
+// child or secondary parent never carries a real balance of their own -
+// listing them here would just be a confusing, always-$0 account.
+// Computed by resolving EVERY active member's own billed-to id and
+// keeping only the members that id actually lands on (a family's real
+// primary parent if one's designated, otherwise whichever parent/admin in
+// it is used as the fallback, or the member themselves if they're not in
+// a family/have no parent at all) - same resolution a real charge would
+// use, rather than trusting the is_primary_parent flag alone and missing
+// that fallback case.
+async function billedMemberIds() {
+  const allMembers = await db.prepare('SELECT id FROM members WHERE active = 1').all();
+  const ids = new Set();
+  for (const m of allMembers) ids.add(await primaryParentForBilling(m.id));
+  return ids;
+}
+
 async function accountRows(q) {
-  let members;
+  const eligibleIds = await billedMemberIds();
+  let members = (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).filter((m) => eligibleIds.has(m.id)).sort(byLastName);
   if (q) {
-    members = (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).filter((m) => m.name.toLowerCase().includes(q)).sort(byLastName);
-  } else {
-    members = (await db.prepare('SELECT id, name FROM members WHERE active = 1 AND id IN (SELECT DISTINCT member_id FROM payment_charges)').all()).sort(byLastName);
+    members = members.filter((m) => m.name.toLowerCase().includes(q));
   }
   const emailByMember = new Map(
     (await db.prepare('SELECT member_id, email FROM member_accounts').all()).map((r) => [r.member_id, r.email])
@@ -81,6 +91,11 @@ async function accountRows(q) {
   return rows;
 }
 
+async function billableMembers() {
+  const eligibleIds = await billedMemberIds();
+  return (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).filter((m) => eligibleIds.has(m.id)).sort(byLastName);
+}
+
 router.get('/', async (req, res) => {
   const q = (req.query.q || '').trim().toLowerCase();
   res.render('admin-accounting-list', {
@@ -88,7 +103,7 @@ router.get('/', async (req, res) => {
     members: await accountRows(q),
     q: req.query.q || '',
     pastDueOnly: req.query.pastDueOnly === '1',
-    allMembers: (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).sort(byLastName),
+    allMembers: await billableMembers(),
     notice: req.query.notice || null,
     error: req.query.error || null,
     formatCents: payments.formatCents,
@@ -179,7 +194,7 @@ router.get('/invoices', async (req, res) => {
     invoices,
     status,
     memberId,
-    allMembers: (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).sort(byLastName),
+    allMembers: await billableMembers(),
     notice: req.query.notice || null,
     error: req.query.error || null,
     formatCents: payments.formatCents,
@@ -197,6 +212,20 @@ router.post('/invoices', async (req, res) => {
   res.redirect('/main-admin/accounting/invoices?notice=' + encodeURIComponent('Invoice added.'));
 });
 
+// A real request: "add a trash icon at the end of each row" (Invoices),
+// also reused by Adjustments' own Cancelled Charges rows (`back`
+// decides which subpage to return to).
+router.post('/invoices/:id/delete', async (req, res) => {
+  const charge = await payments.getCharge(req.params.id);
+  if (!charge) return res.status(404).render('404', { title: 'Not Found' });
+  const memberId = charge.member_id;
+  await payments.deleteCharge(charge.id);
+  await auditLog.record(req.portalAccount.id, 'charge_deleted', 'payment_charge', charge.id, charge.description);
+  const back =
+    req.body.back === 'adjustments' ? '/main-admin/accounting/adjustments' : req.body.back === 'member' ? `/main-admin/accounting/members/${memberId}` : '/main-admin/accounting/invoices';
+  res.redirect(back + '?notice=' + encodeURIComponent('Invoice deleted.'));
+});
+
 // --- Payments (payment_payments rows with amount_cents > 0 - money
 // actually received). ---
 
@@ -208,6 +237,25 @@ router.get('/payments', async (req, res) => {
     error: req.query.error || null,
     formatCents: payments.formatCents,
   });
+});
+
+// A real request: "add a trash button" (Payments), also reused by
+// Adjustments' own Refunds rows (`back` decides which subpage to return
+// to) - both read/write the same payment_payments table.
+router.post('/payments/:id/delete', async (req, res) => {
+  const payment = await payments.getPayment(req.params.id);
+  if (!payment) return res.status(404).render('404', { title: 'Not Found' });
+  const isRefund = payment.amount_cents < 0;
+  const charge = await payments.getCharge(payment.charge_id);
+  await payments.deletePayment(payment.id);
+  await auditLog.record(req.portalAccount.id, isRefund ? 'refund_deleted' : 'payment_deleted', 'payment_charge', payment.charge_id, payments.formatCents(Math.abs(payment.amount_cents)));
+  const back =
+    req.body.back === 'adjustments'
+      ? '/main-admin/accounting/adjustments'
+      : req.body.back === 'member'
+        ? `/main-admin/accounting/members/${charge ? charge.member_id : ''}`
+        : '/main-admin/accounting/payments';
+  res.redirect(back + '?notice=' + encodeURIComponent(isRefund ? 'Refund deleted.' : 'Payment deleted.'));
 });
 
 // --- Adjustments (payment_payments rows with amount_cents < 0 - refunds
@@ -264,16 +312,20 @@ router.post('/settings/payment-methods', async (req, res) => {
 // routes, just now reachable from several subpages above instead of only
 // the Accounts list. ---
 
+// A real request: "first table shows invoices, 2nd table shows
+// payments, 3rd table shows adjustments, credits and refunds. Filter
+// dropdown to view which account year. Current, all or the individual
+// years for accounting." year is 'current' (default, this calendar
+// year), 'all', or a 4-digit year string from payments.yearsForMember.
 router.get('/members/:memberId', async (req, res) => {
   const member = await db.prepare('SELECT id, name FROM members WHERE id = ?').get(req.params.memberId);
   if (!member) return res.status(404).render('404', { title: 'Not Found' });
-  const charges = await payments.chargesForMember(member.id);
-  const balanceCents = await payments.balanceForMember(member.id);
+  const overview = await payments.accountOverviewForMember(member.id, req.query.year || 'current');
+
   res.render('admin-accounting-member', {
     title: member.name,
     member,
-    charges,
-    balanceCents,
+    ...overview,
     autoprint: req.query.autoprint === '1',
     methods: await paymentMethods(),
     notice: req.query.notice || null,

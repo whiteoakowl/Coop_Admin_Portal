@@ -68,7 +68,11 @@ test('Archive tab still has its own Filter dropdown, with no button toolbar to j
   const page = await request(app).get('/main-admin/members?tab=archive').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.doesNotMatch(page.text, /roster-btn-row-fit-text/, 'the Archive tab has no button toolbar');
-  const rowMatch = /<div class="members-search-filter-row no-print">([\s\S]*?)<\/dialog>/.exec(page.text);
+  // Filter now leads the row (a real request: "filter button should be
+  // first on the row"), so the capture must run past the filter's own
+  // dialog to the search form's closing tag, not stop at the first
+  // </dialog> (which now belongs to the filter, not the row).
+  const rowMatch = /<div class="members-search-filter-row no-print">([\s\S]*?<\/form>)\s*<\/div>/.exec(page.text);
   assert.ok(rowMatch, 'expected the search+filter row');
   assert.match(rowMatch[1], /class="members-search-bar"/);
   assert.match(rowMatch[1], /onclick="document\.getElementById\('members-filter-dialog'\)\.showModal\(\)"/);

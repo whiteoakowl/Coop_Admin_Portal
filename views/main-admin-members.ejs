@@ -129,16 +129,17 @@
         </dialog>
       <% } %>
 
-      <%# A real request: "search members on the left and filter drop
-          down next to it on the right. This should appear on the left
-          side of the screen." Both used to be their own separate rows
-          (search full-width above, filter pushed to the far right of
-          the toolbar below it) - now one row, left-aligned. A later real
-          request moved the Filter dropdown out of here for the Members
-          tab specifically (into the button toolbar above, as "row 3"'s
-          lead item) - the Archive tab has no such toolbar, so it keeps
-          its own copy of the filter in its original spot right here. %>
+      <%# A real request (Archive tab): "filter button should be first on
+          the row. Search bar next to it." Reversed from the Members tab's
+          own search-then-filter order (that one keeps its own Filter in
+          the button toolbar above, not here) - the Archive tab has no
+          such toolbar, so its own copy of the filter leads this row
+          instead. %>
       <div class="members-search-filter-row no-print">
+        <% if (activeTab !== 'members') { %>
+          <%- include('partials/members-type-filter', { activeTab, typeFilter, familyFilter, families }) %>
+        <% } %>
+
         <form method="GET" action="/main-admin/members" class="members-search-bar">
           <input type="hidden" name="tab" value="<%= activeTab %>" />
           <input type="hidden" name="type" value="<%= typeFilter %>" />
@@ -146,10 +147,6 @@
           <svg class="icon"><use href="#icon-search"/></svg>
           <input id="q-input" type="search" name="q" value="<%= q %>" placeholder="Search members&hellip;" aria-label="Search members" />
         </form>
-
-        <% if (activeTab !== 'members') { %>
-          <%- include('partials/members-type-filter', { activeTab, typeFilter, familyFilter, families }) %>
-        <% } %>
       </div>
 
       <%# Edit mode's Select All/None + Actions dropdown - hidden until the

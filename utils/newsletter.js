@@ -9,16 +9,12 @@
 const db = require('../db');
 const { sanitizePostBody } = require('./sanitizeHtml');
 const notifications = require('./notifications');
+const { listActiveClassDays, classesWithOpenStaffSlotsForDay } = require('./classSchedule');
+const { getActiveKioskSemesterId } = require('./kioskSettings');
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
-
-// The 30-day lookback shared by the Business Directory and Classifieds
-// sections below - "additions from the last 30 days," a real request -
-// computed in SQL (not a JS Date passed in as a param) so it stays
-// correct against the DB's own clock rather than the app server's.
-const LAST_30_DAYS_SQL = "to_char(now() at time zone 'utc' - interval '30 days', 'YYYY-MM-DD HH24:MI:SS')";
 
 // Every section pulls straight from its own table's live rows - Events,
 // Directory, and Classifieds read from Track A/Track B's own utils
@@ -67,23 +63,28 @@ async function assembleContent() {
     parts.push('<h2>Announcements</h2><ul>' + announcements.map((a) => `<li><strong>${escapeHtml(a.title)}</strong> - ${escapeHtml(a.body)}</li>`).join('') + '</ul>');
   }
 
-  // A real request: "business directory additions from the last 30
-  // days" - every new listing in that window, not a fixed top-N, so a
-  // slow week shows nothing and a busy one shows everything.
-  const listings = await db
-    .prepare(`SELECT l.*, c.title AS "categoryTitle" FROM business_directory_listings l LEFT JOIN business_directory_categories c ON c.id = l.category_id WHERE l.status = 'active' AND l.created_at >= ${LAST_30_DAYS_SQL} ORDER BY l.created_at DESC`)
-    .all();
-  if (listings.length) {
-    parts.push('<h2>New in the Business Directory</h2><ul>' + listings.map((l) => `<li><strong>${escapeHtml(l.business_name)}</strong>${l.categoryTitle ? ' - ' + escapeHtml(l.categoryTitle) : ''}</li>`).join('') + '</ul>');
+  // A real request: "it should show a list of classes still needing a
+  // teacher or assistant" (explicitly NOT a general upcoming-classes
+  // schedule - just the unstaffed ones) - the exact same live
+  // classesWithOpenStaffSlotsForDay (utils/classSchedule.js) the Co-op
+  // Classes page's own "Classes Needing a Teacher or Assistant" button
+  // already uses, just flattened across every active day instead of
+  // one day at a time.
+  const staffingNeeds = [];
+  const activeSemesterId = await getActiveKioskSemesterId();
+  for (const day of await listActiveClassDays()) {
+    const hours = await classesWithOpenStaffSlotsForDay(day, activeSemesterId);
+    for (const hour of hours) {
+      for (const cls of hour.classes) {
+        const roles = [];
+        if (cls.teacherNeeded > 0) roles.push('teacher');
+        if (cls.assistantNeeded > 0) roles.push('assistant');
+        staffingNeeds.push(`<strong>${escapeHtml(cls.class_name)}</strong> (${escapeHtml(day.charAt(0).toUpperCase() + day.slice(1))}) - needs a ${roles.join(' and ')}.`);
+      }
+    }
   }
-
-  // A real request: "classifieds from the last 30 days" - same window
-  // and reasoning as the Business Directory section above.
-  const classifieds = await db
-    .prepare(`SELECT l.*, c.title AS "categoryTitle" FROM classified_listings l LEFT JOIN classified_categories c ON c.id = l.category_id WHERE l.status = 'active' AND l.created_at >= ${LAST_30_DAYS_SQL} ORDER BY l.created_at DESC`)
-    .all();
-  if (classifieds.length) {
-    parts.push('<h2>New Classifieds</h2><ul>' + classifieds.map((l) => `<li><strong>${escapeHtml(l.title)}</strong>${l.price ? ' - ' + escapeHtml(l.price) : ''}${l.categoryTitle ? ' (' + escapeHtml(l.categoryTitle) + ')' : ''}</li>`).join('') + '</ul>');
+  if (staffingNeeds.length) {
+    parts.push('<h2>Classes Needing a Teacher or Assistant</h2><ul>' + staffingNeeds.map((s) => `<li>${s}</li>`).join('') + '</ul>');
   }
 
   // Only public publications - a members-only article summarized in an
@@ -94,11 +95,24 @@ async function assembleContent() {
     parts.push('<h2>Publications</h2><ul>' + publications.map((p) => `<li><strong>${escapeHtml(p.title)}</strong></li>`).join('') + '</ul>');
   }
 
-  // A real request: "quick links for absence form and name tag form."
-  // Unlike every section above, always present regardless of live data -
-  // these are standing, evergreen links, not something that ever has
-  // "nothing to show."
-  parts.push('<h2>Quick Links</h2><ul><li><a href="/absence">Absence/Late Form</a></li><li><a href="/name-tag">Name Tag Form</a></li></ul>');
+  // A real request: "a button for business directory view and view
+  // classifieds. Button for join a committee." Standing links to those
+  // pages themselves (where everything active already lists live),
+  // replacing the old separate "New in the last 30 days" listings here -
+  // always present, not conditioned on anything new existing this week.
+  parts.push(
+    '<h2>Get Involved</h2><ul>' +
+      '<li><a href="/directory">View Business Directory</a></li>' +
+      '<li><a href="/classifieds">View Classifieds</a></li>' +
+      '<li><a href="/committees">Join a Committee</a></li>' +
+      '</ul>'
+  );
+
+  // A real request: "co-op section with a button for the absence/late
+  // form and a button for the name tag form" - its own labeled section,
+  // separate from Get Involved above. Always present, same "standing
+  // link, never conditioned on live data" reasoning as Get Involved.
+  parts.push('<h2>Co-op</h2><ul><li><a href="/absence">Absence/Late Form</a></li><li><a href="/name-tag">Name Tag Form</a></li></ul>');
 
   return sanitizePostBody(parts.join('\n') || '<p>Nothing new to share this week.</p>');
 }
@@ -127,16 +141,13 @@ async function createDraft(subject, accountId) {
   return info.lastInsertRowid;
 }
 
+// A real request: "why are there two editing feature boxes on
+// newsletter there should only be one for writing the main message" -
+// custom_note (now labeled "Newsletter Message") is the one editable
+// field left; body_html stays exactly as assembleContent() produced it
+// at createDraft time, never rewritten by an admin edit again.
 async function updateIssue(id, data) {
-  await db.prepare('UPDATE newsletter_issues SET subject = ?, body_html = ?, updated_at = now_text() WHERE id = ?').run(data.subject, sanitizePostBody(data.bodyHtml), id);
-}
-
-// A real request: "Add a 'Customize Newsletter' action where admin
-// writes their own note/letter that appears before the automatic
-// content." Its own column and its own save action, deliberately
-// separate from updateIssue's body_html.
-async function setCustomNote(id, note) {
-  await db.prepare('UPDATE newsletter_issues SET custom_note = ?, updated_at = now_text() WHERE id = ?').run(sanitizePostBody(note || ''), id);
+  await db.prepare('UPDATE newsletter_issues SET subject = ?, custom_note = ?, updated_at = now_text() WHERE id = ?').run(data.subject, sanitizePostBody(data.customNote || ''), id);
 }
 
 async function scheduleIssue(id, scheduledAt) {
@@ -172,7 +183,6 @@ module.exports = {
   getIssue,
   createDraft,
   updateIssue,
-  setCustomNote,
   scheduleIssue,
   unschedule,
   markSent,

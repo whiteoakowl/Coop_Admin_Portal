@@ -22,7 +22,7 @@ const db = require('../db');
 const { eventSectionIds, memberSatisfiesRestriction, sectionIdsForMember } = require('./sections');
 const { createCharge, amountPaidForCharge, cancelCharge } = require('./payments');
 const { GRADE_OPTIONS } = require('./membership');
-const { lastNameOf } = require('./members');
+const { lastNameOf, primaryParentForBilling } = require('./members');
 const notifications = require('./notifications');
 const { toCsvRow } = require('./spreadsheet');
 const { findMemberByBarcodeOrName } = require('./memberLookup');
@@ -1011,7 +1011,15 @@ async function chargeForConfirmedRegistration(tx, event, member, accountId, tick
       .get(event.id, member.family_id);
   }
   if (reuseCharge) return reuseCharge.charge_id;
-  return createCharge(member.id, accountId, 'event_registration', event.id, `${event.title}${ticketLabel} - event registration`, priceCents, tx);
+  // A real request: "only primary parent is billed for all event signups
+  // and class registrations for the entire family" - same
+  // primaryParentForBilling resolution as utils/classRegistration.js's
+  // own chargeForConfirmedRegistration, which also makes the 'family'
+  // price_per dedup above even more consistent: every sibling's charge
+  // for the same event now resolves to the exact same billed member
+  // regardless of registration order, not just the same event+family.
+  const billedMemberId = await primaryParentForBilling(member.id, tx);
+  return createCharge(billedMemberId, accountId, 'event_registration', event.id, `${event.title}${ticketLabel} - event registration`, priceCents, tx);
 }
 
 // Shared by registerForEvent (below, member self-service, full eligibility

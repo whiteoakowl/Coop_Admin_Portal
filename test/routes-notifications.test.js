@@ -28,6 +28,7 @@ const db = require('../db');
 const { hashPassword } = require('../utils/portalAuth');
 const { generateMemberCode } = require('../utils/members');
 const notifications = require('../utils/notifications');
+const newsletterUtil = require('../utils/newsletter');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -202,8 +203,12 @@ test('sending a newsletter issue notifies every active member account', async ()
   const admin = await loginAsMainAdmin();
   const parent = await createParentAccount();
 
-  const createRes = await request(app).post('/main-admin/newsletter').set('Cookie', admin.cookie).type('form').send({ subject: 'Notify Everyone', _csrf: admin.csrfToken });
-  const issueId = /\/main-admin\/newsletter\/(\d+)\/edit/.exec(createRes.headers.location)[1];
+  // A real request moved newsletter admin to a single always-current
+  // issue (GET /main-admin/newsletter auto-creates one, no more POST /
+  // creation route) - seeded directly here the same way a real draft
+  // would exist by the time someone sends it.
+  const mainAdminAccount = await db.prepare('SELECT id FROM member_accounts WHERE email = ?').get(process.env.MAIN_ADMIN_EMAIL);
+  const issueId = await newsletterUtil.createDraft('Notify Everyone', mainAdminAccount.id);
   await request(app).post(`/main-admin/newsletter/${issueId}/send`).set('Cookie', admin.cookie).type('form').send({ _csrf: admin.csrfToken });
 
   const items = await notifications.listForAccount(parent.accountId);

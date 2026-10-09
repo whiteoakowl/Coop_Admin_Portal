@@ -157,20 +157,28 @@ async function dashboardForMember(memberId) {
 // request for parents to have this same feature among themselves,
 // ranked against other parents only, not the student leaderboard) -
 // same table, same points math, just scoped to 'parent' instead of the
-// default 'student'.
+// default 'student'. A real request: "if a member is an admin they
+// still have the same member privileges as a parent... can complete
+// games, lessons, activities, anything" - the parent leaderboard counts
+// 'admin' alongside 'parent' (the same convention every other "is this
+// an adult/parent" check in this app already uses), so an admin's own
+// logged reading time actually shows up on it instead of silently never
+// counting toward anyone's ranking.
 async function leaderboard(limit = 10, memberType = 'student') {
+  const types = memberType === 'parent' ? ['parent', 'admin'] : [memberType];
+  const placeholders = types.map(() => '?').join(',');
   const rows = await db
     .prepare(
       `SELECT m.id AS member_id, m.name, COALESCE(SUM(rl.hours), 0) AS hours
        FROM members m
        LEFT JOIN reading_logs rl ON rl.member_id = m.id
-       WHERE m.member_type = ? AND m.active = 1
+       WHERE m.member_type IN (${placeholders}) AND m.active = 1
        GROUP BY m.id, m.name
        HAVING COALESCE(SUM(rl.hours), 0) > 0
        ORDER BY hours DESC
        LIMIT ?`
     )
-    .all(memberType, limit);
+    .all(...types, limit);
   return rows.map((row, index) => ({
     rank: index + 1,
     memberId: row.member_id,

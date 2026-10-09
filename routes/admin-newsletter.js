@@ -35,16 +35,43 @@ async function loadSendSchedule() {
   };
 }
 
+// A real request: "there should only be one newsletter to edit. remove
+// the table and add new issue buttons and features. when you click on
+// the newsletter subpage it should have all the editing features and
+// newsletter textbox on that page." newsletter_issues keeps its own
+// history of every past 'sent' issue (the member-facing archive -
+// routes/newsletter.js/newsletter-list.ejs - still browses all of them),
+// but the admin side now always operates on exactly one current
+// draft/scheduled issue instead of picking one from a list: whichever
+// mostRecentUnsentIssue() already finds, auto-creating a fresh one the
+// moment none exists (a brand new co-op, or right after the current one
+// gets marked sent) so this page is never empty and never asks for a
+// subject up front.
+const DEFAULT_NEWSLETTER_SUBJECT = 'This Week at the Co-op';
+
+async function currentIssue(req) {
+  let issue = await newsletter.mostRecentUnsentIssue();
+  if (!issue) {
+    const id = await newsletter.createDraft(DEFAULT_NEWSLETTER_SUBJECT, req.portalAccount.id);
+    issue = await newsletter.getIssue(id);
+  }
+  return issue;
+}
+
 router.get('/', async (req, res) => {
-  const issues = await newsletter.listIssues();
-  res.render('admin-newsletter-list', {
+  res.render('admin-newsletter-edit', {
     title: 'Newsletter',
-    issues,
+    issue: await currentIssue(req),
     schedule: await loadSendSchedule(),
     weekdays: WEEKDAYS,
+    error: req.query.error || null,
     notice: req.query.notice || null,
   });
 });
+
+// Stale bookmarks/links to the old per-issue edit URL land back on the
+// one true page instead of a 404.
+router.get('/:id/edit', (req, res) => res.redirect('/main-admin/newsletter'));
 
 // A real request: "check box under send automatically every week for
 // send newsletter immediately for a quick one time send out off
@@ -70,34 +97,12 @@ router.post('/settings', async (req, res) => {
   res.redirect('/main-admin/newsletter?notice=' + encodeURIComponent('Send schedule saved.'));
 });
 
-router.post('/', async (req, res) => {
-  const subject = (req.body.subject || '').trim();
-  if (!subject) return res.redirect('/main-admin/newsletter?notice=' + encodeURIComponent('A subject is required.'));
-  const id = await newsletter.createDraft(subject, req.portalAccount.id);
-  res.redirect(`/main-admin/newsletter/${id}/edit`);
-});
-
-async function loadEditor(req, res) {
-  const issue = await newsletter.getIssue(req.params.id);
-  if (!issue) return res.status(404).render('404', { title: 'Not Found' });
-  res.render('admin-newsletter-edit', { title: issue.subject, issue, error: req.query.error || null, notice: req.query.notice || null });
-}
-router.get('/:id/edit', loadEditor);
-
 router.post('/:id', async (req, res) => {
   const id = req.params.id;
   const subject = (req.body.subject || '').trim();
-  if (!subject) return res.redirect(`/main-admin/newsletter/${id}/edit?error=` + encodeURIComponent('A subject is required.'));
-  await newsletter.updateIssue(id, { subject, bodyHtml: req.body.bodyHtml || '' });
-  res.redirect(`/main-admin/newsletter/${id}/edit?notice=` + encodeURIComponent('Saved.'));
-});
-
-// A real request: "Add a 'Customize Newsletter' action where admin
-// writes their own note/letter that appears before the automatic
-// content."
-router.post('/:id/customize', async (req, res) => {
-  await newsletter.setCustomNote(req.params.id, req.body.customNote || '');
-  res.redirect(`/main-admin/newsletter/${req.params.id}/edit?notice=` + encodeURIComponent('Custom note saved.'));
+  if (!subject) return res.redirect('/main-admin/newsletter?error=' + encodeURIComponent('A subject is required.'));
+  await newsletter.updateIssue(id, { subject, customNote: req.body.customNote || '' });
+  res.redirect('/main-admin/newsletter?notice=' + encodeURIComponent('Saved.'));
 });
 
 // A real request: "add a button for view newsletter." Reuses the exact
@@ -113,27 +118,32 @@ router.get('/:id/preview', async (req, res) => {
     title: issue.subject,
     issue,
     portalTitle: 'Main Admin',
-    backHref: `/main-admin/newsletter/${issue.id}/edit`,
+    backHref: '/main-admin/newsletter',
   });
 });
 
 router.post('/:id/schedule', async (req, res) => {
   const scheduledAt = (req.body.scheduledAt || '').trim();
-  if (!scheduledAt) return res.redirect(`/main-admin/newsletter/${req.params.id}/edit?error=` + encodeURIComponent('Choose a date/time to schedule.'));
+  if (!scheduledAt) return res.redirect('/main-admin/newsletter?error=' + encodeURIComponent('Choose a date/time to schedule.'));
   await newsletter.scheduleIssue(req.params.id, scheduledAt);
-  res.redirect(`/main-admin/newsletter/${req.params.id}/edit?notice=` + encodeURIComponent('Scheduled.'));
+  res.redirect('/main-admin/newsletter?notice=' + encodeURIComponent('Scheduled.'));
 });
 
 router.post('/:id/unschedule', async (req, res) => {
   await newsletter.unschedule(req.params.id);
-  res.redirect(`/main-admin/newsletter/${req.params.id}/edit?notice=` + encodeURIComponent('Moved back to draft.'));
+  res.redirect('/main-admin/newsletter?notice=' + encodeURIComponent('Moved back to draft.'));
 });
 
+// Marking the current issue sent leaves currentIssue() with nothing
+// non-sent to find on the next GET /, so it auto-creates the next one -
+// "only one newsletter to edit" holds on every visit, not just the first.
 router.post('/:id/send', async (req, res) => {
   await newsletter.markSent(req.params.id);
-  res.redirect(`/main-admin/newsletter/${req.params.id}/edit?notice=` + encodeURIComponent('Marked sent.'));
+  res.redirect('/main-admin/newsletter?notice=' + encodeURIComponent('Marked sent.'));
 });
 
+// Same auto-create-on-next-visit reasoning as send above - deleting the
+// current draft just means currentIssue() builds a fresh one next time.
 router.post('/:id/delete', async (req, res) => {
   const issue = await newsletter.getIssue(req.params.id);
   await newsletter.deleteIssue(req.params.id);

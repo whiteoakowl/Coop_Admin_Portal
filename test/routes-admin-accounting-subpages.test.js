@@ -198,6 +198,132 @@ test('Categories subpage: lives at its own URL (not a modal on Accounts), and st
   assert.match(after.text, /Subpage Test Category/);
 });
 
+// Coverage for a real request: "add a trash icon at the end of each
+// row" (Invoices) and "add a trash button at the end of each row"
+// (Payments/Adjustments) - a genuine delete, not another way to cancel.
+test('Invoices subpage: the trash icon deletes the charge (and any payments against it)', async () => {
+  const admin = await loginAsMainAdmin();
+  const memberId = await createMember();
+  const page = await request(app).get('/main-admin/accounting/invoices').set('Cookie', admin.cookie);
+  await request(app)
+    .post('/main-admin/accounting/invoices')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ memberId: String(memberId), description: 'To Be Deleted', amount: '12.00', _csrf: extractCsrf(page.text) });
+  const charge = await db.prepare('SELECT * FROM payment_charges WHERE member_id = ?').get(memberId);
+
+  const memberPage = await request(app).get(`/main-admin/accounting/members/${memberId}`).set('Cookie', admin.cookie);
+  await request(app)
+    .post(`/main-admin/accounting/charges/${charge.id}/payments`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ direction: 'payment', amount: '12.00', _csrf: extractCsrf(memberPage.text) });
+  assert.ok(await db.prepare('SELECT 1 FROM payment_payments WHERE charge_id = ?').get(charge.id));
+
+  const invoicesPage = await request(app).get('/main-admin/accounting/invoices').set('Cookie', admin.cookie);
+  const res = await request(app)
+    .post(`/main-admin/accounting/invoices/${charge.id}/delete`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: extractCsrf(invoicesPage.text) });
+  assert.match(res.headers.location, /\/main-admin\/accounting\/invoices\?notice=/);
+
+  assert.equal(await db.prepare('SELECT 1 FROM payment_charges WHERE id = ?').get(charge.id), undefined);
+  assert.equal(await db.prepare('SELECT 1 FROM payment_payments WHERE charge_id = ?').get(charge.id), undefined);
+});
+
+test('Adjustments subpage: deleting a cancelled charge\'s row uses the same delete route but returns to Adjustments', async () => {
+  const admin = await loginAsMainAdmin();
+  const memberId = await createMember();
+  const page = await request(app).get('/main-admin/accounting/invoices').set('Cookie', admin.cookie);
+  await request(app)
+    .post('/main-admin/accounting/invoices')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ memberId: String(memberId), description: 'Cancelled Then Deleted', amount: '8.00', _csrf: extractCsrf(page.text) });
+  const charge = await db.prepare('SELECT * FROM payment_charges WHERE member_id = ?').get(memberId);
+  const memberPage = await request(app).get(`/main-admin/accounting/members/${memberId}`).set('Cookie', admin.cookie);
+  await request(app)
+    .post(`/main-admin/accounting/charges/${charge.id}/cancel`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: extractCsrf(memberPage.text) });
+
+  const adjustmentsPage = await request(app).get('/main-admin/accounting/adjustments').set('Cookie', admin.cookie);
+  assert.match(adjustmentsPage.text, /Cancelled Then Deleted/);
+  const res = await request(app)
+    .post(`/main-admin/accounting/invoices/${charge.id}/delete`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ back: 'adjustments', _csrf: extractCsrf(adjustmentsPage.text) });
+  assert.match(res.headers.location, /\/main-admin\/accounting\/adjustments\?notice=/);
+  assert.equal(await db.prepare('SELECT 1 FROM payment_charges WHERE id = ?').get(charge.id), undefined);
+});
+
+test('Payments subpage: the trash button deletes the payment row and puts the charge back to pending', async () => {
+  const admin = await loginAsMainAdmin();
+  const memberId = await createMember();
+  const page = await request(app).get('/main-admin/accounting/invoices').set('Cookie', admin.cookie);
+  await request(app)
+    .post('/main-admin/accounting/invoices')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ memberId: String(memberId), description: 'Paid Then Undone', amount: '25.00', _csrf: extractCsrf(page.text) });
+  const charge = await db.prepare('SELECT * FROM payment_charges WHERE member_id = ?').get(memberId);
+  const memberPage = await request(app).get(`/main-admin/accounting/members/${memberId}`).set('Cookie', admin.cookie);
+  await request(app)
+    .post(`/main-admin/accounting/charges/${charge.id}/payments`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ direction: 'payment', amount: '25.00', _csrf: extractCsrf(memberPage.text) });
+  assert.equal((await db.prepare('SELECT status FROM payment_charges WHERE id = ?').get(charge.id)).status, 'paid');
+  const payment = await db.prepare('SELECT * FROM payment_payments WHERE charge_id = ?').get(charge.id);
+
+  const paymentsPage = await request(app).get('/main-admin/accounting/payments').set('Cookie', admin.cookie);
+  const res = await request(app)
+    .post(`/main-admin/accounting/payments/${payment.id}/delete`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: extractCsrf(paymentsPage.text) });
+  assert.match(res.headers.location, /\/main-admin\/accounting\/payments\?notice=/);
+
+  assert.equal(await db.prepare('SELECT 1 FROM payment_payments WHERE id = ?').get(payment.id), undefined);
+  assert.equal((await db.prepare('SELECT status FROM payment_charges WHERE id = ?').get(charge.id)).status, 'pending');
+});
+
+test('Adjustments subpage: deleting a refund row uses the same payments delete route but returns to Adjustments', async () => {
+  const admin = await loginAsMainAdmin();
+  const memberId = await createMember();
+  const page = await request(app).get('/main-admin/accounting/invoices').set('Cookie', admin.cookie);
+  await request(app)
+    .post('/main-admin/accounting/invoices')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ memberId: String(memberId), description: 'Refunded Then Deleted', amount: '18.00', _csrf: extractCsrf(page.text) });
+  const charge = await db.prepare('SELECT * FROM payment_charges WHERE member_id = ?').get(memberId);
+  const memberPage = await request(app).get(`/main-admin/accounting/members/${memberId}`).set('Cookie', admin.cookie);
+  await request(app)
+    .post(`/main-admin/accounting/charges/${charge.id}/payments`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ direction: 'payment', amount: '18.00', _csrf: extractCsrf(memberPage.text) });
+  await request(app)
+    .post(`/main-admin/accounting/charges/${charge.id}/payments`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ direction: 'refund', amount: '18.00', _csrf: extractCsrf(memberPage.text) });
+  const refund = await db.prepare('SELECT * FROM payment_payments WHERE charge_id = ? AND amount_cents < 0').get(charge.id);
+
+  const adjustmentsPage = await request(app).get('/main-admin/accounting/adjustments').set('Cookie', admin.cookie);
+  const res = await request(app)
+    .post(`/main-admin/accounting/payments/${refund.id}/delete`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ back: 'adjustments', _csrf: extractCsrf(adjustmentsPage.text) });
+  assert.match(res.headers.location, /\/main-admin\/accounting\/adjustments\?notice=/);
+  assert.equal(await db.prepare('SELECT 1 FROM payment_payments WHERE id = ?').get(refund.id), undefined);
+});
+
 test('Settings subpage: Payment Methods list is editable and feeds the Record Payment dialog method dropdown', async () => {
   const admin = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/accounting/settings').set('Cookie', admin.cookie);

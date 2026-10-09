@@ -9,51 +9,55 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p><a href="/main-admin/newsletter">&larr; Back</a></p>
+    <%# A real request: "there should only be one newsletter to edit.
+        remove the table and add new issue buttons and features. when you
+        click on the newsletter subpage it should have all the editing
+        features and newsletter textbox on that page." routes/admin-
+        newsletter.js's own GET / always resolves to exactly one current
+        draft/scheduled issue (auto-created the moment none exists), so
+        this page no longer needs a list to pick one from, a "+ New
+        Issue" button, or a Back link to get here from. %>
     <div class="grid-box-header">
-      <h1><%= issue.subject %></h1>
+      <h1>Newsletter</h1>
       <span class="badge-pill badge-pill-<%= issue.status === 'sent' ? 'green' : issue.status === 'scheduled' ? 'orange' : 'gray' %>"><%= issue.status.charAt(0).toUpperCase() + issue.status.slice(1) %></span>
+    </div>
+    <div class="roster-btn-row no-print">
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-schedule-dialog').showModal()">Edit Weekly Schedule</button>
     </div>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <% if (issue.status === 'sent') { %>
-      <p class="hint">Sent <%= issue.sent_at %> to <%= issue.recipient_count %> active member account(s). Sent issues can't be edited.</p>
-      <% if (issue.custom_note) { %><div class="forum-editable"><%- issue.custom_note %></div><% } %>
-      <div class="forum-editable"><%- issue.body_html %></div>
-    <% } else { %>
-      <%# A real request: "Add a 'Customize Newsletter' action where
-          admin writes their own note/letter that appears before the
-          automatic content." Its own form/save action and its own
-          column (custom_note), kept separate from the auto-assembled
-          body_html below - a later request: "customize existing, delete
-          description" dropped this section's own intro sentence. %>
+    <%# issue here is always 'draft' or 'scheduled' - routes/admin-
+        newsletter.js's own currentIssue() only ever hands this template a
+        non-sent issue, auto-creating a fresh draft the moment the
+        current one gets marked sent, so there's no read-only "sent"
+        state to render here any more.
+        A real request: "why are there two editing feature boxes on
+        newsletter there should only be one for writing the main
+        message." The old second box (body_html, labeled "Automatic
+        Content") let an admin hand-edit the auto-assembled
+        events/staffing-needs/links content itself, which both
+        duplicated this one box's job and meant an admin's own edits
+        there could drift from (or get silently overwritten by) whatever
+        utils/newsletter.js's own assembleContent next produced. Now
+        there's exactly one textbox - this one, custom_note, saved as
+        the newsletter's own written message - and the automatic content
+        is assembled fresh at send time instead of being stored,
+        editable HTML an admin could accidentally break. %>
       <div class="manage-section">
-        <div class="grid-box-header"><h2>Customize Newsletter</h2></div>
-        <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/customize" class="member-form-grid" data-forum-editor>
+        <div class="grid-box-header"><h2>Newsletter Message</h2></div>
+        <form method="POST" action="/main-admin/newsletter/<%= issue.id %>" class="member-form-grid" id="newsletter-edit-form" data-forum-editor>
+          <label class="member-form-full">Subject
+            <input type="text" name="subject" value="<%= issue.subject %>" required />
+          </label>
           <div class="member-form-full">
             <%- include('partials/forum-editor-toolbar') %>
             <div class="forum-editable" data-forum-editable contenteditable="true"><%- issue.custom_note || '' %></div>
             <input type="hidden" name="customNote" data-forum-body-input />
           </div>
-          <div class="member-form-full">
-            <button type="submit" class="primary-btn">Save Note</button>
-          </div>
         </form>
       </div>
-
-      <form method="POST" action="/main-admin/newsletter/<%= issue.id %>" class="member-form-grid" id="newsletter-edit-form">
-        <label class="member-form-full">Subject
-          <input type="text" name="subject" value="<%= issue.subject %>" required />
-        </label>
-        <div class="member-form-full" data-forum-editor>
-          <label>Automatic Content</label>
-          <%- include('partials/forum-editor-toolbar') %>
-          <div class="forum-editable" data-forum-editable contenteditable="true"><%- issue.body_html %></div>
-          <input type="hidden" name="bodyHtml" data-forum-body-input />
-        </div>
-      </form>
       <script src="/js/forum-editor.js"></script>
 
       <%# A real request: "buttons at the bottom. save, schedule, mark
@@ -66,14 +70,21 @@
           "not needed feature since the events update automatically" (the
           content is only ever assembled once, at creation, from
           whatever's live at that moment - see utils/newsletter.js's own
-          assembleContent). %>
+          assembleContent).
+          A later real request: "remove schedule button at the bottom. we
+          only schedule through the edit schedule button at the top" -
+          dropped the per-issue one-time Schedule button/dialog (and its
+          own POST .../schedule) from this row entirely; the top Edit
+          Weekly Schedule dialog's own day/time + Send Now checkbox is
+          the only scheduling control left. An issue already sitting in
+          'scheduled' status from before this change can still be moved
+          back to draft below, but nothing in this UI can schedule a new
+          one that way any more. %>
       <div class="manage-section">
         <div class="grid-box-header"><h2>Actions</h2></div>
         <div class="roster-btn-row roster-btn-row-nowrap">
           <button type="submit" form="newsletter-edit-form" class="roster-action-btn">Save</button>
-          <% if (issue.status === 'draft') { %>
-            <button type="button" class="roster-action-btn" onclick="document.getElementById('newsletter-schedule-dialog').showModal()">Schedule</button>
-          <% } else if (issue.status === 'scheduled') { %>
+          <% if (issue.status === 'scheduled') { %>
             <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/unschedule" class="inline-block-form">
               <button type="submit" class="roster-action-btn">Move Back to Draft</button>
             </form>
@@ -89,22 +100,51 @@
         <% if (issue.status === 'scheduled') { %><p class="hint">Scheduled for <%= issue.scheduled_at %>.</p><% } %>
       </div>
 
-      <%# A real request: "if you click schedule, a pop up window should
-          show to pick the date and time." Replaces the old inline
-          datetime-local input sitting directly in the Actions row. %>
-      <dialog id="newsletter-schedule-dialog" class="member-picker-dialog">
-        <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/schedule">
-          <h3>Schedule Newsletter</h3>
-          <label>Date &amp; Time
-            <input type="datetime-local" name="scheduledAt" required />
+      <%# Edit Weekly Schedule - moved here from the old list page's own
+          toolbar (admin-newsletter-list.ejs, now removed). %>
+      <dialog id="edit-schedule-dialog" class="member-picker-dialog">
+        <form method="POST" action="/main-admin/newsletter/settings">
+          <h3>Edit Weekly Schedule</h3>
+          <p class="hint">
+            Controls when the newsletter would go out automatically once a real email provider is connected - no email
+            provider is configured yet, so nothing sends automatically regardless of this setting. The current
+            newsletter can still be marked sent manually below.
+          </p>
+          <label class="checkbox-option">
+            <input type="checkbox" name="enabled" value="1" <%= schedule.enabled ? 'checked' : '' %> />
+            Send automatically every week
           </label>
+          <%# A real request: "check box under send automatically every
+              week for send newsletter immediately for a quick one time
+              send out off schedule. Reverts back to schedule settings
+              after." A one-time action, never itself persisted - the
+              schedule above saves exactly as submitted either way, and
+              this checkbox is always unchecked again next time the
+              dialog opens. %>
+          <label class="checkbox-option">
+            <input type="checkbox" name="sendNow" value="1" />
+            Send newsletter immediately <span class="hint">(one-time, outside the schedule)</span>
+          </label>
+          <div class="class-form-row">
+            <div class="class-form-field">
+              <span class="class-form-field-label">Day</span>
+              <select name="day">
+                <% weekdays.forEach(function(d) { %>
+                  <option value="<%= d %>" <%= schedule.day === d ? 'selected' : '' %>><%= d %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="class-form-field">
+              <span class="class-form-field-label">Time</span>
+              <input type="time" name="time" value="<%= schedule.time %>" />
+            </div>
+          </div>
           <div class="notes-dialog-actions">
             <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-            <button type="submit" class="primary-btn">Schedule</button>
+            <button type="submit" class="primary-btn">Save Schedule</button>
           </div>
         </form>
       </dialog>
-    <% } %>
   </main>
 </body>
 </html>

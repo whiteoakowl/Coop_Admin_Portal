@@ -137,3 +137,21 @@ test('GET /parent/leaderboard ranks parents against other parents only, never mi
   assert.doesNotMatch(res.text, /Leaderboard Student/, 'a student\'s reading hours must never appear on the parent leaderboard');
   assert.match(res.text, /\(You\)/);
 });
+
+// A real request: "if a member is an admin they still have the same
+// member privileges as a parent... can complete games, lessons,
+// activities, anything" - an admin's own logged reading hours must show
+// up on the parent leaderboard too, not be silently excluded.
+test('GET /parent/leaderboard counts an admin member\'s hours alongside parents\' own', async () => {
+  const { cookie } = await createParentAndLogin('Leaderboard Parent Two', 'leaderboard-parent-2@example.com');
+  const { lastInsertRowid: adminId } = await db
+    .prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Leaderboard Admin', 'leaderboard-admin-barcode', 'admin', 1)")
+    .run();
+  await db
+    .prepare("INSERT INTO reading_logs (member_id, book_title, hours, log_date) VALUES (?, 'Admin Book', 5, ?)")
+    .run(adminId, new Date().toISOString().slice(0, 10));
+
+  const res = await request(app).get('/parent/leaderboard').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /Leaderboard Admin/, 'an admin\'s own logged reading hours should appear on the parent leaderboard');
+});

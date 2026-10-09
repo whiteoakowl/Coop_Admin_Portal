@@ -144,6 +144,23 @@ test('Parent Reading Challenge admin page: a Top 10 Adults By Hours card lists t
   assert.ok(highIndex !== -1 && lowIndex !== -1 && highIndex < lowIndex, 'higher-hours adult should rank above a lower-hours one');
 });
 
+// A real request: "if a member is an admin they still have the same
+// member privileges as a parent... can complete games, lessons,
+// activities, anything" - an admin's own logged reading time should
+// count on the Parent Reading Challenge page and its Top 10 Adults
+// card exactly like a parent's, not be silently excluded.
+test('Parent Reading Challenge admin page: an admin member counts as a parent, not excluded', async () => {
+  const cookie = await loginAsMainAdmin();
+  const info = await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES (?, ?, 'admin', 1)").run('Reading Admin', 'ADM-READ');
+  await db.prepare('INSERT INTO reading_logs (member_id, book_title, hours, log_date) VALUES (?, ?, ?, ?)').run(info.lastInsertRowid, 'Admin Book', 15, '2027-01-01');
+
+  const res = await request(app).get('/main-admin/fun/reading-challenge/parents').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /Reading Admin/);
+  const topCard = res.text.split('<h2>Top 10 Adults By Hours</h2>')[1].split('</table>')[0];
+  assert.match(topCard, /Reading Admin/, 'an admin with logged hours should appear on the adults leaderboard card');
+});
+
 test('Games admin page: top score per game + recent activity', async () => {
   const cookie = await loginAsMainAdmin();
   const info = await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES (?, ?, 'student', 1)").run('Games Test Student', 'GTS-1');

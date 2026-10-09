@@ -10,7 +10,7 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Accounts</h1>
-    <p class="hint">Members with any charge history below. Search Member to add a first charge for someone new.</p>
+    <p class="hint">Every active member below, charge history or not. Search Member to add a first charge for someone new.</p>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
@@ -29,21 +29,14 @@
       <button type="button" class="roster-action-btn" onclick="document.getElementById('goto-member-dialog').showModal()">+ Adjustment</button>
     </div>
 
-    <div class="members-search-filter-row no-print">
-      <form method="GET" action="/main-admin/accounting" class="members-search-bar">
-        <svg class="icon"><use href="#icon-search"/></svg>
-        <input type="search" name="q" value="<%= q %>" placeholder="Search member&hellip;" aria-label="Search member" />
-        <button type="submit" class="members-search-go-btn">Go</button>
-      </form>
-    </div>
-
-    <%# A real request: "2nd button row, filters, email all invoices,
-        print preview icon, export icon." Filter here just narrows the
-        table to members who currently owe something - a status filter
-        (paid/pending/etc.) belongs to the Invoices subpage instead,
-        where "status" actually means something (a charge's own status),
-        not a member's. %>
-    <div class="roster-btn-row accounting-accounts-toolbar-2 no-print">
+    <%# A real request: "past due only should be on the same row as email
+        all invoices. Print icon and export icon should be on the same
+        row next to each other." Two rows instead of the four controls
+        crammed into one - filter here just narrows the table to members
+        who currently owe something; a status filter (paid/pending/etc.)
+        belongs to the Invoices subpage instead, where "status" means a
+        charge's own status, not a member's. %>
+    <div class="roster-btn-row accounting-accounts-toolbar-2 no-print" data-fixed-columns="2">
       <form method="GET" class="inline-block-form">
         <input type="hidden" name="q" value="<%= q %>" />
         <label class="checkbox-option">
@@ -53,39 +46,55 @@
       <form method="POST" action="/main-admin/accounting/email-all-invoices" class="inline-block-form" data-confirm="Send a balance-due reminder to every member who currently owes something?">
         <button type="submit" class="roster-action-btn">Email All Invoices</button>
       </form>
+    </div>
+    <div class="roster-btn-row accounting-accounts-toolbar-3 no-print" data-fixed-columns="2">
       <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print Preview" title="Print Preview"><svg class="icon"><use href="#icon-printer"/></svg></button>
       <a class="icon-btn" href="/main-admin/accounting/export.csv?q=<%= encodeURIComponent(q) %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
     </div>
 
+    <%# A real request: "search bar should be just above the member
+        table" + "go button should be in the search bar, attached." %>
+    <div class="members-search-filter-row no-print">
+      <form method="GET" action="/main-admin/accounting" class="members-search-bar accounting-search-attached">
+        <svg class="icon"><use href="#icon-search"/></svg>
+        <input type="search" name="q" value="<%= q %>" placeholder="Search member&hellip;" aria-label="Search member" />
+        <button type="submit" class="members-search-go-btn">Go</button>
+      </form>
+    </div>
+
     <% const visibleMembers = pastDueOnly ? members.filter((m) => m.balanceCents > 0) : members; %>
     <% if (visibleMembers.length === 0) { %>
-      <p class="roster-empty"><%= q ? 'No active members match that search.' : 'No charges recorded yet.' %></p>
+      <p class="roster-empty"><%= q ? 'No active members match that search.' : 'No active members yet.' %></p>
     <% } else { %>
       <div class="roster-scroll">
-        <table class="roster-table members-table condensed-table">
+        <table class="roster-table members-table condensed-table accounting-table-mobile-fit accounting-accounts-table-fit">
           <thead>
             <tr>
               <th>Member</th>
+              <th></th>
               <th>Balance</th>
               <th>Past Due</th>
-              <th></th>
             </tr>
           </thead>
           <tbody>
             <% visibleMembers.forEach(function(m) { %>
               <tr>
-                <td class="roster-name-col"><a href="/main-admin/accounting/members/<%= m.id %>"><%= m.name %></a></td>
-                <td><span class="badge-pill badge-pill-<%= m.balanceCents > 0 ? 'orange' : 'green' %>"><%= formatCents(m.balanceCents) %></span></td>
-                <td><% if (m.balanceCents > 0) { %><span class="badge-pill badge-pill-orange">Past Due</span><% } else { %>&mdash;<% } %></td>
-                <td class="roster-btn-row">
+                <%# A real request: "when you click on each member name it
+                    shows the full membership profile just like other
+                    pages, exactly. When you click the invoice icon it
+                    goes to that members full account page." %>
+                <td class="roster-name-col"><a href="/main-admin/members/<%= m.id %>"><%= m.name %></a></td>
+                <td class="roster-btn-row accounting-row-icons">
                   <a class="icon-btn" href="/main-admin/accounting/members/<%= m.id %>?autoprint=1" aria-label="Print statement for <%= m.name %>" title="Print statement"><svg class="icon"><use href="#icon-printer"/></svg></a>
                   <% if (m.email) { %>
                     <a class="icon-btn" href="mailto:<%= m.email %>" aria-label="Email <%= m.name %>" title="Email <%= m.name %>"><svg class="icon"><use href="#icon-mail"/></svg></a>
                   <% } else { %>
                     <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No email on file"><svg class="icon"><use href="#icon-mail"/></svg></span>
                   <% } %>
-                  <a class="icon-btn" href="/main-admin/accounting/invoices?memberId=<%= m.id %>" aria-label="View invoices for <%= m.name %>" title="View invoices"><svg class="icon"><use href="#icon-file-text"/></svg></a>
+                  <a class="icon-btn" href="/main-admin/accounting/members/<%= m.id %>" aria-label="View account for <%= m.name %>" title="View account"><svg class="icon"><use href="#icon-file-text"/></svg></a>
                 </td>
+                <td><span class="badge-pill badge-pill-<%= m.balanceCents > 0 ? 'orange' : 'green' %>"><%= formatCents(m.balanceCents) %></span></td>
+                <td><% if (m.balanceCents > 0) { %><span class="badge-pill badge-pill-orange">Past Due</span><% } else { %>&mdash;<% } %></td>
               </tr>
             <% }); %>
           </tbody>

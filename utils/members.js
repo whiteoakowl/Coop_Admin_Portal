@@ -121,6 +121,32 @@ async function familyOf(memberId) {
   return (await db.prepare('SELECT * FROM members WHERE family_id = ? AND id != ? AND active = 1').all(self.family_id, memberId)).sort(byLastName);
 }
 
+// A real request: "primary parent is billed for all event signups and
+// class registrations for the entire family" - resolves whoever a charge
+// for memberId should actually be billed to: the family's own designated
+// primary parent (is_primary_parent - Members page), falling back to
+// whichever parent/admin in the family comes first alphabetically if
+// nobody's been marked primary yet (same fallback utils/scheduleCardData
+// .js's own primaryParentFor already uses for schedule cards, and the
+// same "admin counts as parent" convention used everywhere else in this
+// app). Falls back to memberId itself when there's no family at all, or
+// a family with no parent/admin in it (e.g. only children) - someone has
+// to be billed, and a family's own primary parent might well be memberId
+// already, which this naturally returns since the family query includes
+// every member, not just everyone else. `dbHandle` must be passed as the
+// open transaction handle (`tx`) when called from inside
+// db.withTransaction - see createCharge's own comment (utils/payments.js)
+// on why a query against the outer `db` would never return there.
+async function primaryParentForBilling(memberId, dbHandle = db) {
+  const self = await dbHandle.prepare('SELECT id, family_id FROM members WHERE id = ?').get(memberId);
+  if (!self || self.family_id == null) return memberId;
+  const family = await dbHandle.prepare("SELECT id, name, member_type, is_primary_parent FROM members WHERE family_id = ? AND active = 1").all(self.family_id);
+  const parents = family.filter((m) => m.member_type === 'parent' || m.member_type === 'admin').sort(byLastName);
+  if (parents.length === 0) return memberId;
+  const primary = parents.find((p) => p.is_primary_parent) || parents[0];
+  return primary.id;
+}
+
 // True if any of memberId's family members is 2 years old or younger -
 // used to flag a parent as having an infant on floater lists, since a
 // floater with an infant may need a different kind of coverage.
@@ -412,6 +438,7 @@ module.exports = {
   loadFamilyMember,
   loadFamilyMemberAnyType,
   familyOf,
+  primaryParentForBilling,
   hasInfantChild,
   allFamilies,
   setMemberFamily,

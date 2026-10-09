@@ -70,7 +70,11 @@ router.get('/reading-challenge/students', async (req, res) => {
 // query, scoped to parents, plus each parent's family name to group by
 // in the view. A real request also added "a top card that shows top 10
 // adult with the most hours" - same rows, just re-sorted by hours and
-// sliced rather than a second query.
+// sliced rather than a second query. member_type IN ('parent', 'admin') -
+// a real request: "if a member is an admin they still have the same
+// member privileges as a parent... can complete games, lessons,
+// activities, anything," the same "admin counts as parent" convention
+// every other adult-scoped query in this app already uses.
 router.get('/reading-challenge/parents', async (req, res) => {
   const rows = await db
     .prepare(
@@ -79,7 +83,7 @@ router.get('/reading-challenge/parents', async (req, res) => {
        LEFT JOIN families f ON f.id = m.family_id
        LEFT JOIN reading_logs rl ON rl.member_id = m.id
        LEFT JOIN reading_goals rg ON rg.member_id = m.id
-       WHERE m.member_type = 'parent' AND m.active = 1
+       WHERE m.member_type IN ('parent', 'admin') AND m.active = 1
        GROUP BY m.id, m.name, f.name, rg.weekly_goal_hours
        ORDER BY COALESCE(f.name, 'zzz'), m.name`
     )
