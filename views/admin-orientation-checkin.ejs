@@ -46,22 +46,42 @@
       <p class="roster-empty">No one is registered for classes this semester yet.</p>
     <% } else { %>
       <div class="roster-scroll">
-        <table class="roster-table members-table condensed-table">
+        <table class="roster-table members-table condensed-table orientation-checkin-table">
           <thead>
             <tr>
-              <th>Check In</th>
+              <th class="orientation-col-center">Checked In</th>
+              <th>Name</th>
               <th>Day</th>
             </tr>
           </thead>
           <tbody>
             <% rows.forEach(function(r) { %>
               <tr>
-                <td class="roster-name-col">
-                  <%= r.memberName %>
-                  <% if (r[field]) { %>
-                    <span class="status-badge status-badge-present">Checked In</span>
-                  <% } %>
+                <%# A real request: "checking green bubble next member
+                    names should be its own clean column and allow for
+                    manual click attendance as well as the barcode scan
+                    that is already there" - same orientation-dot click-
+                    to-toggle button/public/js/orientation-toggle.js the
+                    main Orientation Tracking page already uses, just
+                    scoped to this one field (tour or openHouse) instead
+                    of all 4. Manual toggle and the barcode Check In
+                    button above both end up calling the same
+                    setOrientationField, so neither can leave the other
+                    out of sync. %>
+                <td class="orientation-col-center">
+                  <button
+                    type="button"
+                    class="orientation-dot<%= r[field] ? ' orientation-dot-complete' : '' %>"
+                    data-orientation-toggle
+                    data-member-id="<%= r.memberId %>"
+                    data-semester-id="<%= semesterId != null ? semesterId : '' %>"
+                    data-field="<%= field %>"
+                    data-complete="<%= r[field] ? '1' : '0' %>"
+                    aria-pressed="<%= r[field] ? 'true' : 'false' %>"
+                    aria-label="<%= title %> for <%= r.memberName %> - <%= r[field] ? 'checked in' : 'not checked in' %>"
+                  ></button>
                 </td>
+                <td class="roster-name-col"><%= r.memberName %></td>
                 <td><%= r.dayLabel %></td>
               </tr>
             <% }); %>
@@ -71,5 +91,6 @@
     <% } %>
   </main>
   <script src="/js/copy-link.js"></script>
+  <script src="/js/orientation-toggle.js"></script>
 </body>
 </html>

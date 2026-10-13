@@ -172,7 +172,7 @@ test('Orientation toggle rejects an unknown field rather than interpolating it',
   assert.equal(badField.status, 400);
 });
 
-test('Tour Check-In subpage: purple Check In link to the scan screen, Copy Link, and only Check In/Day columns', async () => {
+test('Tour Check-In subpage: purple Check In link to the scan screen, Copy Link, and Checked In/Name/Day columns', async () => {
   const admin = await loginAsAdmin();
   const monday = await createFamilyWithEnrolledStudent('monday', { parentName: 'Tour Monday Parent' });
 
@@ -182,9 +182,14 @@ test('Tour Check-In subpage: purple Check In link to the scan screen, Copy Link,
   assert.match(page.text, /data-copy-link="[^"]*\/admin\/orientation\/tour-checkin"/);
   assert.match(page.text, /Tour Monday Parent/);
   // A real request: "only 1 column for check in and one for day" - no
-  // more Select All/checkbox column, no separate Status column.
-  assert.match(page.text, /<th>Check In<\/th>\s*<th>Day<\/th>/);
+  // more Select All/checkbox column. A later real request: "checking
+  // green bubble next member names should be its own clean column and
+  // allow for manual click attendance" - re-added a dedicated Checked In
+  // column, this time as a click-to-toggle dot rather than the old bulk-
+  // select checkbox column that request was about removing.
+  assert.match(page.text, /<th class="orientation-col-center">Checked In<\/th>\s*<th>Name<\/th>\s*<th>Day<\/th>/);
   assert.doesNotMatch(page.text, /data-select-all-for/);
+  assert.match(page.text, /data-orientation-toggle[\s\S]*?data-field="tour"/);
   void monday;
 });
 
@@ -312,6 +317,23 @@ test('Tour Check-In and Open House Check-In toolbars carry the orientation-check
   }
 });
 
+// A real request: "Tour check in and open house check in, shrink table
+// to fit on mobile. No sliding side to side" - a real name plus a comma-
+// joined multi-day label ("Monday, Wednesday") overflowed the .roster-
+// scroll wrapper under .roster-table td's own base nowrap rule (confirmed
+// live: tableScrollWidth 402 vs the wrapper's own 356 clientWidth at a
+// 390px viewport). public/css/styles.css's own .orientation-checkin-table
+// mobile rules (letting both columns wrap) are what fix that - this just
+// locks in the markup contract those rules are scoped to.
+test('Tour Check-In and Open House Check-In tables carry the orientation-checkin-table class their mobile no-horizontal-scroll CSS is scoped to', async () => {
+  const admin = await loginAsAdmin();
+  for (const url of ['/admin/orientation/tour-checkin', '/admin/orientation/orientation-checkin']) {
+    const page = await request(app).get(url).set('Cookie', admin.cookie);
+    assert.equal(page.status, 200, url);
+    assert.match(page.text, /class="roster-table members-table condensed-table orientation-checkin-table"/, url);
+  }
+});
+
 // A real request: "Orientation video column should say parent
 // orientation, teacher training should say teacher orientation, add a
 // column for open house. If the column title has two words stack them
@@ -364,7 +386,12 @@ test('Date Completed shows the latest completion date once every circle is check
       .send({ _csrf: admin.csrfToken, field, value: '1' });
   }
   const page = await request(app).get('/admin/orientation').set('Cookie', admin.cookie);
-  assert.match(page.text, />100%<\/td>\s*<td>\d{4}-\d{2}-\d{2}/);
+  // A real bug report: this used to render the raw now_text() column
+  // (UTC, "YYYY-MM-DD HH:MM:SS") with no formatting at all - now
+  // converted to Eastern time and the app's usual "M/D/YYYY, h:mm AM/PM"
+  // display (utils/dates.js's own formatTimestamp), same as every other
+  // admin-facing timestamp.
+  assert.match(page.text, />100%<\/td>\s*<td>\d{1,2}\/\d{1,2}\/\d{4}, \d{1,2}:\d{2} (AM|PM)<\/td>/);
 });
 
 // A real request: "Delete orientation Meet-up column", with "Orientation
@@ -394,6 +421,32 @@ test('Open House Check-In subpage scan marks open_house_complete, independently 
   const row = await db.prepare('SELECT open_house_complete, tour_complete FROM orientation_progress WHERE member_id = ?').get(parentId);
   assert.equal(Number(row.open_house_complete), 1);
   assert.equal(Number(row.tour_complete), 0);
+
+  // A real request: "allow for manual click attendance as well as the
+  // barcode scan that is already there" - both paths write the same
+  // orientation_progress row, so the list page's own dot reflects a
+  // barcode-scan check-in exactly as it would a manual click.
+  const afterScan = await request(app).get('/admin/orientation/orientation-checkin').set('Cookie', admin.cookie);
+  assert.match(afterScan.text, /data-field="openHouse"\s+data-complete="1"/);
+});
+
+test('Manually clicking the Checked In dot on Tour Check-In toggles the same field a barcode scan would', async () => {
+  const admin = await loginAsAdmin();
+  const { parentId } = await createFamilyWithEnrolledStudent('monday', { parentName: 'Manual Toggle Parent' });
+
+  const toggleOn = await request(app)
+    .post(`/admin/orientation/${parentId}/toggle`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: admin.csrfToken, field: 'tour', value: '1' });
+  assert.equal(toggleOn.status, 200);
+
+  const row = await db.prepare('SELECT tour_complete FROM orientation_progress WHERE member_id = ?').get(parentId);
+  assert.equal(Number(row.tour_complete), 1);
+
+  const page = await request(app).get('/admin/orientation/tour-checkin').set('Cookie', admin.cookie);
+  assert.match(page.text, /data-field="tour"\s+data-complete="1"/);
+  assert.match(page.text, /class="orientation-dot orientation-dot-complete"/);
 });
 
 // A real request: "Orientation gets a dropdown to pick which semester...

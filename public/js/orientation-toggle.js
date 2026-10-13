@@ -25,12 +25,20 @@
         dot.setAttribute('data-complete', nextValue ? '1' : '0');
         dot.setAttribute('aria-pressed', String(nextValue));
         dot.classList.toggle('orientation-dot-complete', nextValue);
+        // A real request put this same toggle dot on the Tour/Open House
+        // Check-In pages too (views/admin-orientation-checkin.ejs), whose
+        // rows have no % Complete column at all - targeting it by a
+        // dedicated class (rather than the old "2nd td from the end",
+        // which only happened to be the right cell on the Orientation
+        // Tracking table's own row shape) means this percent-recompute
+        // step just finds nothing and no-ops there, instead of silently
+        // overwriting whichever column actually sits in that position.
         const row = dot.closest('tr');
-        if (row) {
+        const percentCell = row ? row.querySelector('.orientation-percent-cell') : null;
+        if (percentCell) {
           const dots = row.querySelectorAll('[data-orientation-toggle]');
           const doneCount = Array.from(dots).filter((d) => d.getAttribute('data-complete') === '1').length;
-          const percentCell = row.querySelector('td:nth-last-child(2)');
-          if (percentCell) percentCell.textContent = `${Math.round((doneCount / dots.length) * 100)}%`;
+          percentCell.textContent = `${Math.round((doneCount / dots.length) * 100)}%`;
         }
       } catch (err) {
         // Reflects the same "reordering is a nice-to-have, not page-

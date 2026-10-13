@@ -26,6 +26,7 @@ const db = require('../db');
 const { primaryParentsFor } = require('./scheduleCardData');
 const { CLASS_DAY_LABELS_FULL } = require('./classDays');
 const { byLastName } = require('./members');
+const { formatTimestamp } = require('./dates');
 
 // A real request: "add a column for open house" - same shape as the 4
 // original circle columns (openHouse -> open_house_complete/
@@ -122,14 +123,19 @@ async function orientationRows(semesterId) {
       // orientation became FULLY complete (every circle checked), the
       // latest of the 5 fields' own _completed_at timestamps; blank
       // until all 5 are done, rather than a half-finished date that
-      // would read as "done" at a glance.
-      const dateCompleted =
+      // would read as "done" at a glance. A real bug report: this was
+      // rendered straight from the raw now_text() column (UTC,
+      // "YYYY-MM-DD HH:MM:SS") with no formatting at all - formatTimestamp
+      // converts it to Eastern time and the app's usual "M/D/YYYY, h:mm
+      // AM/PM" display, same as every other admin-facing timestamp.
+      const rawDateCompleted =
         doneCount === FIELDS.length
           ? FIELDS.map((f) => progress[`${COLUMN_PREFIX[f]}_completed_at`])
               .filter(Boolean)
               .sort()
               .slice(-1)[0] || null
           : null;
+      const dateCompleted = formatTimestamp(rawDateCompleted);
       return {
         memberId: entry.memberId,
         memberName: entry.memberName,

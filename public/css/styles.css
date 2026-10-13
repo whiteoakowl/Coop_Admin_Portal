@@ -9062,6 +9062,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .orientation-table thead th { font-size: 0.52rem; line-height: 1.1; }
 }
 
+/* A real request: "Tour check in and open house check in, shrink table
+   to fit on mobile. No sliding side to side" - a real name plus a comma-
+   joined multi-day label (e.g. "Monday, Wednesday") overflowed the
+   .roster-scroll wrapper on a narrow phone under .roster-table td's own
+   base nowrap rule - the same fix shape as .orientation-table/.committees-
+   table above: let the Name/Day columns wrap instead of forcing one
+   unbroken line. A later real request added a 3rd column (the click-to-
+   toggle dot, first) - it's a fixed-size button, not text, so it needs no
+   wrapping, just enough room via the other two columns shrinking. */
+@media (max-width: 640px) {
+  .orientation-checkin-table .roster-name-col { white-space: normal; max-width: 6rem; }
+  .orientation-checkin-table td:nth-child(3) { white-space: normal; max-width: 4rem; }
+  .orientation-checkin-table .orientation-dot { width: 1.1rem; height: 1.1rem; }
+}
+
 /* A real request: "Members are only listed once with arrow dropdown for
    children to expand and close" - public/js/orientation-toggle.js
    toggles the chevron rotation and the hidden attribute on the very next
