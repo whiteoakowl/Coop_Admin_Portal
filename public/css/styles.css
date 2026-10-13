@@ -9096,6 +9096,33 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .orientation-checkin-table .orientation-dot { width: 1.1rem; height: 1.1rem; }
 }
 
+/* A real request: "co-op admin portal, classes, individual class edit,
+   lessons, shrink table of lessons to view all of it in mobile without
+   scrolling side to side." 6 columns (drag handle/Title/Open/Due/
+   Completed/row actions) is a lot for a phone screen - table-layout:
+   fixed (same fix event-calendar-table's own comment explains) pins
+   every column to a fixed share of the table's own width instead of
+   growing wider to fit content, so the table can only ever be as wide as
+   its .roster-scroll wrapper; Title gets the lion's share via
+   roster-name-col wrapping, same shrink-the-other-columns approach
+   orientation-checkin-table above already uses. */
+.lessons-table-mobile-fit { table-layout: fixed; }
+/* Unconditional, not just the mobile block below - table-layout:fixed
+   locks every column to a fixed share of the table's own width
+   regardless of viewport, so a long title needs to wrap at any width or
+   it overflows its now-fixed-width cell and visually bleeds into the
+   next column instead (confirmed live - a long title ran into the Open
+   column at desktop width before this). */
+.lessons-table-mobile-fit .roster-name-col { white-space: normal; overflow-wrap: break-word; }
+@media (max-width: 640px) {
+  .lessons-table-mobile-fit th, .lessons-table-mobile-fit td { padding: 0.3rem 0.2rem; font-size: 0.6rem; white-space: normal; overflow-wrap: break-word; }
+  .lessons-table-mobile-fit .roster-drag-col { width: 1.3rem; padding-left: 0.15rem; padding-right: 0.15rem; }
+  .lessons-table-mobile-fit .roster-name-col { width: 28%; }
+  .lessons-table-mobile-fit .accounting-row-icons { white-space: nowrap; padding-left: 0.1rem; padding-right: 0.1rem; width: 3.2rem; }
+  .lessons-table-mobile-fit .icon-btn { width: 1.3rem; height: 1.3rem; }
+  .lessons-table-mobile-fit .icon-btn .icon { width: 11px; height: 11px; }
+}
+
 /* A real request: "Members are only listed once with arrow dropdown for
    children to expand and close" - public/js/orientation-toggle.js
    toggles the chevron rotation and the hidden attribute on the very next

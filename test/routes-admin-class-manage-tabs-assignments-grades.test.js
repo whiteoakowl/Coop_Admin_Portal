@@ -186,6 +186,22 @@ test('Class Manage page: create an assignment from the Assignments tab, then gra
   assert.match(gradesTabAfter.text, /1 \/ 1/);
 });
 
+// A real request: "co-op admin portal, classes, individual class edit,
+// lessons, shrink table of lessons to view all of it in mobile without
+// scrolling side to side."
+test('Lessons tab: the table carries the mobile no-horizontal-scroll CSS is scoped to', async () => {
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'Lessons Mobile Fit Class' });
+  await request(app)
+    .post(`/admin/class-schedule/classes/${cls.id}/assignments`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Mobile Fit Lesson', _csrf: admin.csrfToken });
+
+  const page = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage?tab=assignments`).set('Cookie', admin.cookie);
+  assert.match(page.text, /<table class="roster-table members-table condensed-table lessons-table-mobile-fit">/);
+});
+
 // A real bug report: "there is no manage or trash button at the end of
 // each class assignment in co-op admin portal" - there was no way to
 // delete a lesson at all before this.
