@@ -71,7 +71,17 @@ test('Main Admin Members list: no inline Primary badge, search bar sits next to 
 test('Co-op Admin Members list: no inline Primary badge, search bar sits next to filter dropdown', async () => {
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   const cookie = loginRes.headers['set-cookie'];
-  await makeFamily('CoopAdminBadge');
+  const { familyId } = await makeFamily('CoopAdminBadge');
+  // Co-op Admin's own Members list only shows families with an enrolled
+  // student (real request: "members only appear on the member list for
+  // co-op admin portal if they are registered for classes") - makeFamily
+  // only creates a parent, so this family needs a registered student of
+  // its own to show up here at all.
+  const studentId = (
+    await db.prepare("INSERT INTO members (name, barcode, member_type, family_id) VALUES ('CoopAdminBadge Kid', 'coopadminbadge-kid', 'student', ?) RETURNING id").get(familyId)
+  ).id;
+  const fixtureClassId = (await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, 'Badge Fixture Class') RETURNING id").get()).id;
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(fixtureClassId, studentId);
 
   const res = await request(app).get('/admin/members').set('Cookie', cookie);
   assert.equal(res.status, 200);

@@ -46,6 +46,12 @@ test('GET /admin/members only ever shows active members - ?archived=1 does nothi
   const { cookie } = await loginAsAdmin();
   const activeId = (await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Active Member', 'active-member', 'student', 1) RETURNING id").get()).id;
   const archivedId = (await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Archived Member', 'archived-member', 'student', 0) RETURNING id").get()).id;
+  // Co-op Admin's own Members list only shows students registered for
+  // classes (real request: "members only appear on the member list for
+  // co-op admin portal if they are registered for classes"), so the
+  // active fixture needs a class_enrollments row to show up here at all.
+  const fixtureClassId = (await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, 'Bulk Actions Fixture Class') RETURNING id").get()).id;
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(fixtureClassId, activeId);
 
   const activeRes = await request(app).get('/admin/members').set('Cookie', cookie);
   assert.match(activeRes.text, /Active Member/);

@@ -1,11 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
 const db = require('../db');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/spreadsheet');
+const { sendCsv } = require('../utils/spreadsheet');
 const { formatDateLabel, formatDateNumeric, formatTime, ageFromBirthday, isChildAge, isValidISODate } = require('../utils/dates');
-const { spreadsheetFileFilter } = require('../utils/uploads');
 const { uploadMemberPhoto, savePhotoFile, deletePhotoFile } = require('../utils/memberPhoto');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
@@ -27,20 +25,16 @@ const {
 } = require('../utils/members');
 const { GRADE_LEVELS, CLASS_DAY_LABELS_FULL, listActiveClassDays } = require('../utils/classSchedule');
 const { isValidClassDay } = require('../utils/classDays');
-const { allSetupTeams } = require('../utils/setup');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE, memberFamilyGroupKey } = require('../utils/pagination');
 const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions, adminPositionTitlesForMembers } = require('../utils/adminPositions');
 const { portalStatusForMembers, sectionIdsForMembers, setMemberSections, setMemberRoles } = require('../utils/portalPermissions');
-const { resolveFamilyId, createParentMember, createChildMember, uploadIntakePhotos, parseArrayField } = require('../utils/memberIntake');
-const membershipFormFields = require('../utils/membershipFormFields');
 const memberImport = require('../utils/memberImport');
 const { clearVolunteerMembershipIfNotParent } = require('../utils/volunteers');
 
 router.use(requireFullAdmin);
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 // 'admin' is co-op staff/leaders who mainly just need a printable badge
 // (see members.member_type's own schema comment) - no family/grade/setup
 // team fields, just an optional Admin Position (see memberFormFields below
@@ -124,7 +118,40 @@ router.get('/members', async (req, res) => {
   // each, whether or not their row's dialog was ever opened. Now fetched
   // on demand instead - see /members/:id/cards-fragment and
   // /members/:id/schedule-fragment below, and public/js/members-dialogs.js.
-  const filteredMembers = (await membersWithDetails(typeFilter, familyFilter)).filter((m) => Number(m.active) === 1);
+  //
+  // A real request: "membership to the app/website - all members are
+  // listed in the member pages on main admin portal. Members only appear
+  // on the member list for co-op admin portal if they are registered for
+  // classes." Main Admin manages the full roster of everyone who's ever
+  // joined; Co-op Admin only needs to see (and later staff for Floater/
+  // Setup-Cleanup duty) families that have actually shown up for a class.
+  // A family qualifies the moment ANY of its students has a
+  // class_enrollments row - every other member in that same family
+  // (parents, admin-type members included) comes along with it, same as
+  // every other member list on this page already groups by family. An
+  // enrolled student themselves always qualifies too, even on the rare
+  // member row with no family_id at all.
+  const enrolledStudentIds = new Set(
+    (
+      await db
+        .prepare(`SELECT DISTINCT m.id AS "id" FROM members m JOIN class_enrollments ce ON ce.student_id = m.id WHERE m.member_type = 'student'`)
+        .all()
+    ).map((r) => r.id)
+  );
+  const qualifyingFamilyIds = new Set(
+    (
+      await db
+        .prepare(
+          `SELECT DISTINCT m.family_id AS "familyId" FROM members m
+           JOIN class_enrollments ce ON ce.student_id = m.id
+           WHERE m.member_type = 'student' AND m.family_id IS NOT NULL`
+        )
+        .all()
+    ).map((r) => r.familyId)
+  );
+  const filteredMembers = (await membersWithDetails(typeFilter, familyFilter))
+    .filter((m) => Number(m.active) === 1)
+    .filter((m) => enrolledStudentIds.has(m.id) || (m.family_id != null && qualifyingFamilyIds.has(m.family_id)));
   // A real request: "this will then add their admin title label next to
   // their name... on member lists." Batched (not per-row) for the same
   // N+1 reason as nameTagData.js's own bulk-print title lookup.
@@ -316,122 +343,15 @@ router.post('/members/families/new', async (req, res) => {
   res.redirect('/admin/members?notice=' + encodeURIComponent(`"${name}" family added.`));
 });
 
-// "Add Member" now shares the same family-intake form/logic as the
-// Membership Form (routes/membership.js) and Main Admin's own Add Member
-// (routes/main-admin-members.js) - a real request: "Add member and
-// membership request form should be the same." A further request:
-// "there shouldn't be any lone admins/leaders, or single members" -
-// every member is created through this one family-intake form now, no
-// standalone/single-member creation path at all (an earlier "or add a
-// single member" fallback at /members/new-single was removed for this
-// reason - Admin/leader member_type has no path to being newly created
-// through the UI anymore as a result). Editing an EXISTING member
-// (GET/POST /members/:id/edit below) is unaffected - it keeps its own
-// single-person admin-member-edit.ejs form, including any already-
-// existing admin-type members.
-router.get('/members/new', async (req, res) => {
-  res.render('member-intake-form', {
-    title: 'Add Member',
-    portal: 'coop_admin',
-    formAction: '/admin/members/new',
-    backHref: '/admin/members',
-    submitLabel: 'Add Member',
-    isAdmin: true,
-    families: await allFamilies(),
-    setupTeams: await allSetupTeams(),
-    dayLabels: CLASS_DAY_LABELS_FULL,
-    gradeLevels: GRADE_LEVELS,
-    parentFields: await membershipFormFields.listFields('parent'),
-    childFields: await membershipFormFields.listFields('child'),
-    error: req.query.error || null,
-    notice: null,
-  });
-});
-
-router.post('/members/new', uploadIntakePhotos('/admin/members/new'), async (req, res) => {
-  const body = req.body;
-  const back = '/admin/members/new';
-
-  const address = {
-    address: (body.address || '').trim() || null,
-    city: (body.city || '').trim() || null,
-    state: (body.state || '').trim() || null,
-    zip: (body.zip || '').trim() || null,
-  };
-
-  const parents = parseArrayField(body, 'parents')
-    .map((p, index) => ({ ...p, index }))
-    .filter((p) => p && (p.name || '').trim());
-  if (parents.length === 0) {
-    return res.redirect(back + '?error=' + encodeURIComponent('At least one parent/guardian name is required.'));
-  }
-
-  const children = parseArrayField(body, 'children')
-    .map((c, index) => ({ ...c, index }))
-    .filter((c) => c && (c.name || '').trim());
-  if (children.length === 0) {
-    return res.redirect(back + '?error=' + encodeURIComponent('Please add at least one student.'));
-  }
-
-  const familyId = await resolveFamilyId({ familyId: body.familyId, newFamilyName: body.newFamilyName, homeschoolDuration: body.homeschoolDuration });
-
-  for (const p of parents) {
-    await createParentMember(familyId, address, {
-      name: p.name.trim(),
-      email: (p.email || '').trim() || null,
-      phone: (p.phone || '').trim() || null,
-      isPrimaryParent: p.isPrimaryParent === '1',
-      cleanupTeamId: parseInt(p.cleanupTeamId, 10) || null,
-      customFieldValues: p.customFields,
-    });
-  }
-
-  for (const c of children) {
-    const photoFile = (req.files || []).find((f) => f.fieldname === `children[${c.index}][photo]`);
-    await createChildMember(
-      familyId,
-      address,
-      {
-        name: c.name.trim(),
-        birthday: isValidISODate((c.birthday || '').trim()) ? c.birthday.trim() : null,
-        gradeLevel: GRADE_LEVELS.includes(c.gradeLevel) ? c.gradeLevel : null,
-        medicalNotes: (c.medicalNotes || '').trim() || null,
-        customFieldValues: c.customFields,
-      },
-      photoFile
-    );
-  }
-
-  res.redirect('/admin/members?notice=' + encodeURIComponent(`Added ${parents.length + children.length} member(s).`));
-});
-
-// Full-profile bulk import - the Members page is the only place a CSV/XLSX
-// upload can create brand-new member records, so unlike every other import
-// popup in the app, this one reads the full set of profile columns.
-// Registered here (before the /members/:id routes below) so its literal
-// path never gets shadowed by the :id param.
-router.get('/members/import-template.xlsx', (req, res) => {
-  const buffer = buildTemplateWorkbook(
-    ['First Name', 'Last Name', 'Type', 'Address', 'City', 'State', 'Zip', 'Phone', 'Email', 'Birthday', 'Grade Level', 'Medical/Allergy Notes', 'Parent First Name', 'Parent Last Name'],
-    [
-      ['Jane', 'Smith', 'Parent', '123 Main St', 'Anytown', 'NC', '27330', '555-987-6543', 'jane@example.com', '', '', '', '', ''],
-      ['Alice', 'Smith', 'Student', '123 Main St', 'Anytown', 'NC', '27330', '555-123-4567', '', '2015-04-12', '5th Grade', 'Peanut allergy', 'Jane', 'Smith'],
-    ]
-  );
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename="members-import-template.xlsx"');
-  res.send(buffer);
-});
-
-// utils/spreadsheetWorker.js reads every cell with raw:false, i.e. its
-// FORMATTED display text - a genuine Excel/Sheets Date-typed cell (what
-// actually typing a birthdate into a spreadsheet produces) comes back
-// as something like "4/12/2015" in whatever locale format the sheet
-// used, not the ISO "2015-04-12" the birthday column is stored as and
-// isValidISODate expects. Accepts both: already-ISO text as-is, or a
-// U.S.-style M/D/Y (the overwhelming common case for a Date cell)
-// normalized into ISO.
-//
+// A real request: "membership to the app/website. All members are
+// listed in the member pages on main admin portal. Members only appear
+// on the member list for co-op admin portal if they are registered for
+// classes" - member creation (the Add Member form, plus the bulk CSV/
+// XLSX import that used to live here too) is Main Admin-only now; Co-op
+// Admin only ever surfaces members Main Admin has already created, once
+// a student in their family registers for a class (see the GET /members
+// route's own familyIdsWithEnrolledStudent filter). Editing an EXISTING
+// member (GET/POST /members/:id/edit below) is unaffected.
 const PROFILE_TABS = ['profile', 'schedule', 'attendance'];
 
 // Clicking a member's name anywhere lands here - a read-only profile with
@@ -536,8 +456,60 @@ router.get('/members/:id/edit', async (req, res) => {
     portalAccount: portalStatus.account,
     allRoles: await db.prepare('SELECT * FROM roles ORDER BY label').all(),
     portalRoleIds: portalStatus.roleIds,
+    // A real request: "when you click edit profile for a member, it
+    // should show the other parents and children's information as well
+    // for easy editing." - each other family member gets its own compact
+    // inline form (views/partials/family-members-editor.ejs), posting to
+    // the quick-edit route below, so the whole family can be corrected
+    // without leaving this page.
+    familyMembers: await familyOf(id),
     error: req.query.error || null,
+    notice: req.query.notice || null,
   });
+});
+
+// The inline "Family Members" editor's own per-row Save (see GET
+// /members/:id/edit above and views/partials/family-members-editor.ejs) -
+// deliberately NOT the same route as the full Add/Edit Member form: only
+// Name/Email/Phone (everyone) and Birthday/Grade Level (students only,
+// same type-gating as the full form's own partials/member-form-fields.ejs)
+// are editable here, so this never has to carry (and risk blanking out)
+// every other field - photo, address, family, admin positions, sections,
+// portal roles - that full form also saves. Member type itself is always
+// left exactly as it already was, even if a new Birthday would otherwise
+// imply a different one (isChildAge) - that's a bigger change than "easy
+// editing" calls for, and still available from that family member's own
+// full Edit page if it's ever actually needed.
+router.post('/members/:viewerId/family/:memberId/quick-edit', async (req, res) => {
+  const viewerId = parseInt(req.params.viewerId, 10);
+  const memberId = parseInt(req.params.memberId, 10);
+  const back = `/admin/members/${viewerId}/edit`;
+
+  const viewer = await db.prepare('SELECT family_id FROM members WHERE id = ?').get(viewerId);
+  const existing = await db.prepare('SELECT family_id, member_type FROM members WHERE id = ?').get(memberId);
+  if (!viewer || !existing || viewer.family_id == null || existing.family_id !== viewer.family_id) {
+    return res.redirect(back + '?error=' + encodeURIComponent('That family member could not be found.'));
+  }
+
+  const name = (req.body.name || '').trim();
+  if (!name) return res.redirect(back + '?error=' + encodeURIComponent('Name is required.'));
+  const clash = await db.prepare('SELECT id FROM members WHERE LOWER(name) = LOWER(?) AND id != ?').get(name, memberId);
+  if (clash) return res.redirect(back + '?error=' + encodeURIComponent(`"${name}" is already in the member list.`));
+
+  const email = (req.body.email || '').trim() || null;
+  const phone = (req.body.phone || '').trim() || null;
+  const isStudent = existing.member_type === 'student';
+  const birthdayRaw = (req.body.birthday || '').trim();
+  const birthday = isStudent && isValidISODate(birthdayRaw) ? birthdayRaw : null;
+  const gradeLevel = isStudent && GRADE_LEVELS.includes(req.body.gradeLevel) ? req.body.gradeLevel : null;
+
+  if (isStudent) {
+    await db.prepare('UPDATE members SET name = ?, email = ?, phone = ?, birthday = ?, grade_level = ? WHERE id = ?').run(name, email, phone, birthday, gradeLevel, memberId);
+  } else {
+    await db.prepare('UPDATE members SET name = ?, email = ?, phone = ? WHERE id = ?').run(name, email, phone, memberId);
+  }
+
+  res.redirect(back + '?notice=' + encodeURIComponent(`${name} updated.`));
 });
 
 router.post('/members/:id/edit', uploadMemberPhoto((req) => `/admin/members/${req.params.id}/edit`), async (req, res) => {
@@ -615,49 +587,6 @@ router.post('/members/:id/edit', uploadMemberPhoto((req) => `/admin/members/${re
   }
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} updated.`));
-});
-
-router.post('/members/import', upload.single('file'), async (req, res) => {
-  if (!req.file) {
-    return res.redirect('/admin/members?error=' + encodeURIComponent('Please choose a file to import.'));
-  }
-
-  let rows;
-  try {
-    rows = (await readRowsFromFile(req.file.buffer)).map(memberImport.normalizeImportRow).filter((r) => r.name);
-  } catch (err) {
-    return res.redirect('/admin/members?error=' + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
-  }
-
-  const { mergeCandidates, summary } = await memberImport.importMembersFromRows(rows, false);
-
-  if (mergeCandidates.length === 0) {
-    return res.redirect('/admin/members?notice=' + encodeURIComponent(summary));
-  }
-
-  res.render('admin-members-import-confirm', {
-    title: 'Confirm Import Merge',
-    summary,
-    candidates: mergeCandidates.map((c) => ({
-      memberId: c.memberId,
-      memberName: c.memberName,
-      fields: memberImport.IMPORT_MERGE_FIELDS.filter(([field]) => c.updates[field] !== undefined).map(([field, label]) => ({
-        label,
-        value: c.updates[field],
-      })),
-      payload: JSON.stringify(c.updates),
-    })),
-  });
-});
-
-router.post('/members/import/confirm', async (req, res) => {
-  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
-  const payloads = [].concat(req.body.payloads || []);
-  const allMemberIds = [].concat(req.body.allMemberIds || []).map((id) => parseInt(id, 10));
-
-  const merged = await memberImport.applyImportMerges(memberIds, payloads, allMemberIds);
-
-  res.redirect('/admin/members?notice=' + encodeURIComponent(`Merged new profile details into ${merged} existing member(s).`));
 });
 
 router.post('/members/:id/notes', async (req, res) => {

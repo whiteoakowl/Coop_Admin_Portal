@@ -49,9 +49,18 @@ test('Members list: same-family rows share a data-family-key, solo members get a
       .prepare("INSERT INTO members (name, barcode, member_type, family_id) VALUES ('Markup Kid', 'markup-kid', 'student', ?)")
       .run(familyId)
   ).lastInsertRowid;
+  // A solo member with no family at all, type 'student' so it can carry
+  // its own class_enrollments row below - Co-op Admin's own Members list
+  // only shows families with an enrolled student (real request:
+  // "members only appear on the member list for co-op admin portal if
+  // they are registered for classes"), and this test's family rows need
+  // the same qualifying enrollment to show up there too.
   const soloId = (
-    await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Markup Solo Member', 'markup-solo', 'parent')").run()
+    await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Markup Solo Member', 'markup-solo', 'student')").run()
   ).lastInsertRowid;
+  const fixtureClassId = (await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, 'Markup Fixture Class') RETURNING id").get()).id;
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(fixtureClassId, kidId);
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(fixtureClassId, soloId);
 
   const res = await request(app).get('/admin/members').set('Cookie', cookie);
   assert.equal(res.status, 200);

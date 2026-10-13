@@ -1,9 +1,18 @@
-// Real HTTP-level coverage for the Members page's full-profile "Import"
-// feature (routes/admin-members.js's GET /members/import-template.xlsx +
-// POST /members/import) - separate First/Last Name columns are joined back
-// into the single "First Last" string every member is stored as (utils/
-// members.js's lastNameOf), so exact-name matching, duplicate detection,
-// and parent-linking all keep working unchanged.
+// Real HTTP-level coverage for the full-profile "Import" feature's shared
+// logic (utils/memberImport.js) - separate First/Last Name columns are
+// joined back into the single "First Last" string every member is stored
+// as (utils/members.js's lastNameOf), so exact-name matching, duplicate
+// detection, and parent-linking all keep working unchanged.
+//
+// Import itself is Main Admin-only now - Co-op Admin's own copy of this
+// route (GET /members/import-template.xlsx, POST /members/import[/confirm])
+// was removed entirely ("membership to the app/website... member creation
+// is Main Admin-only now"), while Main Admin's stayed and still shares this
+// same utils/memberImport.js logic (see routes/main-admin-members.js), so
+// this suite now drives it through there. test/routes-main-admin-members-
+// import-export.test.js covers the Main Admin route's own wiring/markup;
+// this file is the deep logic coverage (birthday normalization, parent
+// linking, admin-type handling) that used to run against Co-op Admin.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -15,8 +24,8 @@ const testUploadsDir = path.join(os.tmpdir(), `admin-members-import-test-uploads
 process.env.DB_PATH = testDbPath;
 process.env.UPLOADS_DIR = testUploadsDir;
 process.env.SESSION_SECRET = 'test-secret-not-for-real-use';
-process.env.ADMIN_USERNAME = 'testadmin';
-process.env.ADMIN_PASSWORD = 'testpassword123';
+process.env.MAIN_ADMIN_EMAIL = 'mainadmin@coop.local';
+process.env.MAIN_ADMIN_PASSWORD = 'changeme123';
 
 const request = require('supertest');
 const app = require('../server');
@@ -31,10 +40,10 @@ test.after(() => {
   fs.rmSync(testUploadsDir, { recursive: true, force: true });
 });
 
-async function loginAsAdmin() {
-  const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
+async function loginAsMainAdmin() {
+  const loginRes = await request(app).post('/login').type('form').send({ email: process.env.MAIN_ADMIN_EMAIL, password: process.env.MAIN_ADMIN_PASSWORD, next: '/main-admin' });
   const cookie = loginRes.headers['set-cookie'];
-  const page = await request(app).get('/admin/members').set('Cookie', cookie);
+  const page = await request(app).get('/main-admin/members').set('Cookie', cookie);
   const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
   return { cookie, csrfToken };
 }
@@ -51,25 +60,8 @@ function buildImportBuffer(rows) {
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
 
-test('GET /admin/members/import-template.xlsx has separate First/Last Name columns for both member and parent', async () => {
-  const { cookie } = await loginAsAdmin();
-  const res = await request(app)
-    .get('/admin/members/import-template.xlsx')
-    .set('Cookie', cookie)
-    .buffer(true)
-    .parse((response, callback) => {
-      const chunks = [];
-      response.on('data', (chunk) => chunks.push(chunk));
-      response.on('end', () => callback(null, Buffer.concat(chunks)));
-    });
-  assert.equal(res.status, 200);
-  const wb = XLSX.read(res.body, { type: 'buffer' });
-  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
-  assert.deepEqual(rows[0], IMPORT_HEADERS);
-});
-
-test('POST /admin/members/import', async (t) => {
-  const { cookie, csrfToken } = await loginAsAdmin();
+test('POST /main-admin/members/import', async (t) => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
 
   await t.test('First/Last Name columns are joined into the stored "First Last" name, and Parent First/Last links the student to that parent', async () => {
     const buffer = buildImportBuffer([
@@ -77,7 +69,7 @@ test('POST /admin/members/import', async (t) => {
       ['Alice', 'Import', 'Student', '', '', '', '', '', '', '2015-04-12', '5th Grade', 'Peanut allergy', 'Jane', 'Import'],
     ]);
     const res = await request(app)
-      .post('/admin/members/import?_csrf=' + encodeURIComponent(csrfToken))
+      .post('/main-admin/members/import?_csrf=' + encodeURIComponent(csrfToken))
       .set('Cookie', cookie)
       .attach('file', buffer, 'members.xlsx');
     assert.equal(res.status, 302);
@@ -114,7 +106,7 @@ test('POST /admin/members/import', async (t) => {
     XLSX.utils.book_append_sheet(wb, ws, 'Import');
     const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
-    const res = await request(app).post('/admin/members/import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'newcomer.xlsx');
+    const res = await request(app).post('/main-admin/members/import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'newcomer.xlsx');
     assert.equal(res.status, 302);
 
     const dana = await db.prepare("SELECT birthday FROM members WHERE name = 'Dana Newcomer'").get();
@@ -138,7 +130,7 @@ test('POST /admin/members/import', async (t) => {
     XLSX.utils.book_append_sheet(wb, ws, 'Import');
     const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
-    const importRes = await request(app).post('/admin/members/import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'merge.xlsx');
+    const importRes = await request(app).post('/main-admin/members/import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'merge.xlsx');
     assert.equal(importRes.status, 200, 'a mergeable field should render the confirm-merge page, not redirect');
     const memberIdMatch = /name="allMemberIds" value="(\d+)"/.exec(importRes.text);
     assert.ok(memberIdMatch, 'expected a candidate row on the confirm page');
@@ -148,7 +140,7 @@ test('POST /admin/members/import', async (t) => {
     assert.match(payload, /2014-12-25/, 'the confirm page\'s own payload should already be the normalized ISO value, not raw Excel text');
 
     const confirmRes = await request(app)
-      .post('/admin/members/import/confirm?_csrf=' + encodeURIComponent(csrfToken))
+      .post('/main-admin/members/import/confirm?_csrf=' + encodeURIComponent(csrfToken))
       .set('Cookie', cookie)
       .type('form')
       .send({ memberIds: memberIdMatch[1], allMemberIds: memberIdMatch[1], payloads: payload });
@@ -159,17 +151,19 @@ test('POST /admin/members/import', async (t) => {
   });
 
   // A real request: "Admin roles is only chosen under settings in main
-  // admin portal." Co-op Admin's own Import (unlike Main Admin's, which
-  // still honors an "Admin" Type cell) falls back to 'student' for a row
-  // typed Admin, same fallback an unrecognized type already gets - see
-  // utils/memberImport.js's own allowAdminType parameter.
-  await t.test('a row typed "Admin" is created as a Student instead, not actually promoted to Admin', async () => {
-    const buffer = buildImportBuffer([['NoPromo', 'ImportRow', 'Admin', '', '', '', '', '', '', '', '', '', '', '']]);
-    const res = await request(app).post('/admin/members/import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'admin-type.xlsx');
+  // admin portal" drove Co-op Admin's own (now-removed) Import to fall
+  // back an "Admin" Type cell to Student instead of promoting - but Main
+  // Admin's own Settings > Admins tab is exactly the place that request
+  // meant, so Main Admin's Import still honors an Admin Type cell as-is
+  // (utils/memberImport.js's allowAdminType defaults true, and Main
+  // Admin's call site never overrides it).
+  await t.test('a row typed "Admin" is created as an Admin, since Main Admin\'s own Import is the one place that\'s still allowed', async () => {
+    const buffer = buildImportBuffer([['Promo', 'ImportRow', 'Admin', '', '', '', '', '', '', '', '', '', '', '']]);
+    const res = await request(app).post('/main-admin/members/import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'admin-type.xlsx');
     assert.equal(res.status, 302);
 
-    const created = await db.prepare("SELECT member_type FROM members WHERE name = 'NoPromo ImportRow'").get();
+    const created = await db.prepare("SELECT member_type FROM members WHERE name = 'Promo ImportRow'").get();
     assert.ok(created, 'the row should still have created a member');
-    assert.equal(created.member_type, 'student', 'an Admin-typed row imported via Co-op Admin must not actually become Admin');
+    assert.equal(created.member_type, 'admin');
   });
 });

@@ -42,7 +42,16 @@ async function login() {
 test('Members list Add-to-Name-Tag-Request-Log icon', async (t) => {
   const cookie = await login();
 
-  const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Name Tag Request Member', 'name-tag-request-member', 'parent')").run()).lastInsertRowid;
+  // Co-op Admin's own Members list only shows students registered for
+  // classes (real request: "members only appear on the member list for
+  // co-op admin portal if they are registered for classes"), so each
+  // fixture below is a 'student' with a class_enrollments row rather than
+  // a plain unenrolled 'parent' - the icon/button behavior this test
+  // covers is identical either way.
+  const fixtureClassId = (await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, 'Name Tag Request Fixture Class') RETURNING id").get()).id;
+  const enroll = db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)');
+  const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Name Tag Request Member', 'name-tag-request-member', 'student')").run()).lastInsertRowid;
+  await enroll.run(fixtureClassId, memberId);
 
   await t.test('with no pending request, the row shows the Add button', async () => {
     const res = await request(app).get('/admin/members').set('Cookie', cookie);
@@ -78,8 +87,9 @@ test('Members list Add-to-Name-Tag-Request-Log icon', async (t) => {
 
   await t.test('a fetch()-style POST (X-Requested-With: fetch) gets JSON back instead of a redirect, so the page never navigates', async () => {
     const secondMemberId = (
-      await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Fetch Name Tag Request Member', 'fetch-name-tag-request-member', 'parent')").run()
+      await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Fetch Name Tag Request Member', 'fetch-name-tag-request-member', 'student')").run()
     ).lastInsertRowid;
+    await enroll.run(fixtureClassId, secondMemberId);
     const page = await request(app).get('/admin/members').set('Cookie', cookie);
     const csrfToken = extractCsrf(page.text);
     const res = await request(app)

@@ -40,7 +40,7 @@ test.after(() => {
 async function loginAsAdmin() {
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   const cookie = loginRes.headers['set-cookie'];
-  const page = await request(app).get('/admin/members/new').set('Cookie', cookie);
+  const page = await request(app).get('/admin/members').set('Cookie', cookie);
   const match = /name="csrf-token" content="([^"]*)"/.exec(page.text);
   return { cookie, csrfToken: match ? match[1] : null };
 }
@@ -50,23 +50,19 @@ test('the Edit Member form has a single family dropdown, no duplicate checklist'
 
   await t.test('/admin/members/:id/edit renders the select and Add New Family button, not the old checklist', async () => {
     // Add Member ("there shouldn't be any lone admins/leaders, or single
-    // members") now only creates members through the whole-family intake
-    // form at /admin/members/new (views/member-intake-form.ejs), which
-    // has its own plain <select>/<input> "Choose a Family" box - no
-    // dialog at all. This test's dialog-based "Choose a Family" markup
+    // members") used to only create members through the whole-family
+    // intake form, which has its own plain <select>/<input> "Choose a
+    // Family" box - no dialog at all. Member creation moved to Main
+    // Admin-only entirely since ("membership to the app/website...
+    // member creation is Main Admin-only now"), so this inserts the
+    // member directly. This test's dialog-based "Choose a Family" markup
     // (public/js/member-form.js's "+ Add New Family" popup) still lives
     // on the EDIT form only (views/admin-member-edit.ejs via views/
     // partials/member-form-fields.ejs), so it's covered there instead.
-    await request(app)
-      .post('/admin/members/new')
-      .set('Cookie', cookie)
-      .type('form')
-      .send({
-        newFamilyName: 'EditFormCheck',
-        'parents[0][name]': 'Edit Form Parent',
-        'children[0][name]': 'Edit Form Kid',
-        _csrf: csrfToken,
-      });
+    const editFormCheckFamilyId = (await db.prepare("INSERT INTO families (name) VALUES ('EditFormCheck') RETURNING id").get()).id;
+    await db
+      .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, active) VALUES ('Edit Form Parent', 'EDITFORM1', 'EDITFORM1', 'parent', ?, 1)")
+      .run(editFormCheckFamilyId);
     const member = await db.prepare("SELECT id FROM members WHERE name = 'Edit Form Parent'").get();
 
     const res = await request(app).get(`/admin/members/${member.id}/edit`).set('Cookie', cookie);

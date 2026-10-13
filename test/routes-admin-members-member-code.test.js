@@ -4,6 +4,13 @@
 // see db/schema.sql's member_code column comment for the full context on
 // why (barcode used to just be the member's own name, which made a
 // printed barcode's width vary with how long that name was).
+//
+// Member creation itself moved to Main Admin-only ("membership to the
+// app/website... all members are listed in the member pages on main
+// admin portal") - Co-op Admin's own /admin/members/new was removed
+// entirely - so the creation step here goes through Main Admin's
+// equivalent route instead; editing and the barcode print sheet stay on
+// Co-op Admin, since those are unaffected by where a member was created.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -17,6 +24,8 @@ process.env.UPLOADS_DIR = testUploadsDir;
 process.env.SESSION_SECRET = 'test-secret-not-for-real-use';
 process.env.ADMIN_USERNAME = 'testadmin';
 process.env.ADMIN_PASSWORD = 'testpassword123';
+process.env.MAIN_ADMIN_EMAIL = 'mainadmin@coop.local';
+process.env.MAIN_ADMIN_PASSWORD = 'changeme123';
 
 const request = require('supertest');
 const app = require('../server');
@@ -38,15 +47,23 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
+async function loginAsMainAdmin() {
+  const loginRes = await request(app).post('/login').type('form').send({ email: process.env.MAIN_ADMIN_EMAIL, password: process.env.MAIN_ADMIN_PASSWORD, next: '/main-admin' });
+  const cookie = loginRes.headers['set-cookie'];
+  const page = await request(app).get('/main-admin').set('Cookie', cookie);
+  const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
+  return { cookie, csrfToken };
+}
+
 // /admin/members/new-single (a flat {name, memberType} fixture route) was
 // removed - "there shouldn't be any lone admins/leaders, or single
-// members" - so this fixture now goes through the real family-intake
-// form (/admin/members/new) instead, with a throwaway filler entry on
-// the side it doesn't care about (createParentMember/createChildMember
-// never enforce name uniqueness, so a constant filler name is safe to
-// reuse across calls).
-async function addSingleMember(cookie, csrfToken, name, memberType) {
-  const body = { newFamilyName: `${name} Family`, _csrf: csrfToken };
+// members" - so this fixture goes through the real family-intake form
+// (now Main Admin's own /main-admin/members/new) instead, with a
+// throwaway filler entry on the side it doesn't care about
+// (createParentMember/createChildMember never enforce name uniqueness,
+// so a constant filler name is safe to reuse across calls).
+async function addSingleMember(mainCookie, mainCsrfToken, name, memberType) {
+  const body = { newFamilyName: `${name} Family`, _csrf: mainCsrfToken };
   if (memberType === 'parent') {
     body['parents[0][name]'] = name;
     body['children[0][name]'] = 'Filler Child';
@@ -54,14 +71,14 @@ async function addSingleMember(cookie, csrfToken, name, memberType) {
     body['parents[0][name]'] = 'Filler Parent';
     body['children[0][name]'] = name;
   }
-  return request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send(body);
+  return request(app).post('/main-admin/members/new').set('Cookie', mainCookie).type('form').send(body);
 }
 
-test('POST /admin/members/new assigns a 6-digit member_code, and barcode matches it', async (t) => {
-  const { cookie, csrfToken } = await loginAsAdmin();
+test('POST /main-admin/members/new assigns a 6-digit member_code, and barcode matches it', async (t) => {
+  const { cookie: mainCookie, csrfToken: mainCsrf } = await loginAsMainAdmin();
 
   await t.test('a fresh member gets a member_code, not a name-based barcode', async () => {
-    const res = await addSingleMember(cookie, csrfToken, 'Priya Patel', 'student');
+    const res = await addSingleMember(mainCookie, mainCsrf, 'Priya Patel', 'student');
     assert.equal(res.status, 302);
 
     const row = await db.prepare('SELECT barcode, member_code FROM members WHERE name = ?').get('Priya Patel');
@@ -70,17 +87,18 @@ test('POST /admin/members/new assigns a 6-digit member_code, and barcode matches
   });
 
   await t.test('two members created back to back never collide on member_code', async () => {
-    await addSingleMember(cookie, csrfToken, 'Sam Rivera', 'student');
-    await addSingleMember(cookie, csrfToken, 'Jordan Kim', 'student');
+    await addSingleMember(mainCookie, mainCsrf, 'Sam Rivera', 'student');
+    await addSingleMember(mainCookie, mainCsrf, 'Jordan Kim', 'student');
     const codes = (await db.prepare("SELECT member_code FROM members WHERE name IN ('Sam Rivera', 'Jordan Kim')").all()).map((r) => r.member_code);
     assert.equal(codes.length, 2);
     assert.notEqual(codes[0], codes[1]);
   });
 });
 
-test('editing a member never changes their member_code/barcode, even when their name changes', async (t) => {
+test('editing a member on Co-op Admin never changes their member_code/barcode, even when their name changes', async (t) => {
+  const { cookie: mainCookie, csrfToken: mainCsrf } = await loginAsMainAdmin();
   const { cookie, csrfToken } = await loginAsAdmin();
-  await addSingleMember(cookie, csrfToken, 'Original Name', 'student');
+  await addSingleMember(mainCookie, mainCsrf, 'Original Name', 'student');
   const before = await db.prepare('SELECT id, member_code, barcode FROM members WHERE name = ?').get('Original Name');
 
   await t.test('renaming the member on their edit page keeps the same member_code and barcode', async () => {
@@ -98,8 +116,9 @@ test('editing a member never changes their member_code/barcode, even when their 
 });
 
 test('the barcode-only print sheet renders the member_code-based barcode value', async (t) => {
+  const { cookie: mainCookie, csrfToken: mainCsrf } = await loginAsMainAdmin();
   const { cookie, csrfToken } = await loginAsAdmin();
-  await addSingleMember(cookie, csrfToken, 'Barcode Check Kid', 'student');
+  await addSingleMember(mainCookie, mainCsrf, 'Barcode Check Kid', 'student');
   const member = await db.prepare('SELECT id, member_code FROM members WHERE name = ?').get('Barcode Check Kid');
 
   await t.test('the printed barcode SVG carries the member_code as its data-barcode-value, not the name', async () => {

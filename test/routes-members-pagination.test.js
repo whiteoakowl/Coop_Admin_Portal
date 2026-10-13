@@ -43,9 +43,16 @@ function countOccurrences(text, needle) {
 
 test('Members list pagination', async (t) => {
   const cookie = await loginAsAdmin();
-  const insert = db.prepare("INSERT INTO members (name, barcode, member_type) VALUES (?, ?, 'student')");
+  // Co-op Admin's own Members list only shows students registered for
+  // classes (real request: "members only appear on the member list for
+  // co-op admin portal if they are registered for classes"), so each
+  // fixture student needs a class_enrollments row to show up here at all.
+  const fixtureClassId = (await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, 'Pagination Fixture Class') RETURNING id").get()).id;
+  const insert = db.prepare("INSERT INTO members (name, barcode, member_type) VALUES (?, ?, 'student') RETURNING id");
+  const enroll = db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)');
   for (let i = 1; i <= 65; i++) {
-    await insert.run(`Pagination Kid ${String(i).padStart(2, '0')}`, `pagination-kid-${i}`);
+    const { id: memberId } = await insert.get(`Pagination Kid ${String(i).padStart(2, '0')}`, `pagination-kid-${i}`);
+    await enroll.run(fixtureClassId, memberId);
   }
 
   await t.test('page 1 shows the first 50 on screen but all 65 in the print table', async () => {

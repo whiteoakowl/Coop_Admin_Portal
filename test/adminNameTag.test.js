@@ -123,26 +123,20 @@ test('Member form: creating an Admin member with positions, and the position pic
   const treasurerId = positions.find((p) => p.title === 'Treasurer').id;
 
   // Admin member type (a leader who just needs a badge, no family/kids)
-  // has no place on the family-intake form at /admin/members/new -
-  // "there shouldn't be any lone admins/leaders, or single members," so
-  // that form only ever creates parent/student rows. Turning an existing
-  // member INTO an admin is no longer a membership-form choice at all
-  // ("There should not be admin check box on any of the membership form
-  // or profiles... Admins will simply get a star") - it's derived purely
-  // from being assigned to an Admin Position via Main Admin > Settings >
-  // Admins (utils/adminPositions.js's own syncMemberAdminStatus) - so
-  // create a plain family member first, then assign them a position
-  // there, not through either portal's own member edit form.
-  await request(app)
-    .post('/admin/members/new')
-    .set('Cookie', cookie)
-    .type('form')
-    .send({
-      newFamilyName: 'President Family',
-      'parents[0][name]': 'Pat President',
-      'children[0][name]': 'President Filler Kid',
-      _csrf: csrfToken,
-    });
+  // has no place on the family-intake form - "there shouldn't be any lone
+  // admins/leaders, or single members," so that form only ever creates
+  // parent/student rows. Turning an existing member INTO an admin is no
+  // longer a membership-form choice at all ("There should not be admin
+  // check box on any of the membership form or profiles... Admins will
+  // simply get a star") - it's derived purely from being assigned to an
+  // Admin Position via Main Admin > Settings > Admins (utils/
+  // adminPositions.js's own syncMemberAdminStatus) - so create a plain
+  // family member first, then assign them a position there, not through
+  // either portal's own member edit form. Co-op Admin's own member-
+  // creation form was removed entirely ("membership to the app/website...
+  // member creation is Main Admin-only now"), so this inserts directly.
+  const presidentFamilyId = (await db.prepare("INSERT INTO families (name) VALUES ('President Family') RETURNING id").get()).id;
+  await db.prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, active) VALUES ('Pat President', 'PATPRES1', 'PATPRES1', 'parent', ?, 1)").run(presidentFamilyId);
   const created = await db.prepare("SELECT id FROM members WHERE name = 'Pat President'").get();
 
   const newPage = await request(app).get(`/admin/members/${created.id}/edit`).set('Cookie', cookie);

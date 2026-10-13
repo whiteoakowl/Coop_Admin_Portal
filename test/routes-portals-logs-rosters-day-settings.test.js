@@ -21,6 +21,8 @@ process.env.UPLOADS_DIR = testUploadsDir;
 process.env.SESSION_SECRET = 'test-secret-not-for-real-use';
 process.env.ADMIN_USERNAME = 'testadmin';
 process.env.ADMIN_PASSWORD = 'testpassword123';
+process.env.MAIN_ADMIN_EMAIL = 'mainadmin@coop.local';
+process.env.MAIN_ADMIN_PASSWORD = 'changeme123';
 
 const request = require('supertest');
 const app = require('../server');
@@ -45,6 +47,13 @@ async function loginAsAdmin() {
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   const cookie = loginRes.headers['set-cookie'];
   const page = await request(app).get('/admin/schedule?tab=settings').set('Cookie', cookie);
+  return { cookie, csrfToken: extractCsrf(page.text) };
+}
+
+async function loginAsMainAdmin() {
+  const loginRes = await request(app).post('/login').type('form').send({ email: process.env.MAIN_ADMIN_EMAIL, password: process.env.MAIN_ADMIN_PASSWORD, next: '/main-admin' });
+  const cookie = loginRes.headers['set-cookie'];
+  const page = await request(app).get('/main-admin').set('Cookie', cookie);
   return { cookie, csrfToken: extractCsrf(page.text) };
 }
 
@@ -195,10 +204,15 @@ test('portal-profile Schedules tab shows "Tuesday" for a family member\'s Tuesda
 });
 
 test("the Membership Form's Setup/Cleanup Team dropdown shows \"Tuesday\" for a Tuesday-day team", async () => {
-  const admin = await loginAsAdmin();
+  // Shared member-intake-form.ejs - Co-op Admin's own copy of this form
+  // was removed entirely ("membership to the app/website... member
+  // creation is Main Admin-only now"), so this exercises the exact same
+  // shared template/setupTeams dropdown through Main Admin's equivalent
+  // route instead.
+  const mainAdmin = await loginAsMainAdmin();
   await db.prepare("INSERT INTO setup_teams (day, title) VALUES ('tuesday', 'Tuesday Crew')").run();
 
-  const page = await request(app).get('/admin/members/new').set('Cookie', admin.cookie);
+  const page = await request(app).get('/main-admin/members/new').set('Cookie', mainAdmin.cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /Tuesday &ndash; Tuesday Crew/);
 });

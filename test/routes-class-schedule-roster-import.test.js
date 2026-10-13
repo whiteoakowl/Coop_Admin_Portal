@@ -40,23 +40,18 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
-// /admin/members/new-single (a flat {name, memberType} fixture route) was
-// removed - "there shouldn't be any lone admins/leaders, or single
-// members" - so this fixture now goes through the real family-intake
-// form (/admin/members/new) instead, with a throwaway filler entry on
-// the side it doesn't care about (createParentMember/createChildMember
-// never enforce name uniqueness, so a constant filler name is safe to
-// reuse across calls).
+// Co-op Admin's own /admin/members/new was removed outright - "membership
+// to the app/website... member creation is Main Admin-only now" - so this
+// fixture creates the member directly in the DB instead of going through
+// an HTTP form (the earlier /admin/members/new-single flat fixture route
+// before it was removed the same way, for the same "no lone admins" reason
+// this comment used to explain).
+let singleMemberCounter = 0;
 async function addSingleMember(cookie, csrfToken, name, memberType) {
-  const body = { newFamilyName: `${name} Family`, _csrf: csrfToken };
-  if (memberType === 'parent') {
-    body['parents[0][name]'] = name;
-    body['children[0][name]'] = 'Filler Child';
-  } else {
-    body['parents[0][name]'] = 'Filler Parent';
-    body['children[0][name]'] = name;
-  }
-  return request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send(body);
+  singleMemberCounter += 1;
+  const code = `SM${process.pid}${singleMemberCounter}`;
+  const familyId = (await db.prepare('INSERT INTO families (name) VALUES (?) RETURNING id').get(`${name} Family`)).id;
+  await db.prepare('INSERT INTO members (name, barcode, member_code, member_type, family_id, active) VALUES (?, ?, ?, ?, ?, 1)').run(name, code, code, memberType, familyId);
 }
 
 test('GET .../roster/import-template.xlsx has separate Student First/Last Name columns', async () => {

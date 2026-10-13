@@ -94,20 +94,15 @@ test('Main Admin Settings: Admins tab', async (t) => {
     // edit form (views/partials/member-form-fields.ejs) still shows an
     // existing Admin's position checkboxes (just never lets anyone
     // become Admin from there in the first place - see that partial's
-    // own comment).
+    // own comment). Member creation itself is Main Admin-only now
+    // ("membership to the app/website... member creation is Main
+    // Admin-only now"), so this inserts the member directly rather than
+    // through Co-op Admin's own (now-removed) /admin/members/new.
     const coopCookie = await loginAsCoopAdmin();
-    const coopPage = await request(app).get('/admin/members/new').set('Cookie', coopCookie);
-    const coopCsrf = extractCsrf(coopPage.text);
-    await request(app)
-      .post('/admin/members/new')
-      .set('Cookie', coopCookie)
-      .type('form')
-      .send({
-        newFamilyName: 'PositionDropdownCheck',
-        'parents[0][name]': 'Position Dropdown Parent',
-        'children[0][name]': 'Position Dropdown Kid',
-        _csrf: coopCsrf,
-      });
+    const positionCheckFamilyId = (await db.prepare("INSERT INTO families (name) VALUES ('PositionDropdownCheck') RETURNING id").get()).id;
+    await db
+      .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, active) VALUES ('Position Dropdown Parent', 'POSDROP1', 'POSDROP1', 'parent', ?, 1)")
+      .run(positionCheckFamilyId);
     const member = await db.prepare("SELECT id FROM members WHERE name = 'Position Dropdown Parent'").get();
     assert.ok(member, 'the new parent should have been created');
 

@@ -38,6 +38,15 @@ test('Members page family filter', async (t) => {
   await db.prepare("INSERT INTO members (name, barcode, member_type, family_id) VALUES ('Member In A', 'member-in-a', 'parent', ?)").run(familyA);
   await db.prepare("INSERT INTO members (name, barcode, member_type, family_id) VALUES ('Member In B', 'member-in-b', 'parent', ?)").run(familyB);
   await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('No Family Member', 'no-family-member', 'parent')").run();
+  // Co-op Admin's own Members list only shows families with an enrolled
+  // student (real request: "members only appear on the member list for
+  // co-op admin portal if they are registered for classes"), so Family A
+  // needs a registered student of its own for "Member In A" to show here.
+  const kidInAId = (
+    await db.prepare("INSERT INTO members (name, barcode, member_type, family_id) VALUES ('Kid In A', 'kid-in-a', 'student', ?) RETURNING id").get(familyA)
+  ).id;
+  const fixtureClassId = (await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, 'Family Filter Fixture Class') RETURNING id").get()).id;
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(fixtureClassId, kidInAId);
 
   await t.test('the type-select dropdown lists every family as an option', async () => {
     const res = await request(app).get('/admin/members').set('Cookie', cookie);

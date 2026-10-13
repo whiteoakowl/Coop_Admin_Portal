@@ -59,20 +59,31 @@ test('Co-op Admin Members list keeps the last family on a page together instead 
   // 50-per-page boundary would otherwise fall 2 members into it, and one
   // more solo member sorting after the family - so page 1's naive
   // 50-item cutoff would otherwise land squarely inside the family.
-  const soloInsert = db.prepare("INSERT INTO members (name, barcode, member_type) VALUES (?, ?, 'student')");
+  // Co-op Admin's own Members list only shows students registered for
+  // classes (real request: "members only appear on the member list for
+  // co-op admin portal if they are registered for classes"), so every
+  // student fixture below needs a class_enrollments row to show up here.
+  const fixtureClassId = (await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, 'Family Pagination Fixture Class') RETURNING id").get()).id;
+  const enroll = db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)');
+  const soloInsert = db.prepare("INSERT INTO members (name, barcode, member_type) VALUES (?, ?, 'student') RETURNING id");
   for (let i = 1; i <= 48; i++) {
-    await soloInsert.run(`Aardvark Kid ${String(i).padStart(2, '0')}`, `last-family-solo-${i}`);
+    const { id } = await soloInsert.get(`Aardvark Kid ${String(i).padStart(2, '0')}`, `last-family-solo-${i}`);
+    await enroll.run(fixtureClassId, id);
   }
   const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('Zzyszewski')").run()).lastInsertRowid;
-  const familyInsert = db.prepare("INSERT INTO members (name, barcode, member_type, family_id, is_primary_parent) VALUES (?, ?, ?, ?, ?)");
-  await familyInsert.run('Pat Zzyszewski', 'last-family-parent', 'parent', familyId, 1);
-  await familyInsert.run('Alex Zzyszewski', 'last-family-kid-1', 'student', familyId, 0);
-  await familyInsert.run('Bailey Zzyszewski', 'last-family-kid-2', 'student', familyId, 0);
-  await familyInsert.run('Casey Zzyszewski', 'last-family-kid-3', 'student', familyId, 0);
+  const familyInsert = db.prepare("INSERT INTO members (name, barcode, member_type, family_id, is_primary_parent) VALUES (?, ?, ?, ?, ?) RETURNING id");
+  await familyInsert.get('Pat Zzyszewski', 'last-family-parent', 'parent', familyId, 1);
+  const { id: alexId } = await familyInsert.get('Alex Zzyszewski', 'last-family-kid-1', 'student', familyId, 0);
+  const { id: baileyId } = await familyInsert.get('Bailey Zzyszewski', 'last-family-kid-2', 'student', familyId, 0);
+  const { id: caseyId } = await familyInsert.get('Casey Zzyszewski', 'last-family-kid-3', 'student', familyId, 0);
+  await enroll.run(fixtureClassId, alexId);
+  await enroll.run(fixtureClassId, baileyId);
+  await enroll.run(fixtureClassId, caseyId);
   // Sorted by the LAST word of the name, so "Zzzzyx" (not "Last") is what
   // has to sort after "Zzyszewski". Confirms page 2 starts cleanly right
   // after the family, not mid-family and not skipping/duplicating anyone.
-  await soloInsert.run('Last Zzzzyx', 'last-family-solo-last');
+  const { id: lastZzzzyxId } = await soloInsert.get('Last Zzzzyx', 'last-family-solo-last');
+  await enroll.run(fixtureClassId, lastZzzzyxId);
 
   const page1 = await request(app).get('/admin/members').set('Cookie', cookie);
   assert.equal(page1.status, 200);

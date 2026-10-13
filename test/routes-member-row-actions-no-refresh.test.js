@@ -58,6 +58,13 @@ test('Co-op Admin Members list per-row Delete', async (t) => {
 
   await t.test('the row renders a plain button with the delete data attributes, not a hidden <form>', async () => {
     const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Row Action Delete Member', 'row-action-delete-member', 'student') RETURNING id").get()).id;
+    // Co-op Admin's own Members list only shows students registered for
+    // classes (real request: "members only appear on the member list for
+    // co-op admin portal if they are registered for classes"), so this
+    // member needs a class_enrollments row to actually render in the list
+    // this test is asserting against.
+    const fixtureClassId = (await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, 'Row Action Fixture Class') RETURNING id").get()).id;
+    await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(fixtureClassId, memberId);
     const res = await request(app).get('/admin/members').set('Cookie', cookie);
     assert.equal(res.status, 200);
     assert.match(res.text, new RegExp(`data-member-delete-url="/admin/members/${memberId}/delete"`));
