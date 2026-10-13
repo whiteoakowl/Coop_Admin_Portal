@@ -1,0 +1,74 @@
+<%# A real request: "when you click edit profile for a member, it should
+    show the other parents and children's information as well for easy
+    editing." Each other family member (utils/members.js's familyOf,
+    excludes the member this Edit Profile page is actually for) gets its
+    own compact form, with its own Save button, posting straight to
+    routes/admin-members.js's or routes/main-admin-members.js's own
+    POST /:viewerId/family/:memberId/quick-edit - deliberately NOT the
+    same route/fields as the full Add/Edit Member form above: only Name/
+    Email/Phone (everyone) and Birthday/Grade Level (students only, same
+    type-gating partials/member-form-fields.ejs already uses) are
+    editable here, so correcting a sibling's phone number can never
+    accidentally blank out their photo, address, family, admin positions,
+    sections, or portal roles - all of which stay exactly where they
+    already are, reachable from that family member's own full Edit page
+    (linked below) if they're ever actually needed.
+
+    quickEditBasePath is '/admin/members' or '/main-admin/members' -
+    whichever portal rendered this partial. %>
+<% if (familyMembers.length > 0) { %>
+  <div class="manage-section">
+    <h2><svg class="icon"><use href="#icon-users"/></svg> Family Members</h2>
+    <p class="hint">Other members of this family - edit and save each one right here, or open their own full profile for anything else.</p>
+    <div class="family-members-editor-list">
+      <% familyMembers.forEach(function(fm) { %>
+        <% var isStudent = fm.member_type === 'student'; %>
+        <form method="POST" action="<%= quickEditBasePath %>/<%= viewerId %>/family/<%= fm.id %>/quick-edit" class="family-members-editor-card">
+          <div class="family-members-editor-card-head">
+            <strong><%= fm.name %></strong>
+            <span class="hint"><%= fm.member_type.charAt(0).toUpperCase() + fm.member_type.slice(1) %></span>
+            <a class="btn-secondary family-members-editor-full-link" href="<%= quickEditBasePath %>/<%= fm.id %>/edit">Full Profile</a>
+          </div>
+          <div class="class-form-row">
+            <div class="class-form-field">
+              <span class="class-form-field-label required">Name</span>
+              <input type="text" name="name" value="<%= fm.name %>" required />
+            </div>
+            <div class="class-form-field">
+              <span class="class-form-field-label">Phone</span>
+              <span class="input-with-icon">
+                <svg class="icon"><use href="#icon-phone"/></svg>
+                <input type="tel" name="phone" value="<%= fm.phone || '' %>" placeholder="(123) 456-7890" />
+              </span>
+            </div>
+            <div class="class-form-field">
+              <span class="class-form-field-label">Email</span>
+              <span class="input-with-icon">
+                <svg class="icon"><use href="#icon-mail"/></svg>
+                <input type="email" name="email" value="<%= fm.email || '' %>" placeholder="name@example.com" />
+              </span>
+            </div>
+            <% if (isStudent) { %>
+              <div class="class-form-field">
+                <span class="class-form-field-label">Birthday</span>
+                <input type="date" name="birthday" value="<%= fm.birthday || '' %>" />
+              </div>
+              <div class="class-form-field">
+                <span class="class-form-field-label">Grade Level</span>
+                <select name="gradeLevel">
+                  <option value="">Select grade level</option>
+                  <% gradeLevels.forEach(function(g) { %>
+                    <option value="<%= g %>" <%= fm.grade_level === g ? 'selected' : '' %>><%= g %></option>
+                  <% }); %>
+                </select>
+              </div>
+            <% } %>
+          </div>
+          <div class="notes-dialog-actions">
+            <button type="submit" class="btn-secondary"><svg class="icon"><use href="#icon-save"/></svg> Save</button>
+          </div>
+        </form>
+      <% }); %>
+    </div>
+  </div>
+<% } %>

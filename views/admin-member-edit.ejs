@@ -10,6 +10,7 @@
     <h1><%= title %></h1>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <div class="member-form-page-panel">
       <form
@@ -68,6 +69,10 @@
           </div>
         </div>
       </form>
+
+      <% if (mode === 'edit') { %>
+        <%- include('partials/family-members-editor', { familyMembers, gradeLevels, viewerId: member.id, quickEditBasePath: '/admin/members' }) %>
+      <% } %>
 
       <%# Outside #member-form on purpose - a <form> can't nest inside another
           <form> (the browser silently drops the inner tag), so this dialog's

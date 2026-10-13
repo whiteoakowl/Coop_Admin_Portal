@@ -802,9 +802,51 @@ router.get('/:id/edit', async (req, res) => {
     // the password/role fields this box already had.
     allSections: await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all(),
     memberSectionIds: (await sectionIdsForMembers([id]))[id],
+    // A real request: "when you click edit profile for a member, it
+    // should show the other parents and children's information as well
+    // for easy editing." - see routes/admin-members.js's own identical
+    // GET /members/:id/edit comment; this is the Main Admin copy of that
+    // same inline "Family Members" editor.
+    familyMembers: await familyOf(id),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+// The inline "Family Members" editor's own per-row Save - see
+// routes/admin-members.js's own identical route for the full comment on
+// why this is deliberately a separate, narrower route from the full
+// Add/Edit Member form above (POST /:id/edit).
+router.post('/:viewerId/family/:memberId/quick-edit', async (req, res) => {
+  const viewerId = parseInt(req.params.viewerId, 10);
+  const memberId = parseInt(req.params.memberId, 10);
+  const back = `/main-admin/members/${viewerId}/edit`;
+
+  const viewer = await db.prepare('SELECT family_id FROM members WHERE id = ?').get(viewerId);
+  const existing = await db.prepare('SELECT family_id, member_type FROM members WHERE id = ?').get(memberId);
+  if (!viewer || !existing || viewer.family_id == null || existing.family_id !== viewer.family_id) {
+    return res.redirect(back + '?error=' + encodeURIComponent('That family member could not be found.'));
+  }
+
+  const name = (req.body.name || '').trim();
+  if (!name) return res.redirect(back + '?error=' + encodeURIComponent('Name is required.'));
+  const clash = await db.prepare('SELECT id FROM members WHERE LOWER(name) = LOWER(?) AND id != ?').get(name, memberId);
+  if (clash) return res.redirect(back + '?error=' + encodeURIComponent(`"${name}" is already in the member list.`));
+
+  const email = (req.body.email || '').trim() || null;
+  const phone = (req.body.phone || '').trim() || null;
+  const isStudent = existing.member_type === 'student';
+  const birthdayRaw = (req.body.birthday || '').trim();
+  const birthday = isStudent && isValidISODate(birthdayRaw) ? birthdayRaw : null;
+  const gradeLevel = isStudent && GRADE_LEVELS.includes(req.body.gradeLevel) ? req.body.gradeLevel : null;
+
+  if (isStudent) {
+    await db.prepare('UPDATE members SET name = ?, email = ?, phone = ?, birthday = ?, grade_level = ? WHERE id = ?').run(name, email, phone, birthday, gradeLevel, memberId);
+  } else {
+    await db.prepare('UPDATE members SET name = ?, email = ?, phone = ? WHERE id = ?').run(name, email, phone, memberId);
+  }
+
+  res.redirect(back + '?notice=' + encodeURIComponent(`${name} updated.`));
 });
 
 // A real request: "when editing a member profile, there is a button that

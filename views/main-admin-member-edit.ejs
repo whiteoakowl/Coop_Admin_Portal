@@ -104,6 +104,8 @@
         </div>
       </form>
 
+      <%- include('partials/family-members-editor', { familyMembers, gradeLevels, viewerId: member.id, quickEditBasePath: '/main-admin/members' }) %>
+
       <%# Outside #member-form on purpose - see views/admin-member-edit.ejs's
           own identical comment on why this dialog can't nest inside the
           main form. %>
