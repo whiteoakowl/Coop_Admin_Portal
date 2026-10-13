@@ -122,4 +122,33 @@ function requirePortalPermission(permissionKey) {
   };
 }
 
-module.exports = { loadPortalSession, requirePortalAuth, requirePortal, requirePortalPermission };
+// A real request: "Teacher portal, remove the following tabs and
+// features. Business directory, classifieds, resources, store,
+// academics, babysitters, reading challenge, store, accounting and
+// events. Make sure all teacher portal tabs, buttons and pages stay in
+// teacher portal." Resources/Academics/Reading Challenge/the real
+// Babysitters directory page already live under requirePortal('parent')
+// (routes/parent-portal.js) and were never reachable by a teacher-only
+// account in the first place - routes/babysitters.js itself is just a
+// shared photo proxy, not a browsable page, so it's untouched. Business
+// Directory, Classifieds, Shop, Accounting, and the member Events pages
+// (routes/directory.js, classifieds.js, store.js, accounting.js,
+// events.js) are the ones any authenticated portal account could
+// actually browse - this closes that gap for a TEACHER-ONLY account (no
+// other portal role). An account that's ALSO a Parent (self-signed-up to
+// teach a class on top of their existing Parent Portal account, a real
+// everyday case here) keeps full access to these as a parent, completely
+// unaffected - only an account with no role but 'teacher' is blocked.
+// Never touches logged-out/public access (req.portalAccount unset) -
+// Events/Directory/Classifieds already show their own public-visibility
+// items to a signed-out visitor, a separate, intentional concern.
+function blockTeacherOnlyAccounts(req, res, next) {
+  if (req.portalAccount && req.portalRoles.length > 0 && req.portalRoles.every((r) => r.key === 'teacher')) {
+    return res
+      .status(403)
+      .render('403', { title: 'Not Authorized', message: "This isn't available from the Teacher Portal.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  }
+  next();
+}
+
+module.exports = { loadPortalSession, requirePortalAuth, requirePortal, requirePortalPermission, blockTeacherOnlyAccounts };

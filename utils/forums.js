@@ -160,6 +160,22 @@ async function categoryRoleKeys(categoryId) {
 // section-restricted class chat their child belongs to.
 async function canAccessCategory(category, family, accountRoleKeys) {
   const roleKeys = accountRoleKeys || [];
+  // A real request: "Teacher portal chat will only have class chats." A
+  // teacher-ONLY account (no other portal role - a teacher who's also a
+  // Parent, the real "self-signed-up to also teach a class" case, keeps
+  // full access as a parent, same reasoning middleware/portalAuth.js's
+  // blockTeacherOnlyAccounts uses) can only ever reach a 'class' scope
+  // category by default here - whether by the Chat list
+  // (accessibleCategories, which calls this per category) or a direct
+  // URL to a general category/thread (loadCategory/loadThread in
+  // routes/forums.js both call this too). "By default" - an admin's own
+  // explicit "Show on" portal-control list (categoryRoleKeys, checked
+  // below) still wins when it deliberately includes 'teacher', the same
+  // way it already overrides every other role's default visibility.
+  if (category.scope === 'general' && roleKeys.length > 0 && roleKeys.every((k) => k === 'teacher')) {
+    const explicitRoles = await categoryRoleKeys(category.id);
+    if (!explicitRoles.includes('teacher')) return false;
+  }
   if (category.scope === 'class') {
     const memberIds = family.map((m) => m.id);
     if (!memberIds.length) return false;

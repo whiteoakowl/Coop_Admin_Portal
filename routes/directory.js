@@ -8,9 +8,14 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { requirePortalAuth } = require('../middleware/portalAuth');
+const { requirePortalAuth, blockTeacherOnlyAccounts } = require('../middleware/portalAuth');
 const { familyForAccount } = require('../utils/portalAuth');
 const directory = require('../utils/directory');
+
+// A real request: "Teacher portal... remove business directory..."- see
+// blockTeacherOnlyAccounts' own comment. Public/logged-out browsing of
+// public-visibility listings stays untouched.
+router.use(blockTeacherOnlyAccounts);
 
 function withImageUrl(listing) {
   return { ...listing, imageUrl: listing.image_key ? `/uploads/directory/${listing.image_key}` : null };

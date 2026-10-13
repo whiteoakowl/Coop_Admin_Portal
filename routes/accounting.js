@@ -9,12 +9,15 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { requirePortalAuth } = require('../middleware/portalAuth');
+const { requirePortalAuth, blockTeacherOnlyAccounts } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
 const { primaryParentForBilling } = require('../utils/members');
 const payments = require('../utils/payments');
 
 router.use(requirePortalAuth);
+// A real request: "Teacher portal... remove ... accounting..." - see
+// blockTeacherOnlyAccounts' own comment.
+router.use(blockTeacherOnlyAccounts);
 
 // A real request: "this will be the same account view on parent portal
 // too" - same Invoices/Payments/Adjustments tables and year filter as

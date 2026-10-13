@@ -8,13 +8,18 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { requirePortalAuth } = require('../middleware/portalAuth');
+const { requirePortalAuth, blockTeacherOnlyAccounts } = require('../middleware/portalAuth');
 const { familyForAccount } = require('../utils/portalAuth');
 const { formatFriendlyTimestamp, formatFriendlyDateAndTime } = require('../utils/dates');
 const events = require('../utils/events');
 const signupLists = require('../utils/committeesAndSignupLists');
 const notifications = require('../utils/notifications');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
+
+// A real request: "Teacher portal... remove ... events" - see
+// blockTeacherOnlyAccounts' own comment. Public/logged-out browsing of
+// public-visibility events stays untouched.
+router.use(blockTeacherOnlyAccounts);
 
 function withImageUrl(event) {
   return { ...event, imageUrl: events.eventImageUrl(event.image_key) };

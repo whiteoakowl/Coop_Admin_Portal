@@ -8,7 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const { createStorageClient, publicUrl } = require('../utils/storage');
-const { requirePortalAuth } = require('../middleware/portalAuth');
+const { requirePortalAuth, blockTeacherOnlyAccounts } = require('../middleware/portalAuth');
 const { familyForAccount } = require('../utils/portalAuth');
 const store = require('../utils/store');
 
@@ -24,6 +24,9 @@ function withImageUrl(product) {
 }
 
 router.use(requirePortalAuth);
+// A real request: "Teacher portal... remove ... store..." - see
+// blockTeacherOnlyAccounts' own comment.
+router.use(blockTeacherOnlyAccounts);
 
 // A real request: "change shop product card to look similar [to a
 // reference design: image left, In Stock/Out of Stock badge, price and
