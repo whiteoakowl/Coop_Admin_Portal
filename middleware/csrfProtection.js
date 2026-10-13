@@ -50,5 +50,21 @@ module.exports = function csrfProtection(req, res, next) {
   const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
   const message = 'Your session was open too long and needs a refresh before this action can be confirmed. Please reload the page and try again.';
   if (wantsJson) return res.status(403).json({ ok: false, error: message });
-  res.status(403).render('403', { title: 'Session Expired', message });
+  // A real bug report: "Main admin portal, event, creating tickets...
+  // jumps back to co-op admin portal." This is the only 403 render in
+  // the app that left backHref/backLabel unset, so it fell through to
+  // views/403.ejs's own hardcoded '/admin' default - correct for the
+  // single shared Co-op Admin login (req.session.adminId), completely
+  // wrong for a member portal account (req.session.portalAccountId -
+  // Main Admin, Parent, Student, Teacher), which has no access to
+  // '/admin' at all. Every other 403 render for a portal account in this
+  // app already sends it to '/portal' (middleware/portalAuth.js,
+  // routes/admin-events.js's own deny()) - matches that here too.
+  const portalSession = Boolean(req.session.portalAccountId);
+  res.status(403).render('403', {
+    title: 'Session Expired',
+    message,
+    backHref: portalSession ? '/portal' : '/admin',
+    backLabel: portalSession ? 'Back to My Portals' : 'Back to Dashboard',
+  });
 };
