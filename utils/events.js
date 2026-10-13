@@ -1972,6 +1972,16 @@ function monthGrid(monthParam, eventList) {
     }
     weeks.push(week);
   }
+  // A real bug report: "when viewing a month on the calendar it shouldn't
+  // show the dates for the next month at the bottom." The grid above
+  // always builds a fixed 6 rows so every month lines up to the same
+  // height, but a month that only needs 5 (or even 4) calendar rows to
+  // show every one of its own days ends up with a trailing row that's
+  // entirely next month's leading days (inMonth: false) - drop any such
+  // row(s) off the end rather than rendering them.
+  while (weeks.length > 0 && weeks[weeks.length - 1].every((d) => !d.inMonth)) {
+    weeks.pop();
+  }
 
   const prevMonth = new Date(Date.UTC(year, month - 1, 1));
   const nextMonth = new Date(Date.UTC(year, month + 1, 1));
