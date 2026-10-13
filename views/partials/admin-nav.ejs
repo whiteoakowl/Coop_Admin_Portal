@@ -233,19 +233,17 @@
   <% } %>
 <% }); %>
 
-<%- include('session-timeout-dialog') %>
 <%- include('confirm-dialog') %>
 
 <script src="/js/fullscreen-navigate-shim.js"></script>
 <script src="/js/admin-nav.js"></script>
-<%# defer, unlike this file's other scripts - both read window.CSRF_TOKEN,
-    which partials/head.ejs's csrf.js sets. csrf.js is itself deferred (it
-    sits in <head>, before any DOM these two need exists), and a deferred
-    script always runs after every earlier-in-the-document non-deferred
-    script has already executed - so without defer here, either of these
-    would run (and read an still-unset window.CSRF_TOKEN) before csrf.js
-    ever does, despite appearing later in the HTML. %>
-<script src="/js/session-timeout-warning.js" defer></script>
+<%# defer - reads window.CSRF_TOKEN, which partials/head.ejs's csrf.js
+    sets. csrf.js is itself deferred (it sits in <head>, before any DOM
+    this needs exists), and a deferred script always runs after every
+    earlier-in-the-document non-deferred script has already executed - so
+    without defer here, this would run (and read a still-unset
+    window.CSRF_TOKEN) before csrf.js ever does, despite appearing later
+    in the HTML. %>
 <script src="/js/unsaved-changes.js" defer></script>
 <script src="/js/confirm-dialog.js"></script>
 <script src="/js/print-blank-target.js"></script>

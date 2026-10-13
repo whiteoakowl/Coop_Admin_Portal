@@ -335,7 +335,16 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      maxAge: 1000 * 60 * 60 * 8, // 8 hours
+      // A real request: "remove time limit for being logged in. Should
+      // stay logged in indefinitely unless the member logs out." No
+      // native "forever" cookie exists, so this is as close as a real
+      // expiry gets - 10 years, long past the lifetime of any device
+      // this app is actually used on. Applies to both the single shared
+      // Admin session (req.session.adminId) and every member portal
+      // session (req.session.portalAccountId), since they share this one
+      // cookie config - only an explicit Log Out (or clearing cookies)
+      // ends a session now.
+      maxAge: 1000 * 60 * 60 * 24 * 365 * 10,
       httpOnly: true,
       sameSite: 'lax',
       secure: 'auto',
@@ -388,16 +397,8 @@ app.use((req, res, next) => {
   if (isAdmin || isPortalSession) {
     if (!req.session.csrfToken) req.session.csrfToken = crypto.randomBytes(24).toString('hex');
     res.locals.csrfToken = req.session.csrfToken;
-    // A fixed point in time, not a sliding window - this app's session
-    // isn't `rolling`, so cookie.expires is set once at login and stays
-    // put across every later request (see the Cookie source itself:
-    // setting `maxAge` sets `expires` as a side effect, once, at
-    // creation). That's exactly what public/js/session-timeout-warning.js
-    // needs: an absolute deadline to count down to, not an estimate.
-    res.locals.sessionExpiresAt = req.session.cookie.expires ? req.session.cookie.expires.toISOString() : null;
   } else {
     res.locals.csrfToken = null;
-    res.locals.sessionExpiresAt = null;
   }
   next();
 });
