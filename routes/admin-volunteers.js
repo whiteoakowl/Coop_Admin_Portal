@@ -8,6 +8,7 @@ const { parseNamesFromUpload, findMemberByName, hasInfantChild, activeParentAndA
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter } = require('../utils/uploads');
 const {
+  CLASS_DAYS,
   CLASS_DAY_LABELS_FULL: DAY_LABELS,
   CLASS_DAY_WEEKDAY_FULL,
   requireClassDay,
@@ -75,14 +76,30 @@ async function resolveSemesterId(semesterId) {
   return semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
 }
 
-// Floater Assignments is the landing page for Volunteers. Lands on
-// whichever day of the week (Settings > Day Settings) is first in
-// calendar order, same catalog the Classes grid's own tabs use - falls
-// back to Monday on the vanishingly unlikely chance no day has ever been
-// activated at all.
+// Floater Assignments is the landing page for Volunteers (the sidebar's
+// own nav link - views/partials/admin-nav.ejs - points here with no
+// :day). Lands on TODAY's own active day when today is one (so the
+// manage page's own date picker then actually defaults to today - see
+// its "defaultDate" comment), since that's the board an admin clicking
+// this link is almost always trying to check. A real bug report: "shows
+// a teacher absent today when they did not submit a form for today -
+// they were absent another date" - this always redirected to whichever
+// active day sorts FIRST in calendar order (e.g. always Monday) with no
+// regard for what day it actually is, so on every day that wasn't that
+// first day, an admin landed on a different day's board entirely,
+// defaulting to ITS OWN most recent date (which could easily be a date
+// the admin had nothing to do with, including one a teacher really was
+// out for) while still looking exactly like "today" at a glance. Falls
+// back to the old first-in-calendar-order day if today isn't an active
+// class day at all (e.g. a Tuesday with only Monday/Wednesday active),
+// same as before, so the page still never 404s/goes blank when visited
+// off-schedule; and to Monday on the vanishingly unlikely chance no day
+// has ever been activated at all.
 router.get('/volunteers', requireAdmin, async (req, res) => {
   const activeDays = await listActiveClassDays();
-  res.redirect(`/admin/volunteers/${activeDays[0] || 'monday'}/manage`);
+  const todayDay = CLASS_DAYS.find((day) => CLASS_DAY_WEEKDAY_FULL[day] === weekdayOf(todayISO()));
+  const day = activeDays.includes(todayDay) ? todayDay : activeDays[0] || 'monday';
+  res.redirect(`/admin/volunteers/${day}/manage`);
 });
 
 // Shared by the full manage page below and its own /fragment route (see
