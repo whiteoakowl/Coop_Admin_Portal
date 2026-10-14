@@ -9825,8 +9825,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
        over that inline style during the actual print render, regardless
        of whether the JS reset ran - the screen-only shrink-to-fit
        preview is unaffected (this rule is a `@media print` in the first
-       place). */
+       place). transform: none pairs with it for the exact same reason on
+       a browser that doesn't support zoom at all (print-auto.js's own
+       fallback there - see that file's comment): the same beforeprint-
+       didn't-fire-in-time risk applies to its inline transform just as
+       much as to zoom elsewhere. */
     zoom: 1 !important;
+    transform: none !important;
   }
   /* A real bug report: "on an older desktop with outdated Chrome, the
      2nd page being printed always starts on the first page" - every
@@ -9908,6 +9913,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     border: none;
     box-shadow: none;
     zoom: 1 !important;
+    transform: none !important;
   }
 
   /* Keep a hard, exactly-one-portrait-page box at actual print time too
