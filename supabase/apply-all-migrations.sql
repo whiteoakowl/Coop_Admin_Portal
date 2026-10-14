@@ -1,26 +1,3 @@
--- Run this once in the Supabase dashboard's SQL Editor (Project -> SQL
--- Editor -> New query -> paste -> Run) to bring your live database fully
--- up to date with this app's code.
---
--- Every *.sql file in supabase/migrations/, concatenated in the same
--- chronological order the app itself applies them locally/in tests (see
--- db/index.js's allMigrationSql()). This app auto-applies migrations only
--- to its own throwaway/local database - a real Supabase project has
--- always needed each one run by hand (see MIGRATION.md) - and it turned
--- out a much larger backlog of these had never actually been applied here
--- than the single most-recent batch first suspected (the "column
--- image_key does not exist" error was migration 20260923010000, from
--- weeks before tonight).
---
--- SAFE TO RUN MORE THAN ONCE. Every migration in this app is deliberately
--- written idempotently (create table/add column "if not exists", drop-
--- then-recreate for constraints, "on conflict do nothing" for seed data)
--- specifically because this same file replays in full against the local
--- dev/test database on every boot - so running this whole script now,
--- regardless of how much of it your database already has, will only ever
--- apply what's actually missing and leave the rest untouched.
-
--- ===== 20260811035644_initial_schema.sql =====
 -- SH Check-in/out schema - Postgres/Supabase translation of db/schema.sql
 -- (the original SQLite schema, kept in place and unchanged as long as the
 -- app still runs on it during the migration - see MIGRATION.md).
@@ -593,7 +570,6 @@ begin
   end loop;
 end $$;
 
--- ===== 20260817012545_setup_cleanup_assignments.sql =====
 -- Setup/Cleanup Assignments tab: unlike the standing setup_teams roster
 -- (no dates, no per-session state), this tab is date-scoped like Floater
 -- Assignments - an admin picks a session date and suggests which task
@@ -629,7 +605,6 @@ create index if not exists idx_setup_task_assignments_date on setup_task_assignm
 alter table public.setup_dates enable row level security;
 alter table public.setup_task_assignments enable row level security;
 
--- ===== 20260817020000_setup_second_task_slot.sql =====
 -- Real bug report: Setup/Cleanup Assignments only ever offered a single
 -- "Suggested Task" dropdown per member per date, but a small team
 -- routinely needs one member covering two jobs (e.g. Chairs AND Trash) -
@@ -642,7 +617,6 @@ alter table public.setup_task_assignments enable row level security;
 -- shape directly instead of modeling a list nothing needs.
 alter table setup_task_assignments add column if not exists task_item_id_2 integer references task_list_items(id) on delete set null;
 
--- ===== 20260818000000_volunteer_floater_exclusions.sql =====
 -- Real bug report: "when deleting members off the floater lists the
 -- member isn't removed." Root cause: routes/admin-volunteers.js's
 -- remove-member route deletes the volunteer_members row, then calls
@@ -667,7 +641,6 @@ create table if not exists volunteer_floater_exclusions (
   primary key (volunteer_list_id, member_id, section_id)
 );
 
--- ===== 20260818010000_admin_positions.sql =====
 -- Real request: an "admin name tag" (logo, name, barcode, ID number, admin
 -- position) for co-op staff/leaders, plus a Settings-managed list of
 -- position titles (e.g. "President", "Treasurer") that a member of type
@@ -692,7 +665,6 @@ create table if not exists admin_positions (
 -- held it - it just clears their selection back to "none".
 alter table members add column if not exists admin_position_id integer references admin_positions(id) on delete set null;
 
--- ===== 20260818020000_setup_cleanup_badge_fields.sql =====
 -- Real bug report: "Setup/cleanup task cards are a mess... The only
 -- information that should be included on each setup/cleanup badge is
 -- day, team name, leader, task and the barcode." The badge previously
@@ -708,7 +680,6 @@ alter table members add column if not exists admin_position_id integer reference
 alter table misc_badges add column if not exists day text;
 alter table misc_badges add column if not exists leader_name text;
 
--- ===== 20260819000000_member_admin_positions.sql =====
 -- Real request: "ability to add unlimited admin positions to a member
 -- profile" - members.admin_position_id (20260818010000_admin_positions.sql)
 -- was a single nullable FK, one position per member. This adds a proper
@@ -739,7 +710,6 @@ on conflict (member_id, admin_position_id) do nothing;
 -- separate, harder-to-undo decision this request didn't ask for.
 alter table public.member_admin_positions enable row level security;
 
--- ===== 20260819010000_setup_team_meeting_details.sql =====
 -- Real request: "setup/cleanup team cards should have a space for time to
 -- meet and meeting location. the leader, time, location, all those
 -- details should show on the kiosk side when you click the setup/cleanup
@@ -749,7 +719,6 @@ alter table public.member_admin_positions enable row level security;
 alter table setup_teams add column if not exists meeting_time text;
 alter table setup_teams add column if not exists meeting_location text;
 
--- ===== 20260821000000_training_module.sql =====
 -- Training & Learning module - see utils/training.js for the module's own
 -- full design writeup (why lesson progress is keyed to the ATTEMPT, not
 -- the assignment; why quiz answers/lesson progress snapshot their own
@@ -947,7 +916,6 @@ create table if not exists training_quiz_answers (
 );
 create index if not exists idx_training_quiz_answers_attempt on training_quiz_answers(attempt_id);
 
--- ===== 20260823161125_playground_checkin.sql =====
 -- Real request: "we need to add a playground check in and out and log.
 -- anybody can check in and out of the playground. it doesn't have a set
 -- roster." Reuses the existing rosters/attendance/checkouts tables rather
@@ -967,7 +935,6 @@ create table if not exists playground_rosters (
   primary key (day, hour_position)
 );
 
--- ===== 20260824180000_setup_team_task_scan_timing.sql =====
 -- Real request: "add a dropdown menu to each setup/cleanup team list that
 -- asks, log on check in or log on check out. choosing one or the other
 -- will determine when a member is asked to scan their setup/cleanup
@@ -979,7 +946,6 @@ create table if not exists playground_rosters (
 alter table setup_teams add column if not exists task_scan_timing text not null default 'checkout'
   check (task_scan_timing in ('checkin', 'checkout'));
 
--- ===== 20260824180500_attendance_task_scan.sql =====
 -- Real request: "add a dropdown menu to each setup/cleanup team list
 -- that asks, log on check in or log on check out ... if team 1 is, log
 -- on check in, those members will click check in, scan their name tag,
@@ -1000,7 +966,6 @@ alter table setup_teams add column if not exists task_scan_timing text not null 
 alter table attendance add column if not exists task_item_id integer references task_list_items(id) on delete set null;
 alter table attendance add column if not exists task_scanned_at bigint;
 
--- ===== 20260825020000_portal_platform_foundation.sql =====
 -- Foundation for the new multi-portal platform (Public site, Parent,
 -- Student, Teacher, Co-op Admin, and Main Admin portals) built on top of
 -- the existing operational co-op app.
@@ -1163,7 +1128,6 @@ create table if not exists class_registrations (
 create index if not exists idx_class_registrations_class on class_registrations(class_id);
 create index if not exists idx_class_registrations_student on class_registrations(student_id);
 
--- ===== 20260825030000_events_module.sql =====
 -- Community & Commerce track (Track B), item 1: Events. The backbone
 -- other Track B features (volunteer/donation signups now, the Newsletter
 -- and Notification Center later) hang off of - see TEAM_B_HANDOFF.md.
@@ -1276,7 +1240,6 @@ create table if not exists event_donation_claims (
 );
 create index if not exists idx_event_donation_claims_item on event_donation_claims(donation_item_id);
 
--- ===== 20260825030000_registration_windows.sql =====
 -- Staged, group-targeted class registration windows - the "teachers
 -- first, then certain families, then everyone" scope the portal
 -- foundation migration (20260825020000) called out as intentionally not
@@ -1314,7 +1277,6 @@ begin
   end if;
 end $$;
 
--- ===== 20260825040000_academic_records.sql =====
 -- Lessons/assignments/grading, diplomas, and transcripts - the last of
 -- Track A's originally-scoped platform work (see PLATFORM_BUILD.md).
 -- Reuses the EXISTING classes/class_enrollments/class_staff model
@@ -1391,7 +1353,6 @@ create table if not exists student_academic_history (
 );
 create index if not exists idx_student_academic_history_student on student_academic_history(student_id);
 
--- ===== 20260825040000_directory_classifieds.sql =====
 -- Community & Commerce track (Track B), item 4: Business Directory and
 -- Classifieds - built back to back per TEAM_B_HANDOFF.md since they share
 -- the same shape: a member submits a listing, it starts 'pending' until a
@@ -1450,7 +1411,6 @@ create table if not exists classified_listings (
 create index if not exists idx_classifieds_status_visibility on classified_listings(status, visibility);
 create index if not exists idx_classifieds_member on classified_listings(member_id);
 
--- ===== 20260825050000_member_directory.sql =====
 -- Community & Commerce track (Track B), item 5: Member Directory. No new
 -- copy of member data - this reads live from the existing `members`/
 -- `families` tables (Track A's own domain, read-only here) rather than
@@ -1478,7 +1438,6 @@ create table if not exists member_directory_opt_outs (
   opted_out_at text not null default now_text()
 );
 
--- ===== 20260825060000_forums.sql =====
 -- Community & Commerce track (Track B), item 6: Forums. Categories ->
 -- threads -> posts, plus optional private class forums (scope='class',
 -- class_id set) visible only to that class's own teacher/assistants
@@ -1547,7 +1506,6 @@ create table if not exists forum_moderation_actions (
 );
 create index if not exists idx_forum_moderation_actions_target on forum_moderation_actions(target_type, target_id);
 
--- ===== 20260825070000_custom_forms.sql =====
 -- Community & Commerce track (Track B), item 7: Custom Forms - one
 -- generic, reusable form-builder system (per the handoff's own explicit
 -- instruction: "do not create more one-off form tables after this").
@@ -1637,7 +1595,6 @@ create table if not exists custom_form_answer_choices (
   primary key (answer_id, option_id)
 );
 
--- ===== 20260825080000_payments_foundation.sql =====
 -- Community & Commerce track (Track B), item 9: Accounting/Payments
 -- foundation - built ahead of item 8 (Store) even though the handoff
 -- lists Store first, because the handoff's own item 9 text requires
@@ -1694,7 +1651,6 @@ create table if not exists payment_payments (
 );
 create index if not exists idx_payment_payments_charge on payment_payments(charge_id);
 
--- ===== 20260825090000_store.sql =====
 -- Community & Commerce track (Track B), item 8: Store. Checkout is wired
 -- through item 9's own payment_charges/payment_payments abstraction
 -- (utils/payments.js) rather than a separate "did they pay" flag on
@@ -1756,7 +1712,6 @@ create table if not exists store_order_items (
 );
 create index if not exists idx_store_order_items_order on store_order_items(order_id);
 
--- ===== 20260825100000_newsletter.sql =====
 -- Community & Commerce track (Track B), item 10: Weekly Newsletter.
 -- Content is auto-assembled from real, existing tables (events,
 -- announcements, business directory) - see utils/newsletter.js's own
@@ -1784,7 +1739,6 @@ create table if not exists newsletter_issues (
   updated_at text not null default now_text()
 );
 
--- ===== 20260825110000_notifications.sql =====
 -- Community & Commerce track (Track B), item 11: SMS/text notification
 -- framework, sharing one underlying "notification" concept with the
 -- in-app Notification Center rather than being two unrelated systems -
@@ -1867,7 +1821,6 @@ insert into notification_types (key, label, description) values
   ('forum_reply', 'Forum Reply', 'Someone replied to a thread you started.')
 on conflict (key) do nothing;
 
--- ===== 20260825120000_photos_publications.sql =====
 -- Community & Commerce track (Track B), item 12: Photos/Albums and
 -- Publications/Articles.
 --
@@ -1914,7 +1867,6 @@ create table if not exists publications (
   updated_at text not null default now_text()
 );
 
--- ===== 20260825130000_audit_log.sql =====
 -- Community & Commerce track (Track B), item 13: Audit Log.
 -- who/what/when/what-record for meaningful admin actions - threaded
 -- through real actions in already-built features (financial changes in
@@ -1939,7 +1891,6 @@ create table if not exists audit_log (
 );
 create index if not exists idx_audit_log_created on audit_log(created_at desc);
 
--- ===== 20260826000000_announcement_notification_type.sql =====
 -- A real request: Main Admin should be able to compose and send a
 -- customized announcement to some or all members, and Parent Portal's
 -- home page should show current + past announcements sent to that
@@ -1953,7 +1904,6 @@ insert into notification_types (key, label, description) values
   ('announcement', 'Announcement', 'A message Main Admin sent to some or all members.')
 on conflict (key) do nothing;
 
--- ===== 20260826010000_sections.sql =====
 -- A real request: group members into named "sections" (e.g. "Teen Co-op",
 -- "Homeschool Group A") independent of Family, so Events and Classes can
 -- each optionally restrict who can see/register for them to specific
@@ -1975,7 +1925,6 @@ create table if not exists member_sections (
 );
 create index if not exists idx_member_sections_section on member_sections(section_id);
 
--- ===== 20260826020000_class_registration_rules.sql =====
 -- A real, large request covering class registration: who is allowed to
 -- register (parent-on-behalf-of-child, teacher/assistant self-signup,
 -- student self-signup), how many teacher/assistant seats a class has,
@@ -2032,7 +1981,6 @@ alter table payment_charges drop constraint if exists payment_charges_source_typ
 alter table payment_charges add constraint payment_charges_source_type_check
   check (source_type in ('store_order', 'event_registration', 'class_registration', 'manual'));
 
--- ===== 20260826030000_class_waitlist_notification_type.sql =====
 -- A real request: class registration gets a real waitlist (position
 -- number tracked, see 20260826020000_class_registration_rules.sql) - and
 -- when someone ahead cancels, the next waitlisted student is promoted to
@@ -2044,7 +1992,6 @@ insert into notification_types (key, label, description) values
   ('class_waitlist_promoted', 'Moved Off Waitlist', 'A waitlisted class registration was promoted to confirmed because a spot opened up.')
 on conflict (key) do nothing;
 
--- ===== 20260826040000_events_registration_rules.sql =====
 -- A real, large request extending the existing Events module (see
 -- 20260825030000_events_module.sql) with registration rules, categories,
 -- section restriction, guest registration, and check-in/out - the Events
@@ -2172,7 +2119,6 @@ insert into notification_types (key, label, description) values
   ('event_submission_decided', 'Submitted Event Reviewed', 'A Main Admin approved or rejected an event a member submitted.')
 on conflict (key) do nothing;
 
--- ===== 20260827000000_forum_to_chat_rename.sql =====
 -- A real request: "Change forum to chat, everywhere!" - a display-text-
 -- only rename (the Forum/discussion-board feature itself, its routes,
 -- tables, and the notification_types.key 'forum_reply' all stay exactly
@@ -2183,7 +2129,6 @@ on conflict (key) do nothing;
 -- rather than edited retroactively.
 update notification_types set label = 'Chat Reply', description = 'Someone replied to a thread you started.' where key = 'forum_reply';
 
--- ===== 20260827020000_resource_links.sql =====
 -- Resource Links - Student Portal item: "resource links" tab. A short,
 -- admin-curated list of external links (a Google Classroom folder, a
 -- reading list, a permission-slip form, etc.), not a document library or
@@ -2221,7 +2166,6 @@ begin
   end if;
 end $$;
 
--- ===== 20260827030000_babysitter_directory.sql =====
 -- Babysitter Directory - a real request: "Add a Babysitter directory. It
 -- should appear on parent portal to view directory. Parents can view or
 -- create a profile for their child as well to be a babysitter. Requests
@@ -2262,14 +2206,12 @@ insert into notification_types (key, label, description) values
   ('babysitter_submission_decided', 'Babysitter Profile Reviewed', 'A Main Admin approved or rejected a babysitter profile submission or edit.')
 on conflict (key) do nothing;
 
--- ===== 20260827040000_family_homeschool_duration.sql =====
 -- A real request: "on the membership form, ask how long the family has
 -- been homeschooling." Free-text rather than a strict number/date - "3
 -- years", "since 2019", "this is our first year" are all real answers a
 -- family might give, and the admin-facing form has no need to parse it.
 alter table families add column if not exists homeschool_duration text;
 
--- ===== 20260827050000_class_enrollment_registered_at.sql =====
 -- A real request: "on class rosters each student member line should
 -- have registration date/time." class_enrollments never tracked when a
 -- student was actually added to a class - just the (class_id,
@@ -2278,7 +2220,6 @@ alter table families add column if not exists homeschool_duration text;
 -- enrollment from here forward gets a real timestamp.
 alter table class_enrollments add column if not exists created_at text not null default now_text();
 
--- ===== 20260827060000_resource_link_categories.sql =====
 -- A real request: "resource links should have add category button on
 -- admin side. and add resource button. add resource button should pop
 -- up with a window that asks for city and state, title, description and
@@ -2308,7 +2249,6 @@ alter table resource_links add column if not exists submitted_by_member_id integ
 create index if not exists idx_resource_links_category on resource_links(category_id);
 create index if not exists idx_resource_links_status on resource_links(status);
 
--- ===== 20260827080000_membership_approvals.sql =====
 -- A real request: "under members in main admin portal there should be a
 -- tab that says approvals. this is where new membership requests
 -- appear... each member line should have approve button, deny button
@@ -2370,7 +2310,6 @@ insert into notification_types (key, label, description) values
   ('membership_denied', 'Membership Request Denied', 'Your membership request was denied.')
 on conflict (key) do nothing;
 
--- ===== 20260827090000_classified_categories.sql =====
 -- Main Admin Classifieds (Community & Commerce track, item 4) - a real
 -- request: "Only admin can add classifieds categories (same Add Category
 -- popup pattern to add/delete). Members must choose a category when
@@ -2391,7 +2330,6 @@ create table if not exists classified_categories (
 alter table classified_listings add column if not exists category_id integer references classified_categories(id) on delete set null;
 create index if not exists idx_classified_listings_category on classified_listings(category_id);
 
--- ===== 20260827100000_directory_categories.sql =====
 -- Main Admin Business Directory (Community & Commerce track, item 4) - a
 -- real request: "Business Directory gets tabs: Directory, Requests,
 -- Archive. Directory tab gets the same Add Category popup pattern
@@ -2411,7 +2349,6 @@ create table if not exists business_directory_categories (
 alter table business_directory_listings add column if not exists category_id integer references business_directory_categories(id) on delete set null;
 create index if not exists idx_business_directory_listings_category on business_directory_listings(category_id);
 
--- ===== 20260827110000_newsletter_custom_note.sql =====
 -- Weekly Newsletter - a real request: "Add a 'Customize Newsletter'
 -- action where admin writes their own note/letter that appears before
 -- the automatic content." Kept as its own column, separate from
@@ -2421,7 +2358,6 @@ create index if not exists idx_business_directory_listings_category on business_
 -- would if the note lived inside body_html itself.
 alter table newsletter_issues add column if not exists custom_note text;
 
--- ===== 20260828000000_membership_form_fields.sql =====
 -- A real request: "under members in main admin portal there should be a
 -- settings tab for editing and adding parts of the membership form."
 -- Admin-defined extra questions, shown after the fixed Name/Email/Phone
@@ -2463,7 +2399,6 @@ create table if not exists membership_form_field_values (
 );
 create index if not exists idx_membership_form_field_values_member on membership_form_field_values(member_id);
 
--- ===== 20260828010000_announcement_log.sql =====
 -- Real requests: "main admin and co-op admin announcements should be
 -- communication... at the bottom of announcements it says past
 -- announcements, where it lists the announcements that have been sent
@@ -2495,7 +2430,6 @@ create table if not exists announcement_log (
 );
 create index if not exists idx_announcement_log_created on announcement_log(created_at desc);
 
--- ===== 20260828010000_event_wizard_fields.sql =====
 -- Create New Event wizard (Main Admin) - a real request: match a
 -- reference mockup's 5-step event-creation flow (Details / Date & Time /
 -- Location / Tickets / Additional). Most of that mockup's fields already
@@ -2511,7 +2445,6 @@ alter table events add column if not exists language text;
 alter table events add column if not exists organized_by text;
 alter table events add column if not exists tags text;
 
--- ===== 20260828020000_email_campaigns.sql =====
 -- Communication > Email tab (item 12) - a real request: "there should be
 -- a filter that filters the member list by section, role, if there
 -- registered for classes or not, age group, grade level, parent,
@@ -2553,7 +2486,6 @@ create table if not exists email_campaigns (
 );
 create index if not exists idx_email_campaigns_created on email_campaigns(created_at desc);
 
--- ===== 20260828030000_text_campaigns.sql =====
 -- Communication > Text tab (item 13) - a real request: "text tab should
 -- have the same structure as email but simpler, a text box with a 50
 -- word cap." Same filtered-member-list/select-all-none/compose/send-or-
@@ -2579,7 +2511,6 @@ create table if not exists text_campaigns (
 );
 create index if not exists idx_text_campaigns_created on text_campaigns(created_at desc);
 
--- ===== 20260828040000_babysitter_directory_polish.sql =====
 -- Main Admin > Babysitters polish (item 15) - a real request: "babysitter
 -- tab should have babysitter, approvals and settings tab. add a babysitter
 -- profile button that pops up and picks a member (auto fills the rest of
@@ -2593,7 +2524,6 @@ create index if not exists idx_text_campaigns_created on text_campaigns(created_
 -- view could one day filter/sort by it without parsing free text.
 alter table babysitter_profiles add column if not exists contact_preference text check (contact_preference in ('call', 'text', 'either'));
 
--- ===== 20260828050000_event_locations.sql =====
 -- Main Admin > Events Settings (item 8) - a real request: "buttons for
 -- add/edit category, add/edit location. Both create a popup that allows
 -- you to add/edit or delete categories or locations. Locations will then
@@ -2616,7 +2546,6 @@ create table if not exists event_locations (
 
 alter table events add column if not exists location_id integer references event_locations(id) on delete set null;
 
--- ===== 20260829010000_event_settings.sql =====
 -- Main Admin > Events > Settings (item 9) - "add the settings exactly as
 -- shown in the screenshots." One singleton settings row, same shape as
 -- site_settings (20260825020000_portal_platform_foundation.sql): a Main
@@ -2660,7 +2589,6 @@ alter table event_categories add column if not exists allow_sync integer not nul
 alter table event_registrations add column if not exists attendance_status text check (attendance_status in ('present', 'late', 'absent'));
 alter table event_guest_registrations add column if not exists attendance_status text check (attendance_status in ('present', 'late', 'absent'));
 
--- ===== 20260829020000_photo_submission_review.sql =====
 -- Main Admin homepage (item 6) - "a 2nd count display for pending
 -- requests such as... photo submissions... each name should be able to
 -- click and go straight to that request page to view and approve
@@ -2672,7 +2600,6 @@ alter table event_guest_registrations add column if not exists attendance_status
 -- member self-serve upload route sets 'pending' going forward.
 alter table photo_album_photos add column if not exists status text not null default 'approved' check (status in ('pending', 'approved', 'rejected'));
 
--- ===== 20260830010000_student_pets.sql =====
 -- Student Portal > Pets - a real request: "create a personal pet activity
 -- for students. They can choose a pet, choose a few features and save.
 -- Then they can name their pet, feed it, play with it, bathe it." One
@@ -2711,7 +2638,6 @@ create table if not exists student_pets (
   updated_at text not null default now_text()
 );
 
--- ===== 20260830020000_reading_log.sql =====
 -- Student Portal > Reading Competition - a real request: "there will be a
 -- reading log on this page for students to fill out and earn points.
 -- students will compete with other students." One row per reading
@@ -2736,7 +2662,6 @@ create table if not exists reading_logs (
 
 create index if not exists reading_logs_member_id_idx on reading_logs (member_id);
 
--- ===== 20260830030000_game_stats.sql =====
 -- Student Portal > Games header stats - a real request: "include games
 -- played, high score, current streak bar at the top right." Same
 -- "compute on read" approach as reading_logs/student_pets (see those
@@ -2774,7 +2699,6 @@ create table if not exists game_scores (
 );
 create index if not exists game_scores_member_id_idx on game_scores (member_id);
 
--- ===== 20260830040000_reading_goal.sql =====
 -- Student Portal > Reading Challenge - a real request: "is there a button
 -- for setting your reading goal?" The weekly goal used to be a single
 -- hardcoded constant (utils/reading.js's own WEEKLY_GOAL_HOURS) shared by
@@ -2789,7 +2713,6 @@ create table if not exists reading_goals (
   updated_at text not null default now_text()
 );
 
--- ===== 20260830050000_nature_news.sql =====
 -- Student Portal > Nature News - a real request: "students can submit
 -- descriptions and one image of something they discovered in nature...
 -- main admin must approve. then it will appear on student portal
@@ -2812,7 +2735,6 @@ create table if not exists nature_news_posts (
 create index if not exists nature_news_posts_member_id_idx on nature_news_posts (member_id);
 create index if not exists nature_news_posts_status_idx on nature_news_posts (status);
 
--- ===== 20260830060000_spelling_bee.sql =====
 -- Student Portal > Spelling Bee - a real request: "this page will have a
 -- spelling game with vocabulary words for every grade level. grade
 -- level on students member profile determines their vocabulary level."
@@ -2831,7 +2753,6 @@ create table if not exists spelling_scores (
 
 create index if not exists spelling_scores_member_id_idx on spelling_scores (member_id);
 
--- ===== 20260831010000_substitute_assignments_vacancy_slot_type.sql =====
 -- Floater Assignments - a real request: "if class assistant says 1 and
 -- there are 0 assistants signed for that class, then the positions
 -- should appear on the floater list each week until someone is added as
@@ -2847,7 +2768,6 @@ create index if not exists spelling_scores_member_id_idx on spelling_scores (mem
 alter table substitute_assignments drop constraint if exists substitute_assignments_slot_type_check;
 alter table substitute_assignments add constraint substitute_assignments_slot_type_check check (slot_type in ('class', 'job', 'vacancy'));
 
--- ===== 20260901010000_class_edit_settings_reorg.sql =====
 -- Several real requests bundled into one class-edit reorganization:
 --
 -- "there shouldn't be a public and internal class description. just one
@@ -2887,7 +2807,6 @@ alter table classes add constraint classes_price_per_check check (price_per in (
 -- guarantee removeStaff already needs.
 alter table class_staff add column if not exists charge_id integer references payment_charges(id) on delete set null;
 
--- ===== 20260901020000_name_tag_request_new_tag_type.sql =====
 -- Real request: "co-op admin portal name tag request form. options are
 -- schedule change and lost name tag. add new name tag as option." Widens
 -- name_tag_requests.request_type to also accept 'new_tag' - a member who
@@ -2899,7 +2818,6 @@ alter table name_tag_requests drop constraint if exists name_tag_requests_reques
 alter table name_tag_requests add constraint name_tag_requests_request_type_check
   check (request_type in ('lost_tag', 'schedule_change', 'new_tag'));
 
--- ===== 20260901030000_absence_submission_log.sql =====
 -- A real bug report: "If someone submits an absence/late form, it will
 -- be over ridden and show a green P for present if they then come in
 -- later and check in, it will also show their check in and out time and
@@ -2939,7 +2857,6 @@ create table if not exists absence_submissions (
 create index if not exists idx_absence_submissions_date on absence_submissions(session_date desc);
 create index if not exists idx_absence_submissions_member on absence_submissions(member_id);
 
--- ===== 20260901040000_forum_category_moderation.sql =====
 -- A real request: "main admin portal chat, Moderate tab should have a
 -- list of the chat categories. when you click each category it show a
 -- pop up of the category's name, description, check box - allow
@@ -2972,7 +2889,6 @@ create table if not exists forum_category_sections (
   primary key (category_id, section_id)
 );
 
--- ===== 20260901050000_second_setup_cleanup_badge.sql =====
 -- Real request: "after parent scans their setup/cleanup badge it should
 -- ask if they have a 2nd setup/cleanup badge to scan, with yes and no
 -- buttons. if they select yes, it allows them to scan their barcode...
@@ -2993,7 +2909,6 @@ alter table attendance add column if not exists task_item_id_2 integer reference
 alter table attendance add column if not exists task_scanned_at_2 bigint;
 alter table checkouts add column if not exists task_item_id_2 integer references task_list_items(id) on delete set null;
 
--- ===== 20260901060000_event_guest_food_sections.sql =====
 -- Main Admin Events - a real, large request bundled into one migration:
 --
 -- "guests can register should only be a check box under who can register
@@ -3059,7 +2974,6 @@ create index if not exists idx_event_food_claims_item on event_food_claims(food_
 alter table public.event_food_items enable row level security;
 alter table public.event_food_claims enable row level security;
 
--- ===== 20260918010000_committees_and_signup_lists.sql =====
 -- A real request: "main admin portal, volunteer tab, sub pages
 -- committees, sign up list, volunteer list." Three separate features,
 -- each modeled after the shapes utils/events.js's own volunteer roles/
@@ -3180,7 +3094,6 @@ create table if not exists volunteer_signup_list_signups (
 create index if not exists idx_volunteer_signup_list_signups_shift on volunteer_signup_list_signups(shift_id);
 create index if not exists idx_volunteer_signup_list_signups_member on volunteer_signup_list_signups(member_id);
 
--- ===== 20260918020000_roster_manual_removals.sql =====
 -- Real bug report: "Monday/Wednesday attendance. If someone is manually
 -- deleted from the roster they are not automatically added back unless
 -- their schedule changes." Before this, POST /admin/rosters/:tab/remove-
@@ -3202,7 +3115,6 @@ create table if not exists roster_manual_removals (
   primary key (roster_id, member_id)
 );
 
--- ===== 20260918030000_store_categories_and_sizes.sql =====
 -- Real request: "do the admin shop features" - product categories (for
 -- the Shop's own category filter and a Settings tab to manage them,
 -- same admin-managed add/rename/delete shape as classified_categories)
@@ -3227,7 +3139,6 @@ create index if not exists idx_store_products_category on store_products(categor
 -- sizes.
 alter table store_order_items add column if not exists size text;
 
--- ===== 20260919000000_committee_members_and_leader.sql =====
 -- A real request: "adding a leader should be a drop down list of admin
 -- positions. Choose an admin and the leaders name and email address
 -- appears below," with a single leader per committee (not the existing
@@ -3257,7 +3168,6 @@ create table if not exists committee_members (
 create index if not exists idx_committee_members_committee on committee_members(committee_id);
 create index if not exists idx_committee_members_member on committee_members(member_id);
 
--- ===== 20260920010000_event_cancelled_notification_type.sql =====
 -- A real request: "cancel event... automatic email will be sent to
 -- anyone registered for the event to let them know the event is
 -- canceled." Registrants are notified through the same notify()
@@ -3267,7 +3177,6 @@ insert into notification_types (key, label, description) values
   ('event_cancelled', 'Event Cancelled', 'An event you were registered for was cancelled.')
 on conflict (key) do nothing;
 
--- ===== 20260920020000_event_settings_auto_refund.sql =====
 -- A real request: "new settings, automatically issue refund if member
 -- cancels their registration" - a new Main Admin > Events > Settings
 -- toggle, same "stored, ready to wire up once a real refund/payment
@@ -3276,7 +3185,6 @@ on conflict (key) do nothing;
 -- comment).
 alter table event_settings add column if not exists auto_refund_on_family_cancel integer not null default 0;
 
--- ===== 20260920030000_forum_category_archive_and_subscribers.sql =====
 -- A real request: "lock the chat group should be under edit, not on the
 -- front of the chat group card. There should also be an archive
 -- button." Reuses forum_threads' own 'active'/'archived' status
@@ -3301,7 +3209,6 @@ create table if not exists forum_category_subscribers (
 );
 create index if not exists idx_forum_category_subscribers_category on forum_category_subscribers(category_id);
 
--- ===== 20260921010000_store_product_options.sql =====
 -- A real request: "Store, adding options to a product should be a row
 -- with a bar for the option title and the individual price next to it,
 -- and box for qty and enable/disable button." Replaces the old plain
@@ -3357,7 +3264,6 @@ end $$;
 alter table store_order_items add column if not exists option_id integer references store_product_options(id) on delete set null;
 alter table store_order_items add column if not exists option_name text;
 
--- ===== 20260922010000_event_settings_tab_redesign.sql =====
 -- A real request: "event setting check boxes or yes/no in a column on
 -- the left, question to the right. questions with check boxes is this a
 -- public event, allow refunds when member cancels registration, close
@@ -3407,14 +3313,12 @@ alter table events add column if not exists registration_section_id integer refe
 alter table events add column if not exists lock_visibility_to_section integer not null default 0;
 alter table events add column if not exists visibility_section_id integer references sections(id) on delete set null;
 
--- ===== 20260923010000_class_photo.sql =====
 -- A real request: "sql editor copy paste should be for event photo,
 -- class photo and shop photo" - events (image_key, 20260825030000) and
 -- store products (image_key, store migrations) already had a photo;
 -- classes didn't. Same "one optional image per record" shape as those.
 alter table classes add column if not exists image_key text;
 
--- ===== 20260923020000_signup_volunteer_list_member.sql =====
 -- A real request: "main admin signup lists and volunteer lists, edit...
 -- below attach to event, there should be a drop down for attach to
 -- member with a choice of members listed abc by last name." Same
@@ -3423,7 +3327,6 @@ alter table classes add column if not exists image_key text;
 alter table sign_up_lists add column if not exists member_id integer references members(id) on delete set null;
 alter table volunteer_signup_lists add column if not exists member_id integer references members(id) on delete set null;
 
--- ===== 20260924010000_event_ticket_types_and_accounting_category.sql =====
 -- A real request: "event settings, finance, if charging per person there
 -- should be an option for adding several types of tickets with a
 -- different price and title bar next to it. Add a drop down menu for
@@ -3461,7 +3364,6 @@ create table if not exists event_accounting_categories (
 
 alter table events add column if not exists accounting_category_id integer references event_accounting_categories(id) on delete set null;
 
--- ===== 20260925010000_event_extra_fields.sql =====
 -- A real request: "volunteers, food, donations and extra fields tabs
 -- should be under one tab called, Volunteers... Extra fields is where
 -- you can add extra form type questions for people signing up for an
@@ -3491,7 +3393,6 @@ create table if not exists event_registration_answers (
 );
 create index if not exists idx_event_registration_answers_registration on event_registration_answers(registration_id);
 
--- ===== 20260926010000_event_ticket_type_price_per.sql =====
 -- A real request: "event settings finance, add ticket types, price,
 -- title and permissions person or family" - each ticket type now carries
 -- its own person/family charge basis instead of relying on the event's
@@ -3499,7 +3400,6 @@ create index if not exists idx_event_registration_answers_registration on event_
 
 alter table event_ticket_types add column if not exists price_per text not null default 'person' check (price_per in ('person', 'family'));
 
--- ===== 20260927010000_event_settings_registration_group.sql =====
 -- A real request: reorganizing the Settings tab's checkbox list into
 -- "Registration Settings" and "General Settings" sections surfaced two
 -- new questions among the reworded set: "Allow waiting list signups
@@ -3521,11 +3421,9 @@ alter table event_ticket_types add column if not exists price_per text not null 
 alter table events add column if not exists allow_waitlist_signups integer not null default 1;
 alter table events add column if not exists allow_signup_for_others_in_group integer not null default 0;
 
--- ===== 20260928010000_event_payment_instructions.sql =====
 alter table events add column if not exists payment_instructions_title text;
 alter table events add column if not exists payment_instructions_text text;
 
--- ===== 20260929010000_registration_windows_day_section.sql =====
 -- A real request: "main admin, classes, settings. Add registration
 -- schedule. Be able to control who can signup on each schedule grid
 -- monday/wednesday. Date, time and section and open for teacher or
@@ -3556,7 +3454,6 @@ begin
   end if;
 end $$;
 
--- ===== 20260930010000_class_chat_messages.sql =====
 -- A real request: "classes tabs, add class chat" - a simple message log
 -- scoped to one class, for Co-op Admin's own legacy admin session (a
 -- follow-up question confirmed: a separate, simple board here rather
@@ -3574,7 +3471,6 @@ create table if not exists class_chat_messages (
 );
 create index if not exists idx_class_chat_messages_class on class_chat_messages(class_id, created_at);
 
--- ===== 20260930020000_class_age_selection.sql =====
 -- A real request: "co-op admin portal, classes, grade selection and age
 -- selection should be separate menus of choices." classes.age_group
 -- stayed the Grade list (GRADE_LEVELS - Infant through 12th, unchanged);
@@ -3585,7 +3481,6 @@ create index if not exists idx_class_chat_messages_class on class_chat_messages(
 -- already used alone.
 alter table classes add column if not exists numeric_ages text;
 
--- ===== 20261001010000_lesson_content_and_quizzes.sql =====
 -- A real request: "Classes, lessons. Button to add lessons. Could be
 -- link to video, text description, file link, quiz with scoring. Setup
 -- as lesson title with drop down of the different links and activities.
@@ -3691,7 +3586,6 @@ create table if not exists quiz_answers (
 );
 create index if not exists idx_quiz_answers_attempt on quiz_answers(attempt_id);
 
--- ===== 20261002010000_class_parent_lesson_chat_permissions.sql =====
 -- A real request: "Add to class settings, check boxes, allow parents to
 -- complete lessons for student and allow parent to interact in the class
 -- chat. This way it can be turned on or off for different classes." Both
@@ -3726,7 +3620,6 @@ begin
   end if;
 end $$;
 
--- ===== 20261003010000_orientation_progress.sql =====
 -- A real request: "Co-op admin portal. Add an orientation tab. List of
 -- members registered for classes on either day. Columns, member name,
 -- day Monday/Wednesday, orientation video, orientation meet up, teacher
@@ -3761,7 +3654,6 @@ create table if not exists orientation_progress (
 );
 create index if not exists idx_orientation_progress_member on orientation_progress(member_id);
 
--- ===== 20261005010000_store_option_groups.sql =====
 -- A real request: "Shop, add option will be a drop down menu on parent/
 -- student portals. On main admin shop, product, when you add an option
 -- there will be sub categories to add variables, each with their own
@@ -3841,7 +3733,6 @@ create table if not exists store_order_item_options (
 );
 create index if not exists idx_store_order_item_options_item on store_order_item_options(order_item_id);
 
--- ===== 20261006010000_documents_public_and_images.sql =====
 -- A real request: "co-op admin, document upload... should move to the
 -- documents page... each document line should have a copy link button
 -- for easy public sharing. When uploading the document file there should
@@ -3865,7 +3756,6 @@ update documents set public_token = md5(random()::text || clock_timestamp()::tex
 alter table documents alter column public_token set not null;
 create unique index if not exists idx_documents_public_token on documents(public_token);
 
--- ===== 20261007010000_admin_position_permissions.sql =====
 -- A real request: "Main admin portal, settings gear icon, admins...
 -- click on each admin position in the list and it will open an edit
 -- window. Here you can add a member from the drop down list. Add email
@@ -3883,7 +3773,6 @@ create table if not exists admin_position_permissions (
   primary key (admin_position_id, permission_id)
 );
 
--- ===== 20261008010000_orientation_open_house.sql =====
 -- A real request: "Co-op admin portal, orientation member list...
 -- add a column for open house." Same shape as the 4 existing circle
 -- columns on orientation_progress (one _complete/_completed_at pair per
@@ -3891,7 +3780,6 @@ create table if not exists admin_position_permissions (
 alter table orientation_progress add column if not exists open_house_complete integer not null default 0;
 alter table orientation_progress add column if not exists open_house_completed_at text;
 
--- ===== 20261009010000_class_dates_supply_list.sql =====
 -- A real request: "Parent and student portal. On classroom dashboard
 -- when you click on a Class card it take you to that class. Details
 -- should have teachers, assistants, room number, start and end dates,
@@ -3905,7 +3793,6 @@ alter table classes add column if not exists start_date text;
 alter table classes add column if not exists end_date text;
 alter table classes add column if not exists supply_list text;
 
--- ===== 20261010010000_lesson_content_assignments.sql =====
 -- A real request: "Main admin portal, class lessons... Link to video
 -- should include a description area. Link to file should include a
 -- description area. There should be an option in the dropdown menu for
@@ -3923,7 +3810,6 @@ alter table lesson_content_items drop constraint if exists lesson_content_items_
 alter table lesson_content_items add constraint lesson_content_items_type_check
   check (type in ('video', 'text', 'file', 'quiz', 'assignment_upload'));
 
--- ===== 20261011010000_semesters.sql =====
 -- A real request: "Overall class settings. Add a place to create and add
 -- new semester titles. On individual class settings add dropdown for
 -- choosing semester." A brand new, generic concept (like Sections) that
@@ -3939,7 +3825,6 @@ create table if not exists semesters (
 
 alter table classes add column if not exists semester_id integer references semesters(id) on delete set null;
 
--- ===== 20261012010000_orientation_semesters.sql =====
 -- A real request: "Now each orientation semester is created with all
 -- members registered for classes that semester." Orientation progress
 -- moves from being tracked per (member, day) to per (member, semester) -
@@ -4015,7 +3900,6 @@ create table if not exists orientation_settings (
   link_url text not null
 );
 
--- ===== 20261013010000_class_grade_age_lock_and_registration.sql =====
 -- A real request: "Co-op admin, classes, grade and age should have a
 -- checkbox that says lock class by grade or lock class by age." Grade
 -- and Age selections on a class were always BOTH enforced together at
@@ -4033,7 +3917,6 @@ alter table classes add column if not exists lock_by_age integer not null defaul
 -- own Co-op Class Settings rebuild), this just documents it moving to
 -- live on the class's own Details tab instead. No column change needed.
 
--- ===== 20261014010000_event_ticket_type_registration.sql =====
 -- A real request built out the popup-card -> full event page -> ticket
 -- selection -> registration flow for Parent/Student portal events. Ticket
 -- types (event_ticket_types) existed already but were admin-only -
@@ -4042,7 +3925,6 @@ alter table classes add column if not exists lock_by_age integer not null defaul
 -- picked, so its own charge can be priced off that ticket instead.
 alter table event_registrations add column if not exists ticket_type_id integer references event_ticket_types(id) on delete set null;
 
--- ===== 20261015010000_temporary_permanent_jobs.sql =====
 -- A real request: "add a button on floater assignment page ... called
 -- add/edit temporary position. Same popup and format. However, when a
 -- job is added using this temporary button the job is only available
@@ -4057,7 +3939,6 @@ alter table event_registrations add column if not exists ticket_type_id integer 
 -- that one date only.
 alter table permanent_jobs add column if not exists session_date text;
 
--- ===== 20261016010000_volunteer_date_archiving.sql =====
 -- A real request: "Floater assignments, choose date drop down should show
 -- all of the dates so far until you click an archive button for each
 -- date." Before this, a date fell off the manage page's Choose Date
@@ -4071,7 +3952,6 @@ alter table permanent_jobs add column if not exists session_date text;
 -- archived yet.
 alter table volunteer_dates add column if not exists archived_at text;
 
--- ===== 20261017010000_event_ticket_physical_ticket.sql =====
 -- A real request: "finance, add ticket type pop up, add a checkbox for
 -- include physical ticket. Members will be able to print tickets with a
 -- barcode for check in and out. Barcode is the same as their member ID
@@ -4081,7 +3961,6 @@ alter table volunteer_dates add column if not exists archived_at text;
 -- price_per already varies per ticket type rather than per event.
 alter table event_ticket_types add column if not exists includes_physical_ticket boolean not null default false;
 
--- ===== 20261018010000_event_optional_info_sections.sql =====
 -- A real request: "event editing under details add another text box that
 -- says activity information, another text box below that saying meetup
 -- and parking information, another text box under that saying what to
@@ -4102,7 +3981,6 @@ alter table events add column if not exists include_what_to_bring integer not nu
 alter table events add column if not exists extra_notes text;
 alter table events add column if not exists include_extra_notes integer not null default 0;
 
--- ===== 20261019010000_event_organizers.sql =====
 -- A real request: "Organized by should be a drop down to choose Sanford
 -- Homeschoolers or a parent name. Can select multiple. Will show on
 -- parent portal who Organized the event and their email address."
@@ -4123,7 +4001,6 @@ create table if not exists event_organizers (
 );
 create index if not exists idx_event_organizers_event on event_organizers(event_id);
 
--- ===== 20261020010000_event_settings_split_auto_approve.sql =====
 -- A real request: "Main admin, events, settings, under allow families to
 -- submit events calendar events? It should just say yes or no.
 -- Automatically approve event member submit, yes or no, should be it's
@@ -4140,7 +4017,6 @@ update event_settings set auto_approve_family_submissions = 1, family_submit_eve
 alter table event_settings drop constraint if exists event_settings_family_submit_events_check;
 alter table event_settings add constraint event_settings_family_submit_events_check check (family_submit_events in ('yes', 'no'));
 
--- ===== 20261020020000_forum_chat_room.sql =====
 -- A real request: "main admin, chat tab, add chat room where people can
 -- talk to each other in a live continuous feed." A chat room is a
 -- forum_categories row with is_chat_room=1 - instead of members starting
@@ -4152,7 +4028,6 @@ alter table event_settings add constraint event_settings_family_submit_events_ch
 alter table forum_categories add column if not exists is_chat_room integer not null default 0;
 alter table forum_categories add column if not exists room_thread_id integer references forum_threads(id) on delete set null;
 
--- ===== 20261021010000_signup_volunteer_list_open.sql =====
 -- A real request: "volunteer lists, click on a list and add... enable
 -- button when you click it members can signup on the list. Enable button
 -- turns into disable button. If you click disable button nobody can
@@ -4164,7 +4039,6 @@ alter table forum_categories add column if not exists room_thread_id integer ref
 alter table volunteer_signup_lists add column if not exists is_open integer not null default 1;
 alter table sign_up_lists add column if not exists is_open integer not null default 1;
 
--- ===== 20261021020000_event_volunteer_donation_food_requirement_scope.sql =====
 -- A real request: "On volunteer, donations and food signup pages there
 -- should also be a question that says Require for each attendees or each
 -- family. Radio buttons that say attendees, and family." Each of the 3
@@ -4179,7 +4053,6 @@ alter table events add column if not exists volunteer_requirement_scope text not
 alter table events add column if not exists donation_requirement_scope text not null default 'family' check (donation_requirement_scope in ('attendee', 'family'));
 alter table events add column if not exists food_requirement_scope text not null default 'family' check (food_requirement_scope in ('attendee', 'family'));
 
--- ===== 20261022010000_store_settings.sql =====
 -- Main Admin > Shop > Settings - "add a subpage called settings. This is
 -- where general store settings will happen." One singleton settings row,
 -- same shape/reasoning as event_settings
@@ -4207,7 +4080,6 @@ create table if not exists store_settings (
 );
 insert into store_settings (id) values (1) on conflict (id) do nothing;
 
--- ===== 20261023010000_orientation_training_link.sql =====
 -- A real request: "Orientation settings should be linking a training
 -- already created under training to each selection. This was when a
 -- member completes a training it will automatically register as
@@ -4236,7 +4108,6 @@ begin
 end $$;
 alter table orientation_settings add column if not exists training_id integer references trainings(id) on delete set null;
 
--- ===== 20261024010000_kiosk_semester_scoping.sql =====
 -- A real request: "Add a tab in co-op admin portal settings called
 -- kiosk. There will be a drop down picker for choosing a semester that
 -- the kiosk page and all of its features are linked too. The floater
@@ -4300,7 +4171,6 @@ alter table setup_task_assignments drop constraint if exists setup_task_assignme
 create unique index if not exists idx_setup_task_assignments_day_semester_member_date
   on setup_task_assignments (day, coalesce(semester_id, -1), member_id, session_date);
 
--- ===== 20261025010000_class_schedules_day_settings.sql =====
 -- A real request: "Full 7 day expansion so multiple semesters can be
 -- created an managed... now day settings. So we can create multiple
 -- semester schedule grids and all the floater and setup cleanup features
@@ -4379,7 +4249,6 @@ begin
   end if;
 end $$;
 
--- ===== 20261026010000_volunteers_setup_day_expansion.sql =====
 -- Phase 2 of the 7-day expansion ("Full 7 day expansion so multiple
 -- semesters can be created and managed... all the floater and setup
 -- cleanup features for each to go with it" - a real request). Phase 1
@@ -4405,7 +4274,6 @@ alter table setup_dates add constraint setup_dates_day_check check (day in ('sun
 alter table setup_task_assignments drop constraint if exists setup_task_assignments_day_check;
 alter table setup_task_assignments add constraint setup_task_assignments_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));
 
--- ===== 20261027010000_rosters_day_expansion.sql =====
 -- Phase 3 of the 7-day expansion ("Full 7 day expansion so... attendance...
 -- will work for years to come" - a real request). Phase 1 (20261025010000)
 -- let the Classes grid offer any day of the week; Phase 2 (20261026010000)
@@ -4422,7 +4290,6 @@ alter table playground_rosters add constraint playground_rosters_day_check check
 alter table roster_archives drop constraint if exists roster_archives_day_check;
 alter table roster_archives add constraint roster_archives_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));
 
--- ===== 20261028010000_name_tags_and_class_archive_day_expansion.sql =====
 -- Continuing the 7-day expansion's Phase 3 (Name Tags/Badges), plus a real
 -- gap found while auditing for it: class_schedule_archives (Classes' own
 -- Bulk Edit > Archive feature) was missed by Phase 1 (20261025010000) and
@@ -4437,7 +4304,6 @@ alter table name_tag_requests add constraint name_tag_requests_day_check check (
 alter table class_schedule_archives drop constraint if exists class_schedule_archives_day_check;
 alter table class_schedule_archives add constraint class_schedule_archives_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));
 
--- ===== 20261029010000_member_schedules_day_expansion.sql =====
 -- Phase 3 of the 7-day expansion, Member Schedules. Unlike every other
 -- :day-scoped table this expansion touched, member_schedule_archives
 -- wasn't just missing a wider CHECK constraint - it had two fixed
@@ -4461,7 +4327,6 @@ alter table member_schedule_archives add column if not exists day_schedules_json
 alter table member_schedules drop constraint if exists member_schedules_day_check;
 alter table member_schedules add constraint member_schedules_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));
 
--- ===== 20261030010000_substitutes_day_expansion.sql =====
 -- Last table missed by the 7-day expansion: permanent_jobs (Floater
 -- Assignments' Substitutes board - routes/admin-substitutes.js, the
 -- "Add/Edit Position" dialog) still had the original 2-day CHECK
@@ -4471,7 +4336,6 @@ alter table member_schedules add constraint member_schedules_day_check check (da
 alter table permanent_jobs drop constraint if exists permanent_jobs_day_check;
 alter table permanent_jobs add constraint permanent_jobs_day_check check (day in ('sunday','monday','tuesday','wednesday','thursday','friday','saturday'));
 
--- ===== 20261031010000_registration_windows_action_types.sql =====
 -- A real request: "class settings, registration schedule window. Open
 -- for options, parents can register for teaching positions, parents can
 -- register for class assistant positions, parents can register their
@@ -4530,7 +4394,6 @@ alter table registration_windows drop column if exists role_key;
 alter table registration_windows drop column if exists day;
 alter table registration_windows drop column if exists section_id;
 
--- ===== 20261101010000_class_archive_removal_auto_transcripts.sql =====
 -- "We don't need any archive features under classes tab either on co-op
 -- admin portal. Everything is connected to semesters so we don't need
 -- individual archiving anymore." The Class/Student/Parent Schedule
@@ -4550,7 +4413,6 @@ alter table registration_windows drop column if exists section_id;
 alter table student_academic_history add column if not exists class_id integer references classes(id) on delete set null;
 create unique index if not exists idx_student_academic_history_student_class on student_academic_history(student_id, class_id) where class_id is not null;
 
--- ===== 20261102010000_orientation_settings_drop_link_url.sql =====
 -- A real request: "the links for the column check boxes should be
 -- dropdown menus of trainings that have been created" - the plain,
 -- hand-typed link_url field on orientation_settings is removed entirely;
@@ -4558,7 +4420,6 @@ create unique index if not exists idx_student_academic_history_student_class on 
 -- (training_id), picked from a dropdown on Orientation Settings.
 alter table orientation_settings drop column if exists link_url;
 
--- ===== 20261103010000_event_extra_fields_family_scope.sql =====
 -- A real request: "event editing resources and fields. Requires for
 -- each member or family. If required for family is selected only the
 -- parent will be asked to choose or fill out those extra fields. If for
@@ -4572,7 +4433,6 @@ alter table orientation_settings drop column if exists link_url;
 -- parents" convention Orientation already uses), never a student.
 alter table event_extra_fields add column if not exists scope text not null default 'each_member' check (scope in ('each_member', 'family'));
 
--- ===== 20261104010000_members_archived_at.sql =====
 -- A real request: "if a member is archived on main admin portal it
 -- should show the date they were archived." Members were already being
 -- archived (active = 0) with no record of WHEN - this adds that
@@ -4580,7 +4440,6 @@ alter table event_extra_fields add column if not exists scope text not null defa
 -- admin-members.js's own /:id/archive, /:id/unarchive, /bulk-archive).
 alter table members add column if not exists archived_at text;
 
--- ===== 20261106010000_faq_categories.sql =====
 -- A real request: "main admin, settings gear, faq, question answer and
 -- choose category. Button with popup for add/edit category." Same shape
 -- as the Shop's own store_categories/store_products.category_id (see
@@ -4594,7 +4453,6 @@ create table if not exists faq_categories (
 
 alter table faqs add column if not exists category_id integer references faq_categories(id) on delete set null;
 
--- ===== 20261107010000_forum_category_secure_families.sql =====
 -- A real request: "another check box column for secure... If you only
 -- want certain families to be able to access this category, check this
 -- box AND select which families can access it below." A second, family-
@@ -4610,7 +4468,6 @@ create table if not exists forum_category_families (
   primary key (category_id, family_id)
 );
 
--- ===== 20261108010000_resource_link_roles.sql =====
 -- A real request: "resource links, add resource, show on choosing a
 -- portal dropdown should be a clean checkbox dropdown. Checkboxes next
 -- to each portal." Replaces the single nullable role_key column (one
@@ -4642,7 +4499,6 @@ begin
   end if;
 end $$;
 
--- ===== 20261109010000_photo_albums_uploads_archive.sql =====
 -- A real request: "add a check box permission for members can add
 -- photos. If that box is not checked than the album will be view only
 -- on parent and student portals." Member uploads used to be allowed on
@@ -4655,7 +4511,6 @@ alter table photo_albums add column if not exists allow_member_uploads integer n
 -- Business Directory/Classifieds/Shop already use.
 alter table photo_albums add column if not exists status text not null default 'active' check (status in ('active', 'archived'));
 
--- ===== 20261110010000_announcement_schedule.sql =====
 -- A real request: "send announcement should say send announcements
 -- now. Button next to it should say schedule for later. That button
 -- allows you to pick a date and time to send." Same "schedule saves it,
@@ -4669,7 +4524,6 @@ alter table announcement_log add column if not exists sent_at text;
 -- Every existing row was already a real, immediate send.
 update announcement_log set sent_at = created_at where sent_at is null and status = 'sent';
 
--- ===== 20261111010000_forum_category_grade_age_portal.sql =====
 -- A real request: "chat room settings and chat group settings add
 -- clean dropdown menu for controlling and selecting grade levels by
 -- checkbox. Another for select by age level. And one for portal
@@ -4691,7 +4545,6 @@ create table if not exists forum_category_roles (
   primary key (category_id, role_key)
 );
 
--- ===== 20261112010000_class_accounting_category.sql =====
 -- A real request: "class edit details... after charge per add a dropdown
 -- choice for account category." Reuses the SAME admin-managed accounting
 -- category list Events already have (event_accounting_categories,
@@ -4703,7 +4556,6 @@ create table if not exists forum_category_roles (
 -- "class accounting category" list an admin would have to keep in sync.
 alter table classes add column if not exists accounting_category_id integer references event_accounting_categories(id) on delete set null;
 
--- ===== 20261113010000_class_schedule_grid_semester_rows_rooms.sql =====
 -- A real request: "add/edit class schedule grid button on the class
 -- schedule page. When you click this button it opens a pop up to allow
 -- you to create a new schedule grid, choose a semester/day, choose
@@ -4741,7 +4593,6 @@ create table if not exists class_schedule_rooms (
 );
 create unique index if not exists idx_class_schedule_rooms_day_semester_name on class_schedule_rooms (day, coalesce(semester_id, -1), lower(name));
 
--- ===== 20261114010000_lesson_item_completions.sql =====
 -- A real request: "Student and parent portal you can't click on class
 -- lessons to complete them." A quiz content item already has its own
 -- "complete" action (submitting it - quiz_attempts). A video/text/file
@@ -4761,7 +4612,6 @@ create table if not exists lesson_item_completions (
 );
 create index if not exists idx_lesson_item_completions_student on lesson_item_completions(student_id);
 
--- ===== 20261115010000_assignment_submissions.sql =====
 -- A real request: "When creating assignments for classes there should be
 -- a assignment submit option. Where i can add a title, description,
 -- points, grade and the student will see an upload link. The lesson
@@ -4811,7 +4661,6 @@ create table if not exists assignment_submissions (
 create index if not exists idx_assignment_submissions_content_item on assignment_submissions(content_item_id);
 create index if not exists idx_assignment_submissions_student on assignment_submissions(student_id);
 
--- ===== 20261116010000_accounting_categories_fiscal_years_invoices.sql =====
 -- Several real requests bundled together under Accounting:
 -- "Add an accounting category... pop up that asks for title and code" -
 -- event_accounting_categories gets a short `code` alongside its existing
@@ -4864,7 +4713,6 @@ alter table payment_payments add column if not exists adjustment_type text check
 -- block registration/portal access, which was never asked for here).
 alter table members add column if not exists parked boolean not null default false;
 
--- ===== 20261117010000_lesson_close_date.sql =====
 -- A real request: "add a close date to lesson details." class_assignments
 -- ("Lessons" in the UI - see 20261001010000_lesson_content_and_quizzes.sql's
 -- own comment) already has open_date (a lesson is locked/hidden before it)
@@ -4874,7 +4722,6 @@ alter table members add column if not exists parked boolean not null default fal
 -- the same way an unopened one already is.
 alter table class_assignments add column if not exists close_date text;
 
--- ===== 20261118010000_event_charge_description_cleanup.sql =====
 -- A real bug report: "On each invoice on the table, it should only say
 -- the name of the event on the invoice, it should not say event
 -- registration to help save space on the table." utils/events.js's own
@@ -4892,3 +4739,73 @@ where source_type = 'event_registration'
   and description ~* '^Event Registration'
   and trim(regexp_replace(description, '^Event Registration\s*[-:–—]*\s*', '', 'i')) <> '';
 
+-- A real request: "Main admin portal. Settings gear, website. Should say
+-- public homepage. Here you can edit the entire homepage like you would
+-- on Spotify or wix. Drag and drop images and text of different size
+-- choices. Add buttons and links." Replaces the old fixed Hero/About/Why
+-- Families Join Us sections (each a single hardcoded textarea on
+-- site_settings) with an ordered list of content blocks the admin can
+-- add, edit, delete, and drag-reorder freely - same "replace a few fixed
+-- fields with a flexible ordered list" shape as event_sections/
+-- lesson_content_items elsewhere in this schema, just for the public
+-- homepage's own body content.
+create table if not exists homepage_blocks (
+  id integer generated always as identity primary key,
+  position integer not null default 0,
+  block_type text not null check (block_type in ('text', 'image', 'button')),
+  -- 'text' block fields.
+  text_body text,
+  text_size text check (text_size in ('small', 'medium', 'large')),
+  -- 'image' block fields. image_key is a Supabase Storage object key (see
+  -- utils/storage.js) or a local-disk filename under public/uploads/
+  -- homepage/ - same storage-backend-agnostic shape every other image
+  -- column in this app already uses (events.image_key, etc.).
+  image_key text,
+  image_size text check (image_size in ('small', 'medium', 'large', 'full')),
+  image_alt text,
+  -- 'button' block fields.
+  button_label text,
+  button_url text,
+  created_at text not null default now_text(),
+  updated_at text not null default now_text()
+);
+create index if not exists idx_homepage_blocks_position on homepage_blocks(position);
+
+-- One-time seed from whatever the old fixed Hero/About/Benefits fields
+-- already held, so upgrading to the block builder doesn't blank out an
+-- existing live homepage - same reasoning as any other "replace a fixed
+-- field with a flexible list" migration in this app. Gated on the whole
+-- table being empty (checked once, not per-insert) so this only ever
+-- seeds once, on the very first boot after this migration lands, and
+-- never reseeds or duplicates on every later boot.
+do $$
+begin
+  if not exists (select 1 from homepage_blocks) then
+    insert into homepage_blocks (position, block_type, text_body, text_size)
+      select 0, 'text', s.hero_heading, 'large' from site_settings s where s.id = 1;
+    insert into homepage_blocks (position, block_type, text_body, text_size)
+      select 1, 'text', s.hero_body, 'medium' from site_settings s where s.id = 1;
+    insert into homepage_blocks (position, block_type, button_label, button_url)
+      values (2, 'button', 'Become a Member', '/register');
+    insert into homepage_blocks (position, block_type, text_body, text_size)
+      select 3, 'text', s.meeting_schedule_text, 'small' from site_settings s where s.id = 1;
+    insert into homepage_blocks (position, block_type, text_body, text_size)
+      values (4, 'text', 'About Us', 'large');
+    insert into homepage_blocks (position, block_type, text_body, text_size)
+      select 5, 'text', s.about_body, 'medium' from site_settings s where s.id = 1;
+    insert into homepage_blocks (position, block_type, text_body, text_size)
+      values (6, 'text', 'Why Families Join Us', 'large');
+    insert into homepage_blocks (position, block_type, text_body, text_size)
+      select 7, 'text', s.benefits_body, 'medium' from site_settings s where s.id = 1;
+  end if;
+end $$;
+
+-- A real request: "for kiosk check out or in with setup/cleanup cards.
+-- Currently it asks if you did a 2nd job. Also, add asking if you did a
+-- 3rd job." Same shape as 20260901050000_second_setup_cleanup_badge.sql's
+-- own 2nd-badge slot, one slot further - a member covering 3 Setup/
+-- Cleanup jobs the same day now has somewhere for the 3rd to go, instead
+-- of silently only ever being asked about 2.
+alter table attendance add column if not exists task_item_id_3 integer references task_list_items(id) on delete set null;
+alter table attendance add column if not exists task_scanned_at_3 bigint;
+alter table checkouts add column if not exists task_item_id_3 integer references task_list_items(id) on delete set null;

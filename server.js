@@ -170,6 +170,11 @@ const mainAdminTrainingRouter = require('./routes/main-admin-training');
 // on Track A's hard-boundary list).
 const eventsRouter = require('./routes/events');
 const adminEventsRouter = require('./routes/admin-events');
+// Public Homepage block builder - sibling router at /main-admin/website,
+// same shape as adminEventsRouter above (routes/main-admin.js's old
+// /website, /website/settings, /website/announcements/:id/delete routes
+// moved here and rebuilt around homepage_blocks).
+const adminWebsiteRouter = require('./routes/admin-website');
 // Item 4: Business Directory at /directory, Classifieds at /classifieds,
 // same sibling-router shape as Events above.
 const directoryRouter = require('./routes/directory');
@@ -443,6 +448,7 @@ app.use('/parent', parentPortalRouter);
 // re-checks main_admin+manage_events itself.
 app.use('/main-admin/events', adminEventsRouter);
 app.use('/main-admin', mainAdminRouter);
+app.use('/main-admin/website', adminWebsiteRouter);
 app.use('/main-admin/members', mainAdminMembersRouter);
 app.use('/main-admin/announcements', mainAdminAnnouncementsRouter);
 app.use('/main-admin/resource-links', mainAdminResourceLinksRouter);

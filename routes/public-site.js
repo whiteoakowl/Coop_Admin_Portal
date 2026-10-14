@@ -8,6 +8,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { formatFriendlyTimestamp } = require('../utils/dates');
+const homepage = require('../utils/homepage');
 
 router.get('/', async (req, res) => {
   const settings = await db.prepare('SELECT * FROM site_settings WHERE id = 1').get();
@@ -16,12 +17,14 @@ router.get('/', async (req, res) => {
     .all();
   const announcements = announcementRows.map((a) => ({ ...a, publishedLabel: formatFriendlyTimestamp(a.published_at) }));
   const faqs = await db.prepare('SELECT * FROM faqs WHERE is_public = 1 ORDER BY position, id').all();
+  const blocks = await homepage.listBlocks();
 
   res.render('public-home', {
     title: settings.org_name,
     settings,
     announcements,
     faqs,
+    blocks,
   });
 });
 

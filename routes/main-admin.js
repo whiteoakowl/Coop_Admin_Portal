@@ -297,33 +297,16 @@ router.post('/roles/:id/permissions', requirePortalPermission('manage_roles'), a
 });
 
 // --- Website content ---
-
-router.get('/website', requirePortalPermission('manage_website'), async (req, res) => {
-  const settings = await db.prepare('SELECT * FROM site_settings WHERE id = 1').get();
-  res.render('main-admin-website', { title: 'Website', settings, notice: req.query.notice || null });
-});
-
-router.post('/website/settings', requirePortalPermission('manage_website'), async (req, res) => {
-  const fields = ['org_name', 'tagline', 'hero_heading', 'hero_body', 'meeting_schedule_text', 'about_body', 'benefits_body', 'contact_email', 'contact_phone'];
-  const values = fields.map((f) => (req.body[f] || '').trim());
-  await db
-    .prepare(
-      `UPDATE site_settings SET org_name = ?, tagline = ?, hero_heading = ?, hero_body = ?, meeting_schedule_text = ?, about_body = ?, benefits_body = ?, contact_email = ?, contact_phone = ?, updated_at = now_text() WHERE id = 1`
-    )
-    .run(...values);
-  res.redirect('/main-admin/website?notice=' + encodeURIComponent('Website settings saved.'));
-});
-
-// Public homepage announcements are now created from the Announcements
-// tab itself (routes/main-admin-announcements.js's roleKey === 'public'
-// branch) - a real request: "the public home page announcements should
-// be listed under the announcements tab." The delete route stays here
-// (unchanged URL) since that's what the relocated list's own delete
-// forms on that page still post to - only the CREATE form/route moved.
-router.post('/website/announcements/:id/delete', requirePortalPermission('manage_website'), async (req, res) => {
-  await db.prepare('DELETE FROM announcements WHERE id = ?').run(req.params.id);
-  res.redirect('/main-admin/announcements?notice=' + encodeURIComponent('Announcement removed.'));
-});
+// Moved to routes/admin-website.js (a sibling router at /main-admin/
+// website, same shape as adminEventsRouter) - a real request: "edit the
+// entire homepage like you would on Spotify or wix" rebuilt the old
+// single "Homepage Content" form here into a real drag-and-drop block
+// builder, big enough to warrant its own file rather than growing this
+// one further. The old /website/announcements/:id/delete route was
+// already dead - nothing in this app linked to it any more (public
+// homepage announcements are created AND deleted from the Announcements
+// tab itself, routes/main-admin-announcements.js) - so it wasn't carried
+// over.
 
 // --- FAQ (moved off the Website page onto its own Settings tab - a real
 // request: "faq should be it's own tab under settings, not under website

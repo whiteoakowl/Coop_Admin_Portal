@@ -10094,6 +10094,61 @@ tr[data-task-list-item].task-list-item-dragging { opacity: 0.55; background: var
 tr[data-lesson-reorder-row].lesson-row-dragging,
 tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: var(--brand-soft); }
 
+/* Public Homepage block builder (views/main-admin-website.ejs,
+   public/js/homepage-block-reorder.js) - a real request: "edit the
+   entire homepage like you would on Spotify or wix. Drag and drop
+   images and text of different size choices. Add buttons and links.
+   These features will be desktop only." .homepage-builder-desktop-only/
+   .homepage-builder-mobile-notice are a one-way switch (same shape as
+   .landing-desktop-only/.landing-mobile-only further up this file):
+   visible by default (a real desktop/tablet screen), swapped below the
+   900px breakpoint already used elsewhere in this app for "not a real
+   desktop" (see e.g. .event-settings-form's own media query) - a
+   drag-and-drop canvas needs real screen space a phone just doesn't
+   have, so editing is hidden there rather than rendered unusably small. */
+.homepage-builder-mobile-notice { display: none; }
+@media (max-width: 900px) {
+  .homepage-builder-desktop-only { display: none; }
+  .homepage-builder-add-row { display: none; }
+  .homepage-builder-mobile-notice { display: block; }
+}
+.homepage-builder-canvas { display: flex; flex-direction: column; gap: 0.75rem; }
+.homepage-builder-block {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  background: var(--surface);
+}
+.homepage-builder-block.homepage-builder-block-dragging { opacity: 0.55; background: var(--brand-soft); }
+.homepage-builder-block .lesson-drag-handle { margin-top: 0.2rem; }
+.homepage-builder-block-preview { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.homepage-builder-block-type { align-self: flex-start; }
+.homepage-builder-block-text-preview { white-space: pre-wrap; word-break: break-word; }
+.homepage-builder-block-text-preview.homepage-text-small { font-size: 0.85rem; color: var(--muted); }
+.homepage-builder-block-text-preview.homepage-text-large { font-size: 1.2rem; font-weight: 700; }
+.homepage-builder-block-image-preview { max-width: 160px; max-height: 100px; border-radius: var(--radius); object-fit: cover; }
+.homepage-builder-dialog-image-preview { display: block; max-width: 220px; max-height: 140px; border-radius: var(--radius); margin-top: 0.4rem; object-fit: cover; }
+.homepage-builder-block-button-preview { font-weight: 600; word-break: break-word; }
+.homepage-builder-block-actions { display: flex; gap: 0.35rem; flex-shrink: 0; }
+
+/* The public homepage's own rendering of the same blocks, in the same
+   order (views/public-home.ejs) - small/medium/large text sizes and
+   small/medium/large/full image sizes, the "text of different size
+   choices" a real request asked for. */
+.homepage-block { margin: 1.5rem 0; }
+.homepage-block-text.homepage-text-small { font-size: 0.9rem; color: var(--muted); }
+.homepage-block-text.homepage-text-medium { font-size: 1.05rem; }
+.homepage-block-text.homepage-text-large { font-size: 1.75rem; font-weight: 700; line-height: 1.25; }
+.homepage-block-image img { display: block; border-radius: var(--radius); }
+.homepage-block-image.homepage-image-small img { max-width: 240px; }
+.homepage-block-image.homepage-image-medium img { max-width: 480px; }
+.homepage-block-image.homepage-image-large img { max-width: 720px; }
+.homepage-block-image.homepage-image-full img { width: 100%; max-width: none; }
+.homepage-block-button { display: flex; }
+
 /* Parent/Student Lessons tab redesign (views/partials/lessons-view.ejs,
    public/js/lesson-accordion.js) - a real request: "Each lesson should be
    a bar with the lesson title and description. Should show number of
