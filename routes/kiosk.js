@@ -106,35 +106,39 @@ router.post('/checkin/scan', async (req, res) => {
     return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
   }
 
+  // A real bug report: "people assigned to setup were able to check in
+  // without a badge, which is not allowed." Computed before anything is
+  // written - mirrors routes/checkout.js's own memberNeedsSetupBadgeAtCheckout
+  // check, which already withholds recordCheckout the same way. day is
+  // derived from whichever roster(s) this member is actually scheduled on
+  // today (schedule_day), not a separately re-derived "today's real
+  // weekday" - rosters can include a class roster alongside the day's own
+  // Parent/Student one, but they all share the same day. Students never
+  // scan one either way (member_type check).
+  const day = rosters.find((r) => r.schedule_day)?.schedule_day || null;
+  const needsTaskScan = member.member_type !== 'student' && day && (await memberScansTaskAtCheckin(member.id, day));
+
   const now = Date.now();
   // One lookup per roster this member is on today (almost always 1, at
   // most a couple) - each is independent of the others, so run them
   // concurrently instead of one at a time.
-  const existingStatuses = await Promise.all(
-    rosters.map((r) => db.prepare('SELECT status FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?').get(member.id, r.id, today))
+  const existingRows = await Promise.all(
+    rosters.map((r) => db.prepare('SELECT status, task_scanned_at FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?').get(member.id, r.id, today))
   );
-  const alreadyPresent = existingStatuses.every((existing) => existing && existing.status === 'present');
+  const alreadyPresent = existingRows.every((existing) => existing && existing.status === 'present');
 
   if (alreadyPresent) {
-    // A real bug: a "log on check-in" member who scanned their name tag
-    // (step 1, above) but never completed step 2 (their Setup/Cleanup
-    // task scan) - closed the browser, walked away, connection dropped -
-    // used to hit this flat "already checked in" reply on their next
-    // scan and never get re-offered step 2, silently pushing them into
-    // checkout's own task-scan fallback instead of the check-in-time
-    // flow their team is configured for. Re-checks the same
-    // memberScansTaskAtCheckin gate step 1 uses below before accepting
-    // "already checked in" as the final word.
-    if (member.member_type !== 'student') {
-      const day = rosters.find((r) => r.schedule_day)?.schedule_day || null;
-      if (day && (await memberScansTaskAtCheckin(member.id, day))) {
-        const alreadyTaskScanned = await db
-          .prepare('SELECT 1 FROM attendance WHERE member_id = ? AND session_date = ? AND task_scanned_at IS NOT NULL LIMIT 1')
-          .get(member.id, today);
-        if (!alreadyTaskScanned) {
-          return res.json({ ok: true, memberType: 'parent-taskscan', memberId: member.id, name: member.name });
-        }
-      }
+    // A member marked present some OTHER way (an admin's own manual
+    // override on the Attendance grid, say) without ever going through
+    // the badge scan below still genuinely needs to log their task - this
+    // re-offers it instead of a flat "already checked in." A member who
+    // scanned their name tag here but never finished the badge scan can't
+    // reach this branch at all anymore (see the needsTaskScan block
+    // further down - no attendance row is written for them until that
+    // scan actually succeeds), so this is no longer the "resume an
+    // interrupted kiosk flow" case it originally guarded.
+    if (needsTaskScan && existingRows.some((r) => r.task_scanned_at == null)) {
+      return res.json({ ok: true, memberType: 'parent-taskscan', memberId: member.id, name: member.name });
     }
     return res.json({
       ok: true,
@@ -142,6 +146,15 @@ router.post('/checkin/scan', async (req, res) => {
       name: member.name,
       message: `${member.name}, you're already checked in today.`,
     });
+  }
+
+  if (needsTaskScan) {
+    // No attendance row is written yet - /checkin/task-scan below creates
+    // it (status 'present' together with whichever task gets scanned) once
+    // the badge is actually confirmed. Re-scanning this same name tag
+    // before that happens lands right back here every time (still no
+    // 'present' row to find), so there's no separate "resume" path needed.
+    return res.json({ ok: true, memberType: 'parent-taskscan', memberId: member.id, name: member.name });
   }
 
   const upsert = db.prepare(
@@ -154,36 +167,23 @@ router.post('/checkin/scan', async (req, res) => {
   // writes are independent of one another, so run them concurrently.
   await Promise.all(rosters.map((r) => upsert.run(member.id, r.id, today, now)));
 
-  // A real request: "add a dropdown menu to each setup/cleanup team list
-  // that asks, log on check in or log on check out ... if team 1 is, log
-  // on check in, those members will click check in, scan their name tag,
-  // then will be asked to scan their setup/cleanup card." Students never
-  // scan one either way (member_type check below), same as at checkout.
-  // day is derived from whichever roster(s) this member is actually
-  // scheduled on today (schedule_day), not a separately re-derived
-  // "today's real weekday" - rosters can include a class roster
-  // alongside the day's own Parent/Student one, but they all share the
-  // same day.
-  if (member.member_type !== 'student') {
-    const day = rosters.find((r) => r.schedule_day)?.schedule_day || null;
-    if (day && (await memberScansTaskAtCheckin(member.id, day))) {
-      return res.json({ ok: true, memberType: 'parent-taskscan', memberId: member.id, name: member.name });
-    }
-  }
-
   res.json({ ok: true, name: member.name, message: `Thank you for checking in, ${member.name}!` });
 });
 
 // Step 2 ("log on check in" members only): scan the Setup/Cleanup badge
-// for the task about to be done. Writes onto the SAME attendance row(s)
-// step 1 just created/updated (task_item_id/task_scanned_at - see the
-// migration adding them) rather than a separate table, so
-// routes/checkout.js's own /checkout/scan can tell this member already
-// logged their task here and skip asking again at checkout, carrying
-// the same task_item_id into the checkouts row it creates then. Mirrors
-// /checkout/task-scan almost exactly, including the same bypass-badge
-// fallback (findSetupCleanupBypassBadge) for a member with no card of
-// their own to scan.
+// for the task about to be done. A real bug report ("people assigned to
+// setup were able to check in without a badge") means step 1 above no
+// longer writes this member present at all - this is the FIRST write for
+// them today, creating the attendance row (status 'present' together with
+// whichever task gets scanned) rather than updating one that doesn't
+// exist yet, mirroring routes/checkout.js's own recordCheckout (called
+// only from /checkout/task-scan, never /checkout/scan, for the exact same
+// reason). Once written, routes/checkout.js's own /checkout/scan can tell
+// this member already logged their task here and skip asking again at
+// checkout, carrying the same task_item_id into the checkouts row it
+// creates then. Mirrors /checkout/task-scan almost exactly, including the
+// same bypass-badge fallback (findSetupCleanupBypassBadge) for a member
+// with no card of their own to scan.
 router.post('/checkin/task-scan', async (req, res) => {
   if (checkinLimiter.isLimited(req.ip)) {
     return res.json({ ok: false, message: 'Too many check-ins from this device right now. Please wait a moment and try again.' });
@@ -226,10 +226,15 @@ router.post('/checkin/task-scan', async (req, res) => {
 
   const now = Date.now();
   const taskItemId = task ? task.id : null;
-  const update = db.prepare('UPDATE attendance SET task_item_id = ?, task_scanned_at = ? WHERE member_id = ? AND roster_id = ? AND session_date = ?');
+  const upsert = db.prepare(
+    `INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time, source, task_item_id, task_scanned_at)
+     VALUES (?, ?, ?, 'present', ?, 'kiosk', ?, ?)
+     ON CONFLICT(member_id, roster_id, session_date)
+     DO UPDATE SET status = 'present', check_in_time = excluded.check_in_time, source = 'kiosk', recorded_at = now_text(), task_item_id = excluded.task_item_id, task_scanned_at = excluded.task_scanned_at`
+  );
   // Independent per-roster writes (different roster_id each time) - run
   // concurrently instead of one at a time.
-  await Promise.all(rosters.map((r) => update.run(taskItemId, now, member.id, r.id, today)));
+  await Promise.all(rosters.map((r) => upsert.run(member.id, r.id, today, now, taskItemId, now)));
 
   // A real request: "after parent scans their setup/cleanup badge it
   // should ask if they have a 2nd setup/cleanup badge to scan, with yes

@@ -6139,27 +6139,52 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .floater-card-position { font-weight: 600; }
 .floater-card-unassigned { color: var(--muted); font-style: italic; }
 
-/* Setup/Cleanup Assignments' own version of .floater-card-table (shared
-   base class with Floater Assignments' Position/Room/Floater table above,
-   whose 40/24/36 split doesn't fit this table's own 3 columns) - a real
-   bug report: "SUGGESTED TASK 1"/"SUGGESTED TASK 2" ran into each other
-   at the header's inherited white-space: nowrap + a 24%-wide column, the
-   header text simply had nowhere to go but overflow sideways into its
-   neighbor. Task 1/Task 2 (this partial's own shorter column titles) get
-   equal width, wrapping onto a second line if a narrow card still can't
-   fit either header on one. */
-.setup-assignment-table th:nth-child(1), .setup-assignment-table td:nth-child(1) { width: 36%; }
-.setup-assignment-table th:nth-child(2), .setup-assignment-table td:nth-child(2),
-.setup-assignment-table th:nth-child(3), .setup-assignment-table td:nth-child(3) { width: 32%; }
-.setup-assignment-table th { white-space: normal; }
-/* A real request: "shrink font of rows to fit everything in clean rows" -
-   this table packs a member's name (plus infant/absent/checked-out
-   badges) and two full Assign/Unassign slots into three columns, more
-   per row than the base .floater-card-table's 0.82rem was sized for. */
-.setup-assignment-table { font-size: 0.76rem; }
+/* Setup/Cleanup Assignments' own version of .floater-card-table - a real
+   request: "just line the assignments under each member like mobile."
+   Used to be a real multi-column table (Member | Task 1 | Task 2 | Task
+   3) at desktop widths, narrowed further each time a new task slot was
+   added until even the mobile-only stacked-row fallback this replaces
+   (originally added for a real bug report: "you can't see anything in
+   the dropdown") stopped being a mobile-only concession and became how
+   this table should always render - Member, Task 1, Task 2, and Task 3
+   as their own full-width lines, every width. See .floater-chart-table
+   below for the sibling table (Floater Assignments) that's still a real
+   column table at desktop width - this one just no longer is. */
+.setup-assignment-table, .setup-assignment-table tbody { display: block; width: 100%; }
+.setup-assignment-table thead { display: none; }
+.setup-assignment-table tr {
+  display: flex;
+  flex-direction: column;
+  row-gap: 0.3rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.setup-assignment-table tbody tr:last-child { border-bottom: none; }
+.setup-assignment-table td { display: block; width: 100%; padding: 0; border: none; }
+/* The base .floater-card-table's own 40%/24%/36% split (shared class,
+   Floater Assignments' Position/Room/Floater columns, further up)
+   outranks the plain .setup-assignment-table td rule just above on
+   specificity alone (an extra :nth-child pseudo-class) - without
+   repeating those same :nth-child selectors here, this table's first
+   three cells stayed stuck at Floater's own fractions of the row's width
+   (live-confirmed: measured exactly 40%/24%/36% of the row) instead of
+   actually going full-width, the same specificity trap this table's own
+   mobile-only predecessor already had to work around once before. */
+.setup-assignment-table td:nth-child(1),
+.setup-assignment-table td:nth-child(2),
+.setup-assignment-table td:nth-child(3),
+.setup-assignment-table td:nth-child(4) { width: 100%; }
+.setup-assignment-table .floater-assign-form { flex-direction: row; align-items: center; }
 .setup-assignment-table .floater-assign-form select,
-.setup-assignment-table .setup-task-static { font-size: 0.72rem; }
-.setup-assignment-table .floater-assign-btn { font-size: 0.68rem; padding: 0.25rem 0.45rem; }
+.setup-assignment-table .setup-task-static {
+  flex: 1 1 0%;
+  min-width: 0;
+  width: auto;
+  max-width: 100%;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+}
+.setup-assignment-table .floater-assign-btn { align-self: center; flex-shrink: 0; font-size: 0.68rem; padding: 0.25rem 0.45rem; }
 
 .floater-card-footer {
   display: flex;
@@ -6200,8 +6225,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    however many teams exist / how wide the viewport is). Collapses to one
    column under the same ~tablet breakpoint several other card grids in
    this file already use, rather than squeezing 3 columns into a phone
-   width. */
-.setup-assignment-cards-grid { grid-template-columns: repeat(3, 1fr); }
+   width.
+   minmax(0, 1fr), not a bare 1fr - same real bug .floater-chart-cards-
+   grid's own comment above describes: a bare 1fr track's minimum size
+   defaults to its item's own min-content width, which this card's own
+   table (4 columns since a real request added a 3rd task slot) easily
+   exceeds a third of the row's width at. That let the Task 3 column's
+   own select+Assign button spill out past the card's right edge instead
+   of actually shrinking to fit a 3-up row - 0 overrides that automatic
+   minimum so each track (and everything in it) is free to shrink all the
+   way down to its actual share of the available width. */
+.setup-assignment-cards-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 900px) {
   .setup-assignment-cards-grid { grid-template-columns: 1fr; }
 }
@@ -6384,8 +6418,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      widths, where "Position"/"Room"/"Floater" all fit their columns) -
      on a narrow phone card that same nowrap is what let "ROOM" visibly
      run into "FLOATER" instead of wrapping onto its own second line
-     (.setup-assignment-table already opts out of nowrap for this same
-     reason - this brings the Floater Chart's own header in line with it). */
+     (.setup-assignment-table's own header is hidden outright - see its
+     own thead rule further up - so it never had this problem to begin
+     with; this just brings the Floater Chart's own header in line). */
   .floater-card-table th { font-size: 0.6rem; padding: 0.25rem 0.3rem; white-space: normal; }
   /* overflow-wrap: normal overrides the base .floater-card-table td rule's
      break-word - fine at desktop's wide columns, but at a phone-width
@@ -6397,41 +6432,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .floater-chart-table th:nth-child(2) { width: 16%; }
   .floater-chart-table th:nth-child(3) { width: 54%; }
 
-  /* A real bug report: "setup/cleanup team assignments... the dropdown
-     choices for picking a task. You can't see anything in the dropdown.
-     You should at least be able to see the task number." Member/Task 1/
-     Task 2 staying a real 3-column table on a phone (unlike Floater's
-     own chart, converted to stacked flex rows above for this exact
-     reason) squeezed each task's dropdown+button into roughly a third of
-     the card's width, on top of font-size/padding already shrunk as far
-     as this table's own rules below take it - there was nothing left to
-     shrink that would make the "#N - description" text readable, only
-     ever-smaller illegible text. Reusing the Floater Chart's own working
-     fix: stack Member, Task 1, and Task 2 as their own full-width lines
-     instead, so each dropdown gets the WHOLE card to itself the same way
-     Floater's own Position/Room/Floater row does. */
-  .setup-assignment-table, .setup-assignment-table tbody { display: block; width: 100%; }
-  .setup-assignment-table thead { display: none; }
-  .setup-assignment-table tr {
-    display: flex;
-    flex-direction: column;
-    row-gap: 0.3rem;
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--border);
-  }
-  .setup-assignment-table tbody tr:last-child { border-bottom: none; }
-  .setup-assignment-table td { display: block; width: auto; padding: 0; border: none; }
-  /* The desktop-width 36%/32%/32% column split (.setup-assignment-table
-     td:nth-child(N), further up) outranks the plain .setup-assignment-
-     table td rule just above on specificity alone (an extra pseudo-class)
-     - without repeating those same :nth-child selectors here, each stacked
-     "row" above stayed stuck at its old desktop fraction of the row's
-     width instead of actually going full-width, squeezing the dropdown
-     down to a sliver no wider than "#..." regardless of the stacking fix. */
-  .setup-assignment-table td:nth-child(1),
-  .setup-assignment-table td:nth-child(2),
-  .setup-assignment-table td:nth-child(3) { width: auto; }
-
+  /* .setup-assignment-table's own stacked-row layout (Member/Task 1/Task
+     2/Task 3 each as their own full-width line) used to live here, mobile
+     only - a real request ("just line the assignments under each member
+     like mobile") made it the table's unconditional layout instead, see
+     that rule's own comment further up. */
   .floater-assign-form { flex-direction: column; align-items: stretch; gap: 0.3rem; }
   .floater-assign-form select,
   .setup-task-static { width: 100%; font-size: 0.7rem; }
@@ -6510,27 +6515,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     text-overflow: ellipsis;
   }
   .floater-chart-table .floater-assign-btn { align-self: center; flex-shrink: 0; }
-
-  /* Setup/Cleanup Assignments' own version of the row-not-column fix
-     above (a real request: "the assign button should be next to each
-     assignment dropdown") - now that .setup-assignment-table also stacks
-     to full-width rows (just above), each Task cell gets the same room
-     Floater's own dedicated column does; this still shrinks the select
-     relative to its Assign/Unassign button so both sit on one line
-     within that full-width row, with ellipsis as a safety net for an
-     unusually long task description rather than the illegibly-narrow
-     squeeze a real 3-column table forced before. */
-  .setup-assignment-table .floater-assign-form { flex-direction: row; align-items: center; }
-  .setup-assignment-table .floater-assign-form select,
-  .setup-assignment-table .setup-task-static {
-    flex: 1 1 0%;
-    min-width: 0;
-    width: auto;
-    max-width: 100%;
-    font-size: 0.65rem;
-    text-overflow: ellipsis;
-  }
-  .setup-assignment-table .floater-assign-btn { align-self: center; flex-shrink: 0; font-size: 0.62rem; padding: 0.2rem 0.4rem; }
 }
 
 /* ---------- Team cards: Floater Teams + Setup/Cleanup share this look ---------- */

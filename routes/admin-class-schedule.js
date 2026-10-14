@@ -172,13 +172,26 @@ async function enrichRosterStudents(students) {
 // now overrides every one of those 6 with the class's own EXISTING value
 // afterward, since its own form no longer submits them at all (see that
 // route's own comment).
+// A class's own # of Teachers/Assistants Needed is a real cap - unlike
+// a blank field (no cap), an admin typing 0 means "block all sign-ups
+// for this role" and must survive as a literal 0, not get coerced back
+// to null downstream (see utils/classSchedule.js's own comment on why
+// `??` replaced `||` there). A malformed value (never possible through
+// the number input's own browser validation, but not guaranteed from a
+// raw POST) still falls back to null here rather than storing NaN.
+function slotCount(raw) {
+  if (!raw) return null;
+  const n = parseInt(raw, 10);
+  return Number.isNaN(n) ? null : n;
+}
+
 function registrationFieldsFromBody(body) {
   return {
     allowParentRegister: body.allowParentRegister !== 'off',
     allowTeacherRegister: body.allowTeacherRegister !== 'off',
     allowStudentRegister: body.allowStudentRegister === '1',
-    teacherSlots: body.teacherSlots ? parseInt(body.teacherSlots, 10) : null,
-    assistantSlots: body.assistantSlots ? parseInt(body.assistantSlots, 10) : null,
+    teacherSlots: slotCount(body.teacherSlots),
+    assistantSlots: slotCount(body.assistantSlots),
     minCapacity: body.minCapacity ? parseInt(body.minCapacity, 10) : null,
     allowCancel: body.allowCancel !== 'off',
     autoRefundOnCancel: body.autoRefundOnCancel === '1',
@@ -996,8 +1009,8 @@ router.post('/class-schedule/classes/:id/slots', requireFullAdmin, async (req, r
   await updateClassSlots(id, {
     capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
     minCapacity: req.body.minCapacity ? parseInt(req.body.minCapacity, 10) : null,
-    teacherSlots: req.body.teacherSlots ? parseInt(req.body.teacherSlots, 10) : null,
-    assistantSlots: req.body.assistantSlots ? parseInt(req.body.assistantSlots, 10) : null,
+    teacherSlots: slotCount(req.body.teacherSlots),
+    assistantSlots: slotCount(req.body.assistantSlots),
   });
   res.redirect(`/admin/class-schedule/classes/${id}/manage?tab=staffRoster&notice=` + encodeURIComponent('Slots updated.'));
 });

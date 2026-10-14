@@ -44,6 +44,16 @@ async function allSetupTeams(semesterId) {
     .all(sid);
 }
 
+// Every Setup/Cleanup team across every semester and day - used by the
+// Setup/Cleanup Badges print panel's own Team filter (a real request:
+// "filter popup... dropdown to select team"), which has to let an admin
+// pick ANY team regardless of which semester is currently active, unlike
+// teamsForDay/allSetupTeams above which are deliberately scoped to one
+// semester each (see their own comments).
+async function allSetupTeamsEverySemester() {
+  return db.prepare('SELECT id, day, title, semester_id AS "semesterId" FROM setup_teams ORDER BY day, LOWER(title)').all();
+}
+
 async function cleanupTeamIdsForMember(memberId) {
   return (await db.prepare('SELECT team_id FROM setup_team_members WHERE member_id = ?').all(memberId)).map((r) => r.team_id);
 }
@@ -184,48 +194,53 @@ async function removeSetupDate(day, date, semesterId) {
   });
 }
 
-// { [memberId]: { taskItemId, taskItemId2 } } for one date - only members
-// with at least one real suggestion set show up as keys, same "absent
-// means not in the map" shape as familyAttendanceWindowsForDay elsewhere
-// in this app; either slot on a present member can still individually be
-// null (one job suggested, not two).
+// { [memberId]: { taskItemId, taskItemId2, taskItemId3 } } for one date -
+// only members with at least one real suggestion set show up as keys,
+// same "absent means not in the map" shape as familyAttendanceWindowsForDay
+// elsewhere in this app; any slot on a present member can still
+// individually be null (one or two jobs suggested, not necessarily all three).
 async function taskAssignmentsForDate(day, date, semesterId) {
   const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
   const rows = await db
     .prepare(
-      `SELECT member_id AS "memberId", task_item_id AS "taskItemId", task_item_id_2 AS "taskItemId2"
+      `SELECT member_id AS "memberId", task_item_id AS "taskItemId", task_item_id_2 AS "taskItemId2", task_item_id_3 AS "taskItemId3"
        FROM setup_task_assignments WHERE day = ? AND session_date = ? AND semester_id IS NOT DISTINCT FROM ?`
     )
     .all(day, date, sid);
   const byMember = {};
   rows.forEach((r) => {
-    if (r.taskItemId != null || r.taskItemId2 != null) byMember[r.memberId] = { taskItemId: r.taskItemId, taskItemId2: r.taskItemId2 };
+    if (r.taskItemId != null || r.taskItemId2 != null || r.taskItemId3 != null) {
+      byMember[r.memberId] = { taskItemId: r.taskItemId, taskItemId2: r.taskItemId2, taskItemId3: r.taskItemId3 };
+    }
   });
   return byMember;
 }
 
-// slot 1 or 2 - a real bug report: a small team routinely needs one
+// slot 1, 2, or 3 - a real bug report: a small team routinely needs one
 // member covering two jobs, but the Assignments page only ever offered a
-// single "Suggested Task" dropdown per member. Each slot is its own
-// column (task_item_id / task_item_id_2) rather than a list, matching the
-// page's own fixed "always exactly two dropdowns" shape (see
-// partials/setup-assignment-cards.ejs). The suggestion dropdown
-// auto-submits on change (same onchange="this.form.requestSubmit()"
-// pattern as a Floater Teams rank select) - clearing ONE slot back to "no
-// suggestion" (taskItemId falsy) only nulls that column, not the whole
-// row, so the other slot's own suggestion survives; the row itself is
-// only deleted once BOTH slots are empty, keeping
-// taskAssignmentsForDate's "only real suggestions are keys" contract
-// without a separate all-null check there.
+// single "Suggested Task" dropdown per member (a later real request added
+// a third slot the same way, for a member covering three). Each slot is
+// its own column (task_item_id / task_item_id_2 / task_item_id_3) rather
+// than a list, matching the page's own fixed "always exactly three
+// dropdowns" shape (see partials/setup-assignment-cards.ejs). The
+// suggestion dropdown auto-submits on change (same
+// onchange="this.form.requestSubmit()" pattern as a Floater Teams rank
+// select) - clearing ONE slot back to "no suggestion" (taskItemId falsy)
+// only nulls that column, not the whole row, so the other slots' own
+// suggestions survive; the row itself is only deleted once ALL slots are
+// empty, keeping taskAssignmentsForDate's "only real suggestions are
+// keys" contract without a separate all-null check there.
+const ASSIGNMENT_SLOT_COLUMNS = { 1: 'task_item_id', 2: 'task_item_id_2', 3: 'task_item_id_3' };
 async function setTaskAssignment(day, memberId, date, slot, taskItemId, semesterId) {
   const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
-  const column = slot === 2 ? 'task_item_id_2' : 'task_item_id';
-  const otherColumn = slot === 2 ? 'task_item_id' : 'task_item_id_2';
+  const column = ASSIGNMENT_SLOT_COLUMNS[slot] || ASSIGNMENT_SLOT_COLUMNS[1];
+  const otherColumns = Object.values(ASSIGNMENT_SLOT_COLUMNS).filter((c) => c !== column);
   if (!taskItemId) {
     const existing = await db
-      .prepare(`SELECT ${otherColumn} AS "other" FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ? AND semester_id IS NOT DISTINCT FROM ?`)
+      .prepare(`SELECT ${otherColumns.join(', ')} FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ? AND semester_id IS NOT DISTINCT FROM ?`)
       .get(day, memberId, date, sid);
-    if (existing && existing.other != null) {
+    const anyOtherSlotStillSet = existing && otherColumns.some((c) => existing[c] != null);
+    if (anyOtherSlotStillSet) {
       await db
         .prepare(`UPDATE setup_task_assignments SET ${column} = NULL WHERE day = ? AND member_id = ? AND session_date = ? AND semester_id IS NOT DISTINCT FROM ?`)
         .run(day, memberId, date, sid);
@@ -246,10 +261,10 @@ async function setTaskAssignment(day, memberId, date, slot, taskItemId, semester
   const conflict = await db
     .prepare(
       `SELECT member_id FROM setup_task_assignments
-       WHERE day = ? AND session_date = ? AND semester_id IS NOT DISTINCT FROM ? AND member_id != ? AND (task_item_id = ? OR task_item_id_2 = ?)
+       WHERE day = ? AND session_date = ? AND semester_id IS NOT DISTINCT FROM ? AND member_id != ? AND (task_item_id = ? OR task_item_id_2 = ? OR task_item_id_3 = ?)
        LIMIT 1`
     )
-    .get(day, date, sid, memberId, taskItemId, taskItemId);
+    .get(day, date, sid, memberId, taskItemId, taskItemId, taskItemId);
   if (conflict) {
     throw new Error('That task has already been assigned to someone else for this date.');
   }
@@ -311,13 +326,13 @@ async function teamsWithMembers(day, semesterId) {
 // meant to prevent. Tasks only ever mean anything within their own
 // team's own linked list (see utils/taskList.js's taskSectionForTeam), so
 // "someone else" means someone else on THIS team, not site-wide. Returns
-// { [memberId]: { slot1Options, slot2Options } } - each member's own
-// current slot1/slot2 value is always kept available in ITS OWN
-// dropdown (so a saved value still shows what it is), even though that
-// same value is excluded from every other member's dropdowns; a
-// member's own two slots also can't both point at the same task, so
-// each slot additionally excludes whatever the OTHER slot on that same
-// member currently holds.
+// { [memberId]: { slot1Options, slot2Options, slot3Options } } - each
+// member's own current slot1/slot2/slot3 value is always kept available
+// in ITS OWN dropdown (so a saved value still shows what it is), even
+// though that same value is excluded from every other member's
+// dropdowns; a member's own three slots also can't all point at the same
+// task, so each slot additionally excludes whatever the OTHER two slots
+// on that same member currently hold.
 function taskOptionsExcludingAssignedElsewhere(allOptions, members) {
   const byMember = {};
   for (const m of members) {
@@ -326,10 +341,12 @@ function taskOptionsExcludingAssignedElsewhere(allOptions, members) {
       if (other.id === m.id) continue;
       if (other.taskItemId) takenByOthers.add(other.taskItemId);
       if (other.taskItemId2) takenByOthers.add(other.taskItemId2);
+      if (other.taskItemId3) takenByOthers.add(other.taskItemId3);
     }
     byMember[m.id] = {
-      slot1Options: allOptions.filter((item) => !takenByOthers.has(item.id) && item.id !== m.taskItemId2),
-      slot2Options: allOptions.filter((item) => !takenByOthers.has(item.id) && item.id !== m.taskItemId),
+      slot1Options: allOptions.filter((item) => !takenByOthers.has(item.id) && item.id !== m.taskItemId2 && item.id !== m.taskItemId3),
+      slot2Options: allOptions.filter((item) => !takenByOthers.has(item.id) && item.id !== m.taskItemId && item.id !== m.taskItemId3),
+      slot3Options: allOptions.filter((item) => !takenByOthers.has(item.id) && item.id !== m.taskItemId && item.id !== m.taskItemId2),
     };
   }
   return byMember;
@@ -398,6 +415,7 @@ async function assignmentCardsForDate(day, date, semesterId) {
       const a = assignments[m.id] || {};
       const taskItem = a.taskItemId && t.taskSection ? t.taskSection.items.find((i) => i.id === a.taskItemId) : null;
       const taskItem2 = a.taskItemId2 && t.taskSection ? t.taskSection.items.find((i) => i.id === a.taskItemId2) : null;
+      const taskItem3 = a.taskItemId3 && t.taskSection ? t.taskSection.items.find((i) => i.id === a.taskItemId3) : null;
       return {
         id: m.id,
         name: m.name,
@@ -407,22 +425,27 @@ async function assignmentCardsForDate(day, date, semesterId) {
         checkedOut: checkedOutIds.has(m.id),
         taskItemId: a.taskItemId || null,
         taskItemId2: a.taskItemId2 || null,
+        taskItemId3: a.taskItemId3 || null,
         taskNumber: taskItem ? taskItem.number : null,
         taskNumber2: taskItem2 ? taskItem2.number : null,
+        taskNumber3: taskItem3 ? taskItem3.number : null,
         taskDescription: taskItem ? taskItem.description : null,
         taskDescription2: taskItem2 ? taskItem2.description : null,
+        taskDescription3: taskItem3 ? taskItem3.description : null,
       };
     });
     const availableOptionsByMember = taskOptionsExcludingAssignedElsewhere(allOptions, members);
     const membersWithOptions = members.map((m) => ({ ...m, ...availableOptionsByMember[m.id] }));
     // Every Task 1 dropdown gets its own distinct suggestion before Task 2
-    // dropdowns get theirs - a real request: "filling all the task one
-    // dropdowns first then filling task 2 if out of spots."
+    // dropdowns get theirs, before Task 3 dropdowns get theirs - a real
+    // request: "filling all the task one dropdowns first then filling
+    // task 2 if out of spots" (later extended the same way to a third slot).
     const slot1Suggestions = suggestDistinctTasks(membersWithOptions, allOptions, 'taskItemId', 'slot1Options');
     const slot2Suggestions = suggestDistinctTasks(membersWithOptions, allOptions, 'taskItemId2', 'slot2Options');
+    const slot3Suggestions = suggestDistinctTasks(membersWithOptions, allOptions, 'taskItemId3', 'slot3Options');
     // A real request: the card should also list, at its own bottom, every
     // task from this team's linked list that no one currently holds in
-    // EITHER slot - actual assignments only, a suggested-but-not-yet-
+    // ANY slot - actual assignments only, a suggested-but-not-yet-
     // clicked-Assign task still counts as unassigned. Recomputed fresh
     // from current assignments every render, so a task simply disappears
     // from this list the moment someone is assigned it, with nothing
@@ -431,6 +454,7 @@ async function assignmentCardsForDate(day, date, semesterId) {
     for (const m of members) {
       if (m.taskItemId) assignedTaskIds.add(m.taskItemId);
       if (m.taskItemId2) assignedTaskIds.add(m.taskItemId2);
+      if (m.taskItemId3) assignedTaskIds.add(m.taskItemId3);
     }
     const unassignedTasks = allOptions.filter((item) => !assignedTaskIds.has(item.id));
     return {
@@ -450,6 +474,7 @@ async function assignmentCardsForDate(day, date, semesterId) {
         ...m,
         suggestedTaskItemId: slot1Suggestions[m.id] || null,
         suggestedTaskItemId2: slot2Suggestions[m.id] || null,
+        suggestedTaskItemId3: slot3Suggestions[m.id] || null,
       })),
     };
   });
@@ -458,6 +483,7 @@ async function assignmentCardsForDate(day, date, semesterId) {
 module.exports = {
   teamsForDay,
   allSetupTeams,
+  allSetupTeamsEverySemester,
   cleanupTeamIdsForMember,
   membersForTeam,
   setTeamLeader,
