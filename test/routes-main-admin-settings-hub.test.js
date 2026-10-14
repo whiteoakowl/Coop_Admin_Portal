@@ -49,7 +49,9 @@ test('GET /main-admin/settings renders a card for every settings-area destinatio
   // permissions."
   assert.match(res.text, /href="\/main-admin\/roles"[^]*?Portal Permissions/);
   assert.match(res.text, /href="\/main-admin\/admins"[^]*?Admins/);
-  assert.match(res.text, /href="\/main-admin\/website"[^]*?Website/);
+  // A real request: "settings gear, website. Should say public
+  // homepage."
+  assert.match(res.text, /href="\/main-admin\/website"[^]*?Public Homepage/);
   assert.match(res.text, /href="\/main-admin\/faq"[^]*?FAQ/);
   assert.match(res.text, /href="\/main-admin\/quick-links"[^]*?Quick Links/);
   assert.match(res.text, /href="\/main-admin\/audit-log"[^]*?Audit Log/);

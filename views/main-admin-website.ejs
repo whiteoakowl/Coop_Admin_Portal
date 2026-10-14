@@ -10,34 +10,19 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <%- include('partials/main-admin-settings-tabs', { activeSettingsTab: 'website' }) %>
-    <h1>Website</h1>
+    <h1>Public Homepage</h1>
     <p><a href="/welcome" target="_blank">View the live site &rarr;</a></p>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <section class="portal-dashboard-card portal-dashboard-card-wide">
-      <h2>Homepage Content</h2>
+    <section class="manage-section">
+      <div class="grid-box-header">
+        <h2>Site Info</h2>
+      </div>
       <form method="POST" action="/main-admin/website/settings" class="member-form-grid">
         <label class="member-form-full">Organization Name
           <input type="text" name="org_name" value="<%= settings.org_name %>" required />
-        </label>
-        <label class="member-form-full">Tagline
-          <input type="text" name="tagline" value="<%= settings.tagline %>" />
-        </label>
-        <label class="member-form-full">Hero Heading
-          <input type="text" name="hero_heading" value="<%= settings.hero_heading %>" required />
-        </label>
-        <label class="member-form-full">Hero Body
-          <textarea name="hero_body" rows="2"><%= settings.hero_body %></textarea>
-        </label>
-        <label class="member-form-full">Meeting Schedule
-          <input type="text" name="meeting_schedule_text" value="<%= settings.meeting_schedule_text %>" />
-        </label>
-        <label class="member-form-full">About Section
-          <textarea name="about_body" rows="3"><%= settings.about_body %></textarea>
-        </label>
-        <label class="member-form-full">Benefits Section
-          <textarea name="benefits_body" rows="3"><%= settings.benefits_body %></textarea>
         </label>
         <label>Contact Email
           <input type="email" name="contact_email" value="<%= settings.contact_email || '' %>" />
@@ -46,16 +31,178 @@
           <input type="text" name="contact_phone" value="<%= settings.contact_phone || '' %>" />
         </label>
         <div class="member-form-full">
-          <button type="submit" class="primary-btn">Save Homepage Content</button>
+          <button type="submit" class="primary-btn">Save Site Info</button>
         </div>
       </form>
     </section>
 
-    <%# A real request: "the public home page announcements should be
-        listed under the announcements tab" - posting/managing them
-        moved to /main-admin/announcements (its "Public" Send To
-        option). %>
-    <p class="hint">Public homepage announcements are now posted and managed from <a href="/main-admin/announcements">Announcements</a>.</p>
+    <%
+      // A real request: "edit the entire homepage like you would on
+      // Spotify or wix. Drag and drop images and text of different size
+      // choices. Add buttons and links. These features will be desktop
+      // only." homepage_blocks (supabase/migrations/20261118010000_
+      // homepage_builder.sql) is an ordered list of text/image/button
+      // blocks - this canvas is the admin's own drag-and-drop editor for
+      // that list; views/public-home.ejs renders the same list, in the
+      // same order, on the real public page.
+      var BLOCK_TYPE_LABELS = { text: 'Text', image: 'Image', button: 'Button' };
+    %>
+    <section class="manage-section homepage-builder-section">
+      <div class="grid-box-header">
+        <h2>Homepage Content</h2>
+        <div class="roster-btn-row homepage-builder-add-row no-print">
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-block-dialog-text').showModal()">+ Text</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-block-dialog-image').showModal()">+ Image</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-block-dialog-button').showModal()">+ Button</button>
+        </div>
+      </div>
+
+      <div class="homepage-builder-desktop-only">
+        <% if (blocks.length === 0) { %>
+          <p class="roster-empty">No homepage content yet - add a text, image, or button block above.</p>
+        <% } else { %>
+          <div class="homepage-builder-canvas" data-homepage-blocks-container data-reorder-url="/main-admin/website/blocks/reorder">
+            <% blocks.forEach(function(b) { %>
+              <div class="homepage-builder-block" data-homepage-block-row="<%= b.id %>">
+                <span data-homepage-block-drag-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span>
+                <div class="homepage-builder-block-preview">
+                  <span class="badge-pill badge-pill-gray homepage-builder-block-type"><%= BLOCK_TYPE_LABELS[b.block_type] %></span>
+                  <% if (b.block_type === 'text') { %>
+                    <span class="homepage-builder-block-text-preview homepage-text-<%= b.text_size %>"><%= b.text_body || '(empty)' %></span>
+                  <% } else if (b.block_type === 'image') { %>
+                    <% if (b.imageUrl) { %><img src="<%= b.imageUrl %>" alt="" class="homepage-builder-block-image-preview" /><% } else { %><span class="hint">No image chosen yet</span><% } %>
+                  <% } else if (b.block_type === 'button') { %>
+                    <span class="homepage-builder-block-button-preview"><%= b.button_label || '(untitled button)' %> &rarr; <%= b.button_url || '(no link)' %></span>
+                  <% } %>
+                </div>
+                <div class="homepage-builder-block-actions">
+                  <button type="button" class="icon-btn" onclick="document.getElementById('edit-block-dialog-<%= b.id %>').showModal()" aria-label="Edit block" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
+                  <form method="POST" action="/main-admin/website/blocks/<%= b.id %>/delete" data-confirm="Remove this block?" class="inline-block-form">
+                    <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete block" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                  </form>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+      <p class="hint homepage-builder-mobile-notice">Editing the homepage requires a desktop screen. Open this page on a larger screen to add, edit, or reorder content.</p>
+    </section>
+
+    <%# Per-block Edit dialogs. %>
+    <% blocks.forEach(function(b) { %>
+      <dialog id="edit-block-dialog-<%= b.id %>" class="member-picker-dialog dialog-label-stack">
+        <form method="POST" action="/main-admin/website/blocks/<%= b.id %>/update" enctype="multipart/form-data">
+          <h3>Edit <%= BLOCK_TYPE_LABELS[b.block_type] %> Block</h3>
+          <% if (b.block_type === 'text') { %>
+            <label>Text
+              <textarea name="textBody" rows="3"><%= b.text_body || '' %></textarea>
+            </label>
+            <label>Size
+              <select name="textSize">
+                <option value="small" <%= b.text_size === 'small' ? 'selected' : '' %>>Small</option>
+                <option value="medium" <%= b.text_size === 'medium' ? 'selected' : '' %>>Medium</option>
+                <option value="large" <%= b.text_size === 'large' ? 'selected' : '' %>>Large</option>
+              </select>
+            </label>
+          <% } else if (b.block_type === 'image') { %>
+            <% if (b.imageUrl) { %><p class="hint">Current image: <img src="<%= b.imageUrl %>" alt="" class="homepage-builder-dialog-image-preview" /></p><% } %>
+            <label>Replace Image <span class="hint">(optional - leave blank to keep the current one)</span>
+              <input type="file" name="image" accept="image/*" />
+            </label>
+            <label>Alt Text <span class="hint">(describes the image for screen readers)</span>
+              <input type="text" name="imageAlt" value="<%= b.image_alt || '' %>" />
+            </label>
+            <label>Size
+              <select name="imageSize">
+                <option value="small" <%= b.image_size === 'small' ? 'selected' : '' %>>Small</option>
+                <option value="medium" <%= b.image_size === 'medium' ? 'selected' : '' %>>Medium</option>
+                <option value="large" <%= b.image_size === 'large' ? 'selected' : '' %>>Large</option>
+                <option value="full" <%= b.image_size === 'full' ? 'selected' : '' %>>Full Width</option>
+              </select>
+            </label>
+          <% } else if (b.block_type === 'button') { %>
+            <label>Button Text
+              <input type="text" name="buttonLabel" value="<%= b.button_label || '' %>" />
+            </label>
+            <label>Link URL
+              <input type="text" name="buttonUrl" value="<%= b.button_url || '' %>" placeholder="https://... or /register" />
+            </label>
+          <% } %>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Save Changes</button>
+          </div>
+        </form>
+      </dialog>
+    <% }); %>
+
+    <%# Add Block dialogs - one per type, each a plain single-purpose
+        form (no type picker to toggle) since the "+ Text/+ Image/
+        + Button" buttons above already say which kind is being added. %>
+    <dialog id="add-block-dialog-text" class="member-picker-dialog dialog-label-stack">
+      <form method="POST" action="/main-admin/website/blocks">
+        <input type="hidden" name="blockType" value="text" />
+        <h3>Add Text Block</h3>
+        <label>Text
+          <textarea name="textBody" rows="3"></textarea>
+        </label>
+        <label>Size
+          <select name="textSize">
+            <option value="small">Small</option>
+            <option value="medium" selected>Medium</option>
+            <option value="large">Large</option>
+          </select>
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add Text Block</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="add-block-dialog-image" class="member-picker-dialog dialog-label-stack">
+      <form method="POST" action="/main-admin/website/blocks" enctype="multipart/form-data">
+        <input type="hidden" name="blockType" value="image" />
+        <h3>Add Image Block</h3>
+        <label>Image
+          <input type="file" name="image" accept="image/*" required />
+        </label>
+        <label>Alt Text <span class="hint">(describes the image for screen readers)</span>
+          <input type="text" name="imageAlt" />
+        </label>
+        <label>Size
+          <select name="imageSize">
+            <option value="small">Small</option>
+            <option value="medium" selected>Medium</option>
+            <option value="large">Large</option>
+            <option value="full">Full Width</option>
+          </select>
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add Image Block</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="add-block-dialog-button" class="member-picker-dialog dialog-label-stack">
+      <form method="POST" action="/main-admin/website/blocks">
+        <input type="hidden" name="blockType" value="button" />
+        <h3>Add Button Block</h3>
+        <label>Button Text
+          <input type="text" name="buttonLabel" required />
+        </label>
+        <label>Link URL
+          <input type="text" name="buttonUrl" placeholder="https://... or /register" required />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add Button Block</button>
+        </div>
+      </form>
+    </dialog>
   </main>
+  <script src="/js/homepage-block-reorder.js"></script>
 </body>
 </html>
