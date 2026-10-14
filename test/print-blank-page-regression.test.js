@@ -67,3 +67,41 @@ test('every repeating bulk-print sheet class breaks AFTER each item (not before)
     assert.match(css, re, `expected ${cls}:not(:last-child) to break AFTER each sheet, scoped away from the last one`);
   });
 });
+
+// A real bug report: "on an older desktop with outdated Google Chrome,
+// the 2nd page being printed always starts on the first page" - every
+// other device/browser prints it fine. A second confirmed shape of the
+// same underlying class of bug this file already guards above: this one
+// traced to .print-page's own `min-height: 100vh` in @media print - a
+// break-before block whose real height lands very close to (or, with
+// `vh`, resolves inconsistently around) the page's true full usable
+// height confuses a browser's real print-pagination engine, worse and
+// differently on older/less up-to-date print engines (see .badge-sheet-
+// page.badge-sheet's own comment in styles.css, which this file already
+// fixed the same way: an explicit value with real margin below the
+// page's usable height instead of a vh-based one flush against it).
+test('.print-page never uses a vh unit for its own print height/min-height (the confirmed cross-engine blank/misplaced-page bug shape)', () => {
+  const ruleRe = /([^{}]+)\{([^{}]*)\}/g;
+  const offenders = [];
+  let m;
+  while ((m = ruleRe.exec(css))) {
+    const [, selectorList, body] = m;
+    if (!/\.print-page\b/.test(selectorList)) continue;
+    if (!/(height|min-height)\s*:\s*[\d.]+vh\b/.test(body)) continue;
+    offenders.push(selectorList.trim());
+  }
+  assert.deepEqual(offenders, [], `found a vh-based height/min-height on .print-page - this reproduces the real cross-engine pagination bug: ${offenders.join(', ')}`);
+});
+
+test('.print-page keeps a real safety margin below every print view\'s own usable page height (never within half an inch of it)', () => {
+  const match = /\.print-page\s*\{\s*min-height:\s*([\d.]+)in;\s*\}/.exec(css);
+  assert.ok(match, 'expected a plain `.print-page { min-height: <N>in; }` override inside @media print');
+  const minHeight = parseFloat(match[1]);
+  // The smallest usable page height across every view using .print-page
+  // (admin-setup.ejs, admin-volunteer-teams.ejs: 0.5in @page margins on
+  // an 11in letter page = 10in usable) - half an inch of real margin
+  // below that, matching the cushion .team-print-page-fit's own comment
+  // establishes for this exact bug class (9.2in against a 9.8in need).
+  const smallestUsableHeight = 10;
+  assert.ok(minHeight <= smallestUsableHeight - 0.5, `.print-page's min-height (${minHeight}in) is too close to the smallest usable page height (${smallestUsableHeight}in) - risks the same pagination bug this is meant to avoid`);
+});

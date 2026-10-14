@@ -8848,7 +8848,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   border-radius: 4px;
   padding: 0.3rem 0.45rem;
   margin-bottom: 0.35rem;
+  /* Legacy page-break-inside alongside break-inside - an older browser's
+     print engine only understands the former; without it, this card had
+     no "don't split across a page boundary" instruction at all there. */
   break-inside: avoid;
+  page-break-inside: avoid;
 }
 .class-schedule-print-card:last-child { margin-bottom: 0; }
 .class-schedule-print-card h3 { margin: 0; font-size: 0.85rem; }
@@ -9328,7 +9332,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    instead of spilling past it. */
 .member-schedule-compact-page { height: 11in; min-height: 0; }
 .schedule-print-compact-fit { flex: 1; min-height: 0; overflow: hidden; }
-.schedule-print-member-section { break-inside: avoid; margin-bottom: 0.6rem; }
+.schedule-print-member-section { break-inside: avoid; page-break-inside: avoid; margin-bottom: 0.6rem; }
 .schedule-print-member-section:last-child { margin-bottom: 0; }
 .schedule-print-member-section h3 { margin: 0 0 0.25rem; font-size: 0.88rem; }
 .schedule-print-member-days { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
@@ -9521,7 +9525,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     appearance: none;
   }
   .team-info-title-input { font-weight: 700; }
-  .team-col { box-shadow: none; border: 1px solid #999; break-inside: avoid; }
+  .team-col { box-shadow: none; border: 1px solid #999; break-inside: avoid; page-break-inside: avoid; }
 
   /* A real request: "when printing setup/cleanup teams it should not
      show the ... shading" - .team-member-row-absent's red highlight
@@ -9769,7 +9773,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .print-page {
     width: auto;
     height: auto;
-    min-height: 100vh;
     margin: 0;
     border: none;
     box-shadow: none;
@@ -9795,6 +9798,34 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
        place). */
     zoom: 1 !important;
   }
+  /* A real bug report: "on an older desktop with outdated Chrome, the
+     2nd page being printed always starts on the first page" - every
+     other device/browser prints it fine. Root cause is the exact
+     documented pattern this file already traced twice elsewhere
+     (.admin-main's own min-height: 100vh further up this block, and
+     .badge-sheet-page.badge-sheet's own comment below): a break-before
+     block whose real height lands very close to - or, with `vh`,
+     resolves inconsistently around - the page's true full usable
+     height confuses Chromium's real print-pagination engine, and
+     different browser builds round that edge case differently. .print-
+     page was the one place this was deliberately left as min-height:
+     100vh (the comment on .badge-sheet-page.badge-sheet below explains
+     why - this box's content is genuinely variable, sometimes shorter
+     than a page, and needed to "reach at least a full page" to still
+     look like one), but that is exactly the risky pattern - just with
+     `vh` adding its OWN cross-engine inconsistency on top (how "100vh"
+     resolves during real paginated print, vs. a plain screen viewport,
+     is itself not uniformly implemented - more likely to be wrong on an
+     older/less up-to-date engine). Same fix as badge-sheet-page.badge-
+     sheet's own explicit height: a value with real margin below every
+     view's own usable page height (the smallest of which, 0.5in @page
+     margins - admin-setup.ejs, admin-volunteer-teams.ejs - leaves 10in)
+     instead of flush against it, and min-height (not height) so content
+     that's genuinely longer than one page still grows and flows onto a
+     real page 2 exactly as before - only the "pad a short page up to
+     look full" floor moved to a safer number, nothing about multi-page
+     overflow behavior changed. */
+  .print-page { min-height: 9.5in; }
   /* A real bug report: "front and back mirror is still showing a blank
      page every 3rd page when going to print" - traced to "printing it's
      name tags, blank page, schedule card": a genuine EXTRA blank page
