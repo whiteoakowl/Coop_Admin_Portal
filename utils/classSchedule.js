@@ -1356,6 +1356,19 @@ async function absentMemberIdsForDate(date) {
   );
 }
 
+// Same shape as absentMemberIdsForDate above, for status = 'late' - a real
+// request: the Setup/Cleanup Assignments page should highlight a member's
+// name yellow once they've submitted a Late form, same as it already does
+// red for absent/checked-out and green for checked-in.
+async function lateMemberIdsForDate(date) {
+  if (!date) return new Set();
+  return new Set(
+    (await db.prepare(`SELECT DISTINCT member_id FROM attendance WHERE session_date = ? AND status = 'late'`).all(date)).map(
+      (r) => r.member_id
+    )
+  );
+}
+
 // Everyone with an actual kiosk check-in recorded on a given date - a real
 // request: "highlight the member row red if they check in that day" on the
 // Setup/Cleanup Assignments roster (see setup.js's assignmentCardsForDate).
@@ -2467,6 +2480,7 @@ module.exports = {
   classesNeedingStaffForDay,
   classesAtRiskForDay,
   absentMemberIdsForDate,
+  lateMemberIdsForDate,
   checkedInMemberIdsForDate,
   checkedOutMemberIdsForDate,
   absenceFormMemberIdsForDate,

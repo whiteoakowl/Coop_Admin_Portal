@@ -6365,7 +6365,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 /* A real request: "in the dropdown of members to choose for a position,
    highlight them green if they have checked in" - same green already
    used for this exact signal on the Setup/Cleanup Assignments roster
-   (.setup-assignment-row-checked-in above). Support for styling <option>
+   (.setup-assignment-name-checked-in above). Support for styling <option>
    varies by browser, so the option's own text also says "checked in"
    (see floater-chart-cards.ejs) as a non-visual fallback. */
 .floater-assign-form select option.floater-option-checked-in { background: var(--green-bg); color: var(--green); }
@@ -6944,26 +6944,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .team-member-row-absent .team-member-avatar { background: rgba(255,255,255,0.6); color: var(--red); }
 
-/* Same red flag, table-row version - Setup/Cleanup Assignments' own
-   per-member table row (partials/setup-assignment-cards.ejs) instead of
-   the Teams tab's card-list rows above. */
-.setup-assignment-row-absent td { background: var(--red-bg); color: var(--red); }
-/* A real bug report: "setup/cleanup team should highlight red member
-   rows if they are absent. highlight green rows if they are present. it
-   is currently highlighting all rows of people who have checked in red,
-   that's wrong." This used to share the absent row's own red-bg/red-text
-   pairing, just triggered by m.checkedIn instead of m.absent - so a
-   member who'd actually shown up got the same "something's wrong" red
-   flag as one who never came. Green (same pairing as .badge-pill-present/
-   .cell-present elsewhere) reads as "here," red as "not here" - this
-   table only ever shows one of the two at once (see the partial's own
-   comment on precedence). */
-.setup-assignment-row-checked-in td { background: var(--green-bg); color: var(--green); }
-/* A real request: "if someone checks out, it should highlight their name
-   yellow on the setup/cleanup assignment page" - same row-highlight
-   pattern as the absent/checked-in rules just above, this app's own
-   standard yellow pairing (see --yellow/--yellow-bg, e.g. .cell-late). */
-.setup-assignment-row-checked-out td { background: var(--yellow-bg); color: var(--yellow); }
+/* Same flag colors, Setup/Cleanup Assignments' own per-member table row
+   (partials/setup-assignment-cards.ejs) instead of the Teams tab's
+   card-list rows above - a real bug report: "green for checked in,
+   yellow for late, red for absent, red for checked out should only be
+   highlighted on the member name, not the task rows." This used to apply
+   to every `td` in the row (bleeding into the Task 1/2/3 cells too, and
+   blocking checked-out from even being assigned a task - see
+   setTaskAssignment's own comment), so these now target only the name
+   cell itself (.floater-card-position) via its own status class, same
+   red/green/yellow pairings as .cell-absent/.cell-present/.cell-late
+   elsewhere. Only one of these ever applies at a time (see the partial's
+   own precedence comment: absent, then checked out, then late, then
+   checked in). */
+.setup-assignment-name-absent { background: var(--red-bg); color: var(--red); }
+.setup-assignment-name-checked-out { background: var(--red-bg); color: var(--red); }
+.setup-assignment-name-late { background: var(--yellow-bg); color: var(--yellow); }
+.setup-assignment-name-checked-in { background: var(--green-bg); color: var(--green); }
 
 /* A member row staged for removal (public/js/team-member-remove-toggle.js)
    but not yet saved - a real request: "allow for multiple deletes and
