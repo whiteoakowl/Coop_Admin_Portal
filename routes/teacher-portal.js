@@ -56,6 +56,22 @@ async function classesForTeacher(member) {
   return all.filter((c) => classIds.has(c.id));
 }
 
+// A real request: "Teacher portal dashboard add section for my classes
+// tab. Each tab after that should be each class that teacher is signed
+// up for to teach." Populates partials/portal-nav.ejs's own classLinks
+// prop (its "My Classes" sidebar section, classLinksTitle) for every page
+// in this router, the same way req.portalRoles is populated centrally in
+// middleware/portalAuth.js rather than once per route - so every
+// views/teacher-*.ejs page gets it automatically just by passing
+// portalTitle: 'Teacher Portal' into that partial, with no per-route
+// res.render() change needed.
+router.use(async (req, res, next) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  res.locals.classLinks = classes.map((c) => ({ href: `/teacher/classes/${c.id}`, icon: 'graduation-cap', label: c.class_name }));
+  next();
+});
+
 // Announcements on the homepage - same site-wide + per-account
 // 'announcement' notification pattern Parent Portal's own home route
 // established (routes/parent-portal.js), reused as-is here since a
