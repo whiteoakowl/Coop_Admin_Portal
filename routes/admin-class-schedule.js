@@ -1175,16 +1175,38 @@ router.post('/class-schedule/classes/:id/enrollment/:studentId/remove', requireF
   res.redirect(`/admin/class-schedule/${cls.day}`);
 });
 
+// A real bug report: "when adding or deleting a member from a class
+// roster the page refreshes and jumps back to the full class schedule
+// grid. It should stay on the class roster and simply the member
+// disappears." The Student Roster section's own enrollment/add and
+// enrollment/:studentId/remove routes right above already got this exact
+// fix a while ago (see their own comments) - these two never did, even
+// though a teacher/assistant is just as much a "member" of this same
+// roster page. Same wantsJson/renderPartial pattern as those two:
+// public/js/class-roster-ajax.js (below) drives both via fetch(), no
+// redirect; a plain (non-fetch) form submission still gets the original
+// redirect back to the day's grid.
 router.post('/class-schedule/classes/:id/staff/add', requireFullAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const cls = await getClass(id);
   if (!cls) return res.status(404).send('Not found');
+  const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
   const memberId = parseInt(req.body.memberId, 10);
   const role = req.body.role === 'assistant' ? 'assistant' : 'teacher';
   try {
     if (memberId) await addStaff(id, memberId, role);
   } catch (err) {
+    if (wantsJson) return res.status(500).json({ ok: false, error: err.message });
     return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
+  }
+  if (wantsJson) {
+    if (!memberId) return res.json({ ok: true, rowHtml: null });
+    const updatedClass = await getClass(id);
+    const newStaff = updatedClass.staff.find((s) => s.id === memberId);
+    const rowHtml = newStaff
+      ? await renderPartial(req.app, 'partials/roster-staff-row', { s: newStaff, removeAction: `/admin/class-schedule/classes/${id}/staff/${newStaff.id}/remove` })
+      : null;
+    return res.json({ ok: true, rowHtml, addedId: newStaff ? newStaff.id : null });
   }
   res.redirect(`/admin/class-schedule/${cls.day}`);
 });
@@ -1193,11 +1215,14 @@ router.post('/class-schedule/classes/:id/staff/:memberId/remove', requireFullAdm
   const id = parseInt(req.params.id, 10);
   const cls = await getClass(id);
   if (!cls) return res.status(404).send('Not found');
+  const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
   try {
     await removeStaff(id, parseInt(req.params.memberId, 10));
   } catch (err) {
+    if (wantsJson) return res.status(500).json({ ok: false, error: err.message });
     return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
   }
+  if (wantsJson) return res.json({ ok: true });
   res.redirect(`/admin/class-schedule/${cls.day}`);
 });
 

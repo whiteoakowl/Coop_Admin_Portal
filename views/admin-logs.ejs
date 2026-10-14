@@ -152,6 +152,7 @@
                       <span class="absence-member-detail"><%= s.rosterName %></span>
                       <span class="absence-member-detail"><%= s.reasonLabel %></span>
                       <span class="absence-member-detail"><%= s.description %></span>
+                      <span class="absence-member-detail">Submitted <%= s.submittedDateLabel %> <%= s.submittedTimeLabel %></span>
                     </div>
                   <% }); %>
                 </div>
@@ -168,11 +169,11 @@
             .members-list-table/.members-print-table split). %>
         <table class="roster-table members-table condensed-table logs-print-table">
           <thead>
-            <tr><th>Name</th><th>Roster</th><th>Date</th><th>Status</th><th>Reason</th><th>Description</th></tr>
+            <tr><th>Name</th><th>Roster</th><th>Date</th><th>Status</th><th>Reason</th><th>Description</th><th>Submitted</th></tr>
           </thead>
           <tbody>
             <% if (allSubmissions.length === 0) { %>
-              <tr><td colspan="6" class="roster-empty">No absence or late submissions<%= dateFilter ? ' for this date' : ' yet' %>.</td></tr>
+              <tr><td colspan="7" class="roster-empty">No absence or late submissions<%= dateFilter ? ' for this date' : ' yet' %>.</td></tr>
             <% } %>
             <% allSubmissions.forEach(function(s) { %>
               <tr>
@@ -182,6 +183,7 @@
                 <td><span class="status-badge <%= s.statusLabel === 'Late' ? 'status-badge-late' : 'status-badge-absent' %>"><%= s.statusLabel %></span></td>
                 <td><%= s.reasonLabel %></td>
                 <td><%= s.description %></td>
+                <td><%= s.submittedDateLabel %> <%= s.submittedTimeLabel %></td>
               </tr>
             <% }); %>
           </tbody>

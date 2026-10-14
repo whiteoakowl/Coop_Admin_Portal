@@ -335,6 +335,38 @@ function formatDateAndTime(sqlTimestamp) {
   };
 }
 
+// Same numeric "12/12/2026" date shape as formatDateAndTime above, but
+// with formatFriendlyTimestamp/formatFriendlyDateAndTime's own lowercase,
+// no-space "12:45pm" time shape instead of toLocaleTimeString's default
+// "12:45 PM" - a real request: "Absence/late log, include the date and
+// time the member submitted the form... use 12/12/2026 and 12:45pm as the
+// format," which needs the numeric date (not a spelled-out month) paired
+// with that specific time style neither existing formatter produces on
+// its own. formatToParts (not toLocaleTimeString) for the same reason
+// formatFriendlyTimestamp already uses it: toLocaleTimeString's AM/PM has
+// no supported way to force lowercase or drop its own leading space.
+function formatNumericDateAndTime(sqlTimestamp) {
+  if (!sqlTimestamp) return { dateLabel: null, timeLabel: null };
+  const d = new Date(sqlTimestamp.replace(' ', 'T') + 'Z');
+  const parts = {};
+  for (const p of new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).formatToParts(d)) {
+    parts[p.type] = p.value;
+  }
+  const ampm = parts.dayPeriod.toLowerCase();
+  return {
+    dateLabel: `${parts.month}/${parts.day}/${parts.year}`,
+    timeLabel: `${parts.hour}:${parts.minute}${ampm}`,
+  };
+}
+
 // Whole-years-old as of a given reference date (ISO), or null if either
 // date isn't valid - the general form ageFromBirthday below is built on.
 // A real request: "When a class is restricted by age(s): consider the
@@ -402,6 +434,7 @@ module.exports = {
   formatChatTimestamp,
   formatFriendlyDateAndTime,
   formatDateAndTime,
+  formatNumericDateAndTime,
   ageFromBirthday,
   isChildAge,
   ageAsOfDate,

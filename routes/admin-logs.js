@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { formatDateLabel, formatTime, formatDateAndTime, todayISO, weekdayOf } = require('../utils/dates');
+const { formatDateLabel, formatTime, formatDateAndTime, formatNumericDateAndTime, todayISO, weekdayOf } = require('../utils/dates');
 const { REASON_LABELS } = require('../utils/rosters');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { classesAtRiskForDay, CLASS_DAY_LABELS_FULL, listActiveClassDays } = require('../utils/classSchedule');
@@ -45,7 +45,7 @@ function todayIfSessionDay(day) {
 async function allAbsenceSubmissions(dateFilter) {
   let sql = `SELECT m.name AS "memberName", m.family_id AS "familyId", f.name AS "familyName",
              r.name AS "rosterName", a.session_date AS date, a.status,
-             a.reason_category AS "reasonCategory", a.reason_text AS "reasonText"
+             a.reason_category AS "reasonCategory", a.reason_text AS "reasonText", a.submitted_at AS "submittedAt"
              FROM absence_submissions a
              JOIN members m ON m.id = a.member_id
              LEFT JOIN families f ON f.id = m.family_id
@@ -61,17 +61,29 @@ async function allAbsenceSubmissions(dateFilter) {
   return (await db
     .prepare(sql)
     .all(...params))
-    .map((r) => ({
-      memberName: r.memberName,
-      familyId: r.familyId,
-      familyName: r.familyName,
-      rosterName: r.rosterName,
-      date: r.date,
-      dateLabel: formatDateLabel(r.date),
-      statusLabel: r.status === 'late' ? 'Late' : 'Absent',
-      reasonLabel: REASON_LABELS[r.reasonCategory] || '—',
-      description: r.reasonText || '—',
-    }))
+    .map((r) => {
+      // A real request: "Absence/late log, include the date and time the
+      // member submitted the form on the log. Use 12/12/2026 and 12:45pm
+      // as the format." submitted_at already existed on this table
+      // (absence_submissions' own migration) - the form's real submit
+      // time, distinct from `date`/dateLabel above (the CLASS session
+      // date the absence is FOR, which the parent can backdate/forward-
+      // date independently of when they actually filled out the form).
+      const { dateLabel: submittedDateLabel, timeLabel: submittedTimeLabel } = formatNumericDateAndTime(r.submittedAt);
+      return {
+        memberName: r.memberName,
+        familyId: r.familyId,
+        familyName: r.familyName,
+        rosterName: r.rosterName,
+        date: r.date,
+        dateLabel: formatDateLabel(r.date),
+        statusLabel: r.status === 'late' ? 'Late' : 'Absent',
+        reasonLabel: REASON_LABELS[r.reasonCategory] || '—',
+        description: r.reasonText || '—',
+        submittedDateLabel,
+        submittedTimeLabel,
+      };
+    })
     // Date desc stays the primary sort (newest submissions first) - last
     // name only breaks ties within the same date, same as everywhere else
     // member names sort ("ABC order according to the last name").
@@ -418,8 +430,10 @@ router.get('/logs/absence/export.csv', requireAdmin, async (req, res) => {
   const dateFilter = req.query.date || '';
   const submissions = await allAbsenceSubmissions(dateFilter);
   const lines = [
-    toCsvRow(['Name', 'Roster', 'Date', 'Status', 'Reason', 'Description']),
-    ...submissions.map((s) => toCsvRow([s.memberName, s.rosterName, s.dateLabel, s.statusLabel, s.reasonLabel, s.description || ''])),
+    toCsvRow(['Name', 'Roster', 'Date', 'Status', 'Reason', 'Description', 'Submitted Date', 'Submitted Time']),
+    ...submissions.map((s) =>
+      toCsvRow([s.memberName, s.rosterName, s.dateLabel, s.statusLabel, s.reasonLabel, s.description || '', s.submittedDateLabel || '', s.submittedTimeLabel || ''])
+    ),
   ];
   sendCsv(res, 'absence-late-log.csv', lines);
 });

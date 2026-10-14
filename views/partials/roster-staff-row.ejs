@@ -1,0 +1,20 @@
+<%
+// One teacher/assistant's line on a class's Teachers & Assistants list
+// (views/admin-class-schedule-manage.ejs) - a real bug report: "when
+// adding or deleting a member from a class roster the page refreshes and
+// jumps back to the full class schedule grid. It should stay on the
+// class roster and simply the member disappears." The Student Roster
+// section right below this one already got that exact fix (see partials/
+// roster-student-row.ejs's own comment) - this mirrors it for staff, the
+// other "member" on this same page that could still trigger the bug.
+//
+// locals: s (a class_staff row with its own member name/role), classId,
+// removeAction (the fetch() endpoint for the trash icon).
+%>
+<div class="roster-log-row" data-roster-staff-row data-staff-id="<%= s.id %>">
+  <span class="roster-log-name"><a class="member-name-link" href="/admin/members/<%= s.id %>"><%= s.name %></a></span>
+  <span class="roster-log-meta">
+    <span class="badge-pill"><%= s.role === 'assistant' ? 'Assistant' : 'Teacher' %></span>
+  </span>
+  <button type="button" class="icon-btn js-roster-staff-remove no-print" data-remove-endpoint="<%= removeAction %>" data-staff-name="<%= s.name %>" aria-label="Remove <%= s.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+</div>

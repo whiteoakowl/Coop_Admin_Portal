@@ -28,7 +28,7 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
-const { createClass, setEnrollment } = require('../utils/classSchedule');
+const { createClass, setEnrollment, addStaff } = require('../utils/classSchedule');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -228,6 +228,109 @@ test('enrollment/:studentId/remove via fetch with a failure returns a graceful J
   // real point of this test is that the JSON path never crashes into an
   // HTML error page regardless of status.
   assert.equal(res.headers['content-type'].includes('application/json'), true);
+});
+
+// A real bug report: "when adding or deleting a member from a class
+// roster the page refreshes and jumps back to the full class schedule
+// grid. It should stay on the class roster and simply the member
+// disappears." Unlike the Student Roster section above (already fixed a
+// while ago), the Teachers & Assistants section's own staff/add and
+// staff/:memberId/remove routes still did a plain redirect with no
+// Accept: application/json support at all - these cover the server half
+// of the fix that closes that gap.
+test('staff/add via fetch (Accept: application/json) returns the newly-added staff member\'s own rendered roster row, not just ok:true', async () => {
+  const { cookie, csrfToken } = await loginAsAdmin();
+  const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'Staff Ajax Add Class' });
+  const staffId = (
+    await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Ajax Add Teacher', 'ajax-add-teacher', 'parent')").run()
+  ).lastInsertRowid;
+
+  const res = await request(app)
+    .post(`/admin/class-schedule/classes/${classId}/staff/add`)
+    .set('Cookie', cookie)
+    .set('Accept', 'application/json')
+    .type('form')
+    .send({ memberId: String(staffId), role: 'teacher', _csrf: csrfToken });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.headers['content-type'].includes('application/json'), true);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.addedId, staffId);
+  // Same partial the full page itself renders (partials/roster-staff-row),
+  // not a stripped-down summary.
+  assert.match(res.body.rowHtml, /data-roster-staff-row/);
+  assert.match(res.body.rowHtml, /Ajax Add Teacher/);
+  assert.match(res.body.rowHtml, />Teacher</);
+  assert.match(res.body.rowHtml, new RegExp(`js-roster-staff-remove[^>]*data-remove-endpoint="/admin/class-schedule/classes/${classId}/staff/${staffId}/remove"`));
+
+  const page = await request(app).get(`/admin/class-schedule/classes/${classId}/manage?tab=staffRoster`).set('Cookie', cookie);
+  assert.match(page.text, /Ajax Add Teacher/);
+});
+
+test('staff/:memberId/remove via fetch (Accept: application/json) returns ok:true with no redirect, and actually removes the staff member', async () => {
+  const { cookie, csrfToken } = await loginAsAdmin();
+  const classId = await createClass({ day: 'monday', hourPosition: 2, className: 'Staff Ajax Remove Class' });
+  const staffId = (
+    await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Ajax Remove Teacher', 'ajax-remove-teacher', 'parent')").run()
+  ).lastInsertRowid;
+  await addStaff(classId, staffId, 'teacher');
+
+  const res = await request(app)
+    .post(`/admin/class-schedule/classes/${classId}/staff/${staffId}/remove`)
+    .set('Cookie', cookie)
+    .set('Accept', 'application/json')
+    .type('form')
+    .send({ _csrf: csrfToken });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.headers['content-type'].includes('application/json'), true);
+  assert.deepEqual(res.body, { ok: true });
+
+  const page = await request(app).get(`/admin/class-schedule/classes/${classId}/manage?tab=staffRoster`).set('Cookie', cookie);
+  const rosterStart = page.text.indexOf('id="staff-roster-list"');
+  const rosterEnd = page.text.indexOf('manage-section', rosterStart + 1);
+  assert.doesNotMatch(page.text.slice(rosterStart, rosterEnd), /Ajax Remove Teacher/);
+});
+
+test('staff/:memberId/remove via fetch with a failure returns a graceful JSON error, not a 500 HTML crash page', async () => {
+  const { cookie, csrfToken } = await loginAsAdmin();
+  const classId = await createClass({ day: 'monday', hourPosition: 3, className: 'Staff Ajax Remove Error Class' });
+
+  const res = await request(app)
+    .post(`/admin/class-schedule/classes/${classId}/staff/${NONEXISTENT_MEMBER_ID}/remove`)
+    .set('Cookie', cookie)
+    .set('Accept', 'application/json')
+    .type('form')
+    .send({ _csrf: csrfToken });
+
+  assert.equal(res.headers['content-type'].includes('application/json'), true, 'must stay JSON even on a real failure, not an HTML crash page');
+});
+
+test('the Teachers & Assistants section and the Add Teacher/Assistant dialog on the Manage page carry the ids/classes public/js/class-roster-ajax.js needs to drive them', async () => {
+  const { cookie } = await loginAsAdmin();
+  const staffId = (
+    await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Markup Check Teacher', 'markup-check-teacher', 'parent')").run()
+  ).lastInsertRowid;
+  const classId = await createClass({ day: 'wednesday', hourPosition: 2, className: 'Staff Ajax Markup Class' });
+  await addStaff(classId, staffId, 'teacher');
+  const availableId = (
+    await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Available To Add Teacher', 'available-to-add-teacher', 'parent')").run()
+  ).lastInsertRowid;
+
+  const page = await request(app).get(`/admin/class-schedule/classes/${classId}/manage?tab=staffRoster`).set('Cookie', cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /id="staff-roster-list"/);
+  assert.match(page.text, /id="staff-roster-count"/);
+  assert.match(page.text, /id="staff-roster-empty"[^>]*hidden/, 'a non-empty staff list should start with the empty-state message hidden');
+  assert.match(page.text, /id="add-staff-form"/);
+  assert.match(page.text, /id="add-staff-submit"/);
+  assert.match(page.text, new RegExp(`<option value="${availableId}">Available To Add Teacher`), 'the Add dialog should still offer an eligible, not-yet-staffed member');
+  assert.match(page.text, /js-roster-staff-remove[^>]*data-remove-endpoint="[^"]+"[^>]*data-staff-name="Markup Check Teacher"/);
+  // Plain <form data-confirm> would re-intercept the auto-"are you sure?"
+  // popup AND still navigate on confirm - the remove control must be a
+  // real standalone button for public/js/class-roster-ajax.js's own
+  // fetch()-based handler to own it entirely.
+  assert.doesNotMatch(page.text, /data-confirm="Remove Markup Check Teacher/);
 });
 
 test('the Student Roster section and the Add Students dialog on the Manage page carry the ids/classes public/js/class-roster-ajax.js needs to drive them', async () => {
