@@ -141,10 +141,14 @@ test('a member on a "log on check in" team scans their badge at check-in, and ch
     assert.equal(res.body.memberType, 'parent-taskscan');
     assert.equal(res.body.memberId, memberId);
 
-    // Already marked present, even though the task step isn't done yet.
+    // A real bug report: "people assigned to setup were able to check in
+    // without a badge, which is not allowed." Not marked present yet - no
+    // attendance row is written at all until the badge is actually
+    // scanned (see /checkin/task-scan), so walking away or clicking
+    // Cancel on the badge step leaves nothing behind instead of silently
+    // completing check-in with no badge logged.
     const attendance = await db.prepare('SELECT * FROM attendance WHERE member_id = ? AND session_date = ?').get(memberId, todayISO());
-    assert.equal(attendance.status, 'present');
-    assert.equal(attendance.task_scanned_at, null, 'the task step has not happened yet');
+    assert.equal(attendance, undefined, 'no attendance row should exist until the badge is actually scanned');
   });
 
   await t.test('scanning the task badge at check-in records it on the attendance row, and checkout is then a single scan carrying the same task', async () => {
