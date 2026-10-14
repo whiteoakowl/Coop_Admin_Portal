@@ -6955,12 +6955,32 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    cell itself (.floater-card-position) via its own status class, same
    red/green/yellow pairings as .cell-absent/.cell-present/.cell-late
    elsewhere. Only one of these ever applies at a time (see the partial's
-   own precedence comment: absent, then checked out, then late, then
-   checked in). */
+   own precedence comment: absent, then task(s) complete, then checked
+   out, then late, then checked in). */
 .setup-assignment-name-absent { background: var(--red-bg); color: var(--red); }
 .setup-assignment-name-checked-out { background: var(--red-bg); color: var(--red); }
 .setup-assignment-name-late { background: var(--yellow-bg); color: var(--yellow); }
 .setup-assignment-name-checked-in { background: var(--green-bg); color: var(--green); }
+
+/* The "(absent)"/"(checked out)"/"(late)" labels next to a flagged name
+   above are plain italic/muted text (.floater-card-unassigned) - this one
+   is its own real badge instead, since "Task(s) complete: Team-#N" is
+   good news worth standing out, not a caveat to mute. Same green pairing
+   as .setup-assignment-name-checked-in just above (this status always
+   wins that one's color too - see the partial's own precedence comment),
+   icon-first same as every other inline status flag in this app. */
+.setup-task-complete-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: var(--green-bg);
+  color: var(--green);
+  font-weight: 600;
+  font-size: 0.78rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+.setup-task-complete-badge .icon { width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
 
 /* A member row staged for removal (public/js/team-member-remove-toggle.js)
    but not yet saved - a real request: "allow for multiple deletes and

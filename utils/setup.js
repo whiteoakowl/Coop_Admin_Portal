@@ -385,11 +385,71 @@ function suggestDistinctTasks(members, allOptions, assignedKey, optionsKey) {
 // One card per team for a given date - each member's currently-suggested
 // task (if any) plus the list of tasks their team's own linked task list
 // offers, i.e. what the suggestion dropdown's own options are. Shared by
-// the live Assignments page (editable), the read-only Archive view/print/
-// export for a past date, and the public/kiosk read-only view for today
-// or the closest upcoming date (routes/setup.js) - same data, just
-// rendered differently (see partials/setup-assignment-cards.ejs's own
-// `editable` flag).
+// A real request: "when someone checks in or out with a setup/cleanup
+// badge, on the setup/cleanup assignment page their name will be green,
+// with a green check mark next to it saying task(s) complete and the
+// task # they scanned." Same real-badge-scan-only signal utils/
+// rosterGrid.js's own cleanup-task column already uses for the Attendance
+// page (COALESCE of checkouts.task_item_id over attendance.task_item_id -
+// those columns are only ever written by an actual kiosk badge scan,
+// never by this page's own Assign button - see setTaskAssignment's own
+// comment on why assigning never touches them), extended here to all
+// three slots (rosterGrid.js's own column only ever showed slot 1) and
+// grouped per member instead of per roster row, since this page has no
+// roster context of its own. MAX(...) per member/slot is safe, not an
+// arbitrary pick - every roster row for the same member on the same date
+// carries the identical task_item_id (one kiosk write, fanned out to
+// every roster concurrently - see routes/kiosk.js's own Promise.all).
+// Returns { [memberId]: [{ number, teamName }, ...] } - one entry per
+// slot actually scanned, same "<team name>-#<n>" shape rosterGrid.js
+// already shows elsewhere, team name falling back to the task list
+// section's own title when it isn't linked to a setup_teams row.
+async function scannedTasksForMemberDate(date) {
+  if (!date) return {};
+  const rows = await db
+    .prepare(
+      `SELECT merged.member_id AS "memberId", numbered.number, COALESCE(st.title, tls.title) AS "teamName"
+       FROM (
+         SELECT a.member_id, MAX(COALESCE(c.task_item_id, a.task_item_id)) AS "taskItemId"
+         FROM attendance a
+         LEFT JOIN checkouts c ON c.member_id = a.member_id AND c.session_date = a.session_date
+         WHERE a.session_date = ?
+         GROUP BY a.member_id
+         UNION ALL
+         SELECT a.member_id, MAX(COALESCE(c.task_item_id_2, a.task_item_id_2)) AS "taskItemId"
+         FROM attendance a
+         LEFT JOIN checkouts c ON c.member_id = a.member_id AND c.session_date = a.session_date
+         WHERE a.session_date = ?
+         GROUP BY a.member_id
+         UNION ALL
+         SELECT a.member_id, MAX(COALESCE(c.task_item_id_3, a.task_item_id_3)) AS "taskItemId"
+         FROM attendance a
+         LEFT JOIN checkouts c ON c.member_id = a.member_id AND c.session_date = a.session_date
+         WHERE a.session_date = ?
+         GROUP BY a.member_id
+       ) merged
+       JOIN (
+         SELECT id, section_id, ROW_NUMBER() OVER (PARTITION BY section_id ORDER BY position, id) AS number
+         FROM task_list_items
+       ) numbered ON numbered.id = merged."taskItemId"
+       JOIN task_list_sections tls ON tls.id = numbered.section_id
+       LEFT JOIN setup_teams st ON st.id = tls.team_id
+       WHERE merged."taskItemId" IS NOT NULL`
+    )
+    .all(date, date, date);
+  const byMember = {};
+  for (const r of rows) {
+    if (!byMember[r.memberId]) byMember[r.memberId] = [];
+    byMember[r.memberId].push({ number: Number(r.number), teamName: r.teamName });
+  }
+  return byMember;
+}
+
+// Shared by the live Assignments page (editable), the read-only Archive
+// view/print/export for a past date, and the public/kiosk read-only view
+// for today or the closest upcoming date (routes/setup.js) - same data,
+// just rendered differently (see partials/setup-assignment-cards.ejs's
+// own `editable` flag).
 async function assignmentCardsForDate(day, date, semesterId) {
   const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
   const teams = await teamsWithMembers(day, sid);
@@ -412,6 +472,14 @@ async function assignmentCardsForDate(day, date, semesterId) {
   // longer blocks assigning them a task (see setTaskAssignment's own
   // comment) - checking out just highlights, it doesn't lock anything.
   const checkedOutIds = await checkedOutMemberIdsForDate(date);
+  // A real request: "when someone checks in or out with a setup/cleanup
+  // badge, on the setup/cleanup assignment page their name will be
+  // green, with a green check mark next to it saying task(s) complete
+  // and the task # they scanned." Takes precedence over the plain
+  // checked-in/checked-out flags above in the view (see that partial's
+  // own precedence comment) - having actually scanned a real badge is
+  // more specific, confirmed information than either.
+  const scannedTasksByMember = await scannedTasksForMemberDate(date);
   return teams.map((t) => {
     const allOptions = t.taskSection ? t.taskSection.items : [];
     const members = t.members.map((m) => {
@@ -427,6 +495,7 @@ async function assignmentCardsForDate(day, date, semesterId) {
         late: lateIds.has(m.id),
         checkedIn: checkedInIds.has(m.id),
         checkedOut: checkedOutIds.has(m.id),
+        scannedTasks: scannedTasksByMember[m.id] || [],
         taskItemId: a.taskItemId || null,
         taskItemId2: a.taskItemId2 || null,
         taskItemId3: a.taskItemId3 || null,
@@ -502,5 +571,6 @@ module.exports = {
   setTaskAssignment,
   splitDatesByToday,
   teamsWithMembers,
+  scannedTasksForMemberDate,
   assignmentCardsForDate,
 };

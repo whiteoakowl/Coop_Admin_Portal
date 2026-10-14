@@ -126,13 +126,27 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
                   not a whole-row background that bled into the task
                   cells. m.late (assignmentCardsForDate, utils/setup.js) is
                   computed the same "read from the attendance table" way
-                  as m.absent/m.checkedIn above. Precedence, most severe
-                  first: absent, then checked out, then late, then
-                  checked in - each one is a strictly later/worse state
-                  than the next, and only one should ever show at a time. %>
+                  as m.absent/m.checkedIn above. %>
+              <%# A real request: "when someone checks in or out with a
+                  setup/cleanup badge, on the setup/cleanup assignment
+                  page their name will be green, with a green check mark
+                  next to it saying task(s) complete and the task # they
+                  scanned." m.scannedTasks (assignmentCardsForDate,
+                  utils/setup.js's own scannedTasksForMemberDate) is real-
+                  badge-scan-only, the same signal utils/rosterGrid.js
+                  already uses for the Attendance page's own team/task
+                  column - never set just because this page's own Assign
+                  button picked a task for them. Placed ahead of checked-
+                  out/late in precedence: having actually scanned a real
+                  badge is more specific, confirmed information than
+                  either, and matters more to an admin checking this page
+                  specifically for "did they do their task." Full
+                  precedence, most severe/specific first: absent, then
+                  task(s) complete, then checked out, then late, then
+                  checked in - only one should ever show at a time. %>
               <tr>
-                <td class="floater-card-position<% if (m.absent) { %> setup-assignment-name-absent<% } else if (m.checkedOut) { %> setup-assignment-name-checked-out<% } else if (m.late) { %> setup-assignment-name-late<% } else if (m.checkedIn) { %> setup-assignment-name-checked-in<% } %>">
-                  <a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %><% if (m.absent) { %> <span class="floater-card-unassigned">(absent)</span><% } else if (m.checkedOut) { %> <span class="floater-card-unassigned">(checked out)</span><% } else if (m.late) { %> <span class="floater-card-unassigned">(late)</span><% } %>
+                <td class="floater-card-position<% if (m.absent) { %> setup-assignment-name-absent<% } else if (m.scannedTasks.length > 0) { %> setup-assignment-name-checked-in<% } else if (m.checkedOut) { %> setup-assignment-name-checked-out<% } else if (m.late) { %> setup-assignment-name-late<% } else if (m.checkedIn) { %> setup-assignment-name-checked-in<% } %>">
+                  <a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %><% if (m.absent) { %> <span class="floater-card-unassigned">(absent)</span><% } else if (m.scannedTasks.length > 0) { %> <span class="setup-task-complete-badge"><svg class="icon"><use href="#icon-check-circle"/></svg> Task<%= m.scannedTasks.length > 1 ? 's' : '' %> complete: <%= m.scannedTasks.map(function(t) { return t.teamName + '-#' + t.number; }).join(', ') %></span><% } else if (m.checkedOut) { %> <span class="floater-card-unassigned">(checked out)</span><% } else if (m.late) { %> <span class="floater-card-unassigned">(late)</span><% } %>
                 </td>
                 <%
                   var slots = [
