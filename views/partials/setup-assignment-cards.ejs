@@ -68,11 +68,11 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
         <% } %>
         <table class="floater-card-table setup-assignment-table">
           <thead>
-            <tr><th>Member</th><th>Task 1</th><th>Task 2</th></tr>
+            <tr><th>Member</th><th>Task 1</th><th>Task 2</th><th>Task 3</th></tr>
           </thead>
           <tbody>
             <% if (team.members.length === 0) { %>
-              <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
+              <tr><td colspan="4" class="roster-empty">No members yet.</td></tr>
             <% } %>
             <% team.members.forEach(function(m) { %>
               <%
@@ -132,6 +132,7 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
                   var slots = [
                     { num: 1, taskItemId: m.taskItemId, taskNumber: m.taskNumber, taskDescription: m.taskDescription, options: m.slot1Options, suggestedTaskItemId: m.suggestedTaskItemId },
                     { num: 2, taskItemId: m.taskItemId2, taskNumber: m.taskNumber2, taskDescription: m.taskDescription2, options: m.slot2Options, suggestedTaskItemId: m.suggestedTaskItemId2 },
+                    { num: 3, taskItemId: m.taskItemId3, taskNumber: m.taskNumber3, taskDescription: m.taskDescription3, options: m.slot3Options, suggestedTaskItemId: m.suggestedTaskItemId3 },
                   ];
                 %>
                 <% slots.forEach(function(slot) { %>

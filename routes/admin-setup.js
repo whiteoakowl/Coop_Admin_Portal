@@ -343,7 +343,7 @@ router.post('/setup/:day/assignments/:memberId/task', requireAdmin, requireClass
   const semesterId = comboSemesterId(req);
   const memberId = parseInt(req.params.memberId, 10);
   const date = req.body.date;
-  const slot = req.body.slot === '2' ? 2 : 1;
+  const slot = req.body.slot === '3' ? 3 : req.body.slot === '2' ? 2 : 1;
   const taskItemId = parseInt(req.body.taskItemId, 10) || null;
   const back = appendSemester(`/admin/setup/${day}/assignments` + (date ? `?date=${encodeURIComponent(date)}` : ''), semesterId);
   if (date && isValidISODate(date)) {
@@ -379,12 +379,12 @@ router.get('/setup/:day/assignments/export.csv', requireAdmin, requireClassDay, 
   const date = req.query.date;
   const cards = date && isValidISODate(date) ? await assignmentCardsForDate(day, date, comboSemesterId(req)) : [];
 
-  const lines = [toCsvRow(['Team', 'Member', 'Suggested Task 1', 'Suggested Task 2'])];
+  const lines = [toCsvRow(['Team', 'Member', 'Suggested Task 1', 'Suggested Task 2', 'Suggested Task 3'])];
   cards.forEach((t) => {
     if (t.members.length === 0) {
-      lines.push(toCsvRow([t.title, '', '', '']));
+      lines.push(toCsvRow([t.title, '', '', '', '']));
     } else {
-      t.members.forEach((m) => lines.push(toCsvRow([t.title, m.name, m.taskDescription || '', m.taskDescription2 || ''])));
+      t.members.forEach((m) => lines.push(toCsvRow([t.title, m.name, m.taskDescription || '', m.taskDescription2 || '', m.taskDescription3 || ''])));
     }
   });
 

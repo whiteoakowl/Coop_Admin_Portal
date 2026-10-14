@@ -28,20 +28,25 @@ async function generateTaskCode() {
 // adding yet more columns for two fields that already had a natural
 // home; day/leader_name are genuinely new (see the migration that added
 // them).
-async function upsertTaskBadge(itemId, taskText, day, teamName, leaderName, barcode) {
+// teamId/semesterId (a real request: "filter popup... dropdown to select
+// team and dropdown to select semester or all") are denormalized onto the
+// badge the same way day/leader_name already are, for the same reason -
+// the print panel's checklist filters by these without a join back to
+// task_list_items/task_list_sections for every row.
+async function upsertTaskBadge(itemId, taskText, day, teamName, leaderName, barcode, teamId, semesterId) {
   const existing = await db.prepare('SELECT id FROM misc_badges WHERE task_item_id = ?').get(itemId);
   if (existing) {
     await db
-      .prepare('UPDATE misc_badges SET title = ?, description = ?, day = ?, leader_name = ? WHERE id = ?')
-      .run(teamName, taskText, day, leaderName, existing.id);
+      .prepare('UPDATE misc_badges SET title = ?, description = ?, day = ?, leader_name = ?, team_id = ?, semester_id = ? WHERE id = ?')
+      .run(teamName, taskText, day, leaderName, teamId, semesterId, existing.id);
     return;
   }
   await db
     .prepare(
-      `INSERT INTO misc_badges (badge_type, badge_number, title, description, day, leader_name, barcode, task_item_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO misc_badges (badge_type, badge_number, title, description, day, leader_name, barcode, task_item_id, team_id, semester_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run('setupCleanup', barcode, teamName, taskText, day, leaderName, barcode, itemId);
+    .run('setupCleanup', barcode, teamName, taskText, day, leaderName, barcode, itemId, teamId, semesterId);
 }
 
 // Resolves the day/team name/leader a task list section's badges should
@@ -51,8 +56,8 @@ async function upsertTaskBadge(itemId, taskText, day, teamName, leaderName, barc
 // allowed to exist unlinked - see createSection's own teamId being
 // optional).
 async function badgeContextForSection(section) {
-  if (!section) return { day: null, teamName: null, leaderName: null };
-  if (!section.team_id) return { day: section.day, teamName: section.title, leaderName: null };
+  if (!section) return { day: null, teamName: null, leaderName: null, teamId: null, semesterId: null };
+  if (!section.team_id) return { day: section.day, teamName: section.title, leaderName: null, teamId: null, semesterId: section.semester_id };
   const team = await db
     .prepare(
       `SELECT st.title, st.day, m.name AS "leaderName" FROM setup_teams st
@@ -60,7 +65,9 @@ async function badgeContextForSection(section) {
        WHERE st.id = ?`
     )
     .get(section.team_id);
-  return team ? { day: team.day, teamName: team.title, leaderName: team.leaderName || null } : { day: section.day, teamName: section.title, leaderName: null };
+  return team
+    ? { day: team.day, teamName: team.title, leaderName: team.leaderName || null, teamId: section.team_id, semesterId: section.semester_id }
+    : { day: section.day, teamName: section.title, leaderName: null, teamId: null, semesterId: section.semester_id };
 }
 
 // Re-stamps every badge under a team's linked task list with that team's
@@ -73,7 +80,7 @@ async function refreshBadgesForTeam(teamId) {
   if (!section) return;
   const ctx = await badgeContextForSection(section);
   const items = await db.prepare('SELECT id, description, barcode FROM task_list_items WHERE section_id = ?').all(section.id);
-  for (const item of items) await upsertTaskBadge(item.id, item.description, ctx.day, ctx.teamName, ctx.leaderName, item.barcode);
+  for (const item of items) await upsertTaskBadge(item.id, item.description, ctx.day, ctx.teamName, ctx.leaderName, item.barcode, ctx.teamId, ctx.semesterId);
 }
 
 // Every task list section for a day, each with its own ordered task
@@ -191,7 +198,7 @@ async function updateSection(id, fields) {
   const section = await getSection(id);
   const ctx = await badgeContextForSection(section);
   const items = await db.prepare('SELECT id, description, barcode FROM task_list_items WHERE section_id = ?').all(id);
-  for (const item of items) await upsertTaskBadge(item.id, item.description, ctx.day, ctx.teamName, ctx.leaderName, item.barcode);
+  for (const item of items) await upsertTaskBadge(item.id, item.description, ctx.day, ctx.teamName, ctx.leaderName, item.barcode, ctx.teamId, ctx.semesterId);
 }
 
 async function deleteSection(id) {
@@ -248,7 +255,7 @@ async function addItem(sectionId, description) {
     .run(sectionId, description, await nextItemPosition(sectionId), barcode);
   const itemId = info.lastInsertRowid;
   const ctx = await badgeContextForSection(await getSection(sectionId));
-  await upsertTaskBadge(itemId, description, ctx.day, ctx.teamName, ctx.leaderName, barcode);
+  await upsertTaskBadge(itemId, description, ctx.day, ctx.teamName, ctx.leaderName, barcode, ctx.teamId, ctx.semesterId);
   return itemId;
 }
 
@@ -257,7 +264,7 @@ async function updateItem(id, description) {
   const item = await db.prepare('SELECT * FROM task_list_items WHERE id = ?').get(id);
   if (!item) return;
   const ctx = await badgeContextForSection(await getSection(item.section_id));
-  await upsertTaskBadge(id, description, ctx.day, ctx.teamName, ctx.leaderName, item.barcode);
+  await upsertTaskBadge(id, description, ctx.day, ctx.teamName, ctx.leaderName, item.barcode, ctx.teamId, ctx.semesterId);
 }
 
 async function deleteItem(id) {

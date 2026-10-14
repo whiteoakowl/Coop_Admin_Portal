@@ -230,6 +230,33 @@ test('Once assistant_slots is full, the Register as Assistant button disappears 
   assert.match(decodeURIComponent(blocked.headers.location), /already has its full 1 assistant/);
 });
 
+// A real request: "if a class settings has 0 selected for class
+// assistants needed... it won't allow parents to register" - confirmed
+// 0 is meant to keep blocking sign-ups (same as any other real cap), but
+// "already has its full 0 assistant(s)" reads like a bug rather than the
+// intentional "this class isn't taking any" - this covers the clearer,
+// 0-specific message instead.
+test('# of Class Assistants/Teachers Needed set to 0 still blocks sign-up, with a message that does not read like a glitch', async () => {
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'Zero Assistants Needed Class', assistantSlots: '0', teacherSlots: '0' });
+  const parent = await createParentWithChild();
+
+  const blockedAssistant = await request(app)
+    .post(`/parent/classes/${cls.id}/join`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ role: 'assistant', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
+  assert.match(decodeURIComponent(blockedAssistant.headers.location), /isn't accepting any assistants/);
+  assert.doesNotMatch(decodeURIComponent(blockedAssistant.headers.location), /already has its full/);
+
+  const blockedTeacher = await request(app)
+    .post(`/parent/classes/${cls.id}/join`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ role: 'teacher', memberId: parent.memberId, day: 'monday', _csrf: parent.csrfToken });
+  assert.match(decodeURIComponent(blockedTeacher.headers.location), /isn't accepting any teachers/);
+});
+
 test('A registration window scoped to only "parent_register_student" does not block a parent self-registering as teacher/assistant', async () => {
   await db.prepare('DELETE FROM registration_windows').run();
   const { createWindow } = require('../utils/registrationWindows');

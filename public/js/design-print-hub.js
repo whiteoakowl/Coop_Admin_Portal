@@ -197,6 +197,38 @@
     'barcode-labels-select-none-checkbox'
   );
 
+  // Setup/Cleanup Badges picker's own Team/Semester filter (a real
+  // request: "add a filter button. Filter popup included dropdown to
+  // select team and dropdown to select semester or all") - a dialog
+  // (partials/misc-badge-print-panel.ejs) rather than an inline select
+  // like every wireBulkMemberList panel above, but the same row-hiding
+  // mechanics: each .member-picker-row already carries its own
+  // data-team-id/data-semester-id (set server-side from each badge's own
+  // team_id/semester_id - see utils/taskList.js's upsertTaskBadge), an
+  // empty select value means that facet's "All", and a row only shows
+  // once both facets agree. Lives in this file (not inline in the
+  // partial) since this same partial renders twice per page (Setup/
+  // Cleanup and Custom badges) but only 'setupCleanup' has the dialog at
+  // all - the id lookups below simply no-op when it doesn't.
+  function wireMiscBadgeTeamSemesterFilter(type) {
+    const list = document.querySelector(`#${type}-badge-print-form .member-picker-list`);
+    const teamSelect = document.getElementById(`${type}-badge-filter-team`);
+    const semesterSelect = document.getElementById(`${type}-badge-filter-semester`);
+    if (!list || !teamSelect || !semesterSelect) return;
+    const applyFilter = () => {
+      const teamId = teamSelect.value;
+      const semesterId = semesterSelect.value;
+      list.querySelectorAll('.member-picker-row').forEach((row) => {
+        const teamMatches = !teamId || row.dataset.teamId === teamId;
+        const semesterMatches = !semesterId || row.dataset.semesterId === semesterId;
+        row.style.display = teamMatches && semesterMatches ? '' : 'none';
+      });
+    };
+    teamSelect.addEventListener('change', applyFilter);
+    semesterSelect.addEventListener('change', applyFilter);
+  }
+  wireMiscBadgeTeamSemesterFilter('setupCleanup');
+
   // Class Check-In QR Codes picker: select-all/select-none plus a Day/Hour
   // filter popup, all over .qr-picker-row (classes, not members - a
   // separate class from wireBulkMemberList's own .print-picker-row so it
@@ -287,15 +319,21 @@
 
   // Setup/Cleanup + Custom badge lists (partials/misc-badge-print-panel):
   // one Select All checkbox per form, wired the same way as the schedule
-  // cards list above.
+  // cards list above. Skips a row hidden by the Setup/Cleanup Team/
+  // Semester filter above (row.style.display === 'none') the same way
+  // wireBulkMemberList's own Select All does - otherwise "Select All"
+  // after filtering down to one team would silently also select every
+  // OTHER team's badges, not just the ones actually showing on screen.
   ['setupCleanup', 'custom'].forEach((type) => {
     const form = document.getElementById(type + '-badge-print-form');
     if (!form) return;
     const selectAll = form.querySelector('.' + type + '-badge-select-all-checkbox');
     if (!selectAll) return;
     selectAll.addEventListener('change', () => {
-      form.querySelectorAll('input[name="badgeIds"]').forEach((cb) => {
-        cb.checked = selectAll.checked;
+      form.querySelectorAll('.member-picker-row').forEach((row) => {
+        if (row.style.display === 'none') return;
+        const cb = row.querySelector('input[name="badgeIds"]');
+        if (cb) cb.checked = selectAll.checked;
       });
     });
   });

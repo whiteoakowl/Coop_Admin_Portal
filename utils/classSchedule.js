@@ -706,8 +706,14 @@ async function createClass(fields) {
       fields.allowParentRegister === false ? 0 : 1,
       fields.allowTeacherRegister === false ? 0 : 1,
       fields.allowStudentRegister ? 1 : 0,
-      fields.teacherSlots || null,
-      fields.assistantSlots || null,
+      // A real bug report: "class assistants needed = 0 won't allow
+      // parents to register, even though it should" traced back here -
+      // `fields.teacherSlots || null` treats a deliberate 0 (a real cap of
+      // zero) the same as 0 being falsy, silently storing null (no cap/
+      // unlimited) instead. `??` only falls back for null/undefined, so an
+      // explicit 0 now actually saves as 0.
+      fields.teacherSlots ?? null,
+      fields.assistantSlots ?? null,
       fields.minCapacity || null,
       fields.allowCancel === false ? 0 : 1,
       fields.autoRefundOnCancel ? 1 : 0,
@@ -750,8 +756,9 @@ async function updateClass(id, fields) {
     fields.allowParentRegister === false ? 0 : 1,
     fields.allowTeacherRegister === false ? 0 : 1,
     fields.allowStudentRegister ? 1 : 0,
-    fields.teacherSlots || null,
-    fields.assistantSlots || null,
+    // See createClass's own comment on `??` vs `||` here - 0 is a real cap.
+    fields.teacherSlots ?? null,
+    fields.assistantSlots ?? null,
     fields.minCapacity || null,
     fields.allowCancel === false ? 0 : 1,
     fields.autoRefundOnCancel ? 1 : 0,
@@ -1075,7 +1082,8 @@ async function deleteClassSchedule(id) {
 async function updateClassSlots(id, { capacity, minCapacity, teacherSlots, assistantSlots }) {
   await db
     .prepare('UPDATE classes SET capacity = ?, min_capacity = ?, teacher_slots = ?, assistant_slots = ? WHERE id = ?')
-    .run(capacity || null, minCapacity || null, teacherSlots || null, assistantSlots || null, id);
+    // See createClass's own comment on `??` vs `||` here - 0 is a real cap.
+    .run(capacity || null, minCapacity || null, teacherSlots ?? null, assistantSlots ?? null, id);
 }
 
 // Deactivates (never hard-deletes) the class's auto-roster before removing

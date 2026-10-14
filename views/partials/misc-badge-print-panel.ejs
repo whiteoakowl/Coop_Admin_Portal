@@ -1,6 +1,8 @@
 <%
 // locals: type ('setupCleanup' | 'custom'), label, badges (rows from
-// listMiscBadges), basePath (optional, default '/admin/design' - Main
+// listMiscBadges), setupTeams/semesters (only meaningful for
+// 'setupCleanup' - see routes/admin-design.js's own comment on the Team/
+// Semester filter), basePath (optional, default '/admin/design' - Main
 // Admin's own Design/Print page passes '/main-admin/name-tags' so this
 // exact partial can be reused unmodified there too, same basePath
 // parameterization pattern as name-tag-editor.js's own BASE_PATH).
@@ -14,6 +16,7 @@
 // for 'custom', which is still its own independent imported list.
 const isTaskDerived = type === 'setupCleanup';
 const badgeBasePath = typeof basePath !== 'undefined' && basePath ? basePath : '/admin/design';
+const DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday' };
 %>
 <form method="POST" action="<%= badgeBasePath %>/badges/<%= type %>/print" target="_blank" id="<%= type %>-badge-print-form" data-bulk-print-refresh>
   <div class="roster-toolbar no-print">
@@ -28,6 +31,14 @@ const badgeBasePath = typeof basePath !== 'undefined' && basePath ? basePath : '
         <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('<%= type %>-badge-import-dialog').showModal()">Import</button>
         <a class="roster-action-btn file-action-btn" href="<%= badgeBasePath %>/badges/<%= type %>/import-template.xlsx">Sample File</a>
       <% } %>
+      <%# A real request: "print setup/cleanup badges. Add a filter
+          button. Filter popup included dropdown to select team and
+          dropdown to select semester or all." Only meaningful for
+          setupCleanup - 'custom' badges have no team/semester concept at
+          all (see their own task_item_id schema comment). %>
+      <% if (isTaskDerived) { %>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('<%= type %>-badge-filter-dialog').showModal()">Filter</button>
+      <% } %>
       <button type="submit" class="primary-btn">Print</button>
     </div>
   </div>
@@ -37,7 +48,7 @@ const badgeBasePath = typeof basePath !== 'undefined' && basePath ? basePath : '
   <% } else { %>
     <div class="member-picker-list">
       <% badges.forEach(function(b) { %>
-        <label class="member-picker-row">
+        <label class="member-picker-row" <% if (isTaskDerived) { %>data-team-id="<%= b.team_id != null ? b.team_id : '' %>" data-semester-id="<%= b.semester_id != null ? b.semester_id : '' %>"<% } %>>
           <input type="checkbox" name="badgeIds" value="<%= b.id %>" />
           <span><%= b.badge_number ? '#' + b.badge_number + ' — ' : '' %><%= b.title || 'Untitled' %></span>
           <% if (b.description) { %><span class="hint"><%= b.description %></span><% } %>
@@ -94,5 +105,36 @@ const badgeBasePath = typeof basePath !== 'undefined' && basePath ? basePath : '
         <button type="submit" class="primary-btn">Import</button>
       </div>
     </form>
+  </dialog>
+<% } %>
+
+<%# Standalone, same as the import dialog above - not nested inside the
+    print form so the Team/Semester <select>s can't accidentally get
+    submitted as part of it (the filter is purely client-side - see
+    design-print-hub.js's own wireMiscBadgeTeamSemesterFilter - and never
+    posts anything of its own). %>
+<% if (isTaskDerived) { %>
+  <dialog id="<%= type %>-badge-filter-dialog" class="member-picker-dialog dialog-label-stack">
+    <h3>Filter <%= label %> Badges</h3>
+    <label>Team
+      <select id="<%= type %>-badge-filter-team">
+        <option value="">All Teams</option>
+        <% (setupTeams || []).forEach(function(t) { %>
+          <option value="<%= t.id %>">[<%= DAY_LABELS[t.day] || t.day %>] <%= t.title %></option>
+        <% }); %>
+      </select>
+    </label>
+    <label>Semester
+      <select id="<%= type %>-badge-filter-semester">
+        <option value="">All Semesters</option>
+        <% (semesters || []).forEach(function(s) { %>
+          <option value="<%= s.id %>"><%= s.title %></option>
+        <% }); %>
+      </select>
+    </label>
+    <div class="notes-dialog-actions">
+      <button type="button" class="btn-secondary" onclick="document.getElementById('<%= type %>-badge-filter-team').value=''; document.getElementById('<%= type %>-badge-filter-semester').value=''; document.getElementById('<%= type %>-badge-filter-team').dispatchEvent(new Event('change'));">Clear</button>
+      <button type="button" class="primary-btn" onclick="this.closest('dialog').close()">Done</button>
+    </div>
   </dialog>
 <% } %>

@@ -195,8 +195,13 @@ test('Setup/Cleanup Assignments', async (t) => {
     assert.equal(afterClearingBoth, undefined, 'clearing the last remaining slot should delete the row');
   });
 
-  await t.test('export.csv includes both suggested-task columns', async () => {
+  // A real request: "add being able to assign a 3rd job on setup/cleanup
+  // assignments" - mirrors the SECOND-slot test just above, slot 3 this time.
+  await t.test('a member can be given a THIRD, independent suggested task without disturbing the first two', async () => {
     const item2 = await db.prepare("SELECT id FROM task_list_items WHERE description = 'Take out trash'").get();
+    const item3 = await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 2)').run(section.lastInsertRowid, 'Vacuum rugs');
+
+    // Re-set slots 1/2 (cleared by the previous test) so all three are live at once.
     await request(app)
       .post(`/admin/setup/monday/assignments/${member.lastInsertRowid}/task`)
       .set('Cookie', cookie)
@@ -207,12 +212,61 @@ test('Setup/Cleanup Assignments', async (t) => {
       .set('Cookie', cookie)
       .type('form')
       .send({ date, slot: '2', taskItemId: String(item2.id), _csrf: csrfToken });
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${member.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date, slot: '3', taskItemId: String(item3.lastInsertRowid), _csrf: csrfToken });
+
+    const row = await db.prepare('SELECT * FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?').get('monday', member.lastInsertRowid, date);
+    assert.equal(row.task_item_id, item.lastInsertRowid, 'slot 1 should be untouched by setting slot 3');
+    assert.equal(row.task_item_id_2, item2.id, 'slot 2 should be untouched by setting slot 3');
+    assert.equal(row.task_item_id_3, item3.lastInsertRowid);
+
+    const page = await request(app).get(`/admin/setup/monday/assignments?date=${date}`).set('Cookie', cookie);
+    assert.match(page.text, /#1 &mdash; Wipe down counters/);
+    assert.match(page.text, /#2 &mdash; Take out trash/);
+    assert.match(page.text, /#3 &mdash; Vacuum rugs/);
+
+    // Clearing slot 3 only nulls that column - the row survives because
+    // slots 1 and 2 still have real suggestions.
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${member.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date, slot: '3', taskItemId: '', _csrf: csrfToken });
+    const afterClearingThree = await db.prepare('SELECT * FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?').get('monday', member.lastInsertRowid, date);
+    assert.ok(afterClearingThree, 'the row should survive - slots 1/2 still have suggestions');
+    assert.equal(afterClearingThree.task_item_id_3, null);
+    assert.equal(afterClearingThree.task_item_id, item.lastInsertRowid);
+    assert.equal(afterClearingThree.task_item_id_2, item2.id);
+  });
+
+  await t.test('export.csv includes all three suggested-task columns', async () => {
+    const item2 = await db.prepare("SELECT id FROM task_list_items WHERE description = 'Take out trash'").get();
+    const item3 = await db.prepare("SELECT id FROM task_list_items WHERE description = 'Vacuum rugs'").get();
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${member.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date, slot: '1', taskItemId: String(item.lastInsertRowid), _csrf: csrfToken });
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${member.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date, slot: '2', taskItemId: String(item2.id), _csrf: csrfToken });
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${member.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date, slot: '3', taskItemId: String(item3.id), _csrf: csrfToken });
 
     const res = await request(app).get(`/admin/setup/monday/assignments/export.csv?date=${date}`).set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, /"Suggested Task 1","Suggested Task 2"/);
+    assert.match(res.text, /"Suggested Task 1","Suggested Task 2","Suggested Task 3"/);
     assert.match(res.text, /Wipe down counters/);
     assert.match(res.text, /Take out trash/);
+    assert.match(res.text, /Vacuum rugs/);
   });
 
   await t.test('removing a date deletes its task assignments too (cascade)', async () => {
@@ -297,6 +351,50 @@ test('Setup/Cleanup Assignments: Assign/Unassign + mutual exclusion (mirrors Flo
     assert.match(aliceSlot2, /Mop/);
   });
 
+  // A real request: "add being able to assign a 3rd job on setup/cleanup
+  // assignments" - slot 3's own dropdown has to respect the exact same
+  // two exclusion rules slot 2's test just above covers: whatever a
+  // DIFFERENT member already holds in ANY of their three slots, and
+  // whatever this SAME member already holds in their own other two slots.
+  await t.test('slot 3\'s own dropdown excludes a different member\'s assignments AND this member\'s own slot 1/slot 2 picks', async () => {
+    const item3 = await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 2)').run(section.lastInsertRowid, 'Dust shelves');
+    const item4 = await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 3)').run(section.lastInsertRowid, 'Sweep porch');
+
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${bob.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date, slot: '1', taskItemId: String(item2.lastInsertRowid), _csrf: csrfToken }); // Mop
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${bob.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date, slot: '2', taskItemId: String(item3.lastInsertRowid), _csrf: csrfToken }); // Dust shelves
+
+    const page = await request(app).get(`/admin/setup/monday/assignments?date=${date}`).set('Cookie', cookie);
+    const bobSlot3 = extractSlotCell(page.text, bob.lastInsertRowid, 3);
+    assert.match(bobSlot3, /<select/);
+    assert.doesNotMatch(bobSlot3, /Vacuum/, 'slot 3 must not offer a task Alice already holds');
+    assert.doesNotMatch(bobSlot3, /Mop/, 'slot 3 must not also offer whatever Bob already holds in his own slot 1');
+    assert.doesNotMatch(bobSlot3, /Dust shelves/, 'slot 3 must not also offer whatever Bob already holds in his own slot 2');
+    assert.match(bobSlot3, /Sweep porch/, 'the one task nobody holds anywhere should still be offered');
+
+    // Restore Bob to unassigned on every slot so the rest of this suite's
+    // own assumptions about who holds what are undisturbed.
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${bob.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date, slot: '1', taskItemId: '', _csrf: csrfToken });
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${bob.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date, slot: '2', taskItemId: '', _csrf: csrfToken });
+    const bobRow = await db.prepare('SELECT * FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?').get('monday', bob.lastInsertRowid, date);
+    assert.equal(bobRow, undefined, 'Bob should be back to fully unassigned');
+  });
+
   await t.test('Unassign frees the slot back up for everyone - the dropdown reappears and offers the task again', async () => {
     const res = await request(app)
       .post(`/admin/setup/monday/assignments/${alice.lastInsertRowid}/task`)
@@ -318,9 +416,9 @@ test('Setup/Cleanup Assignments: Assign/Unassign + mutual exclusion (mirrors Flo
     assert.equal(row, undefined, 'Alice had no other slot set, so Unassign should have deleted the row entirely');
   });
 
-  await t.test('the Task 1/Task 2 column headers replace the old "Suggested Task" labels', async () => {
+  await t.test('the Task 1/Task 2/Task 3 column headers replace the old "Suggested Task" labels', async () => {
     const page = await request(app).get(`/admin/setup/monday/assignments?date=${date}`).set('Cookie', cookie);
-    assert.match(page.text, /<th>Task 1<\/th><th>Task 2<\/th>/);
+    assert.match(page.text, /<th>Task 1<\/th><th>Task 2<\/th><th>Task 3<\/th>/);
     assert.doesNotMatch(page.text, /Suggested Task/);
   });
 

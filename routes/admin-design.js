@@ -14,7 +14,8 @@ const { buildCardPairs } = require('../utils/cardPairs');
 const { formatDateLabel, formatTimestamp } = require('../utils/dates');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
-const { allClassesList, UNASSIGNED_ROOM, HOUR_POSITIONS, listActiveClassDays, CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
+const { allClassesList, UNASSIGNED_ROOM, HOUR_POSITIONS, listActiveClassDays, CLASS_DAY_LABELS_FULL, listSemesters } = require('../utils/classSchedule');
+const { allSetupTeamsEverySemester } = require('../utils/setup');
 const { playgroundHourLabel } = require('../utils/playground');
 const { allItems: allLibraryItems, allLibraryTypes } = require('../utils/library');
 
@@ -157,6 +158,13 @@ router.get('/design', async (req, res) => {
     // it's filtered out of the regular Setup/Cleanup Badges checklist
     // here instead of showing up twice.
     setupCleanupBadges: (await listMiscBadges('setupCleanup')).filter((b) => b.task_item_id != null),
+    // A real request: "filter popup... dropdown to select team and
+    // dropdown to select semester or all" - every team/semester that
+    // could own a setupCleanup badge, not scoped to the currently active
+    // Kiosk semester, so an admin can filter down to a past semester's
+    // badges too.
+    setupTeams: await allSetupTeamsEverySemester(),
+    semesters: await listSemesters(),
     bypassBadge: await getSetupCleanupBypassBadge(),
     customBadges: await listMiscBadges('custom'),
     pendingNameTagRequests,

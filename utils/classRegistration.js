@@ -122,7 +122,13 @@ async function joinClassAsStaff({ classId, member, accountId, portalRoles, role 
   const counts = await staffCountsForClass(classId);
   const slots = role === 'teacher' ? cls.teacher_slots : cls.assistant_slots;
   if (slots != null && counts[role] >= slots) {
-    return { ok: false, error: `That class already has its full ${slots} ${role}(s).` };
+    // A real request confirmed 0 is meant as a real cap (no assistants
+    // wanted at all for that class), not "no limit" - leaving the field
+    // blank is how an admin asks for no limit. But "already has its full
+    // 0" reads like a glitch, so a 0-specific message spells out what
+    // actually happened instead of implying slots filled up.
+    const error = slots === 0 ? `That class isn't accepting any ${role}s.` : `That class already has its full ${slots} ${role}(s).`;
+    return { ok: false, error };
   }
 
   await db.prepare('INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, ?)').run(classId, member.id, role);
