@@ -4761,8 +4761,6 @@ create table if not exists lesson_item_completions (
 );
 create index if not exists idx_lesson_item_completions_student on lesson_item_completions(student_id);
 
-
-
 -- ===== 20261115010000_assignment_submissions.sql =====
 -- A real request: "When creating assignments for classes there should be
 -- a assignment submit option. Where i can add a title, description,
@@ -4865,3 +4863,13 @@ alter table payment_payments add column if not exists adjustment_type text check
 -- Account page (the only place this flag changes anything - it doesn't
 -- block registration/portal access, which was never asked for here).
 alter table members add column if not exists parked boolean not null default false;
+
+-- ===== 20261117010000_lesson_close_date.sql =====
+-- A real request: "add a close date to lesson details." class_assignments
+-- ("Lessons" in the UI - see 20261001010000_lesson_content_and_quizzes.sql's
+-- own comment) already has open_date (a lesson is locked/hidden before it)
+-- and due_date (informational only, shown to students/parents, never
+-- enforced); close_date is the symmetric hard cutoff on the other end - once
+-- past, utils/academics.js's lessonsForStudentView locks the lesson again,
+-- the same way an unopened one already is.
+alter table class_assignments add column if not exists close_date text;

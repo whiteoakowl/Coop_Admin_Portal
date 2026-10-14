@@ -142,3 +142,85 @@ test('A class with two dateless lessons locks the second until the first is full
   const itemTwoPage = await request(app).get(`/student/content/${itemTwo.id}`).set('Cookie', cookie);
   assert.equal(itemTwoPage.status, 200);
 });
+
+// A real request: "Parent/student clicks on an assignment, on the
+// assignment page there should be a next button with arrow to go to the
+// next assignment."
+test('the assignment detail page offers a Next button to the next reachable item, and none once there is nothing left', async () => {
+  const admin = await loginAsAdmin();
+  seedCounter += 1;
+  const className = `Next Button Class ${seedCounter}`;
+  await request(app)
+    .post('/admin/class-schedule/classes/new')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({
+      day: 'monday', className, hourPosition: '1', room: 'Room A', color: '#EE9A4D',
+      startTime: '9:00 AM', endTime: '9:45 AM', allowParentRegister: '1', _csrf: admin.csrfToken,
+    });
+  const cls = await db.prepare('SELECT * FROM classes WHERE class_name = ?').get(className);
+  const manage = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage`).set('Cookie', admin.cookie);
+  const manageCsrf = extractCsrf(manage.text);
+
+  await request(app).post(`/admin/class-schedule/classes/${cls.id}/assignments`).set('Cookie', admin.cookie).type('form').send({ title: 'Next Button Lesson', _csrf: manageCsrf });
+  const lesson = await db.prepare('SELECT * FROM class_assignments WHERE class_id = ?').get(cls.id);
+  await request(app)
+    .post(`/admin/class-schedule/assignments/${lesson.id}/content`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ type: 'video', title: 'First Item', videoUrl: 'https://example.com/first', _csrf: manageCsrf });
+  await request(app)
+    .post(`/admin/class-schedule/assignments/${lesson.id}/content`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ type: 'text', title: 'Second Item', body: 'second item body', _csrf: manageCsrf });
+  const items = await db.prepare('SELECT * FROM lesson_content_items WHERE assignment_id = ? ORDER BY position ASC').all(lesson.id);
+  assert.equal(items.length, 2);
+  const [firstItem, secondItem] = items;
+
+  seedCounter += 1;
+  const familyId = (await db.prepare('INSERT INTO families (name) VALUES (?)').run(`Next Button Family ${seedCounter}`)).lastInsertRowid;
+  const code = await generateMemberCode();
+  const studentInfo = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, active) VALUES (?, ?, ?, 'student', ?, 1)")
+    .run('Next Button Student', code, code, familyId);
+  const studentId = studentInfo.lastInsertRowid;
+  const email = `next-button-${seedCounter}@example.com`;
+  await db
+    .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text())")
+    .run(studentId, email, hashPassword('testpassword123'));
+  const studentRole = await db.prepare("SELECT id FROM roles WHERE key = 'student'").get();
+  const acct = await db.prepare('SELECT id FROM member_accounts WHERE email = ?').get(email);
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(acct.id, studentRole.id);
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(cls.id, studentId);
+  const loginRes = await request(app).post('/login').type('form').send({ email, password: 'testpassword123', next: '/student' });
+  const cookie = loginRes.headers['set-cookie'];
+
+  const firstPage = await request(app).get(`/student/content/${firstItem.id}`).set('Cookie', cookie);
+  assert.equal(firstPage.status, 200);
+  assert.match(firstPage.text, new RegExp(`<a class="primary-btn" href="/student/content/${secondItem.id}">Next`), 'the first item should offer a Next button straight to the second item');
+
+  const secondPage = await request(app).get(`/student/content/${secondItem.id}`).set('Cookie', cookie);
+  assert.equal(secondPage.status, 200);
+  assert.doesNotMatch(secondPage.text, /class="lesson-content-next"/, 'the last item in the class has nowhere left to go, so no Next button at all');
+
+  // Completing the first lesson's only item unlocks the second lesson -
+  // Next on the last item of lesson one should now carry straight into
+  // lesson two's own first item, not stop at the lesson boundary.
+  await request(app).post(`/admin/class-schedule/classes/${cls.id}/assignments`).set('Cookie', admin.cookie).type('form').send({ title: 'Next Button Lesson Two', _csrf: manageCsrf });
+  const lessonTwo = await db.prepare('SELECT * FROM class_assignments WHERE class_id = ? ORDER BY position DESC LIMIT 1').get(cls.id);
+  await request(app)
+    .post(`/admin/class-schedule/assignments/${lessonTwo.id}/content`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ type: 'text', title: 'Lesson Two First Item', body: 'lesson two content', _csrf: manageCsrf });
+  const lessonTwoItem = await db.prepare('SELECT * FROM lesson_content_items WHERE assignment_id = ?').get(lessonTwo.id);
+
+  const firstItemPage = await request(app).get(`/student/content/${firstItem.id}`).set('Cookie', cookie);
+  const completeCsrf = extractCsrf(firstItemPage.text);
+  await request(app).post(`/student/content/${firstItem.id}/complete`).set('Cookie', cookie).type('form').send({ _csrf: completeCsrf });
+  await request(app).post(`/student/content/${secondItem.id}/complete`).set('Cookie', cookie).type('form').send({ _csrf: completeCsrf });
+
+  const secondPageAfter = await request(app).get(`/student/content/${secondItem.id}`).set('Cookie', cookie);
+  assert.match(secondPageAfter.text, new RegExp(`<a class="primary-btn" href="/student/content/${lessonTwoItem.id}">Next`), 'Next should carry on into the newly-unlocked second lesson\'s own first item');
+});

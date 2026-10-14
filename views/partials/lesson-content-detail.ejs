@@ -83,3 +83,15 @@
 <% } else { %>
   <%- include('lesson-item-complete', { item, canTakeQuiz, quizBasePathLocal, quizQueryLocal }) %>
 <% } %>
+
+<%# A real request: "Parent/student clicks on an assignment, on the
+    assignment page there should be a next button with arrow to go to the
+    next assignment." nextItemHref (routes/student-portal.js's/routes/
+    parent-portal.js's own GET /content/:id, via utils/academics.js's
+    nextContentItemAfter) is null once there's nothing left reachable to
+    go to - the next lesson not being open yet, or this already being the
+    last item overall - so the button only ever shows when there's
+    somewhere real to go. %>
+<% if (typeof nextItemHref !== 'undefined' && nextItemHref) { %>
+  <p class="lesson-content-next"><a class="primary-btn" href="<%= nextItemHref %>">Next <svg class="icon"><use href="#icon-arrow-right"/></svg></a></p>
+<% } %>

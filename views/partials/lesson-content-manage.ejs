@@ -17,6 +17,14 @@
     <label>Open Date
       <input type="date" name="openDate" value="<%= assignment.open_date || '' %>" />
     </label>
+    <%# A real request: "add a close date to lesson details." Open Date
+        already locks the lesson before it; Close Date is the symmetric
+        hard cutoff on the other end - once past, the lesson locks again
+        the same way (utils/academics.js's lessonsForStudentView), unlike
+        each content item's own Due Date above (informational only). %>
+    <label>Close Date <span class="hint">(optional)</span>
+      <input type="date" name="closeDate" value="<%= assignment.close_date || '' %>" />
+    </label>
     <div class="member-form-full">
       <button type="submit" class="primary-btn">Save Lesson Details</button>
     </div>
@@ -31,6 +39,12 @@
       below). %>
   <div class="grid-box-header">
     <h2>Assignments (<%= contentItems.length %>)</h2>
+    <%# A real request: "Add assignments should be a button and then pop
+        up to create the assignment" - replaces the old always-visible
+        inline "Add Assignments" card at the bottom of this section, same
+        pattern views/admin-class-schedule-manage.ejs's own "+ New
+        Lesson" button/dialog already established. %>
+    <button type="button" class="roster-action-btn" onclick="document.getElementById('add-content-dialog').showModal()">+ Add Assignments</button>
   </div>
   <% if (contentItems.length === 0) { %>
     <p class="roster-empty">No assignments added yet.</p>
@@ -185,9 +199,9 @@
     <% }); %>
   <% } %>
 
-  <div class="portal-dashboard-card portal-dashboard-card-wide">
-    <h3>Add Assignments</h3>
+  <dialog id="add-content-dialog" class="member-picker-dialog dialog-label-stack">
     <form method="POST" action="<%= basePath %>/assignments/<%= assignment.id %>/content" enctype="multipart/form-data" class="member-form-grid" data-toggle-form>
+      <h3>Add Assignments</h3>
       <label class="member-form-full">Type
         <select name="type" data-toggle-select>
           <option value="video">Link to Video</option>
@@ -272,11 +286,12 @@
       <label class="member-form-full" data-toggle-field="assignment_submission" style="display: none;">Points Possible
         <input type="number" name="submissionPointsPossible" min="0" />
       </label>
-      <div class="member-form-full">
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
         <button type="submit" class="primary-btn">Add Assignments</button>
       </div>
     </form>
-  </div>
+  </dialog>
 </div>
 <script src="/js/lesson-drag-reorder.js"></script>
 <script src="/js/lesson-content-form.js"></script>

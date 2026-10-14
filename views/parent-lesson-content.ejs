@@ -9,7 +9,7 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <p class="subtitle"><a href="/parent/classes/dashboard/<%= cls.id %>?tab=lessons&<%= viewerQuery %>">&larr; <%= cls.class_name %> Lessons</a></p>
     <% if (selectedChild) { %><p class="hint">Completing for <strong><%= selectedChild.name %></strong></p><% } %>
-    <%- include('partials/lesson-content-detail', { lesson, item, canTakeQuiz, quizBasePathLocal: '/parent', quizQueryLocal: `?${viewerQuery}` }) %>
+    <%- include('partials/lesson-content-detail', { lesson, item, canTakeQuiz, quizBasePathLocal: '/parent', quizQueryLocal: `?${viewerQuery}`, nextItemHref }) %>
   </main>
 </body>
 </html>

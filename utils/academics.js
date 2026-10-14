@@ -22,22 +22,22 @@ async function getAssignment(id) {
   return db.prepare('SELECT * FROM class_assignments WHERE id = ?').get(id);
 }
 
-async function createAssignment({ classId, className, title, description, dueDate, openDate, pointsPossible, createdByAccountId }) {
+async function createAssignment({ classId, className, title, description, dueDate, openDate, closeDate, pointsPossible, createdByAccountId }) {
   const { next_position: nextPosition } = await db
     .prepare('SELECT COALESCE(MAX(position), 0) + 1 AS next_position FROM class_assignments WHERE class_id = ?')
     .get(classId);
   const info = await db
     .prepare(
-      'INSERT INTO class_assignments (class_id, class_name, title, description, due_date, open_date, points_possible, position, created_by_account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO class_assignments (class_id, class_name, title, description, due_date, open_date, close_date, points_possible, position, created_by_account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )
-    .run(classId, className, title, description || null, dueDate || null, openDate || null, pointsPossible || null, nextPosition, createdByAccountId);
+    .run(classId, className, title, description || null, dueDate || null, openDate || null, closeDate || null, pointsPossible || null, nextPosition, createdByAccountId);
   return info.lastInsertRowid;
 }
 
-async function updateAssignment(id, { title, description, dueDate, openDate, pointsPossible }) {
+async function updateAssignment(id, { title, description, dueDate, openDate, closeDate, pointsPossible }) {
   await db
-    .prepare('UPDATE class_assignments SET title = ?, description = ?, due_date = ?, open_date = ?, points_possible = ? WHERE id = ?')
-    .run(title, description || null, dueDate || null, openDate || null, pointsPossible || null, id);
+    .prepare('UPDATE class_assignments SET title = ?, description = ?, due_date = ?, open_date = ?, close_date = ?, points_possible = ? WHERE id = ?')
+    .run(title, description || null, dueDate || null, openDate || null, closeDate || null, pointsPossible || null, id);
 }
 
 // A real bug report: "there is no manage or trash button at the end of
@@ -613,7 +613,19 @@ async function lessonsForStudentView(classId, studentId) {
   const today = todayISO();
   const lessons = await Promise.all(
     assignments.map(async (a) => {
-      const isOpen = !a.open_date || a.open_date <= today;
+      // A real request: "add a close date to lesson details" - the
+      // symmetric hard cutoff to open_date's own gate: once past
+      // close_date, a lesson locks again exactly like one that hasn't
+      // opened yet (isLessonLockedForStudent below reuses this same
+      // isOpen for the content-item routes' own "no bypassing via a
+      // direct URL" check too). isClosed is tracked separately from
+      // isOpen so a closed-but-never-finished lesson doesn't also
+      // permanently block every later lesson in the sequencing gate
+      // below - there's no way for the student to still complete it, so
+      // (unlike one that just hasn't opened yet) it's treated the same
+      // as a no-content lesson there: satisfied, not blocking.
+      const isPastClose = !!(a.close_date && a.close_date < today);
+      const isOpen = (!a.open_date || a.open_date <= today) && !isPastClose;
       const contentItems = isOpen ? await contentItemsForAssignment(a.id, { includeAnswerKey: false }) : [];
       // A real request: "Due dates should be on the assignments, not on
       // the lesson" - each content item ("assignment" in the Parent/
@@ -642,7 +654,7 @@ async function lessonsForStudentView(classId, studentId) {
         })
       );
       const completedCount = withAttempts.filter((item) => item.completed).length;
-      return { ...a, isOpen, contentItems: withAttempts, completedCount, totalCount: withAttempts.length };
+      return { ...a, isOpen, isPastClose, contentItems: withAttempts, completedCount, totalCount: withAttempts.length };
     })
   );
   // A real request: "If no dates are added, it still won't let you go to
@@ -660,7 +672,7 @@ async function lessonsForStudentView(classId, studentId) {
   let previousComplete = true;
   return lessons.map((lesson) => {
     const locked = !lesson.isOpen || !previousComplete;
-    previousComplete = lesson.isOpen && (lesson.totalCount === 0 || lesson.completedCount === lesson.totalCount);
+    previousComplete = lesson.isPastClose || (lesson.isOpen && (lesson.totalCount === 0 || lesson.completedCount === lesson.totalCount));
     return { ...lesson, locked };
   });
 }
@@ -675,6 +687,26 @@ async function isLessonLockedForStudent(classId, studentId, assignmentId) {
   const lessons = await lessonsForStudentView(classId, studentId);
   const lesson = lessons.find((l) => l.id === assignmentId);
   return !lesson || lesson.locked;
+}
+
+// A real request: "Parent/student clicks on an assignment, on the
+// assignment page there should be a next button with arrow to go to the
+// next assignment." `lessons` is the same lessonsForStudentView() result
+// the calling route already has in hand (every open, unlocked lesson's
+// own contentItems, in lesson order then each lesson's own drag-reordered
+// position) - flattened into one continuous sequence so "next" carries
+// on into the next lesson once the current one's items run out, same as
+// working through a course front to back. A locked lesson contributes no
+// items at all (lessonsForStudentView already leaves contentItems empty
+// for one that isn't open), so this naturally stops offering "next" right
+// at the edge of what's actually reachable, never a dead link into
+// something still locked.
+function nextContentItemAfter(lessons, currentItemId) {
+  const flattened = lessons.flatMap((lesson) => lesson.contentItems);
+  const index = flattened.findIndex((item) => item.id === currentItemId);
+  if (index === -1 || index === flattened.length - 1) return null;
+  const next = flattened[index + 1];
+  return { id: next.id, type: next.type, title: next.title };
 }
 
 // A real request: "On lesson list show percentage of how many people in
@@ -775,4 +807,5 @@ module.exports = {
   scoreAnswer,
   lessonsForStudentView,
   isLessonLockedForStudent,
+  nextContentItemAfter,
 };

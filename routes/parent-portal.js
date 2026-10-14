@@ -54,6 +54,7 @@ const {
   transcriptForStudent,
   lessonsForStudentView,
   isLessonLockedForStudent,
+  nextContentItemAfter,
   getContentItem,
   getQuizAttempt,
   submitQuizAttempt,
@@ -922,7 +923,9 @@ router.get('/content/:id', async (req, res) => {
   if (lesson.locked) return res.status(404).render('404', { title: 'Not Found' });
   // Same quiz redirect as routes/student-portal.js's own GET /content/:id.
   if (item.type === 'quiz') return res.redirect(`/parent/content/${item.id}/quiz?${viewerQuery}`);
-  res.render('parent-lesson-content', { title: item.title || 'Assignment', cls, lesson, item, selectedChild, viewerQuery, canTakeQuiz });
+  const nextItem = nextContentItemAfter(lessons, item.id);
+  const nextItemHref = nextItem ? `/parent/content/${nextItem.id}${nextItem.type === 'quiz' ? '/quiz' : ''}?${viewerQuery}` : null;
+  res.render('parent-lesson-content', { title: item.title || 'Assignment', cls, lesson, item, selectedChild, viewerQuery, canTakeQuiz, nextItem, nextItemHref });
 });
 
 // A real request: "allow parents to complete lessons for student...

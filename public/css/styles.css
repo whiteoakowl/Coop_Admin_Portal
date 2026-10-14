@@ -10117,6 +10117,10 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
 .lesson-item-bar-title-group .lesson-complete-badge { width: 1.3rem; height: 1.3rem; }
 .lesson-item-bar-title-group .lesson-complete-badge .icon { width: 0.8rem; height: 0.8rem; }
 .lesson-item-complete { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; flex-shrink: 0; }
+/* A real request: "on the assignment page there should be a next button
+   with arrow to go to the next assignment." */
+.lesson-content-next { margin-top: 1.5rem; }
+.lesson-content-next .icon { width: 1rem; height: 1rem; vertical-align: -0.15em; }
 /* A real request: "Marking complete on an assignment shouldn't be an
    orange button. It should be a green check mark circle that you can
    click to mark complete and it will say complete very small under the

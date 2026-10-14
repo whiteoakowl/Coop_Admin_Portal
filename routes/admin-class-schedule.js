@@ -579,6 +579,7 @@ router.post('/class-schedule/assignments/:id/edit', requireFullAdmin, async (req
     description: (req.body.description || '').trim(),
     dueDate: req.body.dueDate || null,
     openDate: req.body.openDate || null,
+    closeDate: req.body.closeDate || null,
     pointsPossible: req.body.pointsPossible ? parseInt(req.body.pointsPossible, 10) : null,
   });
   res.redirect(back + '?notice=' + encodeURIComponent('Lesson details saved.'));

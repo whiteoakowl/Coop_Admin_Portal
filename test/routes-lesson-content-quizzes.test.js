@@ -309,6 +309,114 @@ test('A lesson gated by a future open date hides its content on the Lessons tab'
   assert.match(lessonsTab.text, /Opens 2099-01-01/);
 });
 
+// A real request: "add a close date to lesson details."
+test('A lesson past its close date hides its content again, like one that hasn\'t opened yet', async () => {
+  const admin = await loginAsAdmin();
+  const teacher = await createClassAndTeacher('lesson-close-gate-teacher@example.com');
+  const student = await enrollStudent(teacher.classId, 'lesson-close-gate-student@example.com');
+
+  await request(app)
+    .post(`/admin/class-schedule/classes/${teacher.classId}/assignments`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: admin.csrfToken, title: 'Closed Lesson' });
+  const assignmentId = (await db.prepare('SELECT id FROM class_assignments WHERE class_id = ?').get(teacher.classId)).id;
+  await request(app)
+    .post(`/admin/class-schedule/assignments/${assignmentId}/content`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: admin.csrfToken, type: 'text', title: 'Should Be Hidden After Close', body: 'closed content' });
+
+  // The Lesson Details form (shared with Teacher Portal) saves closeDate.
+  const detailPage = await request(app).get(`/admin/class-schedule/assignments/${assignmentId}`).set('Cookie', admin.cookie);
+  const detailCsrf = extractCsrf(detailPage.text);
+  await request(app)
+    .post(`/admin/class-schedule/assignments/${assignmentId}/edit`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Closed Lesson', closeDate: '2020-01-01', _csrf: detailCsrf });
+
+  const saved = await db.prepare('SELECT close_date FROM class_assignments WHERE id = ?').get(assignmentId);
+  assert.equal(saved.close_date, '2020-01-01');
+
+  const lessonsTab = await request(app).get(`/student/classes/${teacher.classId}?tab=lessons`).set('Cookie', student.cookie);
+  assert.equal(lessonsTab.status, 200);
+  assert.doesNotMatch(lessonsTab.text, /closed content/);
+  assert.match(lessonsTab.text, /Closed 2020-01-01/);
+
+  const itemId = (await db.prepare('SELECT id FROM lesson_content_items WHERE assignment_id = ?').get(assignmentId)).id;
+  const blockedGet = await request(app).get(`/student/content/${itemId}`).set('Cookie', student.cookie);
+  assert.equal(blockedGet.status, 404);
+});
+
+test('A closed-but-never-finished lesson does not permanently block the next lesson in sequence', async () => {
+  const admin = await loginAsAdmin();
+  const teacher = await createClassAndTeacher('lesson-close-sequence-teacher@example.com');
+  const student = await enrollStudent(teacher.classId, 'lesson-close-sequence-student@example.com');
+
+  await request(app)
+    .post(`/admin/class-schedule/classes/${teacher.classId}/assignments`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: admin.csrfToken, title: 'Expired First Lesson' });
+  const firstId = (await db.prepare('SELECT id FROM class_assignments WHERE class_id = ? ORDER BY position ASC LIMIT 1').get(teacher.classId)).id;
+  await request(app)
+    .post(`/admin/class-schedule/assignments/${firstId}/content`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: admin.csrfToken, type: 'text', title: 'Never Completed', body: 'never completed' });
+  const firstDetail = await request(app).get(`/admin/class-schedule/assignments/${firstId}`).set('Cookie', admin.cookie);
+  await request(app)
+    .post(`/admin/class-schedule/assignments/${firstId}/edit`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Expired First Lesson', closeDate: '2020-01-01', _csrf: extractCsrf(firstDetail.text) });
+
+  await request(app)
+    .post(`/admin/class-schedule/classes/${teacher.classId}/assignments`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: admin.csrfToken, title: 'Still Reachable Second Lesson' });
+  const secondId = (await db.prepare('SELECT id FROM class_assignments WHERE class_id = ? ORDER BY position DESC LIMIT 1').get(teacher.classId)).id;
+  await request(app)
+    .post(`/admin/class-schedule/assignments/${secondId}/content`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: admin.csrfToken, type: 'text', title: 'Reachable Content', body: 'reachable' });
+  const secondItemId = (await db.prepare('SELECT id FROM lesson_content_items WHERE assignment_id = ?').get(secondId)).id;
+
+  const lessonsTab = await request(app).get(`/student/classes/${teacher.classId}?tab=lessons`).set('Cookie', student.cookie);
+  assert.match(lessonsTab.text, new RegExp(`href="/student/content/${secondItemId}"`), 'the second lesson should still be reachable even though the first closed unfinished');
+
+  const secondItemPage = await request(app).get(`/student/content/${secondItemId}`).set('Cookie', student.cookie);
+  assert.equal(secondItemPage.status, 200);
+});
+
+// A real request: "Add assignments should be a button and then pop up to
+// create the assignment." Shared partials/lesson-content-manage.ejs, so
+// one test per portal covers both the Co-op Admin and Teacher Portal
+// lesson detail pages.
+test('the "Add Assignments" form is a button + popup dialog, not an always-visible inline card, on both Co-op Admin and Teacher Portal', async () => {
+  const admin = await loginAsAdmin();
+  const teacher = await createClassAndTeacher('lesson-add-assignments-dialog-teacher@example.com');
+
+  await request(app)
+    .post(`/admin/class-schedule/classes/${teacher.classId}/assignments`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: admin.csrfToken, title: 'Add Assignments Dialog Lesson' });
+  const assignmentId = (await db.prepare('SELECT id FROM class_assignments WHERE class_id = ?').get(teacher.classId)).id;
+
+  const adminPage = await request(app).get(`/admin/class-schedule/assignments/${assignmentId}`).set('Cookie', admin.cookie);
+  assert.match(adminPage.text, /<button type="button" class="roster-action-btn" onclick="document\.getElementById\('add-content-dialog'\)\.showModal\(\)">\+ Add Assignments<\/button>/);
+  assert.match(adminPage.text, /<dialog id="add-content-dialog"/);
+  assert.doesNotMatch(adminPage.text, /<div class="portal-dashboard-card portal-dashboard-card-wide">\s*<h3>Add Assignments<\/h3>/, 'the old always-visible inline card should be gone');
+
+  const teacherPage = await request(app).get(`/teacher/assignments/${assignmentId}`).set('Cookie', teacher.cookie);
+  assert.match(teacherPage.text, /<button type="button" class="roster-action-btn" onclick="document\.getElementById\('add-content-dialog'\)\.showModal\(\)">\+ Add Assignments<\/button>/);
+  assert.match(teacherPage.text, /<dialog id="add-content-dialog"/);
+});
+
 test('Teacher Portal: a teacher cannot manage lesson content on a class they do not teach', async () => {
   const admin = await loginAsAdmin();
   const outsiderTeacher = await createClassAndTeacher('lesson-outsider-teacher@example.com');

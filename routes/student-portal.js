@@ -26,6 +26,7 @@ const {
   transcriptForStudent,
   lessonsForStudentView,
   isLessonLockedForStudent,
+  nextContentItemAfter,
   getContentItem,
   getQuizAttempt,
   submitQuizAttempt,
@@ -341,7 +342,9 @@ router.get('/content/:id', async (req, res) => {
   // quiz branch for (reachable only by typing the URL directly; every
   // real link to a quiz item already points straight at it).
   if (item.type === 'quiz') return res.redirect(`/student/content/${item.id}/quiz`);
-  res.render('student-lesson-content', { title: item.title || 'Assignment', cls, lesson, item });
+  const nextItem = nextContentItemAfter(lessons, item.id);
+  const nextItemHref = nextItem ? `/student/content/${nextItem.id}${nextItem.type === 'quiz' ? '/quiz' : ''}` : null;
+  res.render('student-lesson-content', { title: item.title || 'Assignment', cls, lesson, item, nextItem, nextItemHref });
 });
 
 // Quiz-taking - student-only, per the confirmed access model (a parent

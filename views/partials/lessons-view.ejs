@@ -49,7 +49,9 @@
                 shortening it, so a locked lesson just falls through to
                 the ordinary count/No-content badge below like any other
                 lesson. %>
-            <% if (!lesson.isOpen) { %>
+            <% if (lesson.isPastClose) { %>
+              <span class="hint">Closed <%= lesson.close_date %></span>
+            <% } else if (!lesson.isOpen) { %>
               <span class="hint">Opens <%= lesson.open_date %></span>
             <% } else if (lesson.totalCount === 0) { %>
               <span class="hint">No content</span>
