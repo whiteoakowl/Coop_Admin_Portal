@@ -17,18 +17,20 @@
       <% if (contacts.length === 0) { %>
         <p class="hint">No leadership contacts yet.</p>
       <% } else { %>
-        <table class="roster-table">
-          <thead><tr><th>Role</th><th>Name</th><th>Email</th></tr></thead>
-          <tbody>
-            <% contacts.forEach(function(c) { %>
-              <tr>
-                <td><%= c.role %></td>
-                <td><%= c.name || '—' %></td>
-                <td><% if (c.email) { %><a href="mailto:<%= c.email %>"><%= c.email %></a><% } else { %>—<% } %></td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
+        <div class="roster-scroll">
+          <table class="roster-table">
+            <thead><tr><th>Role</th><th>Name</th><th>Email</th></tr></thead>
+            <tbody>
+              <% contacts.forEach(function(c) { %>
+                <tr>
+                  <td><%= c.role %></td>
+                  <td><%= c.name || '—' %></td>
+                  <td><% if (c.email) { %><a href="mailto:<%= c.email %>"><%= c.email %></a><% } else { %>—<% } %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
       <% } %>
     </div>
 

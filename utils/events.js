@@ -375,6 +375,12 @@ async function createFiscalYear(startDate, endDate) {
   await db.prepare('INSERT INTO fiscal_years (start_date, end_date) VALUES (?, ?)').run(startDate, endDate);
 }
 
+// A real request: "there should be an edit button on categories and
+// fiscal year lines" - fiscal years only had add/delete before this.
+async function updateFiscalYear(id, startDate, endDate) {
+  await db.prepare('UPDATE fiscal_years SET start_date = ?, end_date = ? WHERE id = ?').run(startDate, endDate, id);
+}
+
 async function deleteFiscalYear(id) {
   await db.prepare('DELETE FROM fiscal_years WHERE id = ?').run(id);
 }
@@ -2035,6 +2041,7 @@ module.exports = {
   deleteAccountingCategory,
   listFiscalYears,
   createFiscalYear,
+  updateFiscalYear,
   deleteFiscalYear,
   EXTRA_FIELD_TYPES,
   addExtraField,

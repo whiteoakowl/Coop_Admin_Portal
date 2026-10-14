@@ -34,10 +34,15 @@ test.after(() => {
 });
 
 let classCounter = 0;
-async function makeClass(name) {
+async function makeClass(name, opts) {
   classCounter += 1;
+  const day = (opts && opts.day) || 'monday';
+  const hourPosition = (opts && opts.hourPosition) || 1;
+  const semesterId = opts && opts.semesterId != null ? opts.semesterId : null;
   return (
-    await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, ?) RETURNING id").get(name || `Teacher Nav Class ${classCounter}`)
+    await db
+      .prepare('INSERT INTO classes (day, hour_position, class_name, semester_id) VALUES (?, ?, ?, ?) RETURNING id')
+      .get(day, hourPosition, name || `Teacher Nav Class ${classCounter}`, semesterId)
   ).id;
 }
 
@@ -63,15 +68,75 @@ async function loginTeacher(classIds) {
   return loginRes.headers['set-cookie'];
 }
 
-test('Teacher Portal nav: "Classes" is renamed "Co-op Classes" with Classroom Dashboard + Absence/Late Form subpages', async () => {
+test('Teacher Portal nav: "Classes" is renamed "Class Schedule", with no subpages', async () => {
   const classId = await makeClass();
   const cookie = await loginTeacher([classId]);
   const page = await request(app).get('/teacher').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.doesNotMatch(page.text, />Classes<\/a>/, 'the old plain "Classes" label should be gone');
-  assert.match(page.text, />Co-op Classes/);
-  assert.match(page.text, /<a href="\/teacher\/classes">Classroom Dashboard<\/a>/);
-  assert.match(page.text, /<a href="\/absence">Absence\/Late Form<\/a>/);
+  assert.doesNotMatch(page.text, />Co-op Classes/, 'the old "Co-op Classes" label should be gone');
+  assert.match(page.text, /<a href="\/teacher\/classes">[\s\S]*?Class Schedule<\/a>/);
+});
+
+test('Teacher Portal Class Schedule tab: shows a day-by-day table of the classes this teacher teaches, no subpages', async () => {
+  const classId = await makeClass('Schedule Tab Class');
+  const cookie = await loginTeacher([classId]);
+  const page = await request(app).get('/teacher/classes').set('Cookie', cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<h1>Class Schedule<\/h1>/);
+  assert.match(page.text, /Schedule Tab Class/);
+  assert.doesNotMatch(page.text, /View Roster/, 'the old per-class card grid should be gone');
+});
+
+test('Teacher Portal Class Schedule tab: has a Semester dropdown, a Print button, and List/Calendar view icons', async () => {
+  const fall = (await db.prepare("INSERT INTO semesters (title) VALUES ('Fall Nav Test') RETURNING id").get()).id;
+  const spring = (await db.prepare("INSERT INTO semesters (title) VALUES ('Spring Nav Test') RETURNING id").get()).id;
+  const fallClass = await makeClass('Fall Semester Class', { semesterId: fall });
+  const springClass = await makeClass('Spring Semester Class', { day: 'wednesday', hourPosition: 2, semesterId: spring });
+  const cookie = await loginTeacher([fallClass, springClass]);
+
+  const allPage = await request(app).get('/teacher/classes').set('Cookie', cookie);
+  assert.equal(allPage.status, 200);
+  assert.match(allPage.text, /Semester/);
+  assert.match(allPage.text, /Fall Semester Class/);
+  assert.match(allPage.text, /Spring Semester Class/);
+  assert.match(allPage.text, /Print/);
+  assert.match(allPage.text, /aria-label="List view"/);
+  assert.match(allPage.text, /aria-label="Calendar view"/);
+
+  // The sidebar's own "My Classes" section (populated independently of
+  // this page's semester filter) always lists both classes, so scope this
+  // check to the schedule table's own day headings rather than the whole
+  // page: Fall's class meets Monday, Spring's meets Wednesday.
+  const fallOnly = await request(app).get(`/teacher/classes?semesterId=${fall}`).set('Cookie', cookie);
+  assert.match(fallOnly.text, /<h2>Monday<\/h2>/);
+  assert.doesNotMatch(fallOnly.text, /<h2>Wednesday<\/h2>/, 'picking one semester should hide classes from another');
+
+  const calendarView = await request(app).get('/teacher/classes?view=calendar').set('Cookie', cookie);
+  assert.equal(calendarView.status, 200);
+  assert.match(calendarView.text, /class-schedule-room-grid/);
+  assert.match(calendarView.text, /Fall Semester Class/);
+  assert.match(calendarView.text, /Spring Semester Class/);
+});
+
+test('Teacher Portal Class Schedule tab: Calendar view shows the entire co-op schedule grid for the semester, not just this teacher\'s own classes', async () => {
+  const fall = (await db.prepare("INSERT INTO semesters (title) VALUES ('Fall Grid Test') RETURNING id").get()).id;
+  const spring = (await db.prepare("INSERT INTO semesters (title) VALUES ('Spring Grid Test') RETURNING id").get()).id;
+  const myClass = await makeClass('My Own Grid Class', { day: 'monday', hourPosition: 1, semesterId: fall });
+  const otherTeacherClass = await makeClass('Someone Elses Grid Class', { day: 'monday', hourPosition: 2, semesterId: fall });
+  const springOnlyClass = await makeClass('Spring Only Grid Class', { day: 'monday', hourPosition: 3, semesterId: spring });
+  const cookie = await loginTeacher([myClass]);
+
+  const allSemesters = await request(app).get('/teacher/classes?view=calendar').set('Cookie', cookie);
+  assert.equal(allSemesters.status, 200);
+  assert.match(allSemesters.text, /My Own Grid Class/);
+  assert.match(allSemesters.text, /Someone Elses Grid Class/, 'the grid should show every class in the co-op, not just this teacher\'s own');
+  assert.match(allSemesters.text, /Spring Only Grid Class/, '"All Semesters" should include every semester\'s classes');
+
+  const fallOnly = await request(app).get(`/teacher/classes?view=calendar&semesterId=${fall}`).set('Cookie', cookie);
+  assert.equal(fallOnly.status, 200);
+  assert.match(fallOnly.text, /Someone Elses Grid Class/);
+  assert.doesNotMatch(fallOnly.text, /Spring Only Grid Class/, 'the semester dropdown should scope the whole-co-op grid too');
 });
 
 test('Teacher Portal nav: a "My Classes" section lists one entry per class this teacher actually teaches', async () => {
@@ -101,6 +166,6 @@ test('Teacher Portal nav: every page carries the same centralized nav, not a per
   for (const url of ['/teacher', '/teacher/classes', '/teacher/attendance', '/teacher/assignments']) {
     const res = await request(app).get(url).set('Cookie', cookie);
     assert.equal(res.status, 200, `expected ${url} to render`);
-    assert.match(res.text, />Co-op Classes/, `expected ${url} to show the renamed Co-op Classes tab`);
+    assert.match(res.text, />Class Schedule/, `expected ${url} to show the renamed Class Schedule tab`);
   }
 });

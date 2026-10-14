@@ -22,23 +22,24 @@ router.get('/checkout', (req, res) => {
 
 // Records this member's checkout across every roster they're scheduled on
 // today - taskItemId is null for students (who never scan one) and for a
-// parent whose scanned task barcode wasn't recognized. taskItemId2 (a
-// real request: "after parent scans their setup/cleanup badge it should
-// ask if they have a 2nd setup/cleanup badge to scan") is null unless a
-// second badge was scanned - see /checkout/task-scan-2 below - or
-// carried over from an already-logged check-in-time scan (see
-// /checkout/scan's alreadyLogged branch).
-async function recordCheckout(member, rosters, today, taskItemId, taskItemId2) {
+// parent whose scanned task barcode wasn't recognized. taskItemId2/
+// taskItemId3 (a real request: "after parent scans their setup/cleanup
+// badge it should ask if they have a 2nd setup/cleanup badge to scan" -
+// later extended: "add asking if you did a 3rd job") are null unless a
+// second/third badge was scanned - see /checkout/task-scan-2 and
+// /checkout/task-scan-3 below - or carried over from an already-logged
+// check-in-time scan (see /checkout/scan's alreadyLogged branch).
+async function recordCheckout(member, rosters, today, taskItemId, taskItemId2, taskItemId3) {
   const upsert = db.prepare(
-    `INSERT INTO checkouts (member_id, roster_id, session_date, task_item_id, task_item_id_2, check_out_time)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO checkouts (member_id, roster_id, session_date, task_item_id, task_item_id_2, task_item_id_3, check_out_time)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(member_id, roster_id, session_date)
-     DO UPDATE SET task_item_id = excluded.task_item_id, task_item_id_2 = excluded.task_item_id_2, check_out_time = excluded.check_out_time, recorded_at = now_text()`
+     DO UPDATE SET task_item_id = excluded.task_item_id, task_item_id_2 = excluded.task_item_id_2, task_item_id_3 = excluded.task_item_id_3, check_out_time = excluded.check_out_time, recorded_at = now_text()`
   );
   const now = Date.now();
   // Each roster gets its own row (member_id, roster_id, session_date) -
   // writes are independent of one another, so run them concurrently.
-  await Promise.all(rosters.map((roster) => upsert.run(member.id, roster.id, today, taskItemId, taskItemId2 || null, now)));
+  await Promise.all(rosters.map((roster) => upsert.run(member.id, roster.id, today, taskItemId, taskItemId2 || null, taskItemId3 || null, now)));
 }
 
 // Step 1: scan the member's own name tag. Students are checked out
@@ -123,10 +124,10 @@ router.post('/checkout/scan', async (req, res) => {
   // findSetupCleanupBypassBadge's own comment), which must still count
   // as logged.
   const alreadyLogged = await db
-    .prepare('SELECT task_item_id, task_item_id_2 FROM attendance WHERE member_id = ? AND session_date = ? AND task_scanned_at IS NOT NULL LIMIT 1')
+    .prepare('SELECT task_item_id, task_item_id_2, task_item_id_3 FROM attendance WHERE member_id = ? AND session_date = ? AND task_scanned_at IS NOT NULL LIMIT 1')
     .get(member.id, today);
   if (alreadyLogged) {
-    await recordCheckout(member, rosters, today, alreadyLogged.task_item_id, alreadyLogged.task_item_id_2);
+    await recordCheckout(member, rosters, today, alreadyLogged.task_item_id, alreadyLogged.task_item_id_2, alreadyLogged.task_item_id_3);
     return res.json({ ok: true, memberType: 'parent-already-logged', name: member.name, message: `Thank you for checking out, ${member.name}! Have a great day!` });
   }
 
@@ -250,6 +251,53 @@ router.post('/checkout/task-scan-2', async (req, res) => {
   // Independent per-roster writes (different roster_id each time) - run
   // concurrently instead of one at a time.
   await Promise.all(rosters.map((r) => update.run(taskItemId2, member.id, r.id, today)));
+
+  // A real request: "also, add asking if you did a 3rd job" - same
+  // needsSecondBadgeChoice idea as /checkout/task-scan above, one slot
+  // further.
+  res.json({ ok: true, name: member.name, needsThirdBadgeChoice: true, message: `Thank you for checking out, ${member.name}! Have a great day!` });
+});
+
+// Step 4 (optional): a parent covering three Setup/Cleanup jobs the same
+// day scans a third badge after answering "Yes" to the step-3 prompt
+// above. Mirrors /checkout/task-scan-2 exactly, writing onto the 3rd slot.
+router.post('/checkout/task-scan-3', async (req, res) => {
+  if (checkoutLimiter.isLimited(req.ip)) {
+    return res.json({ ok: false, message: 'Too many check-outs from this device right now. Please wait a moment and try again.' });
+  }
+  checkoutLimiter.recordAttempt(req.ip);
+
+  const memberId = parseInt(req.body.memberId, 10);
+  const barcode = (req.body.barcode || '').trim();
+  const today = todayISO();
+
+  if (!barcode) {
+    return res.json({ ok: false, message: 'No barcode scanned.' });
+  }
+
+  const member = await db.prepare('SELECT * FROM members WHERE id = ? AND active = 1').get(memberId);
+  if (!member) {
+    return res.json({ ok: false, message: 'Member not found.' });
+  }
+
+  const task = await findTaskItemByBarcode(barcode);
+  const bypass = task ? null : await findSetupCleanupBypassBadge(barcode);
+  if (!task && !bypass) {
+    return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
+  }
+
+  if (task && (await taskAlreadyLoggedByAnotherMember(task.id, today, member.id))) {
+    return res.json({ ok: false, message: `"${task.description}" has already been logged today. Please scan a different Setup/Cleanup badge.` });
+  }
+
+  const rosters = (await getMemberRostersForDate(member.id, today)).filter((r) => r.category !== 'Class Roster');
+  if (rosters.length === 0) {
+    return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
+  }
+
+  const taskItemId3 = task ? task.id : null;
+  const update = db.prepare('UPDATE checkouts SET task_item_id_3 = ? WHERE member_id = ? AND roster_id = ? AND session_date = ?');
+  await Promise.all(rosters.map((r) => update.run(taskItemId3, member.id, r.id, today)));
 
   res.json({ ok: true, name: member.name, message: `Thank you for checking out, ${member.name}! Have a great day!` });
 });

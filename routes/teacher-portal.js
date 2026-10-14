@@ -11,7 +11,8 @@ const path = require('path');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
-const { allClassesList } = require('../utils/classSchedule');
+const { allClassesList, listSemesters, roomGridForDay, listActiveClassDays } = require('../utils/classSchedule');
+const { CLASS_DAY_ORDER, CLASS_DAY_LABELS_FULL } = require('../utils/classDays');
 const {
   assignmentsForClass,
   getAssignment,
@@ -47,12 +48,16 @@ router.use(requirePortalAuth, requirePortal('teacher'));
 // re-derived from class_staff on every request rather than trusted from
 // the request, the same "never trust a class id belongs to this account"
 // rule Parent Portal's own childrenForAccount follows for students.
-async function classesForTeacher(member) {
+// semesterId is an optional scope-down for the Class Schedule tab's own
+// semester dropdown below (allClassesList's own null/undefined semesterId
+// already means "no filter, every semester" - every other call site here
+// keeps calling this with just `member`, unaffected).
+async function classesForTeacher(member, semesterId) {
   if (!member) return [];
   const staffRows = await db.prepare('SELECT class_id, role FROM class_staff WHERE member_id = ?').all(member.id);
   const classIds = new Set(staffRows.map((r) => r.class_id));
   if (classIds.size === 0) return [];
-  const all = await allClassesList(null);
+  const all = await allClassesList(null, semesterId);
   return all.filter((c) => classIds.has(c.id));
 }
 
@@ -104,14 +109,67 @@ router.get('/', async (req, res) => {
   res.render('teacher-home', { title: 'Teacher Portal', member, classes, announcements });
 });
 
-// "Classes" tab - the same per-class cards the homepage used to show,
-// now its own page so Home can lead with Announcements instead (a real
-// request: teacher/student portal both get an explicit Classes tab,
-// separate from Home).
+// "Class Schedule" tab - a real request: "Co-op classes should be called
+// Class Schedule and simply show the class schedule. No other subpages
+// are needed under this tab." Used to show the same per-class cards as
+// the homepage (and before that, "Co-op Classes" with Classroom
+// Dashboard/Absence-Late Form subpages); now just a day-by-day table of
+// the classes this teacher teaches - the per-class cards' own "View
+// Roster" links are redundant with the separate "My Classes" sidebar
+// section (classLinks above) already linking straight to each class.
+//
+// A follow-up real request: "Should have a dropdown menu for switching
+// semesters. Print button and calendar view and list view icons." The
+// semester dropdown defaults to showing every semester at once (this
+// page had no semester scoping at all before now, so an admin-style
+// default-to-the-active-semester would have silently hidden classes a
+// teacher was already used to seeing); picking one narrows classesForTeacher
+// the same way allClassesList's own semesterId already supports elsewhere.
+// Print reuses the plain window.print() + .no-print pattern (see e.g.
+// admin-members.ejs) rather than a dedicated print route - .admin-sidebar
+// (portal-nav.ejs's own shell) is already globally hidden in @media print,
+// so there's nothing portal-specific to add.
+//
+// A further real request: "the class schedule page should show the
+// entire classes schedule grid for the semester" - Calendar view's grid
+// was originally just this one teacher's own classes; it now reuses the
+// exact same roomGridForDay the Co-op Admin/Parent Portal grids already
+// render (every class, every room, not filtered to this teacher), stacked
+// one day at a time the same way List view already stacks days, so a
+// teacher can see the whole co-op's schedule for context. List view
+// stays this teacher's own classes only (unchanged) - the "My Classes"
+// sidebar section already covers "what do I personally teach".
+//
+// roomGridForDay/hoursForDay treat a semesterId of null as "untagged
+// classes only" (unlike allClassesList's own null, used by List view
+// above, which means "no filter") - the "All Semesters" dropdown option
+// (selectedSemesterId === null) is passed through as undefined here so
+// it keeps meaning "every semester", not "only untagged classes".
 router.get('/classes', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
-  const classes = await classesForTeacher(member);
-  res.render('teacher-classes', { title: 'My Classes', classes });
+  const semesters = await listSemesters();
+  const selectedSemesterId = req.query.semesterId ? parseInt(req.query.semesterId, 10) : null;
+  const classes = await classesForTeacher(member, selectedSemesterId);
+  const sorted = [...classes].sort(
+    (a, b) => (CLASS_DAY_ORDER[a.day] - CLASS_DAY_ORDER[b.day]) || a.hour_position - b.hour_position
+  );
+  const byDay = [];
+  for (const cls of sorted) {
+    let group = byDay.find((g) => g.day === cls.day);
+    if (!group) { group = { day: cls.day, dayLabel: cls.dayLabel, classes: [] }; byDay.push(group); }
+    group.classes.push(cls);
+  }
+  const view = req.query.view === 'calendar' ? 'calendar' : 'list';
+  let weekDays = null;
+  if (view === 'calendar') {
+    const gridSemesterId = selectedSemesterId === null ? undefined : selectedSemesterId;
+    const activeDays = await listActiveClassDays();
+    const dayGrids = await Promise.all(activeDays.map((day) => roomGridForDay(day, gridSemesterId)));
+    weekDays = activeDays
+      .map((day, i) => ({ day, dayLabel: CLASS_DAY_LABELS_FULL[day], roomGrid: dayGrids[i] }))
+      .filter((d) => d.roomGrid.rows.some((row) => row.cells.some((cell) => cell.classes.length > 0)));
+  }
+  res.render('teacher-classes', { title: 'Class Schedule', byDay, weekDays, view, semesters, selectedSemesterId });
 });
 
 router.get('/classes/:id', async (req, res) => {

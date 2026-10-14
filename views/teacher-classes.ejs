@@ -7,23 +7,98 @@
   <%- include('partials/portal-nav', { portalTitle: 'Teacher Portal' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Classes</h1>
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Class Schedule</p>
+      </div>
+    </div>
+    <h1>Class Schedule</h1>
 
-    <% if (classes.length === 0) { %>
+    <div class="filter-row no-print">
+      <div class="category-filter">
+        <label for="teacher-schedule-semester-select">Semester</label>
+        <select id="teacher-schedule-semester-select" onchange="window.fullscreenNavigate(this.value)">
+          <option value="/teacher/classes?view=<%= view %>" <%= selectedSemesterId === null ? 'selected' : '' %>>All Semesters</option>
+          <% semesters.forEach(function(s) { %>
+            <option value="/teacher/classes?view=<%= view %>&semesterId=<%= s.id %>" <%= selectedSemesterId === s.id ? 'selected' : '' %>><%= s.title %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="class-schedule-view-toggle" role="group" aria-label="List or calendar view">
+        <a class="icon-btn<%= view === 'list' ? ' icon-btn-active' : '' %>" href="/teacher/classes?view=list<%= selectedSemesterId ? `&semesterId=${selectedSemesterId}` : '' %>" aria-pressed="<%= view === 'list' %>" aria-label="List view" title="List view"><svg class="icon"><use href="#icon-clipboard-list"/></svg></a>
+        <a class="icon-btn<%= view === 'calendar' ? ' icon-btn-active' : '' %>" href="/teacher/classes?view=calendar<%= selectedSemesterId ? `&semesterId=${selectedSemesterId}` : '' %>" aria-pressed="<%= view === 'calendar' %>" aria-label="Calendar view" title="Calendar view"><svg class="icon"><use href="#icon-calendar-check"/></svg></a>
+      </div>
+      <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
+    </div>
+
+    <% if (view === 'calendar') { %>
+      <%# A real request: "the class schedule page should show the entire
+          classes schedule grid for the semester" - every class/room for
+          the day, not just this teacher's own (List view below stays
+          scoped to this teacher's own classes). Same Room x Hour grid
+          markup as parent-classes.ejs's own Grid view, read-only here
+          (no click-to-register dialog - a teacher isn't registering). %>
+      <% if (weekDays.length === 0) { %>
+        <p class="roster-empty">No classes have been scheduled yet.</p>
+      <% } else { %>
+        <% weekDays.forEach(function(wd) { %>
+          <h2><%= wd.dayLabel %></h2>
+          <div class="roster-scroll">
+            <table class="roster-table class-schedule-room-grid">
+              <thead>
+                <tr>
+                  <th class="class-schedule-room-col">Room</th>
+                  <% wd.roomGrid.hours.forEach(function(h) { %>
+                    <th><%= h.label %></th>
+                  <% }); %>
+                </tr>
+              </thead>
+              <tbody>
+                <% wd.roomGrid.rows.forEach(function(row) { %>
+                  <tr>
+                    <td class="class-schedule-room-col"><%= row.room %></td>
+                    <% row.cells.forEach(function(cell) { %>
+                      <td colspan="<%= cell.span %>" class="class-schedule-cell">
+                        <% if (cell.classes.length === 0) { %>
+                          &nbsp;
+                        <% } else { %>
+                          <% cell.classes.forEach(function(cls) { %>
+                            <div class="teacher-schedule-grid-card" style="border-left-color: <%= cls.color %>;">
+                              <strong><%= cls.class_name %></strong>
+                              <% if (cls.gradeLabel) { %><div class="hint"><%= cls.gradeLabel %></div><% } %>
+                              <div class="hint">Teacher: <%= cls.teacherNames.length ? cls.teacherNames.join(', ') : '—' %></div>
+                            </div>
+                          <% }); %>
+                        <% } %>
+                      </td>
+                    <% }); %>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% }); %>
+      <% } %>
+    <% } else if (byDay.length === 0) { %>
       <p class="roster-empty">You're not staffed on any classes yet.</p>
     <% } else { %>
-      <div class="portal-dashboard-grid">
-        <% classes.forEach(function(c) { %>
-          <section class="portal-dashboard-card">
-            <h2><%= c.class_name %></h2>
-            <p class="hint"><%= c.dayLabel %> &middot; <%= c.timeLabel %> &middot; <%= c.gradeLabel || 'All grades' %></p>
-            <p class="portal-dashboard-stat"><%= c.studentCount %></p>
-            <p class="hint">student<%= Number(c.studentCount) === 1 ? '' : 's' %> enrolled</p>
-            <% if (c.assistantNames.length) { %><p class="hint">Co-taught with <%= c.assistantNames.join(', ') %></p><% } %>
-            <a class="roster-action-btn" href="/teacher/classes/<%= c.id %>">View Roster</a>
-          </section>
-        <% }); %>
-      </div>
+      <% byDay.forEach(function(group) { %>
+        <h2><%= group.dayLabel %></h2>
+        <table class="roster-table schedule-print-table">
+          <thead><tr><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>
+          <tbody>
+            <% group.classes.forEach(function(c) { %>
+              <tr>
+                <td><%= c.timeLabel || '—' %></td>
+                <td><%= c.class_name %></td>
+                <td><%= c.room || '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% }); %>
     <% } %>
   </main>
 </body>

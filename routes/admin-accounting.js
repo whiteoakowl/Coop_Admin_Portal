@@ -214,6 +214,14 @@ router.post('/fiscal-years', async (req, res) => {
   res.redirect('/main-admin/accounting/categories?notice=' + encodeURIComponent('Fiscal year added.'));
 });
 
+router.post('/fiscal-years/:id/update', async (req, res) => {
+  const startDate = (req.body.startDate || '').trim();
+  const endDate = (req.body.endDate || '').trim();
+  if (!startDate || !endDate) return res.redirect('/main-admin/accounting/categories?error=' + encodeURIComponent('Start date and end date are both required.'));
+  await events.updateFiscalYear(req.params.id, startDate, endDate);
+  res.redirect('/main-admin/accounting/categories?notice=' + encodeURIComponent('Fiscal year updated.'));
+});
+
 router.post('/fiscal-years/:id/delete', async (req, res) => {
   await events.deleteFiscalYear(req.params.id);
   res.redirect('/main-admin/accounting/categories?notice=' + encodeURIComponent('Fiscal year removed.'));

@@ -13,38 +13,51 @@
       <h1>Category/Fiscal Year</h1>
       <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
     </div>
-    <p class="hint">A fixed list an event's Finance tab (or an invoice's own Category) picks one of, for internal bookkeeping.</p>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
+    <%# A real request: "there should be an edit button on categories and
+        fiscal year lines" - each row's title/code used to be always-
+        editable inputs that auto-submitted on change, which also drove
+        the "shrink to fit mobile" complaint (a full-width text input per
+        cell is wide regardless of how little text it holds). Plain text
+        + one Edit button/dialog per row, same pattern as every other
+        list in this app, fits mobile on its own merits and matches what
+        was asked for literally. %>
     <% if (accountingCategories.length === 0) { %>
       <p class="roster-empty">No accounting categories yet &mdash; add one above.</p>
     <% } else { %>
       <div class="roster-scroll">
-        <table class="roster-table condensed-table accounting-table-mobile-fit">
+        <table class="roster-table condensed-table accounting-table-mobile-fit accounting-categories-table-fit">
           <thead><tr><th>Title</th><th>Code</th><th></th></tr></thead>
           <tbody>
             <% accountingCategories.forEach(function(c) { %>
               <tr>
-                <td>
-                  <form method="POST" action="/main-admin/accounting/accounting-categories/<%= c.id %>/update" class="inline-block-form">
-                    <input type="hidden" name="code" value="<%= c.code || '' %>" />
-                    <input type="text" name="name" value="<%= c.name %>" onchange="this.form.submit()" aria-label="Title for <%= c.name %>" />
-                  </form>
-                </td>
-                <td>
-                  <form method="POST" action="/main-admin/accounting/accounting-categories/<%= c.id %>/update" class="inline-block-form">
-                    <input type="hidden" name="name" value="<%= c.name %>" />
-                    <input type="text" name="code" value="<%= c.code || '' %>" onchange="this.form.submit()" aria-label="Code for <%= c.name %>" />
-                  </form>
-                </td>
-                <td>
+                <td class="roster-name-col"><%= c.name %></td>
+                <td><%= c.code || '—' %></td>
+                <td class="roster-btn-row accounting-row-icons">
+                  <button type="button" class="icon-btn" onclick="document.getElementById('edit-category-dialog-<%= c.id %>').showModal()" aria-label="Edit <%= c.name %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
                   <form method="POST" action="/main-admin/accounting/accounting-categories/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete this accounting category? Events/invoices using it will just show no category.">
                     <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= c.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                   </form>
                 </td>
               </tr>
+              <dialog id="edit-category-dialog-<%= c.id %>" class="member-picker-dialog dialog-label-stack">
+                <form method="POST" action="/main-admin/accounting/accounting-categories/<%= c.id %>/update">
+                  <h3>Edit Category</h3>
+                  <label>Title
+                    <input type="text" name="name" value="<%= c.name %>" required />
+                  </label>
+                  <label>Code
+                    <input type="text" name="code" value="<%= c.code || '' %>" />
+                  </label>
+                  <div class="notes-dialog-actions">
+                    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+                    <button type="submit" class="primary-btn">Save</button>
+                  </div>
+                </form>
+              </dialog>
             <% }); %>
           </tbody>
         </table>
@@ -60,26 +73,42 @@
       <p class="roster-empty">No fiscal years yet &mdash; add one above.</p>
     <% } else { %>
       <div class="roster-scroll">
-        <table class="roster-table condensed-table accounting-table-mobile-fit">
+        <table class="roster-table condensed-table accounting-table-mobile-fit accounting-categories-table-fit">
           <thead><tr><th>Start Date</th><th>End Date</th><th></th></tr></thead>
           <tbody>
             <% fiscalYears.forEach(function(fy) { %>
               <tr>
                 <td><%= fy.start_date %></td>
                 <td><%= fy.end_date %></td>
-                <td>
+                <td class="roster-btn-row accounting-row-icons">
+                  <button type="button" class="icon-btn" onclick="document.getElementById('edit-fiscal-year-dialog-<%= fy.id %>').showModal()" aria-label="Edit fiscal year" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
                   <form method="POST" action="/main-admin/accounting/fiscal-years/<%= fy.id %>/delete" class="inline-block-form" data-confirm="Delete this fiscal year?">
                     <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete fiscal year" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                   </form>
                 </td>
               </tr>
+              <dialog id="edit-fiscal-year-dialog-<%= fy.id %>" class="member-picker-dialog dialog-label-stack">
+                <form method="POST" action="/main-admin/accounting/fiscal-years/<%= fy.id %>/update">
+                  <h3>Edit Fiscal Year</h3>
+                  <label>Start Date
+                    <input type="date" name="startDate" value="<%= fy.start_date %>" required />
+                  </label>
+                  <label>End Date
+                    <input type="date" name="endDate" value="<%= fy.end_date %>" required />
+                  </label>
+                  <div class="notes-dialog-actions">
+                    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+                    <button type="submit" class="primary-btn">Save</button>
+                  </div>
+                </form>
+              </dialog>
             <% }); %>
           </tbody>
         </table>
       </div>
     <% } %>
 
-    <dialog id="add-category-dialog" class="member-picker-dialog">
+    <dialog id="add-category-dialog" class="member-picker-dialog dialog-label-stack">
       <form method="POST" action="/main-admin/accounting/accounting-categories">
         <h3>Add Category</h3>
         <label>Title
@@ -95,7 +124,7 @@
       </form>
     </dialog>
 
-    <dialog id="add-fiscal-year-dialog" class="member-picker-dialog">
+    <dialog id="add-fiscal-year-dialog" class="member-picker-dialog dialog-label-stack">
       <form method="POST" action="/main-admin/accounting/fiscal-years">
         <h3>Add Fiscal Year</h3>
         <label>Start Date

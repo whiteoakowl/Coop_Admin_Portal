@@ -14,26 +14,28 @@
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <table class="roster-table members-table condensed-table">
-      <thead>
-        <tr><th>Type</th><th>Description</th><th>Auto-send (email/SMS)</th><th></th></tr>
-      </thead>
-      <tbody>
-        <% types.forEach(function(t) { %>
-          <tr>
-            <td><%= t.label %></td>
-            <td><%= t.description %></td>
-            <td><span class="badge-pill badge-pill-<%= t.auto_send_enabled ? 'green' : 'gray' %>"><%= t.auto_send_enabled ? 'On' : 'Off' %></span></td>
-            <td>
-              <form method="POST" action="/main-admin/notifications/<%= t.key %>/auto-send" class="inline-block-form">
-                <input type="hidden" name="enabled" value="<%= t.auto_send_enabled ? '0' : '1' %>" />
-                <button type="submit" class="roster-action-btn"><%= t.auto_send_enabled ? 'Turn Off' : 'Turn On' %></button>
-              </form>
-            </td>
-          </tr>
-        <% }); %>
-      </tbody>
-    </table>
+    <div class="roster-scroll">
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr><th>Type</th><th>Description</th><th>Auto-send (email/SMS)</th><th></th></tr>
+        </thead>
+        <tbody>
+          <% types.forEach(function(t) { %>
+            <tr>
+              <td><%= t.label %></td>
+              <td><%= t.description %></td>
+              <td><span class="badge-pill badge-pill-<%= t.auto_send_enabled ? 'green' : 'gray' %>"><%= t.auto_send_enabled ? 'On' : 'Off' %></span></td>
+              <td>
+                <form method="POST" action="/main-admin/notifications/<%= t.key %>/auto-send" class="inline-block-form">
+                  <input type="hidden" name="enabled" value="<%= t.auto_send_enabled ? '0' : '1' %>" />
+                  <button type="submit" class="roster-action-btn"><%= t.auto_send_enabled ? 'Turn Off' : 'Turn On' %></button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
   </main>
 </body>
 </html>

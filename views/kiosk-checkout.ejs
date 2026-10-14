@@ -236,6 +236,68 @@
 
       <button id="cancel-btn-2" type="button" class="kiosk-cancel-btn">Cancel</button>
     </div>
+
+    <!-- A real request: "also, add asking if you did a 3rd job." Same
+         question/yes-no pattern as step-second-badge above, shown right
+         after step-task-2's own badge scan succeeds. -->
+    <div id="step-third-badge" class="kiosk-panel kiosk-hidden">
+      <p class="kiosk-instructions">Do you have a 3rd Setup/Cleanup badge to scan?</p>
+      <div class="kiosk-yesno-buttons">
+        <button type="button" id="third-badge-yes-btn" class="primary-btn">Yes</button>
+        <button type="button" id="third-badge-no-btn" class="btn-secondary">No</button>
+      </div>
+    </div>
+
+    <!-- Badge #3 - an exact copy of step-task-2 above, reused by public/js/
+         kiosk-checkout.js's shared wireTaskStep() for the third scan. -->
+    <div id="step-task-3" class="kiosk-panel kiosk-hidden">
+      <div class="kiosk-method-choice">
+        <div class="kiosk-method-buttons">
+          <button type="button" class="kiosk-method-btn kiosk-method-btn-scanner" data-method="scanner">
+            <span class="landing-icon"><svg class="icon"><use href="#icon-barcode"/></svg></span>
+            <span class="landing-label">Barcode Scanner</span>
+          </button>
+          <button type="button" class="kiosk-method-btn kiosk-method-btn-manual" data-method="manual">
+            <span class="landing-icon"><svg class="icon"><use href="#icon-grid"/></svg></span>
+            <span class="landing-label">Manually Enter ID #</span>
+          </button>
+        </div>
+      </div>
+
+      <div data-method-panel="scanner" hidden>
+        <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
+        <p class="kiosk-instructions kiosk-task-ask-text">Hi <span class="task-member-name">-</span>, please scan your 3rd Setup/Cleanup badge</p>
+      </div>
+
+      <div data-method-panel="manual" hidden>
+        <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
+        <p class="kiosk-instructions kiosk-task-ask-text">Hi <span class="task-member-name">-</span>, please enter your 3rd Setup/Cleanup badge ID number</p>
+        <div class="task-id-keypad" id="task-id-keypad-3"></div>
+        <button type="button" class="task-manual-submit-btn primary-btn" id="task-manual-submit-btn-3">Submit</button>
+      </div>
+
+      <div class="task-kiosk-result" id="task-kiosk-result-3" hidden>
+        <div class="task-kiosk-status kiosk-status kiosk-status-idle" id="task-kiosk-status-3">
+          <span class="kiosk-status-icon"></span>
+        </div>
+        <p class="task-kiosk-instructions kiosk-instructions" id="task-kiosk-instructions-3"></p>
+      </div>
+
+      <form class="task-scan-form" id="task-scan-form-3" autocomplete="off">
+        <input
+          class="task-barcode-input"
+          id="task-barcode-input-3"
+          name="barcode"
+          type="text"
+          aria-label="Scan your 3rd Setup/Cleanup badge"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+        />
+      </form>
+
+      <button id="cancel-btn-3" type="button" class="kiosk-cancel-btn">Cancel</button>
+    </div>
   </main>
   <script src="/js/kiosk-common.js"></script>
   <script src="/js/kiosk-id-keypad.js"></script>

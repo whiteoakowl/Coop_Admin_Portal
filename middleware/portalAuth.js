@@ -81,10 +81,22 @@ async function loadPortalSession(req, res, next) {
   next();
 }
 
+// A real bug report: "after adding 4 categories it asks me to log in and
+// then goes to a 404 page." A session that expires mid-use lands its
+// NEXT request here - for a POST (an add/edit/delete form's own action
+// URL), that's write-only, with no GET handler of its own. Re-logging in
+// follows `next` with a plain GET (routes/portal-auth.js's own
+// res.redirect(next)), so replaying a POST-only URL that way 404s
+// outright - only a GET request's own URL is safe to send a signed-in
+// account straight back to. Shared by every guard below.
+function loginRedirectUrl(req) {
+  return req.method === 'GET' ? '/login?next=' + encodeURIComponent(req.originalUrl) : '/login';
+}
+
 // Requires a signed-in, active account - anything past this point can
 // read req.portalAccount safely.
 function requirePortalAuth(req, res, next) {
-  if (!req.portalAccount) return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
+  if (!req.portalAccount) return res.redirect(loginRedirectUrl(req));
   next();
 }
 
@@ -96,7 +108,7 @@ function requirePortalAuth(req, res, next) {
 // would be misleading.
 function requirePortal(roleKey) {
   return function (req, res, next) {
-    if (!req.portalAccount) return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
+    if (!req.portalAccount) return res.redirect(loginRedirectUrl(req));
     if (!req.portalRoles.some((r) => r.key === roleKey)) {
       return res
         .status(403)
@@ -112,7 +124,7 @@ function requirePortal(roleKey) {
 // necessarily be able to do.
 function requirePortalPermission(permissionKey) {
   return function (req, res, next) {
-    if (!req.portalAccount) return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
+    if (!req.portalAccount) return res.redirect(loginRedirectUrl(req));
     if (!req.portalPermissions.has(permissionKey)) {
       return res
         .status(403)

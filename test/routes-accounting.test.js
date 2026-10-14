@@ -185,10 +185,12 @@ test('a cancelled charge no longer counts toward balance and its status never ch
 
 // Coverage for a real request: "list of members should be all members on
 // the app, not just ones who had a charge" - every active member shows
-// up by default, with or without charge history; Search Member (same
-// row as the typed search bar) narrows that same list to a name match,
-// still regardless of charge history.
-test('Main Admin Accounting home: lists every active member, charge history or not, and Search Member narrows it by name', async () => {
+// up by default, with or without charge history. A later real request
+// ("remove search bar from accounts page") dropped the UI search bar
+// itself; the underlying ?q= filter (routes/admin-accounting.js's own
+// accountRows, shared with the Email All.../export.csv routes) stays
+// reachable by URL even with no UI control pointed at it.
+test('Main Admin Accounting home: lists every active member, charge history or not, and ?q= still narrows it by name', async () => {
   const admin = await loginAsMainAdmin();
   const parent = await createParentAccount();
 
@@ -197,7 +199,7 @@ test('Main Admin Accounting home: lists every active member, charge history or n
   // full membership profile just like other pages" - the Accounts
   // table's own name link now goes there, not the Account page.
   assert.match(noQuery.text, new RegExp(`/main-admin/members/${parent.memberId}">Parent ${familyCounter}</a>`));
-  assert.match(noQuery.text, /placeholder="Search member&hellip;"/);
+  assert.doesNotMatch(noQuery.text, /placeholder="Search member&hellip;"/, 'the search bar was removed from this page');
   assert.doesNotMatch(noQuery.text, /Find a member/);
 
   const searched = await request(app).get(`/main-admin/accounting?q=Parent ${familyCounter}`).set('Cookie', admin.cookie);

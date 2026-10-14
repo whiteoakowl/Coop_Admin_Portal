@@ -84,11 +84,17 @@ router.get('/', async (req, res) => {
     db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'parent'").get(),
     db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'student'").get(),
     db.prepare("SELECT COUNT(DISTINCT member_id) AS c FROM class_staff WHERE role = 'teacher'").get(),
+    // A real request: "admin count should be based off how many members
+    // are admins under the settings gear" - that's Settings > Admins
+    // (routes/main-admin.js's own /admins route, utils/adminPositions.js),
+    // a member_admin_positions assignment to an Admin Position (President,
+    // Treasurer, ...), not whoever happens to hold the 'coop_admin'/
+    // 'main_admin' PORTAL role (a login capability, not a leadership
+    // position - a member can easily have one without the other).
     db
       .prepare(
-        `SELECT COUNT(DISTINCT mar.member_account_id) AS c FROM member_account_roles mar
-         JOIN roles r ON r.id = mar.role_id JOIN member_accounts ma ON ma.id = mar.member_account_id
-         WHERE r.key IN ('coop_admin', 'main_admin') AND ma.status = 'active'`
+        `SELECT COUNT(DISTINCT map.member_id) AS c FROM member_admin_positions map
+         JOIN members m ON m.id = map.member_id WHERE m.active = 1`
       )
       .get(),
     events.listEvents({ approvalStatus: 'pending' }),

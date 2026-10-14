@@ -16,8 +16,13 @@
   const stepTask2 = document.getElementById('step-task-2');
   const secondBadgeYesBtn = document.getElementById('second-badge-yes-btn');
   const secondBadgeNoBtn = document.getElementById('second-badge-no-btn');
+  const stepThirdBadge = document.getElementById('step-third-badge');
+  const stepTask3 = document.getElementById('step-task-3');
+  const thirdBadgeYesBtn = document.getElementById('third-badge-yes-btn');
+  const thirdBadgeNoBtn = document.getElementById('third-badge-no-btn');
   const cancelBtn = document.getElementById('cancel-btn');
   const cancelBtn2 = document.getElementById('cancel-btn-2');
+  const cancelBtn3 = document.getElementById('cancel-btn-3');
   const doneBtn = document.getElementById('done-btn');
   const methodChoice = stepScan.querySelector('.kiosk-method-choice');
 
@@ -37,6 +42,10 @@
   // secondBadgeNoBtn below), so that path can show it without a second
   // round trip to the server.
   let pendingFinalMessage = '';
+  // Same idea, one badge further - set on step-task-2's own success, held
+  // onto in case the "Do you have a 3rd badge?" answer is "No" (see
+  // thirdBadgeNoBtn below).
+  let pendingFinalMessage2 = '';
   let lastTaskMethod = 'scanner';
 
   function setState(state, message, iconId) {
@@ -127,8 +136,19 @@
     };
   }
 
-  const task2 = wireTaskStep(stepTask2, '/kiosk/checkout/task-scan-2', (data) => {
-    task2.showFinal(data.message);
+  const task3 = wireTaskStep(stepTask3, '/kiosk/checkout/task-scan-3', (data) => {
+    task3.showFinal(data.message);
+  });
+
+  // Step 3 (optional, parents only): scan the 2nd Setup/Cleanup badge. On
+  // success, ask whether there's a 3rd badge (step-third-badge below)
+  // instead of finishing right away - same pattern task1 below uses for
+  // the 2nd badge question.
+  const task2 = wireTaskStep(stepTask2, '/kiosk/checkout/task-scan-2', (data, activeMethod) => {
+    pendingFinalMessage2 = data.message;
+    lastTaskMethod = activeMethod;
+    stepTask2.classList.add('kiosk-hidden');
+    stepThirdBadge.classList.remove('kiosk-hidden');
   });
 
   // Step 2 (parents only): scan the Setup/Cleanup badge for the task just
@@ -146,11 +166,14 @@
     stepTask.classList.add('kiosk-hidden');
     stepSecondBadge.classList.add('kiosk-hidden');
     stepTask2.classList.add('kiosk-hidden');
+    stepThirdBadge.classList.add('kiosk-hidden');
+    stepTask3.classList.add('kiosk-hidden');
     stepScan.classList.remove('kiosk-hidden');
     result.hidden = true;
     chooser.showChooser();
     task1.reset();
     task2.reset();
+    task3.reset();
     armIdleTimer();
   }
 
@@ -272,6 +295,7 @@
       currentMemberId = data.memberId;
       task1.setName(data.name);
       task2.setName(data.name);
+      task3.setName(data.name);
       result.hidden = true;
       stepScan.classList.add('kiosk-hidden');
       stepTask.classList.remove('kiosk-hidden');
@@ -308,8 +332,23 @@
     task2.chooser.showPanel(lastTaskMethod);
   });
 
+  // A real request: "also, add asking if you did a 3rd job" - same
+  // yes/no pattern as the 2nd-badge question above, one badge further.
+  thirdBadgeNoBtn.addEventListener('click', () => {
+    stepThirdBadge.classList.add('kiosk-hidden');
+    stepTask2.classList.remove('kiosk-hidden');
+    task2.showFinal(pendingFinalMessage2);
+  });
+
+  thirdBadgeYesBtn.addEventListener('click', () => {
+    stepThirdBadge.classList.add('kiosk-hidden');
+    stepTask3.classList.remove('kiosk-hidden');
+    task3.chooser.showPanel(lastTaskMethod);
+  });
+
   cancelBtn.addEventListener('click', resetToScan);
   cancelBtn2.addEventListener('click', resetToScan);
+  cancelBtn3.addEventListener('click', resetToScan);
 
   doneBtn.addEventListener('click', finishSession);
 

@@ -10,61 +10,64 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Accounts</h1>
-    <p class="hint">Every active member below, charge history or not. Search Member to add a first charge for someone new.</p>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <%# A real request: "accounts page... +invoice/+payment/+adjustment
-        buttons." +Invoice creates a charge for any member directly from
-        here (same POST /invoices the Invoices subpage's own dialog
-        uses); +Payment/+Adjustment both just jump to that member's own
-        Account page below, where Record Payment (direction: payment or
-        refund) already works per-charge - one shared "which member?"
-        dialog for both rather than two, since they lead to the exact
-        same place. %>
-    <div class="roster-btn-row accounting-list-toolbar no-print">
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('goto-invoice-dialog').showModal()">+ Invoice</button>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('goto-member-dialog').showModal()">+ Payment</button>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('goto-member-dialog').showModal()">+ Adjustment</button>
-    </div>
+    <%# A real request: "on desktop all orange buttons should be on the
+        same row next to each other. On mobile, row 1 orange buttons, row
+        2 email invoice buttons, row 3 search bar, row 4 print and export
+        icons." (the search bar itself was later removed - "remove search
+        bar from accounts page" - leaving rows 1/2/3 here).
+        .accounting-orange-buttons-group below lays the two orange-button
+        rows (+Invoice/+Payment/+Adjustment, Email All...) out as one flex
+        row on desktop (they're already each their own flex row
+        internally, so sitting them side by side as two flex items reads
+        as "the same row") while keeping them two separate stacked rows
+        on mobile, where each keeps its own existing shrink-to-fit grid
+        of buttons. %>
+    <div class="accounting-accounts-controls">
+      <div class="accounting-orange-buttons-group">
+        <%# +Invoice creates a charge for any member directly from here
+            (same POST /invoices the Invoices subpage's own dialog uses);
+            +Payment/+Adjustment both just jump to that member's own
+            Account page below, where Record Payment (direction: payment
+            or refund) already works per-charge - one shared "which
+            member?" dialog for both rather than two, since they lead to
+            the exact same place. %>
+        <div class="roster-btn-row accounting-list-toolbar no-print">
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('goto-invoice-dialog').showModal()">+ Invoice</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('goto-member-dialog').showModal()">+ Payment</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('goto-member-dialog').showModal()">+ Adjustment</button>
+        </div>
 
-    <%# A real request: "print and export icons should be to the left and
-        on the same row next to each other" - moved ahead of the Email
-        buttons row below. %>
-    <div class="roster-btn-row accounting-accounts-toolbar-3 no-print" data-fixed-columns="2">
-      <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print Preview" title="Print Preview"><svg class="icon"><use href="#icon-printer"/></svg></button>
-      <a class="icon-btn" href="/main-admin/accounting/export.csv?q=<%= encodeURIComponent(q) %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-    </div>
+        <%# A real request: "past due check box should be a button that says
+            email all past due invoices. Email all invoices button will send
+            all. These two buttons should shrink to fit side by side on one
+            row." Replaces the old Past Due Only filter checkbox (which just
+            narrowed the table) with a real action button of its own, side by
+            side with Email All Invoices (now a genuine "everyone", not the
+            same past-due-only list under a misleading name). %>
+        <div class="roster-btn-row accounting-accounts-toolbar-2 no-print roster-btn-row-fit-text" data-fixed-columns="2">
+          <form method="POST" action="/main-admin/accounting/email-all-past-due-invoices" class="inline-block-form" data-confirm="Send a balance-due reminder to every member who currently owes something?">
+            <button type="submit" class="roster-action-btn roster-action-btn-fit">Email All Past Due Invoices</button>
+          </form>
+          <form method="POST" action="/main-admin/accounting/email-all-invoices" class="inline-block-form" data-confirm="Send an accounting statement to every member with billing on record?">
+            <button type="submit" class="roster-action-btn roster-action-btn-fit">Email All Invoices</button>
+          </form>
+        </div>
+      </div>
 
-    <%# A real request: "past due check box should be a button that says
-        email all past due invoices. Email all invoices button will send
-        all. These two buttons should shrink to fit side by side on one
-        row." Replaces the old Past Due Only filter checkbox (which just
-        narrowed the table) with a real action button of its own, side by
-        side with Email All Invoices (now a genuine "everyone", not the
-        same past-due-only list under a misleading name). %>
-    <div class="roster-btn-row accounting-accounts-toolbar-2 no-print roster-btn-row-fit-text" data-fixed-columns="2">
-      <form method="POST" action="/main-admin/accounting/email-all-past-due-invoices" class="inline-block-form" data-confirm="Send a balance-due reminder to every member who currently owes something?">
-        <button type="submit" class="roster-action-btn roster-action-btn-fit">Email All Past Due Invoices</button>
-      </form>
-      <form method="POST" action="/main-admin/accounting/email-all-invoices" class="inline-block-form" data-confirm="Send an accounting statement to every member with billing on record?">
-        <button type="submit" class="roster-action-btn roster-action-btn-fit">Email All Invoices</button>
-      </form>
-    </div>
-
-    <%# A real request: "search bar should be just above the member
-        table" + "go button should be in the search bar, attached." %>
-    <div class="members-search-filter-row no-print">
-      <form method="GET" action="/main-admin/accounting" class="members-search-bar accounting-search-attached">
-        <svg class="icon"><use href="#icon-search"/></svg>
-        <input type="search" name="q" value="<%= q %>" placeholder="Search member&hellip;" aria-label="Search member" />
-        <button type="submit" class="members-search-go-btn">Go</button>
-      </form>
+      <%# A real request: "print and export icons should be to the left and
+          on the same row next to each other." %>
+      <div class="roster-btn-row accounting-accounts-toolbar-3 no-print" data-fixed-columns="2">
+        <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print Preview" title="Print Preview"><svg class="icon"><use href="#icon-printer"/></svg></button>
+        <a class="icon-btn" href="/main-admin/accounting/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+      </div>
     </div>
 
     <% if (members.length === 0) { %>
-      <p class="roster-empty"><%= q ? 'No active members match that search.' : 'No active members yet.' %></p>
+      <p class="roster-empty">No active members yet.</p>
     <% } else { %>
       <div class="roster-scroll">
         <table class="roster-table members-table condensed-table accounting-table-mobile-fit accounting-accounts-table-fit">

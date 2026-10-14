@@ -247,32 +247,22 @@ const PARENT_NAV_LINKS = [
 // A real request: "Teacher portal dashboard add section for my classes
 // tab. Each tab after that should be each class that teacher is signed up
 // for to teach. Classes tab should be called co-op classes and have all
-// the same subpages as parent portal co-op classes tab." The existing
-// "Classes" tab is renamed "Co-op Classes" to match Parent Portal's own
-// naming, but only gets the 2 of Parent's 5 Co-op Classes subpages that
-// have a real Teacher Portal equivalent today - Class Registration,
-// Policy Handbook, and Name Tag Form don't apply to a teacher's own
-// relationship to a class (assigned to it, not registering for it) and
-// no Teacher-facing version of either page exists yet, so inventing one
-// was explicitly scoped out rather than guessed at; Classroom Dashboard
-// (/teacher/classes, this tab's own bare href) and Absence/Late Form
-// (the same shared /absence route Parent/Student Portal's own Co-op
-// Classes/Classes subpages already link to) are the two real matches.
-// The separate "My Classes" section further down (classLinks/
-// classLinksTitle - one entry per class this teacher actually teaches,
-// computed per-request in routes/teacher-portal.js since it varies by
-// account) is the new dashboard section that request's first sentence
-// asked for - a different thing from this tab's own subpages, despite
-// the similar name, so its own subpage label below is "Classroom
-// Dashboard" (matching Parent's own naming for the closest real
-// equivalent), not "My Classes" again.
+// the same subpages as parent portal co-op classes tab." This originally
+// renamed the tab "Co-op Classes" with 2 subpages (Classroom Dashboard,
+// Absence/Late Form). A later real request: "Co-op classes should be
+// called Class Schedule and simply show the class schedule. No other
+// subpages are needed under this tab" - dropped the subpages array
+// entirely and renamed the tab again; its own bare href now renders a
+// day-by-day schedule of this teacher's own classes (see
+// routes/teacher-portal.js's /classes route and views/teacher-classes.ejs)
+// instead of the old per-class card grid, which is redundant with the
+// separate "My Classes" section below (classLinks/classLinksTitle - one
+// entry per class this teacher actually teaches, computed per-request in
+// routes/teacher-portal.js) already linking straight to each class.
 const TEACHER_NAV_LINKS = [
   { href: '/teacher', icon: 'home', label: 'Home' },
   { href: '/teacher/attendance', icon: 'calendar-check', label: 'Attendance' },
-  { href: '/teacher/classes', icon: 'graduation-cap', label: 'Co-op Classes', subpages: [
-    { href: '/teacher/classes', label: 'Classroom Dashboard' },
-    { href: '/absence', label: 'Absence/Late Form' },
-  ] },
+  { href: '/teacher/classes', icon: 'graduation-cap', label: 'Class Schedule' },
   { href: '/training', icon: 'graduation-cap', label: 'Training' },
   { href: '/teacher/assignments', icon: 'clipboard-list', label: 'Assignments' },
 ];

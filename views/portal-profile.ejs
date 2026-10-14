@@ -101,39 +101,43 @@
       <% if (schedule.length === 0) { %>
         <p class="hint">No class schedule on file yet.</p>
       <% } else { %>
-        <table class="roster-table">
-          <thead><tr><th>Name</th><th>Role</th><th>Day</th><th>Time</th><th>Class</th><th>Room</th></tr></thead>
-          <tbody>
-            <% schedule.forEach(function(row) { %>
-              <tr>
-                <td><%= row.memberName %></td>
-                <td><%= row.role %></td>
-                <td><%= dayLabels[row.day] || row.day %></td>
-                <td><%= row.start_time || '' %><% if (row.end_time) { %>&ndash;<%= row.end_time %><% } %></td>
-                <td><%= row.class_name %></td>
-                <td><%= row.room || '' %></td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
+        <div class="roster-scroll">
+          <table class="roster-table">
+            <thead><tr><th>Name</th><th>Role</th><th>Day</th><th>Time</th><th>Class</th><th>Room</th></tr></thead>
+            <tbody>
+              <% schedule.forEach(function(row) { %>
+                <tr>
+                  <td><%= row.memberName %></td>
+                  <td><%= row.role %></td>
+                  <td><%= dayLabels[row.day] || row.day %></td>
+                  <td><%= row.start_time || '' %><% if (row.end_time) { %>&ndash;<%= row.end_time %><% } %></td>
+                  <td><%= row.class_name %></td>
+                  <td><%= row.room || '' %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
       <% } %>
     <% } else { %>
       <% if (signups.length === 0) { %>
         <p class="hint">No event sign-ups on file yet.</p>
       <% } else { %>
-        <table class="roster-table">
-          <thead><tr><th>Name</th><th>Event</th><th>Date</th><th>Status</th></tr></thead>
-          <tbody>
-            <% signups.forEach(function(row) { %>
-              <tr>
-                <td><%= row.memberName %></td>
-                <td><%= row.title %></td>
-                <td><%= (row.starts_at || '').slice(0, 10) %></td>
-                <td><span class="badge-pill <%= row.status === 'confirmed' ? 'badge-pill-green' : 'badge-pill-orange' %>"><%= row.status.charAt(0).toUpperCase() + row.status.slice(1) %></span></td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
+        <div class="roster-scroll">
+          <table class="roster-table">
+            <thead><tr><th>Name</th><th>Event</th><th>Date</th><th>Status</th></tr></thead>
+            <tbody>
+              <% signups.forEach(function(row) { %>
+                <tr>
+                  <td><%= row.memberName %></td>
+                  <td><%= row.title %></td>
+                  <td><%= (row.starts_at || '').slice(0, 10) %></td>
+                  <td><span class="badge-pill <%= row.status === 'confirmed' ? 'badge-pill-green' : 'badge-pill-orange' %>"><%= row.status.charAt(0).toUpperCase() + row.status.slice(1) %></span></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
       <% } %>
     <% } %>
   </main>

@@ -1735,6 +1735,36 @@ body.public-page .roster-empty {
 }
 .admin-page-corner-actions .admin-corner-link:hover { background: #fff; }
 
+/* A real request: "on desktop, button on the top of the different
+   portals. The profile, settings, portals and log in buttons should be
+   blue with black text." .admin-page-corner-actions (My Profile/
+   Settings/Switch Portal) is already desktop/tablet-only - see its own
+   comment above - hidden below the mobile-topbar breakpoint, where
+   these same controls fold into that bar's own icon row instead and
+   keep their look untouched. .site-header-actions's own Log In button
+   (views/public-home.ejs, the one other "button at the top of the page"
+   this covers) isn't split by viewport the same way, so it's wrapped in
+   its own min-width guard here. */
+.admin-page-corner-actions .admin-corner-link,
+.admin-page-corner-actions .portal-switcher-details summary {
+  background: var(--brand);
+  color: var(--ink);
+}
+.admin-page-corner-actions .admin-corner-link:hover,
+.admin-page-corner-actions .portal-switcher-details summary:hover,
+.admin-page-corner-actions .portal-switcher-details[open] summary {
+  background: var(--brand-dark);
+  color: var(--ink);
+}
+@media (min-width: 861px) {
+  .site-header-actions .btn-secondary {
+    background: var(--brand);
+    color: var(--ink);
+    border-color: var(--brand);
+  }
+  .site-header-actions .btn-secondary:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
+}
+
 /* Switch Portal's <details>/<summary> (.portal-switcher-details below)
    defaults to white text for the dark sidebar it used to live in - a
    real request ("Switch portal, profile icon, settings icon should all
@@ -3251,6 +3281,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .roster-name-col { text-align: left !important; position: sticky; left: 0; background: var(--surface); font-weight: 600; }
 .roster-table thead .roster-name-col { background: var(--brand-soft); }
+
+/* A real request: "audit across the entire mobile view of the app for
+   table and text. Every table should shrink to fit on the screen. Make
+   the font smaller to ensure they are fit in mobile view." Dozens of
+   individual tables already have their own hand-tuned `-mobile-fit`
+   class (a more specific selector, so it still wins over this one) -
+   this is the baseline every OTHER .roster-table gets for free even
+   without one, so a page nobody's gotten to yet still shrinks instead of
+   staying at the full desktop 0.9rem/0.75rem-1rem padding. Paired with
+   .roster-scroll (wrapped around every real .roster-table in the app as
+   of this same audit) as the fallback for whatever's still too wide
+   after shrinking - a genuinely dense table (many real columns) scrolls
+   sideways within its own box rather than blowing out the page. */
+@media (max-width: 640px) {
+  .roster-table { font-size: 0.78rem; }
+  .roster-table th, .roster-table td { padding: 0.45rem 0.55rem; }
+}
 
 /* A real request, repeated across several tables: "shrink to fit on
    mobile - no side to side scroll." Shrinking font/padding alone (the
@@ -7636,6 +7683,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   font-size: 0.85rem;
 }
 .class-schedule-cell { background: #fff; overflow: hidden; }
+/* Teacher Portal's own read-only Class Schedule grid (views/teacher-
+   classes.ejs, Calendar view) reuses .class-schedule-room-grid/
+   .class-schedule-cell above but not the interactive .class-card (no
+   click-to-register dialog for a teacher just viewing the co-op's whole
+   schedule) - this is its own plain, non-clickable equivalent. */
+.teacher-schedule-grid-card {
+  border-left: 3px solid var(--border);
+  padding: 0.2rem 0.4rem;
+  margin-bottom: 0.3rem;
+  font-size: 0.8rem;
+}
+.teacher-schedule-grid-card:last-child { margin-bottom: 0; }
 /* Grabbing this handle and moving up/down reorders the room rows (see
    public/js/room-row-reorder.js) - touch-action: none stops the browser's
    own scroll/pan gesture from hijacking a touch drag, same reasoning as
@@ -10409,10 +10468,17 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
   gap: 0.85rem;
   margin-top: 1rem;
 }
+/* A real request: "Delete all descriptions. Each portal button is the
+   title only and centered. Make the text a bit larger." .portal-picker-
+   desc is gone (unused now - every card is just its own title), and
+   this card's own flex layout centers that one remaining line both ways
+   instead of the old left-aligned title-above-description stack. */
 .portal-picker-card {
   display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 5.5rem;
   padding: 1.25rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -10421,8 +10487,7 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
   transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
 .portal-picker-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
-.portal-picker-title { font-size: 1.05rem; font-weight: 700; color: var(--ink); }
-.portal-picker-desc { font-size: 0.88rem; color: var(--muted); }
+.portal-picker-title { font-size: 1.3rem; font-weight: 700; color: var(--ink); }
 
 /* ---------------------------------------------------------------------
    Public marketing homepage (public-home.ejs) - a welcoming, content-led
@@ -12688,6 +12753,64 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
      forcing the row wide, same .roster-name-col treatment as every other
      shrunk table in this app. */
   .accounting-accounts-table-fit .roster-name-col { white-space: normal; }
+  /* A real bug report: "the tables rows are off. They should be clean
+     rows with straight lines and no side to side movement." Without
+     table-layout: fixed, the icon cell's own 3 nowrap .icon-btn buttons
+     (.accounting-row-icons above) have a real minimum content width that
+     can exceed a phone's viewport even at width: 100%, forcing the whole
+     table wider than its container - .roster-scroll (already wrapping
+     this table) then has something real to scroll, but every row reads
+     as "off": mostly-empty Balance/Past Due cells stretched to match
+     whichever row's icon cell happens to be widest. Pinning the icon/
+     balance/past-due columns and letting only the Member name column
+     wrap keeps every row's columns the same width as every other row's -
+     straight borders top to bottom - with no more horizontal slack to
+     "move" sideways than .roster-scroll's own real, accepted fallback
+     for whatever still doesn't fit (same convention as every other
+     table-layout: fixed mobile fit elsewhere in this app). */
+  .accounting-accounts-table-fit { table-layout: fixed; width: 100%; }
+  .accounting-accounts-table-fit .accounting-row-icons { width: 5.6rem; }
+  .accounting-accounts-table-fit th:nth-child(3),
+  .accounting-accounts-table-fit td:nth-child(3),
+  .accounting-accounts-table-fit th:nth-child(4),
+  .accounting-accounts-table-fit td:nth-child(4) { width: 4.2rem; }
+}
+
+/* A real request: "Accounts page, on desktop all orange buttons should
+   be on the same row next to each other. On mobile, row 1 orange
+   buttons, row 2 email invoice buttons, row 3 search bar, row 4 print
+   and export icons." (views/admin-accounting-list.ejs) - the search bar
+   itself was later removed ("remove search bar from accounts page"),
+   leaving just the orange-button group and the icons row.
+   .accounting-orange-buttons-group wraps the two orange-button rows
+   (+Invoice/+Payment/+Adjustment and Email All...) - each is already its
+   own flex row of buttons, so making the GROUP itself `display: flex`
+   too just sits those two existing rows side by side as one combined
+   row on desktop, with no change needed to either row's own internal
+   button layout. .accounting-accounts-controls (the outer wrapper around
+   the group and the icons row) then orders those two top-level pieces -
+   icons directly below the orange buttons, same at every width now that
+   there's no search bar to place differently on mobile. */
+.accounting-accounts-controls { display: flex; flex-direction: column; }
+.accounting-orange-buttons-group { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; order: 1; }
+.accounting-accounts-controls .accounting-accounts-toolbar-3 { order: 2; }
+@media (max-width: 640px) {
+  .accounting-orange-buttons-group { flex-direction: column; align-items: stretch; }
+}
+
+/* Category/Fiscal Year page (views/admin-accounting-categories.ejs) - a
+   real request: "shrink all tables to fit nicely in mobile." Replacing
+   each row's always-editable, full-width text inputs with plain text +
+   an Edit button (see that same real request: "there should be an edit
+   button on categories and fiscal year lines") already does most of the
+   work; table-layout: fixed plus wrapping the title/name column keeps a
+   long category title from forcing the table wider than a phone screen,
+   same convention as .lessons-table-mobile-fit elsewhere. */
+.accounting-categories-table-fit { table-layout: fixed; }
+.accounting-categories-table-fit .roster-name-col { white-space: normal; overflow-wrap: break-word; }
+@media (max-width: 640px) {
+  .accounting-categories-table-fit th:last-child,
+  .accounting-categories-table-fit td:last-child { width: 4.6rem; }
 }
 
 /* Invoices/Payments/Adjustments/Logs run 6-9 real columns (Invoice #,

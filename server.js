@@ -334,16 +334,20 @@ app.use(
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
+    // A real request: "remove time limit for being logged in. Should
+    // stay logged in indefinitely unless the member logs out." Without
+    // `rolling: true`, a session's expiry is fixed once at LOGIN time
+    // (cookie.maxAge below only ever gets applied when the session cookie
+    // is first created) and never extended by later activity - a 10-year
+    // maxAge still makes that effectively unlimited, but any session
+    // created before this maxAge was raised (or in a future deploy that
+    // lowers it again) keeps its own older, shorter expiry baked in until
+    // its owner logs in fresh. `rolling: true` resets the expiry - and
+    // re-sends Set-Cookie with it - on every request, so "stay logged in
+    // while active" is actually enforced server-side, not just a long
+    // fixed window hoped to outlast real use.
+    rolling: true,
     cookie: {
-      // A real request: "remove time limit for being logged in. Should
-      // stay logged in indefinitely unless the member logs out." No
-      // native "forever" cookie exists, so this is as close as a real
-      // expiry gets - 10 years, long past the lifetime of any device
-      // this app is actually used on. Applies to both the single shared
-      // Admin session (req.session.adminId) and every member portal
-      // session (req.session.portalAccountId), since they share this one
-      // cookie config - only an explicit Log Out (or clearing cookies)
-      // ends a session now.
       maxAge: 1000 * 60 * 60 * 24 * 365 * 10,
       httpOnly: true,
       sameSite: 'lax',

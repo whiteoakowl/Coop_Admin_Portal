@@ -13,8 +13,11 @@
       <h1><%= member.name %></h1>
       <span class="badge-pill badge-pill-<%= balanceCents > 0 ? 'orange' : 'green' %>"><%= formatCents(balanceCents) %> due</span>
       <% if (member.parked) { %><span class="badge-pill badge-pill-gray" title="Auto-parked: an auto-park invoice is overdue and unpaid">Parked</span><% } %>
+      <%# A real request: "add print button to member account pages on
+          parent portal and main admin portal." %>
+      <button type="button" class="roster-action-btn print-action-btn no-print" onclick="window.print()">Print</button>
     </div>
-    <p><a href="/main-admin/accounting">&larr; All Accounts</a></p>
+    <p class="no-print"><a href="/main-admin/accounting">&larr; All Accounts</a></p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
@@ -64,14 +67,28 @@
               <% invoices.forEach(function(c) { %>
                 <tr>
                   <td>#<%= c.id %></td>
-                  <td><%= c.description %></td>
+                  <%# A real request: "be able to click on each invoice
+                      name and view the invoice" - same destination as
+                      the Edit icon below, just also reachable from the
+                      name itself. %>
+                  <td><a href="/main-admin/accounting/invoices/<%= c.id %>/edit"><%= c.description %></a></td>
                   <td><%= formatCents(c.amount_cents) %></td>
                   <td><%= formatCents(c.amountPaid) %></td>
                   <td><span class="badge-pill badge-pill-<%= c.status === 'paid' ? 'green' : c.status === 'cancelled' || c.status === 'refunded' ? 'gray' : 'orange' %>"><%= c.status.replace('_', ' ') %></span></td>
                   <td><%= c.dateLabel %></td>
                   <td class="roster-btn-row member-invoice-actions">
-                    <% if (c.status !== 'cancelled') { %>
+                    <%# A real request: "remove record payment and red
+                        delete button on invoices that have been paid" -
+                        Edit and Cancel stay available either way (a paid
+                        charge can still need its description/amount
+                        corrected, or be voided outright); Record Payment
+                        (nothing left to pay) and the Delete icon below
+                        (losing a completed charge's own payment history)
+                        are the two that stop making sense once paid. %>
+                    <% if (c.status !== 'cancelled' && c.status !== 'paid') { %>
                       <button type="button" class="roster-action-btn roster-action-btn-fit" onclick="document.getElementById('payment-dialog-<%= c.id %>').showModal()">Record Payment</button>
+                    <% } %>
+                    <% if (c.status !== 'cancelled') { %>
                       <form method="POST" action="/main-admin/accounting/charges/<%= c.id %>/cancel" class="inline-block-form" data-confirm="Cancel this charge?">
                         <button type="submit" class="roster-action-btn roster-action-btn-danger roster-action-btn-fit">Cancel</button>
                       </form>
@@ -79,10 +96,12 @@
                   </td>
                   <td class="roster-btn-row accounting-row-icons">
                     <a class="icon-btn" href="/main-admin/accounting/invoices/<%= c.id %>/edit" aria-label="Edit invoice #<%= c.id %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></a>
-                    <form method="POST" action="/main-admin/accounting/invoices/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete invoice #<%= c.id %>? This also removes any payments recorded against it.">
-                      <input type="hidden" name="back" value="member" />
-                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete invoice #<%= c.id %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                    </form>
+                    <% if (c.status !== 'paid') { %>
+                      <form method="POST" action="/main-admin/accounting/invoices/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete invoice #<%= c.id %>? This also removes any payments recorded against it.">
+                        <input type="hidden" name="back" value="member" />
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete invoice #<%= c.id %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    <% } %>
                   </td>
                 </tr>
               <% }); %>
@@ -197,7 +216,9 @@
     </dialog>
 
     <% invoices.forEach(function(c) { %>
-      <% if (c.status !== 'cancelled') { %>
+      <%# Only rendered where its own trigger button still is - see the
+          Record Payment button's matching condition above. %>
+      <% if (c.status !== 'cancelled' && c.status !== 'paid') { %>
         <dialog id="payment-dialog-<%= c.id %>" class="member-picker-dialog">
           <form method="POST" action="/main-admin/accounting/charges/<%= c.id %>/payments" data-toggle-form>
             <h3>Record Payment &mdash; <%= c.description %></h3>

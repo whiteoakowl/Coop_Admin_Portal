@@ -49,7 +49,12 @@ for (const [name, middleware] of [['requireAdmin', requireAdmin], ['requireFullA
     });
 
     await t.test('redirects to login (with the original URL preserved) when there is no session and no JSON was requested', () => {
-      const req = { session: null, headers: {}, originalUrl: '/admin/members?tab=x' };
+      // method: 'GET' - a POST-only action URL is deliberately NOT safe
+      // to carry forward as `next=` (see requireAdmin.js/requireFullAdmin.js's
+      // own comment: re-logging in follows `next` with a plain GET, so a
+      // write-only URL replayed that way 404s outright) - only a GET
+      // request's own URL is preserved.
+      const req = { session: null, headers: {}, originalUrl: '/admin/members?tab=x', method: 'GET' };
       const res = mockRes();
       middleware(req, res, () => assert.fail('next() should not be called'));
       assert.equal(res.redirectedTo, '/admin/login?next=%2Fadmin%2Fmembers%3Ftab%3Dx');
@@ -66,10 +71,23 @@ for (const [name, middleware] of [['requireAdmin', requireAdmin], ['requireFullA
     });
 
     await t.test('a session with no adminId is treated the same as no session', () => {
-      const req = { session: {}, headers: {}, originalUrl: '/admin/members' };
+      const req = { session: {}, headers: {}, originalUrl: '/admin/members', method: 'GET' };
       const res = mockRes();
       middleware(req, res, () => assert.fail('next() should not be called'));
       assert.equal(res.redirectedTo, '/admin/login?next=%2Fadmin%2Fmembers');
+    });
+
+    // A real bug report: "after adding 4 categories it asks me to log in
+    // and then goes to a 404 page." A POST to a write-only action URL
+    // (no GET handler of its own) used to carry that same URL forward as
+    // `next=`; re-logging in follows it with a plain GET, which 404s on
+    // a POST-only route. Only a GET request's own URL is safe to send a
+    // signed-in admin straight back to.
+    await t.test('a POST with no session redirects to login with no next= (the URL would 404 if replayed as a GET)', () => {
+      const req = { session: null, headers: {}, originalUrl: '/admin/accounting/accounting-categories', method: 'POST' };
+      const res = mockRes();
+      middleware(req, res, () => assert.fail('next() should not be called'));
+      assert.equal(res.redirectedTo, '/admin/login');
     });
   });
 }

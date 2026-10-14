@@ -9,7 +9,8 @@
 <% if (fields.length === 0) { %>
   <p class="hint">No extra <%= label.toLowerCase() %> fields yet.</p>
 <% } else { %>
-  <table class="roster-table condensed-table" style="margin-bottom: 1rem;">
+  <div class="roster-scroll" style="margin-bottom: 1rem;">
+  <table class="roster-table condensed-table">
     <thead><tr><th>Label</th><th>Type</th><th>Required</th><th>Actions</th></tr></thead>
     <tbody>
       <% fields.forEach(function(f) { %>
@@ -51,6 +52,7 @@
       <% }); %>
     </tbody>
   </table>
+  </div>
 <% } %>
 <details class="manage-section">
   <summary>+ Add <%= label %> Field</summary>
