@@ -73,6 +73,11 @@ test('GET /main-admin shows Families/Parents/Students counters and a plain setti
   assert.match(res.text, /<span class="family-student-row-label">Teachers<\/span>/);
   assert.match(res.text, /<span class="family-student-row-label">Admins<\/span>/);
 
+  // A real request: "family count should be first" - Families' own row
+  // now renders ahead of Parents/Students/Teachers/Admins in document
+  // order (previously 3rd).
+  assert.match(res.text, /Families<\/span>[\s\S]*?Parents<\/span>[\s\S]*?Students<\/span>[\s\S]*?Teachers<\/span>[\s\S]*?Admins<\/span>/);
+
   // Pending-requests counters (item 6) each link straight to their own
   // request page. A later request added Membership Requests to this same
   // "Pending Requests" section, reusing the account-approval count/link
@@ -163,4 +168,37 @@ test('Teacher count: distinct members assigned as teacher on class_staff, teachi
   const res = await request(app).get('/main-admin').set('Cookie', cookie);
   assert.equal(res.status, 200);
   assert.match(res.text, /<span class="family-student-row-label">Teachers<\/span>\s*<span class="family-student-row-value">1<\/span>/);
+});
+
+// A real request: "admin count should be based off how many members are
+// admins under the settings gear" - Settings > Admins
+// (routes/main-admin.js's own /admins route) assigns members to Admin
+// Positions (member_admin_positions), a completely different thing from
+// holding the 'coop_admin'/'main_admin' PORTAL role (a login capability)
+// the count used to read instead - a member can easily have one without
+// the other.
+test('Admin count: distinct active members holding an Admin Position (Settings > Admins), not accounts with a coop_admin/main_admin portal role', async () => {
+  const positionId = (await db.prepare("INSERT INTO admin_positions (title, position) VALUES ('Treasurer', 0) RETURNING id").get()).id;
+  const secondPositionId = (await db.prepare("INSERT INTO admin_positions (title, position) VALUES ('Secretary', 1) RETURNING id").get()).id;
+
+  // Holds 2 admin positions - counted once.
+  const twoPositionMemberId = (await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Two Position Admin', 'two-position-admin-1', 'admin', 1) RETURNING id").get()).id;
+  await db.prepare('INSERT INTO member_admin_positions (member_id, admin_position_id) VALUES (?, ?)').run(twoPositionMemberId, positionId);
+  await db.prepare('INSERT INTO member_admin_positions (member_id, admin_position_id) VALUES (?, ?)').run(twoPositionMemberId, secondPositionId);
+
+  // Holds the Main Admin PORTAL role but no Admin Position - should NOT
+  // count, unlike the old member_account_roles query.
+  const portalOnlyId = (await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Portal Role Only Admin', 'portal-only-admin-1', 'admin', 1) RETURNING id").get()).id;
+  const portalAccountId = (
+    await db
+      .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, 'portal-only-admin@example.com', ?, 'active', now_text()) RETURNING id")
+      .get(portalOnlyId, hashPassword('testpassword123'))
+  ).id;
+  const mainAdminRole = await db.prepare("SELECT id FROM roles WHERE key = 'main_admin'").get();
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(portalAccountId, mainAdminRole.id);
+
+  const cookie = await loginAsMainAdmin();
+  const res = await request(app).get('/main-admin').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /<span class="family-student-row-label">Admins<\/span>\s*<span class="family-student-row-value">1<\/span>/);
 });

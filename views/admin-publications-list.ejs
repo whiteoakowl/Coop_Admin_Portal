@@ -16,21 +16,23 @@
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <table class="roster-table members-table condensed-table">
-      <thead>
-        <tr><th>Title</th><th>Status</th><th>Visibility</th><th></th></tr>
-      </thead>
-      <tbody>
-        <% items.forEach(function(i) { %>
-          <tr>
-            <td><a href="/main-admin/publications/<%= i.id %>/edit"><%= i.title %></a></td>
-            <td><span class="badge-pill badge-pill-<%= i.status === 'published' ? 'green' : 'gray' %>"><%= i.status.charAt(0).toUpperCase() + i.status.slice(1) %></span></td>
-            <td><%= i.visibility === 'public' ? 'Public' : 'Members Only' %></td>
-            <td><a class="roster-action-btn" href="/main-admin/publications/<%= i.id %>/edit">Edit</a></td>
-          </tr>
-        <% }); %>
-      </tbody>
-    </table>
+    <div class="roster-scroll">
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr><th>Title</th><th>Status</th><th>Visibility</th><th></th></tr>
+        </thead>
+        <tbody>
+          <% items.forEach(function(i) { %>
+            <tr>
+              <td><a href="/main-admin/publications/<%= i.id %>/edit"><%= i.title %></a></td>
+              <td><span class="badge-pill badge-pill-<%= i.status === 'published' ? 'green' : 'gray' %>"><%= i.status.charAt(0).toUpperCase() + i.status.slice(1) %></span></td>
+              <td><%= i.visibility === 'public' ? 'Public' : 'Members Only' %></td>
+              <td><a class="roster-action-btn" href="/main-admin/publications/<%= i.id %>/edit">Edit</a></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
 
     <dialog id="new-pub-dialog" class="member-picker-dialog">
       <form method="POST" action="/main-admin/publications">

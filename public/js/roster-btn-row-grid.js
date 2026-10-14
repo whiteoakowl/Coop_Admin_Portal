@@ -25,26 +25,22 @@
 // intact.
 (function () {
   function layout(row) {
-    // A toolbar action that's really a tiny <form method="POST"> around
-    // its own .roster-action-btn (Resync, Archive, ...) counts as one
-    // "slot" too, same as a plain <button> - styles.css makes that form
-    // display: contents on mobile so its button IS the real grid item,
-    // so this counts the button, not the (layout-invisible) form itself.
-    // A real bug report (Floater Assignments' own Edit Dates/+ Add/Edit
-    // Position row): a .roster-btn-row can also hold .btn-secondary
-    // buttons instead of .roster-action-btn ones - those used to count as
-    // zero items here, so this returned before ever setting a column
-    // count, leaving the row's own `display: grid` (styles.css) with no
-    // explicit columns - one implicit column, stacking every button onto
-    // its own row on mobile instead of laying them out side by side.
-    const items = row.querySelectorAll(':scope > .roster-action-btn, :scope > form > .roster-action-btn, :scope > .btn-secondary');
-    if (items.length === 0) return;
     // A toolbar can opt into a fixed column count (e.g. the Members page
     // wanting its 3 buttons to always read as 2 neat rows, not 1 wide
     // row) via data-fixed-columns="2" instead of the adaptive layout
     // below - same inline grid-template-columns mechanism, just skipping
     // the "fewest rows at ≤4 columns" calculation for a toolbar that
-    // wants a specific shape regardless of button count.
+    // wants a specific shape regardless of button count. Checked FIRST,
+    // ahead of the items.length === 0 early return just below - a real
+    // bug report (views/admin-accounting-list.ejs's own Print/Export
+    // icon row): its children are .icon-btn, not .roster-action-btn/
+    // .btn-secondary, so `items` was always empty for it and this used
+    // to bail out before ever reaching its own data-fixed-columns="2",
+    // leaving the row's `display: grid` (styles.css) with no explicit
+    // columns - one implicit column, stacking the 2 icons on mobile
+    // instead of the side-by-side row that attribute exists to force
+    // "regardless of what it finds inside" (its own original intent,
+    // just never actually reachable until this reordering).
     //
     // A real request: "on event the arrow buttons should be half the
     // size" - the Events calendar's own Prev/Month/Year/Next row
@@ -64,6 +60,20 @@
       row.style.gridTemplateColumns = `repeat(${fixedColumns}, 1fr)`;
       return;
     }
+    // A toolbar action that's really a tiny <form method="POST"> around
+    // its own .roster-action-btn (Resync, Archive, ...) counts as one
+    // "slot" too, same as a plain <button> - styles.css makes that form
+    // display: contents on mobile so its button IS the real grid item,
+    // so this counts the button, not the (layout-invisible) form itself.
+    // A real bug report (Floater Assignments' own Edit Dates/+ Add/Edit
+    // Position row): a .roster-btn-row can also hold .btn-secondary
+    // buttons instead of .roster-action-btn ones - those used to count as
+    // zero items here, so this returned before ever setting a column
+    // count, leaving the row's own `display: grid` (styles.css) with no
+    // explicit columns - one implicit column, stacking every button onto
+    // its own row on mobile instead of laying them out side by side.
+    const items = row.querySelectorAll(':scope > .roster-action-btn, :scope > form > .roster-action-btn, :scope > .btn-secondary');
+    if (items.length === 0) return;
     // As few rows as it takes to keep every row at 4 columns or fewer,
     // then columns balanced evenly across exactly that many rows (rather
     // than cramming 4-per-row into every row but the last, which would

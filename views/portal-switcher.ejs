@@ -11,12 +11,16 @@
         <img class="form-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
         <h1>My Portals</h1>
       </div>
-      <p class="hint">Choose a portal to continue.</p>
+      <%# A real request: "Portal choosing screen. Delete all
+          descriptions. Each portal button is the title only and
+          centered. Make the text a bit larger." Both the page's own
+          "Choose a portal to continue" hint and each card's own
+          role.description are gone; .portal-picker-title's own CSS
+          below carries the centering/larger-text part. %>
       <div class="portal-picker-grid">
         <% roles.forEach(function(role) { %>
           <a class="portal-picker-card" href="<%= portalHomeRoutes[role.key] || '/portal' %>">
             <span class="portal-picker-title"><%= role.label %></span>
-            <% if (role.description) { %><span class="portal-picker-desc"><%= role.description %></span><% } %>
           </a>
         <% }); %>
       </div>

@@ -27,6 +27,9 @@
       <div class="grid-box-header">
         <h1>Accounting</h1>
         <span class="badge-pill badge-pill-<%= balanceCents > 0 ? 'orange' : 'green' %>"><%= balanceCents > 0 ? formatCents(balanceCents) + ' due' : 'Paid in full' %></span>
+        <%# A real request: "add print button to member account pages on
+            parent portal and main admin portal." %>
+        <button type="button" class="roster-action-btn print-action-btn no-print" onclick="window.print()">Print</button>
       </div>
       <p class="hint">Charges and payment history for your family's account (<%= member.name %>). Payments are recorded by a Main Admin after money is received - there's no online payment here.</p>
 

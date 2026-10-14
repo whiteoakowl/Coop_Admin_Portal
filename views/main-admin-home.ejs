@@ -37,6 +37,12 @@
         <svg class="icon"><use href="#icon-users"/></svg>
         <h2>Members</h2>
       </div>
+      <%# A real request: "family count should be first." %>
+      <div class="family-student-row">
+        <span class="family-student-row-icon family-student-row-icon-blue"><svg class="icon"><use href="#icon-home"/></svg></span>
+        <span class="family-student-row-label">Families</span>
+        <span class="family-student-row-value"><%= familyCount %></span>
+      </div>
       <div class="family-student-row">
         <span class="family-student-row-icon family-student-row-icon-blue"><svg class="icon"><use href="#icon-users"/></svg></span>
         <span class="family-student-row-label">Parents</span>
@@ -46,11 +52,6 @@
         <span class="family-student-row-icon family-student-row-icon-blue"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
         <span class="family-student-row-label">Students</span>
         <span class="family-student-row-value"><%= studentCount %></span>
-      </div>
-      <div class="family-student-row">
-        <span class="family-student-row-icon family-student-row-icon-blue"><svg class="icon"><use href="#icon-home"/></svg></span>
-        <span class="family-student-row-label">Families</span>
-        <span class="family-student-row-value"><%= familyCount %></span>
       </div>
       <div class="family-student-row">
         <span class="family-student-row-icon family-student-row-icon-blue"><svg class="icon"><use href="#icon-book"/></svg></span>

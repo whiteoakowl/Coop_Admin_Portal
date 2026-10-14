@@ -341,24 +341,25 @@ async function findSetupCleanupBypassBadge(barcode) {
 // times a day, so callers should only invoke this for a real
 // findTaskItemByBarcode result, never for a bypass scan.
 //
-// Also checks each table's own "2nd badge" slot (task_item_id_2 - a real
-// request: "after parent scans their setup/cleanup badge it should ask
-// if they have a 2nd setup/cleanup badge to scan") - a task scanned as
-// someone's SECOND badge is just as logged as one scanned as their
-// first, so it has to block a different member's scan of that same
-// badge in either slot too.
+// Also checks each table's own "2nd badge"/"3rd badge" slots
+// (task_item_id_2/task_item_id_3 - a real request: "after parent scans
+// their setup/cleanup badge it should ask if they have a 2nd setup/
+// cleanup badge to scan," later extended: "also, add asking if you did a
+// 3rd job") - a task scanned as someone's SECOND or THIRD badge is just
+// as logged as one scanned as their first, so it has to block a
+// different member's scan of that same badge in any slot too.
 async function taskAlreadyLoggedByAnotherMember(taskItemId, date, memberId) {
   const row = await db
     .prepare(
       `SELECT member_id FROM attendance
         WHERE session_date = ? AND member_id != ?
-          AND ((task_item_id = ? AND task_scanned_at IS NOT NULL) OR (task_item_id_2 = ? AND task_scanned_at_2 IS NOT NULL))
+          AND ((task_item_id = ? AND task_scanned_at IS NOT NULL) OR (task_item_id_2 = ? AND task_scanned_at_2 IS NOT NULL) OR (task_item_id_3 = ? AND task_scanned_at_3 IS NOT NULL))
        UNION
        SELECT member_id FROM checkouts
-        WHERE session_date = ? AND member_id != ? AND (task_item_id = ? OR task_item_id_2 = ?)
+        WHERE session_date = ? AND member_id != ? AND (task_item_id = ? OR task_item_id_2 = ? OR task_item_id_3 = ?)
        LIMIT 1`
     )
-    .get(date, memberId, taskItemId, taskItemId, date, memberId, taskItemId, taskItemId);
+    .get(date, memberId, taskItemId, taskItemId, taskItemId, date, memberId, taskItemId, taskItemId, taskItemId);
   return !!row;
 }
 

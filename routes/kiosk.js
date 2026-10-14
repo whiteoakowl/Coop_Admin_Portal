@@ -286,6 +286,54 @@ router.post('/checkin/task-scan-2', async (req, res) => {
   // concurrently instead of one at a time.
   await Promise.all(rosters.map((r) => update.run(taskItemId, now, member.id, r.id, today)));
 
+  // A real request: "also, add asking if you did a 3rd job" - same
+  // needsSecondBadgeChoice idea as /checkin/task-scan above, one slot
+  // further.
+  res.json({ ok: true, name: member.name, needsThirdBadgeChoice: true, message: `Thank you for checking in, ${member.name}!` });
+});
+
+// Step 4 (optional): a member covering three Setup/Cleanup jobs the same
+// day scans a third badge after answering "Yes" to the step-3 prompt
+// above. Mirrors /checkin/task-scan-2 exactly, writing onto the 3rd slot.
+router.post('/checkin/task-scan-3', async (req, res) => {
+  if (checkinLimiter.isLimited(req.ip)) {
+    return res.json({ ok: false, message: 'Too many check-ins from this device right now. Please wait a moment and try again.' });
+  }
+  checkinLimiter.recordAttempt(req.ip);
+
+  const memberId = parseInt(req.body.memberId, 10);
+  const barcode = (req.body.barcode || '').trim();
+  const today = todayISO();
+
+  if (!barcode) {
+    return res.json({ ok: false, message: 'No barcode scanned.' });
+  }
+
+  const member = await db.prepare('SELECT * FROM members WHERE id = ? AND active = 1').get(memberId);
+  if (!member) {
+    return res.json({ ok: false, message: 'Member not found.' });
+  }
+
+  const task = await findTaskItemByBarcode(barcode);
+  const bypass = task ? null : await findSetupCleanupBypassBadge(barcode);
+  if (!task && !bypass) {
+    return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
+  }
+
+  if (task && (await taskAlreadyLoggedByAnotherMember(task.id, today, member.id))) {
+    return res.json({ ok: false, message: `"${task.description}" has already been logged today. Please scan a different Setup/Cleanup badge.` });
+  }
+
+  const rosters = (await getMemberRostersForDate(member.id, today)).filter((r) => r.category !== 'Class Roster');
+  if (rosters.length === 0) {
+    return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
+  }
+
+  const now3 = Date.now();
+  const taskItemId3 = task ? task.id : null;
+  const update3 = db.prepare('UPDATE attendance SET task_item_id_3 = ?, task_scanned_at_3 = ? WHERE member_id = ? AND roster_id = ? AND session_date = ?');
+  await Promise.all(rosters.map((r) => update3.run(taskItemId3, now3, member.id, r.id, today)));
+
   res.json({ ok: true, name: member.name, message: `Thank you for checking in, ${member.name}!` });
 });
 
