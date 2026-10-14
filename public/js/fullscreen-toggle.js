@@ -52,8 +52,21 @@
       ? initPinKeypad(pinDialog.querySelector('#fullscreen-exit-pin-keypad'), pinInput, pinForm)
       : null;
 
+  // Flagged immediately before every real document.exitFullscreen() call
+  // below (never just from opening the PIN dialog - cancelling that
+  // dialog must NOT suppress recovery from some later, unrelated
+  // fullscreen loss) so fullscreen-nav.js's own recovery listener can
+  // tell this deliberate exit apart from fullscreen being lost some
+  // OTHER way (a camera permission prompt, the device's own screen-lock/
+  // app-switch) and knows not to silently re-enter kiosk mode right back
+  // on top of it - see that file's own comment for the real bug this is
+  // paired with.
+  function markIntentionalExit() {
+    window.__kioskIntentionalFullscreenExit = true;
+  }
+
   function requestExit() {
-    if (!pinDialog) { document.exitFullscreen(); return; }
+    if (!pinDialog) { markIntentionalExit(); document.exitFullscreen(); return; }
     if (pinError) pinError.hidden = true;
     if (pinInput) pinInput.value = '';
     if (pinKeypad) pinKeypad.clear();
@@ -83,6 +96,7 @@
       }
       if (result.ok) {
         pinDialog.close();
+        markIntentionalExit();
         document.exitFullscreen();
       } else if (pinError) {
         pinError.textContent = result.error || 'Incorrect PIN.';

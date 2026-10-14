@@ -6075,7 +6075,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
+  /* Legacy page-break-inside alongside break-inside, directly here
+     rather than relying on the @media print block further down to add
+     it - harmless outside of paginated print either way, and makes this
+     rule correct standalone instead of depending on cascade order. */
   break-inside: avoid;
+  page-break-inside: avoid;
 }
 /* A real bug report, worst on a phone-width Setup/Cleanup Assignments
    page: the whole card (Assign buttons included) sat past the right edge
@@ -9320,7 +9325,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 
 .schedule-print-card {
+  /* Legacy page-break-inside alongside break-inside - an older browser's
+     print engine only understands the prefixed/legacy property, same
+     pairing already applied to every other break-inside rule in this
+     file that genuinely prints (.class-schedule-print-card,
+     .schedule-print-member-section, .team-col, .grid-box, .floater-card,
+     .event-calendar-table) - this one (the single-member Schedule print
+     page's own per-class card) had been missed. */
   break-inside: avoid;
+  page-break-inside: avoid;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -11222,8 +11235,24 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
    button isn't inside a flex ROW. Scoped to this page only (views/
    parent-home.ejs's own .parent-home-main) rather than a blanket
    .portal-dashboard-card override, since that class is shared by every
-   portal's own home page. */
-.parent-home-main .roster-action-btn { align-self: flex-start; }
+   portal's own home page.
+   A real follow-up report: the buttons were STILL different sizes after
+   the align-self fix above - "should all be similar size, fit to text,
+   same height." Root cause: .roster-action-btn's own flex: 1 0 auto sets
+   flex-GROW: 1 too, and .portal-dashboard-grid is a CSS grid with its
+   default align-items: stretch, which stretches every card in the same
+   grid ROW to match its tallest sibling's height. A card with less
+   content above its button (e.g. Quick Links, a short list) ends up with
+   real leftover vertical space once stretched to match a taller
+   neighbor - flex-grow: 1 handed every bit of that leftover space
+   straight to the button itself (the only flex-growable child in that
+   column), stretching it tall while a button in a naturally-tall card
+   stayed its normal small height. flex-grow: 0 (keep shrink/basis as-is)
+   stops the button from absorbing that space, so every button's height
+   is driven only by its own text/padding again, matching every other
+   button on the page regardless of how much (or little) content shares
+   its own card. */
+.parent-home-main .roster-action-btn { align-self: flex-start; flex-grow: 0; }
 
 /* Student Portal home: Announcements + Word of the Week side by side - a
    real request: "desktop it should be smaller width. announcements first,

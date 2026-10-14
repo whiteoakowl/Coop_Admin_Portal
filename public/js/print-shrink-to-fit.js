@@ -7,6 +7,91 @@
 // page-break calculation actually looks at - a transform-scaled box still
 // reports its original, oversized height and would still overflow onto a
 // second page even though it visually looks smaller on screen.
+//
+// A real bug report: "make sure printing works universal for any age
+// device like all other programs in the world." `zoom` is not a web
+// standard - it's a long-standing Chromium/WebKit/IE proprietary
+// property, and Firefox (still common on older/locked-down devices)
+// didn't implement it at all until version 126 (May 2024). On any older
+// Firefox, every `inner.style.zoom = scale` line below is silently a
+// no-op: the content never actually shrinks, and (just as bad) the
+// correction loop's own getBoundingClientRect() check would keep seeing
+// the same oversized, un-shrunk box no matter how far `scale` drops,
+// since zoom genuinely isn't doing anything there - the exact
+// "something's still wrong with the pagination" shape this file's own
+// comments already describe for a different root cause (the oversized-
+// team case above). ZOOM_SUPPORTED feature-detects this once at load and
+// routes every scale application through applyScale/resetScale below:
+// browsers that support zoom (the overwhelming majority, and the only
+// ones this file's extensive "confirmed live" tuning above was ever
+// verified against) keep running through the exact same `.style.zoom =`
+// path, completely unchanged; only a browser that genuinely can't do
+// `zoom` falls through to the `transform: scale()` version instead -
+// transform is a mature, universal CSS Transforms property with no
+// comparable support gap on any browser old enough to still matter.
+// transform doesn't shrink its own element's LAYOUT footprint the way
+// zoom does (see the file-level comment above for why zoom was chosen
+// over it originally) - getBoundingClientRect() still reports the
+// POST-transform size correctly either way (confirmed: transforms do
+// affect that, just not an ancestor's own auto-sizing), so the
+// correction loop's own math is identical for both; only `wrap` (whose
+// real height the print engine's pagination actually reads, normally
+// kept in sync automatically by zoom shrinking what `wrap` auto-sizes
+// around) needs a manual nudge in the transform case - applyScale sets
+// it directly to the content's real post-scale footprint, and
+// resetScale puts it back.
+var ZOOM_SUPPORTED = typeof CSS !== 'undefined' && !!CSS.supports && CSS.supports('zoom', '1');
+
+// Applies the visual scale only - called on every pass of fitOne's own
+// correction loop below, same as a plain `inner.style.zoom = scale`
+// used to be. getBoundingClientRect() reflects a `transform: scale()`
+// correctly (confirmed: transforms DO affect that, just not an
+// ancestor's own auto-sizing the way zoom does), so the correction
+// loop's own math needs no changes at all for the fallback branch - only
+// what happens once the loop has actually converged (syncWrapToScale
+// below) differs.
+function applyVisualScale(inner, scale) {
+  if (ZOOM_SUPPORTED) {
+    inner.style.zoom = scale;
+    return;
+  }
+  inner.style.transform = scale === 1 ? '' : 'scale(' + scale + ')';
+  inner.style.transformOrigin = 'top left';
+}
+
+// Only meaningful (and only ever called) in the transform fallback path -
+// zoom already keeps `wrap`'s own auto-height in sync with `inner`'s
+// shrunk box for free, which is the whole reason it was chosen over
+// transform to begin with (see this file's top comment). transform
+// doesn't: `inner` still occupies its full, UNSCALED box as far as
+// `wrap`'s auto-height is concerned, so `wrap` - whose real height the
+// print engine's own pagination actually reads - needs to be told its
+// true size directly, once the correction loop has already settled on a
+// final scale and inner's rendered (post-transform) box genuinely
+// reflects it. overflow: hidden keeps inner's still-full-size reserved
+// layout box (the part transform never shrinks) from visually spilling
+// past wrap's now-smaller real one.
+function syncWrapToScale(inner, wrap, scale) {
+  if (ZOOM_SUPPORTED) return;
+  if (scale === 1) {
+    wrap.style.height = '';
+    wrap.style.overflow = '';
+    return;
+  }
+  const rect = inner.getBoundingClientRect();
+  wrap.style.height = rect.height + 'px';
+  wrap.style.overflow = 'hidden';
+}
+
+function resetScale(inner, wrap) {
+  inner.style.zoom = 1;
+  inner.style.transform = '';
+  if (wrap) {
+    wrap.style.height = '';
+    wrap.style.overflow = '';
+  }
+}
+
 (function () {
   var MAX_CORRECTIONS = 40;
   // A real bug report, two surfaces at once: "printing setup cleanup team
@@ -35,10 +120,16 @@
   // better outcome than every page on the job going illegible for it.
   var MIN_SCALE = 0.4;
 
+  // Returns the final scale it settled on (1 if there was nothing to
+  // shrink, or the wrap/inner were missing/unmeasurable) - fitGroup below
+  // needs this back directly rather than reading it off inner.style.zoom
+  // the way it used to, since that reflects nothing at all once
+  // applyVisualScale is using the transform fallback (see this file's
+  // own top comment on why ZOOM_SUPPORTED exists).
   function fitOne(wrap) {
     const inner = wrap.firstElementChild;
-    if (!inner) return;
-    inner.style.zoom = 1;
+    if (!inner) return 1;
+    resetScale(inner, wrap);
     // [data-shrink-to-fit-budget] (e.g. "9.8in") is for a wrapper that
     // does NOT want a real, permanent CSS height of its own - unlike
     // #grid-box-attendance, which genuinely needs a fixed height all the
@@ -65,7 +156,7 @@
     const availW = wrap.clientWidth;
     const availH = wrap.clientHeight;
     if (budget) wrap.style.height = '';
-    if (!availW || !availH) return;
+    if (!availW || !availH) return 1;
     // MIN_SCALE clamped right here too, not just inside the correction
     // loop below - a genuinely oversized case's first estimate can land
     // below it outright (e.g. a 150-member team estimating ~0.12), and
@@ -74,7 +165,7 @@
     // loop's internal clamp ever runs - see this file's own top-of-file
     // comment on the real bug this caused.
     let scale = Math.max(MIN_SCALE, Math.min(1, availW / inner.scrollWidth, availH / inner.scrollHeight));
-    inner.style.zoom = scale;
+    applyVisualScale(inner, scale);
     // The ratio above is computed from the UNSCALED box, then applied in
     // one shot - fine for most content, but a table with many rows can
     // drift a few real pixels off that estimate (border/padding rounding
@@ -122,13 +213,19 @@
       const widthRatio = availW / rect.width;
       const heightRatio = availH / rect.height;
       scale = Math.max(MIN_SCALE, scale * Math.min(1, widthRatio, heightRatio));
-      inner.style.zoom = scale;
+      applyVisualScale(inner, scale);
     }
+    // The correction loop above only ever calls applyVisualScale (the
+    // visual part, every pass) - wrap's own real box is only synced to
+    // the final, converged scale once, here, not on every intermediate
+    // pass (see syncWrapToScale's own comment on why it's needed at all).
+    syncWrapToScale(inner, wrap, scale);
+    return scale;
   }
 
   function resetOne(wrap) {
     const inner = wrap.firstElementChild;
-    if (inner) inner.style.zoom = 1;
+    if (inner) resetScale(inner, wrap);
   }
 
   // A real request: Setup/Cleanup team printing, one team per page - "all
@@ -145,15 +242,17 @@
   function fitGroup(wraps) {
     let minScale = 1;
     wraps.forEach((wrap) => {
-      fitOne(wrap);
-      const inner = wrap.firstElementChild;
-      if (!inner) return;
-      const zoom = parseFloat(inner.style.zoom);
-      if (!Number.isNaN(zoom) && zoom < minScale) minScale = zoom;
+      // fitOne's own return value, not inner.style.zoom read back off the
+      // element - that reflects nothing at all once applyVisualScale is
+      // using the transform fallback (see this file's own top comment).
+      const scale = fitOne(wrap);
+      if (scale < minScale) minScale = scale;
     });
     wraps.forEach((wrap) => {
       const inner = wrap.firstElementChild;
-      if (inner) inner.style.zoom = minScale;
+      if (!inner) return;
+      applyVisualScale(inner, minScale);
+      syncWrapToScale(inner, wrap, minScale);
     });
   }
 

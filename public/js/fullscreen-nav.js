@@ -202,4 +202,38 @@
     },
     true
   );
+
+  // A real bug report: "something is still kicking it out of kiosk
+  // mode." Everything above keeps fullscreen alive across an in-app
+  // navigation, but fullscreen can still be lost for reasons that have
+  // nothing to do with navigating at all - most concretely, this app's
+  // own "Mobile Barcode Scan" option (public/js/kiosk-camera-scanner.js)
+  // requests camera access, and on several mobile browsers (Android
+  // Chrome, iOS Safari) showing the native camera-permission prompt
+  // forcibly exits fullscreen as a platform security measure - no amount
+  // of JS on this page can prevent that prompt from doing it. Device
+  // screen-lock/app-switching can do the same. This listens for
+  // fullscreen being lost and, unless it was THIS app's own deliberate,
+  // PIN-verified exit (fullscreen-toggle.js sets
+  // window.__kioskIntentionalFullscreenExit right before its own
+  // document.exitFullscreen() calls), tries to silently re-enter it
+  // right away - so a kiosk left running recovers kiosk mode on its own
+  // instead of quietly sitting in a normal browser window (with the real
+  // address bar, back button, etc. all exposed) until someone happens to
+  // notice. requestFullscreen() still requires recent user activation in
+  // most browsers; this only succeeds when the loss itself followed a
+  // user gesture closely enough to still be within that window (true for
+  // a permission-prompt dismissal, which is exactly the common real
+  // case) - .catch(() => {}) is the same silent-no-op every other
+  // best-effort requestFullscreen() call in this app already uses when
+  // that's not the case, leaving kiosk mode off (same as before this
+  // existed) rather than surfacing an error over it.
+  document.addEventListener('fullscreenchange', () => {
+    if (isFullscreen()) return;
+    if (window.__kioskIntentionalFullscreenExit) {
+      window.__kioskIntentionalFullscreenExit = false;
+      return;
+    }
+    document.documentElement.requestFullscreen().catch(() => {});
+  });
 })();
