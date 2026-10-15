@@ -282,23 +282,13 @@
 
         <div class="manage-section">
           <div class="grid-box-header">
-            <h2>Teachers &amp; Assistants (<%= cls.staff.length %>)</h2>
+            <h2>Teachers &amp; Assistants (<span id="staff-roster-count"><%= cls.staff.length %></span>)</h2>
             <button type="button" class="btn-secondary no-print" onclick="document.getElementById('add-staff-dialog').showModal()">+ Add Teacher/Assistant</button>
           </div>
-          <div class="roster-log-list">
-            <% if (cls.staff.length === 0) { %>
-              <p class="roster-log-empty">No teachers/assistants yet.</p>
-            <% } %>
+          <div class="roster-log-list" id="staff-roster-list">
+            <p class="roster-log-empty" id="staff-roster-empty" <% if (cls.staff.length > 0) { %>hidden<% } %>>No teachers/assistants yet.</p>
             <% cls.staff.forEach(function(s) { %>
-              <div class="roster-log-row">
-                <span class="roster-log-name"><a class="member-name-link" href="/admin/members/<%= s.id %>"><%= s.name %></a></span>
-                <span class="roster-log-meta">
-                  <span class="badge-pill"><%= s.role === 'assistant' ? 'Assistant' : 'Teacher' %></span>
-                </span>
-                <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/staff/<%= s.id %>/remove" class="inline-block-form no-print" data-confirm="Remove <%= s.name %> from this class?">
-                  <button type="submit" class="icon-btn" aria-label="Remove <%= s.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                </form>
-              </div>
+              <%- include('partials/roster-staff-row', { s: s, removeAction: '/admin/class-schedule/classes/' + cls.id + '/staff/' + s.id + '/remove' }) %>
             <% }); %>
           </div>
         </div>
@@ -457,11 +447,10 @@
     </dialog>
 
     <dialog id="add-staff-dialog" class="member-picker-dialog">
-      <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/staff/add">
+      <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/staff/add" id="add-staff-form">
         <h3>Add Teacher/Assistant</h3>
-        <% if (availableStaff.length === 0) { %>
-          <p class="hint">Every eligible parent/student is already assigned to this class.</p>
-        <% } else { %>
+        <p class="hint" id="add-staff-empty-hint" <% if (availableStaff.length > 0) { %>hidden<% } %>>Every eligible parent/student is already assigned to this class.</p>
+        <% if (availableStaff.length > 0) { %>
           <label>Member
             <select name="memberId" required>
               <% availableStaff.forEach(function(p) { %>
@@ -476,9 +465,7 @@
         <% } %>
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <% if (availableStaff.length > 0) { %>
-            <button type="submit" class="primary-btn">Add</button>
-          <% } %>
+          <button type="submit" class="primary-btn" id="add-staff-submit" <% if (availableStaff.length === 0) { %>hidden<% } %>>Add</button>
         </div>
       </form>
     </dialog>

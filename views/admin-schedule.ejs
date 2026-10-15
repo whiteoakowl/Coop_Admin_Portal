@@ -3,17 +3,17 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
-<body class="admin-page schedule-page">
+<body class="admin-page schedule-page<%= tab === 'classregistrationlog' ? ' class-reglog-print-page' : '' %>">
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="print-header">
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub">Schedule</p>
+        <p class="print-header-sub"><%= tab === 'classregistrationlog' ? 'Class Registration Log' : 'Schedule' %></p>
       </div>
     </div>
-    <h1><%= tab === 'settings' ? 'Co-op Class Settings' : tab === 'members' ? 'Member Schedules' : 'Class Schedules' %></h1>
+    <h1><%= tab === 'settings' ? 'Co-op Class Settings' : tab === 'members' ? 'Member Schedules' : tab === 'classregistrationlog' ? 'Class Registration Log' : 'Class Schedules' %></h1>
 
     <%# Class Schedules/Member Schedules/Settings now live as subpages
         under the orange bar's own Schedules item (views/partials/admin-
@@ -202,6 +202,82 @@
           </dialog>
         <% }); %>
       <% } %>
+      <% } else if (tab === 'classregistrationlog') { %>
+        <%# A real request: "Co-op admin portal, classes tab, add a sub
+            page called class registration log, setup the same way as I
+            described the new event log" - true two-level grouping
+            (routes/admin-schedule.js's own
+            groupClassRegistrationActionsByDate), same accordion CSS/JS
+            Main Admin's own Event Registration Log already established
+            (.absence-family-group and friends, public/js/absence-log-
+            accordion.js), with a nested family list inside each date's
+            own panel. %>
+        <div class="roster-toolbar no-print">
+          <form method="GET" action="/admin/schedule" class="dashboard-date-picker">
+            <input type="hidden" name="tab" value="classregistrationlog" />
+            <svg class="icon"><use href="#icon-calendar-check"/></svg>
+            <span class="dashboard-date-picker-label"><%= dateFilterLabel %></span>
+            <svg class="icon"><use href="#icon-chevron-down"/></svg>
+            <input type="date" name="date" value="<%= dateFilter %>" aria-label="Filter by date" onchange="this.form.requestSubmit()" />
+          </form>
+          <% if (dateFilter) { %><a class="roster-action-btn" href="/admin/schedule?tab=classregistrationlog">Clear</a><% } %>
+          <div class="roster-btn-row">
+            <a class="roster-action-btn file-action-btn" href="/admin/schedule/classregistrationlog/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
+            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+          </div>
+        </div>
+
+        <% if (dateGroups.length === 0) { %>
+          <p class="roster-empty no-print">No class registrations or cancellations<%= dateFilter ? ' for this date' : ' yet' %>.</p>
+        <% } else { %>
+          <div class="absence-family-groups no-print">
+            <% dateGroups.forEach(function(g, i) { %>
+              <div class="absence-family-group">
+                <button type="button" class="absence-family-toggle" aria-expanded="false" aria-controls="classreglog-date-<%= i %>">
+                  <span class="absence-family-name"><%= g.dateLabel %></span>
+                  <span class="absence-family-count"><%= g.familyGroups.length %> famil<%= g.familyGroups.length === 1 ? 'y' : 'ies' %></span>
+                  <svg class="icon absence-family-chevron"><use href="#icon-chevron-down"/></svg>
+                </button>
+                <div class="absence-family-members" id="classreglog-date-<%= i %>" hidden>
+                  <% g.familyGroups.forEach(function(fg) { %>
+                    <p class="reglog-family-heading"><%= fg.familyName %></p>
+                    <% fg.members.forEach(function(r) { %>
+                      <div class="absence-member-row">
+                        <span class="absence-member-name"><%= r.memberName %></span>
+                        <span class="status-badge <%= r.actionLabel === 'Cancelled' ? 'status-badge-absent' : r.actionLabel === 'Waitlisted' ? 'status-badge-late' : 'status-badge-present' %>"><%= r.actionLabel %></span>
+                        <span class="absence-member-detail"><%= r.className %></span>
+                        <span class="absence-member-detail"><%= r.classDayLabel %></span>
+                      </div>
+                    <% }); %>
+                  <% }); %>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+
+        <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref }) %>
+
+        <table class="roster-table members-table condensed-table logs-print-table class-reglog-print-table">
+          <thead>
+            <tr><th>Date</th><th>Family</th><th>Name</th><th>Class</th><th>Day</th><th>Action</th></tr>
+          </thead>
+          <tbody>
+            <% if (allSubmissions.length === 0) { %>
+              <tr><td colspan="6" class="roster-empty">No class registrations or cancellations<%= dateFilter ? ' for this date' : ' yet' %>.</td></tr>
+            <% } %>
+            <% allSubmissions.forEach(function(r) { %>
+              <tr>
+                <td><%= r.dateLabel %></td>
+                <td><%= r.familyName || '—' %></td>
+                <td><%= r.memberName %></td>
+                <td><%= r.className %></td>
+                <td><%= r.classDayLabel %></td>
+                <td><span class="status-badge <%= r.actionLabel === 'Cancelled' ? 'status-badge-absent' : r.actionLabel === 'Waitlisted' ? 'status-badge-late' : 'status-badge-present' %>"><%= r.actionLabel %></span></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
       <% } else { %>
         <%
           function buildQuery(overrides) {
@@ -340,5 +416,8 @@
   <script src="/js/forum-editor.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/class-card-title-fit.js"></script>
+  <% if (tab === 'classregistrationlog') { %>
+    <script src="/js/absence-log-accordion.js"></script>
+  <% } %>
 </body>
 </html>

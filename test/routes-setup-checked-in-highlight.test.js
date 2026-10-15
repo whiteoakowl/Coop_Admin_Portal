@@ -111,12 +111,12 @@ test('Setup/Cleanup Assignments: admin + kiosk views highlight a checked-in memb
       // list surface"), not plain text directly in the <td>.
       assert.match(
         res.text,
-        /<tr class="setup-assignment-row-checked-in">\s*<td class="floater-card-position">\s*<a class="member-name-link"[^>]*>Checked In Volunteer/,
+        /<tr>\s*<td class="floater-card-position setup-assignment-name-checked-in">\s*<a class="member-name-link"[^>]*>Checked In Volunteer/,
         'the checked-in member should be highlighted'
       );
       assert.doesNotMatch(
         res.text,
-        /<tr class="setup-assignment-row-checked-in">\s*<td class="floater-card-position">\s*<a class="member-name-link"[^>]*>Not Checked In Volunteer/,
+        /<tr>\s*<td class="floater-card-position setup-assignment-name-checked-in">\s*<a class="member-name-link"[^>]*>Not Checked In Volunteer/,
         'a member who never checked in is never highlighted'
       );
     });
@@ -147,14 +147,14 @@ test('Setup/Cleanup Assignments: an absent member is highlighted absent, not che
   // Scoped to this specific member's own row, not "anywhere on the page" -
   // an earlier test in this same file left an unrelated, genuinely
   // checked-in member on this same monday tab, so the page as a whole
-  // legitimately does contain setup-assignment-row-checked-in elsewhere.
+  // legitimately does contain setup-assignment-name-checked-in elsewhere.
   assert.match(
     res.text,
-    /<tr class="setup-assignment-row-absent">\s*<td class="floater-card-position">\s*<a class="member-name-link"[^>]*>Both Flags Volunteer/,
+    /<tr>\s*<td class="floater-card-position setup-assignment-name-absent">\s*<a class="member-name-link"[^>]*>Both Flags Volunteer/,
     'absent takes precedence over checked-in when both are true'
   );
   assert.doesNotMatch(
     res.text,
-    /<tr class="setup-assignment-row-checked-in">\s*<td class="floater-card-position">\s*<a class="member-name-link"[^>]*>Both Flags Volunteer/
+    /<tr>\s*<td class="floater-card-position setup-assignment-name-checked-in">\s*<a class="member-name-link"[^>]*>Both Flags Volunteer/
   );
 });

@@ -20,9 +20,11 @@
 // Registration Schedule's own role-scoped windows already cover that.
 const db = require('../db');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('./sections');
-const { ageGroupList, classGlobalSettings, classScheduleIdsForClass } = require('./classSchedule');
-const { ageAsOfDate, todayISO } = require('./dates');
+const { ageGroupList, classGlobalSettings, classScheduleIdsForClass, CLASS_DAY_LABELS_FULL } = require('./classSchedule');
+const { ageAsOfDate, todayISO, formatDateLabel } = require('./dates');
 const { createCharge, amountPaidForCharge, cancelCharge, recordPayment } = require('./payments');
+const { lastNameOf } = require('./members');
+const { toCsvRow } = require('./spreadsheet');
 const { primaryParentForBilling } = require('./members');
 const { isRegistrationOpenForAccount } = require('./registrationWindows');
 const notifications = require('./notifications');
@@ -429,4 +431,91 @@ async function adminRemoveStudentFromClass(classId, studentId, adminAccountId) {
   }
 }
 
-module.exports = { registerForClass, unregisterFromClass, adminRemoveStudentFromClass, joinClassAsStaff, leaveClassAsStaff, staffCountsForClass };
+// A real request: "add a subapage called class registration log[,] setup
+// the same way as I described the new event log[:] record every time a
+// member registers for a class or cancels[,] organized by date and then
+// by family." class_registrations is the same shape event_registrations
+// turned out to be (see utils/events.js's own allEventRegistrationActions
+// comment for the full story) - cancelRegistration/adminRemoveStudent
+// FromClass above both UPDATE the SAME row's status/cancelled_at in
+// place rather than inserting a new one, so a cancelled row's own
+// created_at only ever reflects the ORIGINAL registration moment, never
+// the later cancellation. Synthesized into up to two flat entries per
+// row exactly like the event log does, for the same reason: a real
+// register moment (created_at) and, only if it happened, a later cancel
+// moment (cancelled_at) are two separate "a member did something"
+// events this log needs to show on their own dates, not one row stuck
+// at whichever timestamp happened to be written first. Co-op Admin's own
+// pre-existing Logs page "Class Registration" tab (routes/admin-logs.js)
+// has this exact same gap (reads a cancelled row's created_at as "the
+// day the action happened," silently missing the cancel date itself) -
+// left as-is rather than changed here, since nothing about it was asked
+// for and it's a separate, already-shipped feature.
+async function allClassRegistrationActions() {
+  const rows = await db
+    .prepare(
+      `SELECT c.class_name AS "className", c.day AS "classDay",
+              m.name AS "memberName", m.family_id AS "familyId", f.name AS "familyName",
+              cr.status, cr.created_at AS "createdAt", cr.cancelled_at AS "cancelledAt"
+       FROM class_registrations cr
+       JOIN classes c ON c.id = cr.class_id
+       JOIN members m ON m.id = cr.student_id
+       LEFT JOIN families f ON f.id = m.family_id`
+    )
+    .all();
+
+  const actions = [];
+  for (const r of rows) {
+    const date = r.createdAt.slice(0, 10);
+    actions.push({
+      memberName: r.memberName,
+      familyId: r.familyId,
+      familyName: r.familyName,
+      className: r.className,
+      classDayLabel: CLASS_DAY_LABELS_FULL[r.classDay] || r.classDay,
+      actionLabel: r.status === 'waitlisted' ? 'Waitlisted' : 'Registered',
+      date,
+      dateLabel: formatDateLabel(date),
+    });
+    if (r.cancelledAt) {
+      const cancelDate = r.cancelledAt.slice(0, 10);
+      actions.push({
+        memberName: r.memberName,
+        familyId: r.familyId,
+        familyName: r.familyName,
+        className: r.className,
+        classDayLabel: CLASS_DAY_LABELS_FULL[r.classDay] || r.classDay,
+        actionLabel: 'Cancelled',
+        date: cancelDate,
+        dateLabel: formatDateLabel(cancelDate),
+      });
+    }
+  }
+
+  return actions.sort(
+    (a, b) =>
+      b.date.localeCompare(a.date) ||
+      lastNameOf(a.memberName).localeCompare(lastNameOf(b.memberName), undefined, { sensitivity: 'base' }) ||
+      a.memberName.localeCompare(b.memberName, undefined, { sensitivity: 'base' })
+  );
+}
+
+const CLASS_REGISTRATION_LOG_EXPORT_HEADER = ['Date', 'Family', 'Name', 'Class', 'Day', 'Action'];
+
+function buildClassRegistrationLogExportCsvLines(actions) {
+  return [
+    toCsvRow(CLASS_REGISTRATION_LOG_EXPORT_HEADER),
+    ...actions.map((a) => toCsvRow([a.dateLabel, a.familyName || '', a.memberName, a.className, a.classDayLabel, a.actionLabel])),
+  ];
+}
+
+module.exports = {
+  registerForClass,
+  unregisterFromClass,
+  adminRemoveStudentFromClass,
+  joinClassAsStaff,
+  leaveClassAsStaff,
+  staffCountsForClass,
+  allClassRegistrationActions,
+  buildClassRegistrationLogExportCsvLines,
+};

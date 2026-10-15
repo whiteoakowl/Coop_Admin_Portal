@@ -3,7 +3,7 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
-<body>
+<body class="<%= activeTab === 'registrationlog' ? 'events-registrationlog-print-page' : '' %>">
   <%- include('partials/portal-nav', {
     portalTitle: 'Main Admin',
   }) %>
@@ -20,8 +20,13 @@
         <% } %>
         <%# A real request: "remove export and import buttons from the
             event settings page" - still shown on Calendar/Drafts/
-            Requests/Attendance, just not here. %>
-        <% if (activeTab !== 'settings') { %>
+            Requests/Attendance, just not here. The Event Registration Log
+            builds its own Export/Print/date-filter toolbar further down
+            (same shape Co-op Admin's own Logs page tabs use) - it needs
+            its own export endpoint (registration actions, not the events
+            list this generic Export button hits) and has no Import of
+            its own at all. %>
+        <% if (activeTab !== 'settings' && activeTab !== 'registrationlog') { %>
           <a class="roster-action-btn file-action-btn" href="/main-admin/events/export.csv">Export</a>
           <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-events-dialog').showModal()">Import</button>
         <% } %>
@@ -160,6 +165,85 @@
           </table>
         </div>
       <% } %>
+    <% } else if (activeTab === 'registrationlog') { %>
+      <%# A real request: "add a subpage called event registration log.
+          Here it will record every time a member registers for an event
+          or cancels[,] organized by date and then by family." True two-
+          level grouping (routes/admin-events.js's own
+          groupEventRegistrationActionsByDate) - every DATE accordion
+          holds its own FAMILY sub-groups, not the flatter one-(family,
+          date)-tuple-per-row shape Co-op Admin's own Absence/Class
+          Registration logs use. Reuses the exact same accordion CSS/JS
+          (.absence-family-group and friends, public/js/absence-log-
+          accordion.js) those logs already established, just with a
+          nested family list inside each date's own panel instead of a
+          flat member list. %>
+      <div class="roster-toolbar no-print">
+        <form method="GET" action="/main-admin/events" class="dashboard-date-picker">
+          <input type="hidden" name="tab" value="registrationlog" />
+          <svg class="icon"><use href="#icon-calendar-check"/></svg>
+          <span class="dashboard-date-picker-label"><%= dateFilterLabel %></span>
+          <svg class="icon"><use href="#icon-chevron-down"/></svg>
+          <input type="date" name="date" value="<%= dateFilter %>" aria-label="Filter by date" onchange="this.form.requestSubmit()" />
+        </form>
+        <% if (dateFilter) { %><a class="roster-action-btn" href="/main-admin/events?tab=registrationlog">Clear</a><% } %>
+        <div class="roster-btn-row">
+          <a class="roster-action-btn file-action-btn" href="/main-admin/events/registrationlog/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
+          <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+        </div>
+      </div>
+
+      <% if (dateGroups.length === 0) { %>
+        <p class="roster-empty no-print">No event registrations or cancellations<%= dateFilter ? ' for this date' : ' yet' %>.</p>
+      <% } else { %>
+        <div class="absence-family-groups no-print">
+          <% dateGroups.forEach(function(g, i) { %>
+            <div class="absence-family-group">
+              <button type="button" class="absence-family-toggle" aria-expanded="false" aria-controls="eventreglog-date-<%= i %>">
+                <span class="absence-family-name"><%= g.dateLabel %></span>
+                <span class="absence-family-count"><%= g.familyGroups.length %> famil<%= g.familyGroups.length === 1 ? 'y' : 'ies' %></span>
+                <svg class="icon absence-family-chevron"><use href="#icon-chevron-down"/></svg>
+              </button>
+              <div class="absence-family-members" id="eventreglog-date-<%= i %>" hidden>
+                <% g.familyGroups.forEach(function(fg) { %>
+                  <p class="reglog-family-heading"><%= fg.familyName %></p>
+                  <% fg.members.forEach(function(r) { %>
+                    <div class="absence-member-row">
+                      <span class="absence-member-name"><%= r.memberName %></span>
+                      <span class="status-badge <%= r.actionLabel === 'Cancelled' ? 'status-badge-absent' : r.actionLabel === 'Waitlisted' ? 'status-badge-late' : 'status-badge-present' %>"><%= r.actionLabel %></span>
+                      <span class="absence-member-detail"><%= r.eventTitle %></span>
+                      <span class="absence-member-detail"><%= r.eventStartsLabel %></span>
+                    </div>
+                  <% }); %>
+                <% }); %>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+
+      <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref }) %>
+
+      <table class="roster-table members-table condensed-table logs-print-table event-reglog-print-table">
+        <thead>
+          <tr><th>Date</th><th>Family</th><th>Name</th><th>Event</th><th>Event Date</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <% if (allSubmissions.length === 0) { %>
+            <tr><td colspan="6" class="roster-empty">No event registrations or cancellations<%= dateFilter ? ' for this date' : ' yet' %>.</td></tr>
+          <% } %>
+          <% allSubmissions.forEach(function(r) { %>
+            <tr>
+              <td><%= r.dateLabel %></td>
+              <td><%= r.familyName || '—' %></td>
+              <td><%= r.memberName %></td>
+              <td><%= r.eventTitle %></td>
+              <td><%= r.eventStartsLabel %></td>
+              <td><span class="status-badge <%= r.actionLabel === 'Cancelled' ? 'status-badge-absent' : r.actionLabel === 'Waitlisted' ? 'status-badge-late' : 'status-badge-present' %>"><%= r.actionLabel %></span></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
     <% } else { %>
       <%# A real request: "add/edit categories, add/edit locations buttons
           should be at the top of the page" - moved above General
@@ -455,6 +539,9 @@
       </form>
     </dialog>
   </main>
+  <% if (activeTab === 'registrationlog') { %>
+    <script src="/js/absence-log-accordion.js"></script>
+  <% } %>
   <script>
     (function () {
       var dialog = document.getElementById('event-quick-edit-dialog');

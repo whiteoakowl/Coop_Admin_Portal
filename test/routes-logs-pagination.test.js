@@ -77,7 +77,9 @@ test('Logs page pagination', async (t) => {
     // print table (always the full, unpaginated list, same as every
     // other tab here) is untouched - still plain <td> rows, a distinct
     // needle from the on-screen accordion's own markup.
-    { tab: 'absence', printTableCols: 6, screenNeedle: 'class="absence-family-name">Log Test Kid', printNeedle: '<td>Log Test Kid' },
+    // 7, not 6: a real request added a "Submitted" timestamp column to
+    // this print table (views/admin-logs.ejs's own absence thead).
+    { tab: 'absence', printTableCols: 7, screenNeedle: 'class="absence-family-name">Log Test Kid', printNeedle: '<td>Log Test Kid' },
     { tab: 'checkinout', printTableCols: 6, screenNeedle: '<td>Log Test Kid', printNeedle: '<td>Log Test Kid' },
     { tab: 'nametag', printTableCols: 6, screenNeedle: '<td>Log Test Kid', printNeedle: '<td>Log Test Kid' }, // Name/Description/Date/Time/Day/Request - no Archive column in print
   ];

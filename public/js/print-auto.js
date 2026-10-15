@@ -26,15 +26,52 @@
 // already gives these classes their real, unshrunk physical size (see
 // styles.css), and printing through a leftover screen-fit zoom would
 // print everything shrunk too.
+//
+// A real bug report: "this issue happens for all printing of name tags,
+// schedule cards etc. as well" - the exact same zoom-unsupported-browser
+// gap print-shrink-to-fit.js's own fix closes (see that file's much
+// longer comment on it) existed here too, completely independently: this
+// file backs the on-screen preview shrink for EVERY one of those pages
+// (anything with .badge-sheet-page/.print-page/.avery-label-sheet-page -
+// Name Tags, Schedule Cards, Class Schedule, Setup/Cleanup Teams, barcode
+// sheets, all of it), and used the same proprietary `zoom` property with
+// no fallback at all. On any browser that genuinely doesn't support zoom
+// (older Firefox, before version 126/May 2024), every page.style.zoom =
+// scale line below was a silent no-op - the exact mobile-bleeds-off-
+// screen bug this file exists to fix in the first place, just for a
+// different slice of browsers than the ones it was originally written
+// against. ZOOM_SUPPORTED feature-detects this once at load; a browser
+// that supports zoom (the overwhelming majority) runs through the exact
+// same .style.zoom = path, completely unchanged - only a browser that
+// genuinely can't do zoom falls through to transform: scale() instead.
+// Unlike print-shrink-to-fit.js's own fallback, this doesn't also try to
+// collapse the element's own reserved layout space to match (no second
+// "wrap" element to resize here - `page` IS both the thing being scaled
+// and the thing sized by its own CSS) - worst case on a zoom-unsupported
+// browser is some extra blank space trailing a shrunk preview, a one-time
+// on-screen cosmetic (never printed - @media print always resets to a
+// real, unshrunk page first) that's a strict improvement over the
+// content bleeding off-screen unreadable, not a regression against it.
 (function () {
+  var ZOOM_SUPPORTED = typeof CSS !== 'undefined' && !!CSS.supports && CSS.supports('zoom', '1');
+
+  function applyPageScale(page, scale) {
+    if (ZOOM_SUPPORTED) {
+      page.style.zoom = scale;
+      return;
+    }
+    page.style.transform = scale === 1 ? '' : 'scale(' + scale + ')';
+    page.style.transformOrigin = 'top left';
+  }
+
   function fitOne(page) {
-    page.style.zoom = 1;
+    applyPageScale(page, 1);
     const wrap = page.parentElement;
     if (!wrap) return;
     const available = wrap.clientWidth;
     if (!available) return;
     const scale = Math.min(1, available / page.scrollWidth);
-    page.style.zoom = scale;
+    applyPageScale(page, scale);
   }
 
   function fitAll() {
@@ -42,7 +79,7 @@
   }
 
   function resetAll() {
-    document.querySelectorAll('.badge-sheet-page, .print-page, .avery-label-sheet-page').forEach((page) => { page.style.zoom = 1; });
+    document.querySelectorAll('.badge-sheet-page, .print-page, .avery-label-sheet-page').forEach((page) => applyPageScale(page, 1));
   }
 
   window.addEventListener('load', fitAll);

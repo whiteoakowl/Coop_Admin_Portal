@@ -245,7 +245,10 @@ test('Committee member-facing sign up: parent portal has a Committee Sign Up but
 
   const family = await createFamily();
   const homeRes = await request(app).get('/parent').set('Cookie', family.cookie);
-  assert.match(homeRes.text, /Committee Sign Up/);
+  // A real request later moved this from its own dedicated card into a
+  // plain Quick Links list item (see views/parent-home.ejs's own
+  // comment) - same real destination, new real link text.
+  assert.match(homeRes.text, /Join a Committee/);
   assert.match(homeRes.text, /href="\/committees"/);
 
   const committeesPage = await request(app).get('/committees').set('Cookie', family.cookie);

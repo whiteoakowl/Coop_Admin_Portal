@@ -108,25 +108,45 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
                   rows of people who have checked in red." m.checkedIn
                   (assignmentCardsForDate, utils/setup.js) is computed the
                   same "read from attendance" way as m.absent just above -
-                  only the CSS pairing for setup-assignment-row-checked-in
-                  needed to change (red -> green, see styles.css), the
+                  only the CSS pairing for this status needed to change
+                  (red -> green, see styles.css), the
                   class name/precedence logic itself was already right.
                   Absent wins if somehow both are true (a corrected status
                   after an earlier check-in), same plain-control-flow-tag
                   class-attribute pattern as m.absent for the reason
                   explained above. %>
-              <%# A real request: "if someone checks out, it should
-                  highlight their name yellow on the setup/cleanup
-                  assignment page." m.checkedOut (assignmentCardsForDate,
-                  utils/setup.js) is computed the same "read from the
-                  checkouts table" way as m.absent/m.checkedIn above -
-                  absent still wins if somehow both are true (a corrected
-                  status), and checkedOut wins over checkedIn since
-                  checking out is a later, more specific state than simply
-                  having checked in earlier that day. %>
-              <tr<% if (m.absent) { %> class="setup-assignment-row-absent"<% } else if (m.checkedOut) { %> class="setup-assignment-row-checked-out"<% } else if (m.checkedIn) { %> class="setup-assignment-row-checked-in"<% } %>>
-                <td class="floater-card-position">
-                  <a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %><% if (m.absent) { %> <span class="floater-card-unassigned">(absent)</span><% } else if (m.checkedOut) { %> <span class="floater-card-unassigned">(checked out)</span><% } %>
+              <%# A real bug report: "green for checked in, yellow for
+                  late, red for absent, red for checked out should only be
+                  highlighted on the member name, not the task rows."
+                  Checking out used to also highlight yellow and block
+                  assignment entirely - now it's just a status flag, same
+                  red as absent (see setTaskAssignment's own comment on why
+                  the hard block was removed), and the highlight itself
+                  lives on the name cell's own class below (styles.css),
+                  not a whole-row background that bled into the task
+                  cells. m.late (assignmentCardsForDate, utils/setup.js) is
+                  computed the same "read from the attendance table" way
+                  as m.absent/m.checkedIn above. %>
+              <%# A real request: "when someone checks in or out with a
+                  setup/cleanup badge, on the setup/cleanup assignment
+                  page their name will be green, with a green check mark
+                  next to it saying task(s) complete and the task # they
+                  scanned." m.scannedTasks (assignmentCardsForDate,
+                  utils/setup.js's own scannedTasksForMemberDate) is real-
+                  badge-scan-only, the same signal utils/rosterGrid.js
+                  already uses for the Attendance page's own team/task
+                  column - never set just because this page's own Assign
+                  button picked a task for them. Placed ahead of checked-
+                  out/late in precedence: having actually scanned a real
+                  badge is more specific, confirmed information than
+                  either, and matters more to an admin checking this page
+                  specifically for "did they do their task." Full
+                  precedence, most severe/specific first: absent, then
+                  task(s) complete, then checked out, then late, then
+                  checked in - only one should ever show at a time. %>
+              <tr>
+                <td class="floater-card-position<% if (m.absent) { %> setup-assignment-name-absent<% } else if (m.scannedTasks.length > 0) { %> setup-assignment-name-checked-in<% } else if (m.checkedOut) { %> setup-assignment-name-checked-out<% } else if (m.late) { %> setup-assignment-name-late<% } else if (m.checkedIn) { %> setup-assignment-name-checked-in<% } %>">
+                  <a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %><% if (m.absent) { %> <span class="floater-card-unassigned">(absent)</span><% } else if (m.scannedTasks.length > 0) { %> <span class="setup-task-complete-badge"><svg class="icon"><use href="#icon-check-circle"/></svg> Task<%= m.scannedTasks.length > 1 ? 's' : '' %> complete: <%= m.scannedTasks.map(function(t) { return t.teamName + '-#' + t.number; }).join(', ') %></span><% } else if (m.checkedOut) { %> <span class="floater-card-unassigned">(checked out)</span><% } else if (m.late) { %> <span class="floater-card-unassigned">(late)</span><% } %>
                 </td>
                 <%
                   var slots = [
@@ -157,16 +177,6 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
                           nothing to hand-pick until they're marked present again. %>
                       <select disabled class="floater-select-noavail" aria-label="<%= m.name %> is absent - no task suggested">
                         <option>Absent - no task</option>
-                      </select>
-                    <% } else if (m.checkedOut) { %>
-                      <%# "you won't be allowed to assign a job to them" once
-                          checked out - same disabled-dropdown treatment as
-                          the absent branch just above, matching the hard
-                          server-side block setTaskAssignment now throws if
-                          this is somehow bypassed (a stale page, a second
-                          admin tab). %>
-                      <select disabled class="floater-select-noavail" aria-label="<%= m.name %> has checked out - no task can be assigned">
-                        <option>Checked out - no task</option>
                       </select>
                     <% } else if (slot.options.length === 0) { %>
                       <select disabled class="floater-select-noavail" aria-label="No tasks available for <%= m.name %>">

@@ -2618,6 +2618,19 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 .absence-member-name { font-weight: 600; min-width: 8rem; }
 .absence-member-detail { color: var(--muted); font-size: 0.85rem; }
 
+/* Main Admin > Events > Event Registration Log and Co-op Admin > Classes
+   > Class Registration Log: both use true two-level grouping (routes/
+   admin-events.js's own groupEventRegistrationActionsByDate, routes/
+   admin-schedule.js's own groupClassRegistrationActionsByDate) - each
+   date's .absence-family-members panel holds its own family sub-
+   headings above that family's own .absence-member-row lines, instead of
+   the flatter one-row-per-(family,date) shape the Co-op Admin Absence/
+   Class Registration LOGS-PAGE tab uses (see either grouping function's
+   own comment on why). Shared class name - purely cosmetic, nothing
+   about this rule depends on which entity (event or class) is involved. */
+.reglog-family-heading { font-weight: 700; margin: 0.6rem 0 0.2rem; }
+.reglog-family-heading:first-child { margin-top: 0; }
+
 @media (max-width: 640px) {
   .absence-family-toggle { padding: 0.7rem 0.8rem; gap: 0.5rem; flex-wrap: wrap; }
   .absence-family-date { font-size: 0.75rem; }
@@ -3276,6 +3289,69 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   text-align: left;
   white-space: nowrap;
 }
+
+/* Main Admin > Events > Event Registration Log: a real request, "shrink
+   table to fit properly in mobile view." Confirmed live via Playwright
+   (a long family/member/event name at a 390px mobile print pass, see
+   views/admin-events-list.ejs's own tab==='registrationlog' comment):
+   without table-layout:fixed, the browser's default table layout sizes
+   columns to each cell's own preferred (unwrapped) width first, growing
+   the table past its own 100%-of-container width (846px measured
+   against a 720px pinned container) instead of ever wrapping text to
+   stay inside it - the same bug (and the same fix) .event-calendar-
+   table's own comment documents for the Events Calendar grid. MUST live
+   AFTER the plain .roster-table th/td rule just above, not merely have
+   a more specific selector than it (both are exactly one class + one
+   element, i.e. equal specificity) - confirmed live the first version of
+   this rule, placed earlier in the file with identical selector weight,
+   lost the cascade to that rule's own white-space: nowrap and text
+   still visibly overflowed into the next column; source order is what
+   actually wins a specificity tie, not merely writing white-space:
+   normal somewhere else in the file. */
+.event-reglog-print-table { table-layout: fixed; }
+.event-reglog-print-table th, .event-reglog-print-table td { white-space: normal; overflow-wrap: break-word; }
+.event-reglog-print-table th:nth-child(1), .event-reglog-print-table td:nth-child(1) { width: 12%; }
+.event-reglog-print-table th:nth-child(2), .event-reglog-print-table td:nth-child(2) { width: 18%; }
+.event-reglog-print-table th:nth-child(3), .event-reglog-print-table td:nth-child(3) { width: 18%; }
+.event-reglog-print-table th:nth-child(4), .event-reglog-print-table td:nth-child(4) { width: 28%; }
+.event-reglog-print-table th:nth-child(5), .event-reglog-print-table td:nth-child(5) { width: 14%; }
+.event-reglog-print-table th:nth-child(6), .event-reglog-print-table td:nth-child(6) { width: 10%; }
+
+/* Co-op Admin > Classes > Class Registration Log: same request, same
+   root cause and fix as .event-reglog-print-table just above (a long
+   family/member/class name overflowing a fixed-width mobile print
+   column) - own column shares since the content shape differs (Day is a
+   short word like "Monday", nothing like Event Registration Log's full
+   date+time "Event Date" column). MUST also live after the plain
+   .roster-table th/td rule above for the exact same equal-specificity-
+   tie reason. */
+.class-reglog-print-table { table-layout: fixed; }
+.class-reglog-print-table th, .class-reglog-print-table td { white-space: normal; overflow-wrap: break-word; }
+.class-reglog-print-table th:nth-child(1), .class-reglog-print-table td:nth-child(1) { width: 12%; }
+.class-reglog-print-table th:nth-child(2), .class-reglog-print-table td:nth-child(2) { width: 18%; }
+.class-reglog-print-table th:nth-child(3), .class-reglog-print-table td:nth-child(3) { width: 20%; }
+.class-reglog-print-table th:nth-child(4), .class-reglog-print-table td:nth-child(4) { width: 30%; }
+.class-reglog-print-table th:nth-child(5), .class-reglog-print-table td:nth-child(5) { width: 12%; }
+.class-reglog-print-table th:nth-child(6), .class-reglog-print-table td:nth-child(6) { width: 8%; }
+
+/* Co-op Admin > Logs > Class Cancellation Risk: same request, same root
+   cause and fix as .event-reglog-print-table/.class-reglog-print-table
+   above (a long class name overflowing a fixed-width mobile print
+   column) - own column shares for this table's own shape (Date/Hour/
+   Class/Room/Expected/Enrolled/Times At Risk, 7 columns). MUST also live
+   after the plain .roster-table th/td rule above for the exact same
+   equal-specificity-tie reason - see either sibling rule's own comment.
+   No separate width pin needed - this table already lives on the Logs
+   page, which pins .admin-main itself (.logs-page .admin-main below). */
+.class-risk-print-table { table-layout: fixed; }
+.class-risk-print-table th, .class-risk-print-table td { white-space: normal; overflow-wrap: break-word; }
+.class-risk-print-table th:nth-child(1), .class-risk-print-table td:nth-child(1) { width: 12%; }
+.class-risk-print-table th:nth-child(2), .class-risk-print-table td:nth-child(2) { width: 12%; }
+.class-risk-print-table th:nth-child(3), .class-risk-print-table td:nth-child(3) { width: 28%; }
+.class-risk-print-table th:nth-child(4), .class-risk-print-table td:nth-child(4) { width: 14%; }
+.class-risk-print-table th:nth-child(5), .class-risk-print-table td:nth-child(5) { width: 12%; }
+.class-risk-print-table th:nth-child(6), .class-risk-print-table td:nth-child(6) { width: 12%; }
+.class-risk-print-table th:nth-child(7), .class-risk-print-table td:nth-child(7) { width: 10%; }
 
 .roster-table thead th { background: var(--brand-soft); color: var(--ink); font-weight: 700; }
 
@@ -6075,7 +6151,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
+  /* Legacy page-break-inside alongside break-inside, directly here
+     rather than relying on the @media print block further down to add
+     it - harmless outside of paginated print either way, and makes this
+     rule correct standalone instead of depending on cascade order. */
   break-inside: avoid;
+  page-break-inside: avoid;
 }
 /* A real bug report, worst on a phone-width Setup/Cleanup Assignments
    page: the whole card (Assign buttons included) sat past the right edge
@@ -6365,7 +6446,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 /* A real request: "in the dropdown of members to choose for a position,
    highlight them green if they have checked in" - same green already
    used for this exact signal on the Setup/Cleanup Assignments roster
-   (.setup-assignment-row-checked-in above). Support for styling <option>
+   (.setup-assignment-name-checked-in above). Support for styling <option>
    varies by browser, so the option's own text also says "checked in"
    (see floater-chart-cards.ejs) as a non-visual fallback. */
 .floater-assign-form select option.floater-option-checked-in { background: var(--green-bg); color: var(--green); }
@@ -6944,26 +7025,43 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .team-member-row-absent .team-member-avatar { background: rgba(255,255,255,0.6); color: var(--red); }
 
-/* Same red flag, table-row version - Setup/Cleanup Assignments' own
-   per-member table row (partials/setup-assignment-cards.ejs) instead of
-   the Teams tab's card-list rows above. */
-.setup-assignment-row-absent td { background: var(--red-bg); color: var(--red); }
-/* A real bug report: "setup/cleanup team should highlight red member
-   rows if they are absent. highlight green rows if they are present. it
-   is currently highlighting all rows of people who have checked in red,
-   that's wrong." This used to share the absent row's own red-bg/red-text
-   pairing, just triggered by m.checkedIn instead of m.absent - so a
-   member who'd actually shown up got the same "something's wrong" red
-   flag as one who never came. Green (same pairing as .badge-pill-present/
-   .cell-present elsewhere) reads as "here," red as "not here" - this
-   table only ever shows one of the two at once (see the partial's own
-   comment on precedence). */
-.setup-assignment-row-checked-in td { background: var(--green-bg); color: var(--green); }
-/* A real request: "if someone checks out, it should highlight their name
-   yellow on the setup/cleanup assignment page" - same row-highlight
-   pattern as the absent/checked-in rules just above, this app's own
-   standard yellow pairing (see --yellow/--yellow-bg, e.g. .cell-late). */
-.setup-assignment-row-checked-out td { background: var(--yellow-bg); color: var(--yellow); }
+/* Same flag colors, Setup/Cleanup Assignments' own per-member table row
+   (partials/setup-assignment-cards.ejs) instead of the Teams tab's
+   card-list rows above - a real bug report: "green for checked in,
+   yellow for late, red for absent, red for checked out should only be
+   highlighted on the member name, not the task rows." This used to apply
+   to every `td` in the row (bleeding into the Task 1/2/3 cells too, and
+   blocking checked-out from even being assigned a task - see
+   setTaskAssignment's own comment), so these now target only the name
+   cell itself (.floater-card-position) via its own status class, same
+   red/green/yellow pairings as .cell-absent/.cell-present/.cell-late
+   elsewhere. Only one of these ever applies at a time (see the partial's
+   own precedence comment: absent, then task(s) complete, then checked
+   out, then late, then checked in). */
+.setup-assignment-name-absent { background: var(--red-bg); color: var(--red); }
+.setup-assignment-name-checked-out { background: var(--red-bg); color: var(--red); }
+.setup-assignment-name-late { background: var(--yellow-bg); color: var(--yellow); }
+.setup-assignment-name-checked-in { background: var(--green-bg); color: var(--green); }
+
+/* The "(absent)"/"(checked out)"/"(late)" labels next to a flagged name
+   above are plain italic/muted text (.floater-card-unassigned) - this one
+   is its own real badge instead, since "Task(s) complete: Team-#N" is
+   good news worth standing out, not a caveat to mute. Same green pairing
+   as .setup-assignment-name-checked-in just above (this status always
+   wins that one's color too - see the partial's own precedence comment),
+   icon-first same as every other inline status flag in this app. */
+.setup-task-complete-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: var(--green-bg);
+  color: var(--green);
+  font-weight: 600;
+  font-size: 0.78rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+.setup-task-complete-badge .icon { width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
 
 /* A member row staged for removal (public/js/team-member-remove-toggle.js)
    but not yet saved - a real request: "allow for multiple deletes and
@@ -9303,7 +9401,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 
 .schedule-print-card {
+  /* Legacy page-break-inside alongside break-inside - an older browser's
+     print engine only understands the prefixed/legacy property, same
+     pairing already applied to every other break-inside rule in this
+     file that genuinely prints (.class-schedule-print-card,
+     .schedule-print-member-section, .team-col, .grid-box, .floater-card,
+     .event-calendar-table) - this one (the single-member Schedule print
+     page's own per-class card) had been missed. */
   break-inside: avoid;
+  page-break-inside: avoid;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -9429,11 +9535,50 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      (every .badge-sheet-page/.print-page bulk-print route, Members,
      Logs, ...) either size their OWN print surface explicitly already,
      or have no single, page-wide @page margin this box could safely
-     assume. */
+     assume - the Logs page (views/admin-logs.ejs) turned out to be a
+     real exception: it DOES have one single, fixed @page margin (0.4in)
+     no matter which tab is open, so it gets the same pin as Setup/
+     Cleanup Assignments below. A real bug report: "make sure the table
+     for [the Missed Duty / No-Show Log] shrinks to fit on mobile" -
+     confirmed live via Playwright (page at a 390px mobile viewport,
+     then emulateMedia('print')) that .admin-main rendered at exactly
+     that 390px ambient viewport width with no pin, while its own print
+     table needed 696px for its columns - the identical "mobile's print
+     pipeline uses the on-screen viewport width, not the paper's" gap
+     already described above for Setup/Cleanup Assignments/Floater
+     Teams/Assignments, just never caught here since every print surface
+     on THIS page used to be the family-accordion cards, which happen to
+     reflow fine at any width - the Missed Duty tab's own table (Date/
+     Name/Family/Flagged For/both running totals, see routes/admin-
+     logs.js's own missedDutyRows) was the first wide one. Scoped to a
+     `logs-page` body class (every Logs tab shares this one template) so
+     this doesn't widen anything on the dozens of OTHER admin pages that
+     also happen to use plain `.admin-page .admin-main`. */
   .setup-teams-print-page .admin-main,
-  .floater-teams-print-page .admin-main { width: 7.5in; } /* @page margin: 0.5in */
+  .floater-teams-print-page .admin-main,
+  /* Main Admin > Events > Event Registration Log: a real request, same
+     class of bug as the Logs page comment just above - "make sure the
+     table for this log shrinks to fit properly in mobile view."
+     views/admin-events-list.ejs deliberately has no @page override of
+     its own (unlike the Logs page) - it's shared by the Calendar tab's
+     own existing Print button too, and adding one here would change that
+     tab's print margins as a side effect nobody asked for. Pinned to the
+     same conservative 7.5in this group already uses (a safe width under
+     ordinary browser-default print margins, not tied to a specific
+     @page rule this page doesn't have) rather than inventing a new
+     number. */
+  .events-registrationlog-print-page .admin-main,
+  /* Co-op Admin > Classes > Class Registration Log: same reasoning as
+     .events-registrationlog-print-page just above - views/admin-
+     schedule.ejs has no @page override of its own either (it's shared
+     by the Class Schedule grid's own already-tuned print layout and the
+     Member Schedules tab's print, neither of which this should touch),
+     so this is scoped to a tab-specific body class, not the page's own
+     already-present `schedule-page` class every tab shares. */
+  .class-reglog-print-page .admin-main { width: 7.5in; } /* @page margin: 0.5in, or browser default */
   .setup-assignments-print-page .admin-main,
-  .floater-assignments-print-page .admin-main { width: 7.7in; } /* @page margin: 0.4in */
+  .floater-assignments-print-page .admin-main,
+  .logs-page .admin-main { width: 7.7in; } /* @page margin: 0.4in */
 
   .roster-scroll { overflow: visible; border: none; }
   .roster-table { font-size: 11px; }
@@ -9795,8 +9940,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
        over that inline style during the actual print render, regardless
        of whether the JS reset ran - the screen-only shrink-to-fit
        preview is unaffected (this rule is a `@media print` in the first
-       place). */
+       place). transform: none pairs with it for the exact same reason on
+       a browser that doesn't support zoom at all (print-auto.js's own
+       fallback there - see that file's comment): the same beforeprint-
+       didn't-fire-in-time risk applies to its inline transform just as
+       much as to zoom elsewhere. */
     zoom: 1 !important;
+    transform: none !important;
   }
   /* A real bug report: "on an older desktop with outdated Chrome, the
      2nd page being printed always starts on the first page" - every
@@ -9878,6 +10028,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     border: none;
     box-shadow: none;
     zoom: 1 !important;
+    transform: none !important;
   }
 
   /* Keep a hard, exactly-one-portrait-page box at actual print time too
@@ -10342,10 +10493,35 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
   flex: 1 1 0;
 }
 
-@page {
-  size: landscape;
-  margin: 1cm;
-}
+/* A real bug report, reproduced live: "an older desktop with outdated
+   Chrome, the 2nd page being printed always starts on the first page[,]
+   continues overlapping on the wrong pages" for name tags/badges/every
+   print page in the app. Root cause traced to a stray, completely
+   unscoped `@page { size: landscape; margin: 1cm; }` that used to sit
+   right here - this stylesheet is shared by every single page in the
+   app (every view links it via partials/head.ejs), so an unscoped @page
+   rule in it is a global default for ALL of them, not just whichever
+   one feature it was meant for. The one view that genuinely wants
+   landscape (admin-events-registrations-print.ejs, "wide roster" print)
+   already declares its own properly scoped `@page { size: letter
+   landscape; ... }` in its own <style> tag - the established, correct
+   pattern every portrait print view in this app already follows (see
+   admin-name-tag-print.ejs and friends). Confirmed live via Playwright
+   (page.pdf) that this stray rule alone was enough to flip a portrait
+   badge sheet to a landscape physical page - its own 10in-tall content
+   no longer fit the now-8.5in-tall page, so it split mid-sheet onto an
+   extra physical page, matching the reported symptom exactly. For the
+   several views below that never declared their own @page override at
+   all (student-diploma.ejs, events-ticket-print.ejs, the Members roster
+   print, etc.) this was a guaranteed landscape default on ANY browser,
+   not just an old one - for the views that DO override it, correctness
+   depended on every browser engine resolving a shared-stylesheet-vs-
+   inline-style cascade the same way, exactly the kind of cross-engine
+   inconsistency an older browser is most likely to get wrong. Deleted
+   outright rather than re-scoped: @page has no class/attribute selector
+   to scope it with the normal way, and the one view that actually wants
+   landscape already owns its own override - a shared stylesheet should
+   never carry a page-wide default like this at all. */
 
 /* ============================================================
    Training & Learning module (admin Training Builder/Report,
@@ -11205,8 +11381,139 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
    button isn't inside a flex ROW. Scoped to this page only (views/
    parent-home.ejs's own .parent-home-main) rather than a blanket
    .portal-dashboard-card override, since that class is shared by every
-   portal's own home page. */
-.parent-home-main .roster-action-btn { align-self: flex-start; }
+   portal's own home page.
+   A real follow-up report: the buttons were STILL different sizes after
+   the align-self fix above - "should all be similar size, fit to text,
+   same height." Root cause: .roster-action-btn's own flex: 1 0 auto sets
+   flex-GROW: 1 too, and .portal-dashboard-grid is a CSS grid with its
+   default align-items: stretch, which stretches every card in the same
+   grid ROW to match its tallest sibling's height. A card with less
+   content above its button (e.g. Quick Links, a short list) ends up with
+   real leftover vertical space once stretched to match a taller
+   neighbor - flex-grow: 1 handed every bit of that leftover space
+   straight to the button itself (the only flex-growable child in that
+   column), stretching it tall while a button in a naturally-tall card
+   stayed its normal small height. flex-grow: 0 (keep shrink/basis as-is)
+   stops the button from absorbing that space, so every button's height
+   is driven only by its own text/padding again, matching every other
+   button on the page regardless of how much (or little) content shares
+   its own card. */
+.parent-home-main .roster-action-btn { align-self: flex-start; flex-grow: 0; }
+
+/* A real request: "Change the parent portal dashboard to have cards
+   exactly like this [reference image]" - a colored icon badge + title +
+   "View All" link in each card's own header, a tinted card background
+   matching that color, and a deeper per-card redesign (date badges for
+   Upcoming Events, thumbnails for Classifieds, a colored category icon
+   for Business Directory, a real weekly-goal progress bar for Reading
+   Challenge - see routes/parent-portal.js's own comments on exactly
+   what real data backs each one). A dedicated class set, not
+   .portal-dashboard-card/.portal-dashboard-grid above - those are
+   shared by every OTHER portal's own home dashboard (Main Admin,
+   Teacher, Student...), so reusing/overriding them here would have
+   restyled pages nobody asked to change. views/parent-home.ejs is the
+   only view that uses any of the following. */
+.parent-home-cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.5rem; margin: 1.5rem 0; }
+
+.parent-home-card-v2 { border-radius: 16px; box-shadow: var(--shadow-md); overflow: hidden; display: flex; flex-direction: column; border: 1px solid transparent; }
+.parent-home-card-v2-head { display: flex; align-items: flex-start; gap: 0.85rem; padding: 1.25rem 1.5rem 1rem; }
+.parent-home-card-v2-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; }
+.parent-home-card-v2-icon svg { width: 22px; height: 22px; }
+.parent-home-card-v2-titles { flex: 1; min-width: 0; }
+.parent-home-card-v2-titles h2 { margin: 0; font-size: 1.15rem; font-weight: 800; }
+.parent-home-card-v2-titles p { margin: 0.15rem 0 0; font-size: 0.8rem; color: var(--muted); }
+.parent-home-card-v2-viewall { font-size: 0.85rem; font-weight: 700; white-space: nowrap; display: flex; align-items: center; gap: 0.2rem; text-decoration: none; flex-shrink: 0; margin-top: 0.3rem; }
+.parent-home-card-v2-viewall svg { width: 15px; height: 15px; }
+.parent-home-card-v2-body { padding: 0 1.5rem 1.5rem; display: flex; flex-direction: column; gap: 0.6rem; flex: 1; }
+
+.parent-home-card-v2-green { background: #effaf3; border-color: #cdebd6; }
+.parent-home-card-v2-green .parent-home-card-v2-icon { background: #1fa355; }
+.parent-home-card-v2-green .parent-home-card-v2-viewall { color: #1fa355; }
+.parent-home-card-v2-blue { background: #eef5fe; border-color: #cfe3fb; }
+.parent-home-card-v2-blue .parent-home-card-v2-icon { background: #2f7fe0; }
+.parent-home-card-v2-blue .parent-home-card-v2-viewall { color: #2f7fe0; }
+.parent-home-card-v2-amber { background: #fdf7ec; border-color: #f3e3bf; }
+.parent-home-card-v2-amber .parent-home-card-v2-icon { background: #c7912a; }
+.parent-home-card-v2-amber .parent-home-card-v2-viewall { color: #c7912a; }
+.parent-home-card-v2-purple { background: #f6f0fc; border-color: #e3d2f4; }
+.parent-home-card-v2-purple .parent-home-card-v2-icon { background: #8148c2; }
+.parent-home-card-v2-purple .parent-home-card-v2-viewall { color: #8148c2; }
+.parent-home-card-v2-indigo { background: #eef0fd; border-color: #d4d8f7; }
+.parent-home-card-v2-indigo .parent-home-card-v2-icon { background: #4f55c7; }
+.parent-home-card-v2-indigo .parent-home-card-v2-viewall { color: #4f55c7; }
+.parent-home-card-v2-slate { background: #f3f4f6; border-color: #dfe2e7; }
+.parent-home-card-v2-slate .parent-home-card-v2-icon { background: #55617a; }
+.parent-home-card-v2-slate .parent-home-card-v2-viewall { color: #55617a; }
+.parent-home-card-v2-rose { background: #fdf0f2; border-color: #f6d4da; }
+.parent-home-card-v2-rose .parent-home-card-v2-icon { background: #d0486a; }
+.parent-home-card-v2-rose .parent-home-card-v2-viewall { color: #d0486a; }
+
+/* Dedicated CTA buttons for these cards (not .roster-action-btn - that
+   class's own background/color/border triplet is already a fixed,
+   sitewide look, not meant to flex into the mockup's "solid green" /
+   "outline amber" / "outline purple" per-card button looks). */
+.parent-home-cta {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  border-radius: 8px; padding: 0.6rem 1rem; font-size: 0.9rem; font-weight: 700;
+  font-family: inherit; cursor: pointer; text-decoration: none; margin-top: 0.2rem;
+}
+.parent-home-cta svg { width: 16px; height: 16px; }
+.parent-home-cta-outline-amber { background: transparent; border: 1.5px solid #c7912a; color: #c7912a; }
+.parent-home-cta-outline-purple { background: transparent; border: 1.5px solid #8148c2; color: #8148c2; }
+.parent-home-cta-outline-blue { background: transparent; border: 1.5px solid #2f7fe0; color: #2f7fe0; }
+.parent-home-cta-outline-indigo { background: transparent; border: 1.5px solid #4f55c7; color: #4f55c7; }
+.parent-home-cta-outline-rose { background: transparent; border: 1.5px solid #d0486a; color: #d0486a; }
+
+/* Upcoming Events: a colored date-badge (month abbreviation stacked over
+   the day number) instead of a plain text date line. */
+.parent-home-event-list, .parent-home-classified-list, .parent-home-directory-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.parent-home-row { display: flex; align-items: center; gap: 0.85rem; text-decoration: none; color: inherit; background: rgba(255,255,255,0.6); border-radius: 10px; padding: 0.6rem 0.7rem; transition: background 0.15s ease; }
+.parent-home-row:hover { background: #fff; }
+.parent-home-chevron { flex-shrink: 0; width: 16px; height: 16px; color: var(--muted); }
+
+.parent-home-date-badge { flex-shrink: 0; width: 46px; border-radius: 9px; background: #2f7fe0; color: #fff; text-align: center; padding: 0.3rem 0; line-height: 1.1; }
+.parent-home-date-badge-month { display: block; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; opacity: 0.9; }
+.parent-home-date-badge-day { display: block; font-size: 1.05rem; font-weight: 800; }
+.parent-home-row-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.parent-home-row-title { font-weight: 700; font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.parent-home-row-sub { font-size: 0.78rem; color: var(--muted); display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.parent-home-row-sub svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+/* Classifieds: a thumbnail (or a plain placeholder box when the listing
+   has no photo - classifieds image_key is genuinely optional). */
+.parent-home-classified-thumb { flex-shrink: 0; width: 46px; height: 46px; border-radius: 9px; object-fit: cover; background: var(--surface-alt, #f3f4f6); }
+.parent-home-classified-thumb-empty { display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.parent-home-classified-price { font-weight: 700; color: #c7912a; font-size: 0.82rem; }
+
+/* Business Directory: a colored circle icon per listing - a real request
+   ("business directory listing" card), with each listing's own color
+   picked deterministically from its category name (routes/parent-
+   portal.js's own colorForCategory - business_directory_categories has
+   no color/icon column of its own to read one from). */
+.parent-home-directory-icon { flex-shrink: 0; width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #fff; }
+.parent-home-directory-icon svg { width: 18px; height: 18px; }
+.parent-home-directory-icon-teal { background: #0f9488; }
+.parent-home-directory-icon-amber { background: #c7912a; }
+.parent-home-directory-icon-green { background: #1fa355; }
+.parent-home-directory-icon-purple { background: #8148c2; }
+.parent-home-directory-icon-blue { background: #2f7fe0; }
+.parent-home-directory-icon-rose { background: #d0486a; }
+
+/* Reading Challenge: "only show the parent reading challenge
+   leaderboard" (a real follow-up request - an earlier weekly-goal-
+   progress-bar version of this card is gone, see git history) - a plain
+   ranked list, same .parent-home-row shape as every other card's own
+   list, with a rank badge in place of a date-badge/thumbnail/category
+   icon and each leader's hours right-aligned. */
+.parent-home-leaderboard-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.parent-home-rank-badge { flex-shrink: 0; width: 36px; height: 36px; border-radius: 999px; background: #1fa355; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.8rem; }
+.parent-home-leaderboard-hours { flex-shrink: 0; font-weight: 700; font-size: 0.85rem; color: var(--muted); }
+
+@media (max-width: 640px) {
+  .parent-home-cards-grid { grid-template-columns: 1fr; }
+  .parent-home-card-v2-head { padding: 1rem 1.1rem 0.8rem; }
+  .parent-home-card-v2-body { padding: 0 1.1rem 1.1rem; }
+}
 
 /* Student Portal home: Announcements + Word of the Week side by side - a
    real request: "desktop it should be smaller width. announcements first,

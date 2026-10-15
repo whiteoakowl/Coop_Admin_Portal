@@ -16,7 +16,8 @@ const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const { requirePortalPermission } = require('../middleware/portalAuth');
 const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, generateKey } = require('../utils/storage');
-const { formatFriendlyTimestamp, formatFriendlyDateAndTime } = require('../utils/dates');
+const { formatFriendlyTimestamp, formatFriendlyDateAndTime, formatDateLabel } = require('../utils/dates');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 const db = require('../db');
 const events = require('../utils/events');
 const { activeParentOptionsWithEmail } = require('../utils/members');
@@ -357,15 +358,55 @@ function toSqlTimestamp(datetimeLocal) {
 // standalone /categories page). Cancelling an event is still possible
 // from its own builder page (the /:id/status route below is unchanged) -
 // only the dedicated tab for BROWSING every cancelled event is gone.
-const EVENTS_TABS = ['calendar', 'drafts', 'requests', 'attendance', 'settings'];
+const EVENTS_TABS = ['calendar', 'drafts', 'requests', 'attendance', 'settings', 'registrationlog'];
 // Matches the exact subpage labels the nav sidebar already uses for this
 // tab (views/partials/portal-nav.ejs's own MAIN_ADMIN_NAV_LINKS) - a real
 // request: "make sure the title of all subpages is the same as the title
 // on the subpage menu."
-const EVENTS_TAB_TITLES = { calendar: 'Calendar', drafts: 'Drafts', requests: 'Requests', attendance: 'Event Attendance', settings: 'Settings' };
+const EVENTS_TAB_TITLES = {
+  calendar: 'Calendar',
+  drafts: 'Drafts',
+  requests: 'Requests',
+  attendance: 'Event Attendance',
+  settings: 'Settings',
+  registrationlog: 'Event Registration Log',
+};
+
+// A real request: "record every time a member registers for an event or
+// cancels[,] organized by date and then by family." A true two-level
+// grouping - every date's own group holds its own family sub-groups,
+// unlike routes/admin-logs.js's own groupAbsenceSubmissionsByFamilyAndDate
+// (Co-op Admin's Absence/Class Registration logs), which only ever
+// produces a FLAT list of one (family, date) tuple per group - fine for
+// those logs (a family rarely has more than one event on the same
+// family+date pairing anyway), but not literally "date, then family" the
+// way this request asked for. A member/guest with no family becomes
+// their own solo group, keyed off their own id, same "empty means
+// standalone" convention as that file's own version.
+function groupEventRegistrationActionsByDate(actions) {
+  const dateGroups = new Map();
+  for (const a of actions) {
+    if (!dateGroups.has(a.date)) dateGroups.set(a.date, { date: a.date, dateLabel: a.dateLabel, familyGroups: [] });
+    const dateGroup = dateGroups.get(a.date);
+    const familyKey = a.familyId != null ? `f${a.familyId}` : `solo-${a.memberName}`;
+    let familyGroup = dateGroup.familyGroups.find((f) => f.key === familyKey);
+    if (!familyGroup) {
+      familyGroup = { key: familyKey, familyName: a.familyName || a.memberName, members: [] };
+      dateGroup.familyGroups.push(familyGroup);
+    }
+    familyGroup.members.push(a);
+  }
+  // Insertion order already follows allEventRegistrationActions' own
+  // date-desc/last-name sort, so the first action seen in each date/
+  // family group also fixes that group's own sort position - no separate
+  // re-sort needed, same reasoning routes/admin-logs.js's own
+  // groupAbsenceSubmissionsByFamilyAndDate relies on.
+  return Array.from(dateGroups.values());
+}
 
 router.get('/', async (req, res) => {
   const activeTab = EVENTS_TABS.includes(req.query.tab) ? req.query.tab : 'calendar';
+  const dateFilter = req.query.date || '';
   const pending = await events.listEvents({ approvalStatus: 'pending' });
   const pendingCount = pending.length;
 
@@ -375,6 +416,10 @@ router.get('/', async (req, res) => {
   let drafts = [];
   let requests = [];
   let attendance = [];
+  let registrationLogDateGroups = [];
+  let registrationLogAllActions = [];
+  let registrationLogDates = [];
+  let registrationLogPagination = null;
   // Always loaded (not just for the Settings tab) - the New Event
   // dialog's own Category/Location dropdowns are reachable from the
   // Calendar and Drafts tabs too.
@@ -405,6 +450,17 @@ router.get('/', async (req, res) => {
     attendance = await Promise.all(
       published.map(async (e) => ({ ...e, startsLabel: formatFriendlyTimestamp(e.starts_at), registrationCount: await events.registrationCountForEvent(e.id) }))
     );
+  } else if (activeTab === 'registrationlog') {
+    const allActions = await events.allEventRegistrationActions();
+    // Already newest-first (allEventRegistrationActions' own sort) - a Map
+    // keyed by date preserves first-seen order, so this stays newest-first
+    // too without a separate sort, same pattern routes/admin-logs.js's own
+    // missedDutyRows uses for its date dropdown.
+    registrationLogDates = Array.from(new Map(allActions.map((a) => [a.date, { date: a.date, label: a.dateLabel }])).values());
+    registrationLogAllActions = dateFilter ? allActions.filter((a) => a.date === dateFilter) : allActions;
+    registrationLogDateGroups = groupEventRegistrationActionsByDate(registrationLogAllActions);
+    const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+    registrationLogPagination = paginate(registrationLogDateGroups, parsePage(req.query.page), pageSize);
   }
 
   res.render('admin-events-list', {
@@ -421,9 +477,24 @@ router.get('/', async (req, res) => {
     categories,
     locations,
     eventSettings,
+    dateGroups: registrationLogPagination ? registrationLogPagination.items : registrationLogDateGroups,
+    allSubmissions: registrationLogAllActions,
+    pagination: registrationLogPagination,
+    viewingAll: registrationLogPagination ? registrationLogPagination.pageSize === Infinity : false,
+    baseHref: `/main-admin/events?tab=registrationlog${dateFilter ? `&date=${encodeURIComponent(dateFilter)}` : ''}&`,
+    dates: registrationLogDates,
+    dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
+});
+
+router.get('/registrationlog/export.csv', async (req, res) => {
+  const dateFilter = req.query.date || '';
+  const allActions = await events.allEventRegistrationActions();
+  const actions = dateFilter ? allActions.filter((a) => a.date === dateFilter) : allActions;
+  sendCsv(res, 'event-registration-log.csv', events.buildEventRegistrationLogExportCsvLines(actions));
 });
 
 router.post('/categories', async (req, res) => {

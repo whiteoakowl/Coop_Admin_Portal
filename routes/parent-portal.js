@@ -41,7 +41,7 @@ const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
 const { buildCardPairs } = require('../utils/cardPairs');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
-const { formatFriendlyTimestamp, formatTimestamp, ageFromBirthday, todayISO } = require('../utils/dates');
+const { formatFriendlyTimestamp, formatTimestamp, ageFromBirthday, todayISO, eventDateBadge, formatTimeOnly } = require('../utils/dates');
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
 const { familyOf, byLastName } = require('../utils/members');
 const { libraryActivityForMemberIds, allItems: allLibraryItems, allLibraryTypes } = require('../utils/library');
@@ -223,7 +223,10 @@ router.get('/', async (req, res) => {
   // directly, never touching class_registrations at all). class_enrollments
   // is the actual "is this student in this class" table used everywhere
   // else (attendance, rosters, ...), so it's the right source here too.
-  const [countsByStudent, visibilityFlags] = await Promise.all([
+  const classifiedsSlice = classifiedsListingsRaw.slice(0, 4);
+  const classifiedsMemberIds = classifiedsSlice.map((l) => l.member_id);
+
+  const [countsByStudent, visibilityFlags, classifiedsPosterRows] = await Promise.all([
     childIds.length
       ? db
           .prepare(
@@ -232,17 +235,62 @@ router.get('/', async (req, res) => {
           .all(...childIds)
       : Promise.resolve([]),
     Promise.all(upcoming.map((e) => events.eventVisibleToFamily(e.id, family))),
+    // classifieds.listListings() never joins a poster name (routes/
+    // classifieds.js's own live listing page doesn't show one either) -
+    // a real request for this homepage card specifically ("Posted by
+    // Jamie L.") needs one, so it's looked up here rather than widening
+    // that shared function for every other caller.
+    classifiedsMemberIds.length
+      ? db.prepare(`SELECT id, name FROM members WHERE id IN (${classifiedsMemberIds.map(() => '?').join(',')})`).all(...classifiedsMemberIds)
+      : Promise.resolve([]),
   ]);
   const countByStudentId = new Map(countsByStudent.map((r) => [Number(r.student_id), Number(r.c)]));
   const registrationCountsByChild = children.map((c) => ({ name: c.name, count: countByStudentId.get(Number(c.id)) || 0 }));
 
   const upcomingEvents = upcoming
     .filter((e, i) => visibilityFlags[i])
-    .slice(0, 3)
-    .map((e) => ({ title: e.title, startsLabel: formatFriendlyTimestamp(e.starts_at) }));
+    .slice(0, 4)
+    .map((e) => ({
+      id: e.id,
+      title: e.title,
+      dateBadge: eventDateBadge(e.starts_at),
+      timeLabel: formatTimeOnly(e.starts_at),
+      endsLabel: e.ends_at ? formatTimeOnly(e.ends_at) : null,
+      locationLabel: e.locationName || e.location || null,
+      badgeColor: e.categoryColor || null,
+    }));
 
-  const businessDirectoryListings = businessDirectoryListingsRaw.slice(0, 4);
-  const classifiedsListings = classifiedsListingsRaw.slice(0, 4);
+  // A real request: redesign the Business Directory card with a colored
+  // category icon per listing - business_directory_categories has no
+  // color/icon column of its own (views/directory-list.ejs's live page
+  // just shows one generic tag icon for every category today), so this
+  // maps a category's own title to one of a small fixed rotation of
+  // colors deterministically (same category always lands on the same
+  // color, without a real column to read one from).
+  const DIRECTORY_COLOR_ROTATION = ['teal', 'amber', 'green', 'purple', 'blue', 'rose'];
+  function colorForCategory(title) {
+    if (!title) return DIRECTORY_COLOR_ROTATION[0];
+    let hash = 0;
+    for (let i = 0; i < title.length; i++) hash = (hash * 31 + title.charCodeAt(i)) >>> 0;
+    return DIRECTORY_COLOR_ROTATION[hash % DIRECTORY_COLOR_ROTATION.length];
+  }
+  const businessDirectoryListings = businessDirectoryListingsRaw.slice(0, 4).map((l) => ({
+    id: l.id,
+    businessName: l.business_name,
+    categoryTitle: l.categoryTitle || null,
+    phone: l.phone || null,
+    color: colorForCategory(l.categoryTitle),
+  }));
+
+  const posterNameById = new Map(classifiedsPosterRows.map((r) => [Number(r.id), r.name]));
+  const classifiedsListings = classifiedsSlice.map((l) => ({
+    id: l.id,
+    title: l.title,
+    price: l.price || null,
+    imageUrl: l.image_key ? `/uploads/classifieds/${l.image_key}` : null,
+    posterName: posterNameById.get(Number(l.member_id)) || null,
+    dateLabel: formatFriendlyTimestamp(l.created_at),
+  }));
 
   res.render('parent-home', {
     title: 'Parent Portal',

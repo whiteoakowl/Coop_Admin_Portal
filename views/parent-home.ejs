@@ -9,123 +9,230 @@
   <main id="main-content" tabindex="-1" class="admin-main parent-home-main">
     <h1>Welcome, <%= member.name %></h1>
 
-    <section class="portal-dashboard-section">
-      <h2>Announcements</h2>
-      <% if (announcements.length === 0) { %>
-        <p class="roster-empty">No announcements right now.</p>
-      <% } else { %>
-        <div class="site-announcement-list">
-          <% announcements.forEach(function(a) { %>
-            <div class="site-announcement-card">
-              <span class="site-announcement-date">
-                <%= a.dateLabel %>
-                <% if (a.isNew) { %><span class="badge-pill badge-pill-present">New</span><% } %>
-              </span>
-              <h3><%= a.title %></h3>
-              <div class="forum-editable-display"><%- a.body %></div>
-            </div>
-          <% }); %>
+    <%# A real request: "On desktop quicklinks should be next to
+        announcements on the same row. On mobile announcements is first,
+        then quick links below it." Same .home-top-grid 2fr/1fr pattern
+        Student Portal's own Announcements + Word of the Week row already
+        uses (public/css/styles.css) - Announcements gets the wider
+        column, collapses to a single stacked column (Announcements
+        first, matching markup order) below that rule's own breakpoint. %>
+    <div class="home-top-grid">
+      <section class="portal-dashboard-section">
+        <h2>Announcements</h2>
+        <% if (announcements.length === 0) { %>
+          <p class="roster-empty">No announcements right now.</p>
+        <% } else { %>
+          <div class="site-announcement-list">
+            <% announcements.forEach(function(a) { %>
+              <div class="site-announcement-card">
+                <span class="site-announcement-date">
+                  <%= a.dateLabel %>
+                  <% if (a.isNew) { %><span class="badge-pill badge-pill-present">New</span><% } %>
+                </span>
+                <h3><%= a.title %></h3>
+                <div class="forum-editable-display"><%- a.body %></div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </section>
+
+      <section class="parent-home-card-v2 parent-home-card-v2-slate">
+        <div class="parent-home-card-v2-head">
+          <span class="parent-home-card-v2-icon"><svg><use href="#icon-link"/></svg></span>
+          <div class="parent-home-card-v2-titles">
+            <h2>Quick Links</h2>
+          </div>
         </div>
-      <% } %>
-    </section>
-
-    <div class="portal-dashboard-grid">
-      <%# A real request: "Take off the my family card and replace it with
-          upcoming events from the event calendar." %>
-      <section class="portal-dashboard-card">
-        <h2>Upcoming Events</h2>
-        <% if (upcomingEvents.length === 0) { %>
-          <p class="roster-empty">No upcoming events right now.</p>
-        <% } else { %>
+        <div class="parent-home-card-v2-body">
           <ul class="portal-dashboard-list">
-            <% upcomingEvents.forEach(function(e) { %>
-              <li><%= e.title %> <span class="hint">&middot; <%= e.startsLabel %></span></li>
-            <% }); %>
+            <li><a href="/name-tag">Name Tag Form</a></li>
+            <li><a href="/absence">Absence/Late Form</a></li>
+            <%# A real request: "Join a Committee should just be a link
+                under quick links" - no longer its own card (see git
+                history for the previous dedicated Committees card). %>
+            <li><a href="/committees">Join a Committee</a></li>
           </ul>
-        <% } %>
-        <a class="roster-action-btn" href="/events?view=calendar&portal=parent">View Event Calendar</a>
+        </div>
+      </section>
+    </div>
+
+    <%# A real request: "Change the parent portal dashboard to have cards
+        exactly like this [reference image]" - a colored icon badge +
+        title + View All link per card, a tinted background matching
+        that color, and each card's own list redesigned around its real
+        data (see routes/parent-portal.js's own comments on exactly what
+        backs each one - a date-badge for events, a thumbnail for
+        classifieds, a colored category icon for business directory, a
+        ranked leaderboard for the reading challenge - a later real
+        request pinned this one back to "only show the parent reading
+        challenge leaderboard," dropping an earlier weekly-goal-progress
+        version of this same card). Quick Links/Committees moved out of
+        this grid entirely - see the Announcements row above. %>
+    <div class="parent-home-cards-grid">
+      <section class="parent-home-card-v2 parent-home-card-v2-blue">
+        <div class="parent-home-card-v2-head">
+          <span class="parent-home-card-v2-icon"><svg><use href="#icon-calendar-check"/></svg></span>
+          <div class="parent-home-card-v2-titles">
+            <h2>Upcoming Events</h2>
+            <p>Mark your calendar!</p>
+          </div>
+          <a class="parent-home-card-v2-viewall" href="/events?view=calendar&amp;portal=parent">View All <svg><use href="#icon-chevron-right"/></svg></a>
+        </div>
+        <div class="parent-home-card-v2-body">
+          <% if (upcomingEvents.length === 0) { %>
+            <p class="roster-empty">No upcoming events right now.</p>
+          <% } else { %>
+            <ul class="parent-home-event-list">
+              <% upcomingEvents.forEach(function(e) { %>
+                <li>
+                  <a class="parent-home-row" href="/events/<%= e.id %>">
+                    <span class="parent-home-date-badge" <%= e.badgeColor ? `style="background:${e.badgeColor};"` : '' %>>
+                      <span class="parent-home-date-badge-month"><%= e.dateBadge.monthShort %></span>
+                      <span class="parent-home-date-badge-day"><%= e.dateBadge.day %></span>
+                    </span>
+                    <span class="parent-home-row-info">
+                      <span class="parent-home-row-title"><%= e.title %></span>
+                      <span class="parent-home-row-sub"><%= e.timeLabel %><% if (e.endsLabel) { %> &ndash; <%= e.endsLabel %><% } %></span>
+                      <% if (e.locationLabel) { %><span class="parent-home-row-sub"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= e.locationLabel %></span><% } %>
+                    </span>
+                    <svg class="icon parent-home-chevron"><use href="#icon-chevron-right"/></svg>
+                  </a>
+                </li>
+              <% }); %>
+            </ul>
+          <% } %>
+        </div>
       </section>
 
-      <section class="portal-dashboard-card">
-        <h2>Class Registrations</h2>
-        <%# A real request: "should show how many classes your family is
-            registered for by person in your family" - per-child counts
-            instead of one ambiguous family-wide total. %>
-        <% if (registrationCountsByChild.length === 0) { %>
-          <p class="hint">No students linked to your family yet.</p>
-        <% } else { %>
-          <ul class="portal-dashboard-list">
-            <% registrationCountsByChild.forEach(function(c) { %>
-              <li><%= c.name %>: <span class="badge-pill badge-pill-blue"><%= c.count %> class<%= c.count === 1 ? '' : 'es' %></span></li>
-            <% }); %>
-          </ul>
-        <% } %>
-        <a class="roster-action-btn" href="/parent/classes/dashboard">Classroom Dashboard</a>
+      <section class="parent-home-card-v2 parent-home-card-v2-green">
+        <div class="parent-home-card-v2-head">
+          <span class="parent-home-card-v2-icon"><svg><use href="#icon-book"/></svg></span>
+          <div class="parent-home-card-v2-titles">
+            <h2>Reading Challenge</h2>
+            <p>Read. Grow. Achieve.</p>
+          </div>
+          <a class="parent-home-card-v2-viewall" href="/parent/leaderboard">View All <svg><use href="#icon-chevron-right"/></svg></a>
+        </div>
+        <div class="parent-home-card-v2-body">
+          <%# A real request: "For the reading challenge its going to only
+              show the parent reading challenge leaderboard" - back to
+              the plain top-5 ranking (readingLeaders), no weekly-goal
+              progress bar or single "Top Reader" callout. %>
+          <% if (readingLeaders.length === 0) { %>
+            <p class="roster-empty">No reading hours logged yet.</p>
+          <% } else { %>
+            <ul class="parent-home-leaderboard-list">
+              <% readingLeaders.forEach(function(l) { %>
+                <li class="parent-home-row">
+                  <span class="parent-home-rank-badge">#<%= l.rank %></span>
+                  <span class="parent-home-row-info">
+                    <span class="parent-home-row-title"><%= l.name %></span>
+                  </span>
+                  <span class="parent-home-leaderboard-hours"><%= l.hours %> hrs</span>
+                </li>
+              <% }); %>
+            </ul>
+          <% } %>
+        </div>
       </section>
 
-      <section class="portal-dashboard-card">
-        <h2>Quick Links</h2>
-        <ul class="portal-dashboard-list">
-          <li><a href="/name-tag">Name Tag Form</a></li>
-          <li><a href="/absence">Absence/Late Form</a></li>
-        </ul>
+      <section class="parent-home-card-v2 parent-home-card-v2-amber">
+        <div class="parent-home-card-v2-head">
+          <span class="parent-home-card-v2-icon"><svg><use href="#icon-megaphone"/></svg></span>
+          <div class="parent-home-card-v2-titles">
+            <h2>Classifieds</h2>
+            <p>Buy. Sell. Give. Find what you need.</p>
+          </div>
+          <a class="parent-home-card-v2-viewall" href="/classifieds">View All <svg><use href="#icon-chevron-right"/></svg></a>
+        </div>
+        <div class="parent-home-card-v2-body">
+          <% if (classifiedsListings.length === 0) { %>
+            <p class="roster-empty">No classifieds listings yet.</p>
+          <% } else { %>
+            <ul class="parent-home-classified-list">
+              <% classifiedsListings.forEach(function(l) { %>
+                <li>
+                  <a class="parent-home-row" href="/classifieds/<%= l.id %>">
+                    <% if (l.imageUrl) { %>
+                      <img class="parent-home-classified-thumb" src="<%= l.imageUrl %>" alt="" />
+                    <% } else { %>
+                      <span class="parent-home-classified-thumb parent-home-classified-thumb-empty"><svg class="icon"><use href="#icon-image"/></svg></span>
+                    <% } %>
+                    <span class="parent-home-row-info">
+                      <span class="parent-home-row-title"><%= l.title %></span>
+                      <% if (l.price) { %><span class="parent-home-classified-price"><%= l.price %></span><% } %>
+                      <span class="parent-home-row-sub">
+                        <% if (l.posterName) { %>Posted by <%= l.posterName %><% } %>
+                        <% if (l.posterName && l.dateLabel) { %>&middot;<% } %>
+                        <%= l.dateLabel %>
+                      </span>
+                    </span>
+                    <svg class="icon parent-home-chevron"><use href="#icon-chevron-right"/></svg>
+                  </a>
+                </li>
+              <% }); %>
+            </ul>
+          <% } %>
+          <a class="parent-home-cta parent-home-cta-outline-amber" href="/classifieds/mine"><svg><use href="#icon-plus"/></svg> Post a Classified</a>
+        </div>
       </section>
 
-      <%# A real request: "add a button on the parent portal homepage for
-          committee sign up." Its own card (matching Quick Links' own
-          card treatment) rather than a 3rd Quick Links list item - a
-          real signup action, not just a link to a form. %>
-      <section class="portal-dashboard-card">
-        <h2>Committees</h2>
-        <p class="hint">Signup for a Committee and help us create fun events for the group!</p>
-        <a class="roster-action-btn" href="/committees">Committee Sign Up</a>
+      <section class="parent-home-card-v2 parent-home-card-v2-purple">
+        <div class="parent-home-card-v2-head">
+          <span class="parent-home-card-v2-icon"><svg><use href="#icon-store"/></svg></span>
+          <div class="parent-home-card-v2-titles">
+            <h2>Business Directory</h2>
+            <p>Support local. Support our community.</p>
+          </div>
+          <a class="parent-home-card-v2-viewall" href="/directory">View All <svg><use href="#icon-chevron-right"/></svg></a>
+        </div>
+        <div class="parent-home-card-v2-body">
+          <% if (businessDirectoryListings.length === 0) { %>
+            <p class="roster-empty">No business listings yet.</p>
+          <% } else { %>
+            <ul class="parent-home-directory-list">
+              <% businessDirectoryListings.forEach(function(l) { %>
+                <li>
+                  <a class="parent-home-row" href="/directory/<%= l.id %>">
+                    <span class="parent-home-directory-icon parent-home-directory-icon-<%= l.color %>"><svg><use href="#icon-store"/></svg></span>
+                    <span class="parent-home-row-info">
+                      <span class="parent-home-row-title"><%= l.businessName %></span>
+                      <% if (l.categoryTitle) { %><span class="parent-home-row-sub"><%= l.categoryTitle %></span><% } %>
+                      <% if (l.phone) { %><span class="parent-home-row-sub"><svg class="icon"><use href="#icon-phone"/></svg> <%= l.phone %></span><% } %>
+                    </span>
+                    <svg class="icon parent-home-chevron"><use href="#icon-chevron-right"/></svg>
+                  </a>
+                </li>
+              <% }); %>
+            </ul>
+          <% } %>
+          <a class="parent-home-cta parent-home-cta-outline-purple" href="/directory/mine"><svg><use href="#icon-plus"/></svg> Add Your Business</a>
+        </div>
       </section>
 
-      <%# A real request: "should have a card showing the rankings for
-          Parent reading challenge" - same leaderboard /parent/leaderboard
-          already renders, scoped to parents. %>
-      <section class="portal-dashboard-card">
-        <h2>Parent Reading Challenge</h2>
-        <% if (readingLeaders.length === 0) { %>
-          <p class="roster-empty">No reading hours logged yet.</p>
-        <% } else { %>
-          <ul class="portal-dashboard-list">
-            <% readingLeaders.forEach(function(l) { %>
-              <li>#<%= l.rank %> <%= l.name %> <span class="hint">&middot; <%= l.hours %> hrs</span></li>
-            <% }); %>
-          </ul>
-        <% } %>
-        <a class="roster-action-btn" href="/parent/leaderboard">View Reading Challenge</a>
-      </section>
-
-      <%# A real request: "a card showing business directory listing." %>
-      <section class="portal-dashboard-card">
-        <h2>Business Directory</h2>
-        <% if (businessDirectoryListings.length === 0) { %>
-          <p class="roster-empty">No business listings yet.</p>
-        <% } else { %>
-          <ul class="portal-dashboard-list">
-            <% businessDirectoryListings.forEach(function(l) { %>
-              <li><%= l.business_name %></li>
-            <% }); %>
-          </ul>
-        <% } %>
-        <a class="roster-action-btn" href="/directory">View Business Directory</a>
-      </section>
-
-      <%# A real request: "a card showing classifieds listings." %>
-      <section class="portal-dashboard-card">
-        <h2>Classifieds</h2>
-        <% if (classifiedsListings.length === 0) { %>
-          <p class="roster-empty">No classifieds listings yet.</p>
-        <% } else { %>
-          <ul class="portal-dashboard-list">
-            <% classifiedsListings.forEach(function(l) { %>
-              <li><%= l.title %></li>
-            <% }); %>
-          </ul>
-        <% } %>
-        <a class="roster-action-btn" href="/classifieds">View Classifieds</a>
+      <section class="parent-home-card-v2 parent-home-card-v2-indigo">
+        <div class="parent-home-card-v2-head">
+          <span class="parent-home-card-v2-icon"><svg><use href="#icon-clipboard-list"/></svg></span>
+          <div class="parent-home-card-v2-titles">
+            <h2>Class Registrations</h2>
+          </div>
+        </div>
+        <div class="parent-home-card-v2-body">
+          <%# A real request: "should show how many classes your family is
+              registered for by person in your family" - per-child counts
+              instead of one ambiguous family-wide total. %>
+          <% if (registrationCountsByChild.length === 0) { %>
+            <p class="hint">No students linked to your family yet.</p>
+          <% } else { %>
+            <ul class="portal-dashboard-list">
+              <% registrationCountsByChild.forEach(function(c) { %>
+                <li><%= c.name %>: <span class="badge-pill badge-pill-blue"><%= c.count %> class<%= c.count === 1 ? '' : 'es' %></span></li>
+              <% }); %>
+            </ul>
+          <% } %>
+          <a class="parent-home-cta parent-home-cta-outline-indigo" href="/parent/classes/dashboard"><svg><use href="#icon-chevron-right"/></svg> Classroom Dashboard</a>
+        </div>
       </section>
     </div>
   </main>

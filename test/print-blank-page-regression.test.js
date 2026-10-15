@@ -105,3 +105,30 @@ test('.print-page keeps a real safety margin below every print view\'s own usabl
   const smallestUsableHeight = 10;
   assert.ok(minHeight <= smallestUsableHeight - 0.5, `.print-page's min-height (${minHeight}in) is too close to the smallest usable page height (${smallestUsableHeight}in) - risks the same pagination bug this is meant to avoid`);
 });
+
+// A real bug report: "printing works... all other devices. Make sure
+// printing works universal for any age device." An audit for this report
+// found .schedule-print-card (the single-member Schedule print page's own
+// per-class card) using `break-inside: avoid` with no legacy `page-break-
+// inside: avoid` alongside it - an older browser's print engine only
+// understands the legacy property, so that card could still split across
+// a page break there even though every other break-inside rule in this
+// file already carries both (see .class-schedule-print-card's own
+// comment on exactly why). This locks that pairing in for every current
+// and future break-inside rule file-wide, not just this one case.
+test('every break-inside rule in styles.css also carries the legacy page-break-inside pairing, for older print engines', () => {
+  const ruleRe = /([^{}]+)\{([^{}]*)\}/g;
+  const offenders = [];
+  let m;
+  while ((m = ruleRe.exec(css))) {
+    const [, selectorList, body] = m;
+    if (!/(^|[^-])break-inside\s*:/.test(body)) continue;
+    if (/(^|[^-])page-break-inside\s*:/.test(body)) continue;
+    offenders.push(selectorList.trim());
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `found a break-inside rule with no paired legacy page-break-inside - older print engines won't honor it: ${offenders.join(', ')}`
+  );
+});

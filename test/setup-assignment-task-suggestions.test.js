@@ -103,7 +103,7 @@ test('Task 1 dropdowns each suggest a distinct task before Task 2 dropdowns get 
 
   // Cara is absent - her row is flagged and nothing is suggested (no
   // <select> with a pre-selected option; a disabled "Absent" control instead).
-  assert.match(res.text, /setup-assignment-row-absent/);
+  assert.match(res.text, /setup-assignment-name-absent/);
   assert.match(caraSlot1, /Absent - no task/);
   assert.doesNotMatch(caraSlot1, /selected/);
 });

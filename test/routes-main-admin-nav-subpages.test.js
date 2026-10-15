@@ -130,7 +130,7 @@ test('Mobile orange bar: every subpages-bearing item gets its own popup trigger 
     // Parent/Student/Teacher-facing Contact Admins page) added a 5th
     // subpage here.
     { slug: 'communication', tabCount: 5 },
-    { slug: 'events', tabCount: 5 },
+    { slug: 'events', tabCount: 6 },
     { slug: 'chat', tabCount: 3 },
     { slug: 'volunteers', tabCount: 3 },
     { slug: 'name-tags', tabCount: 3 },
