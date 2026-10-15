@@ -4,14 +4,14 @@
   <%- include('partials/head', { title }) %>
   <style>@page { size: letter; margin: 0.4in; }</style>
 </head>
-<body class="admin-page">
+<body class="admin-page logs-page">
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="print-header">
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Co-op Check-In/Out Log' : tab === 'classcheckinout' ? 'Class Check-In/Out Log' : tab === 'classrisk' ? 'Class Cancellation Risk' : tab === 'substitutes' ? 'Substitutes Needed' : tab === 'allergies' ? 'Allergies/Medical Log' : tab === 'classregistration' ? 'Class Registration Log' : 'Name Tag Requests' %></p>
+        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Co-op Check-In/Out Log' : tab === 'classcheckinout' ? 'Class Check-In/Out Log' : tab === 'classrisk' ? 'Class Cancellation Risk' : tab === 'substitutes' ? 'Substitutes Needed' : tab === 'allergies' ? 'Allergies/Medical Log' : tab === 'classregistration' ? 'Class Registration Log' : tab === 'missedduty' ? 'Missed Duty / No-Show Log' : 'Name Tag Requests' %></p>
       </div>
     </div>
     <h1><%= title %></h1>
@@ -95,6 +95,89 @@
                 <td><%= r.classDayLabel %></td>
                 <td><%= r.dateLabel %></td>
                 <td><span class="status-badge <%= r.statusLabel === 'Cancelled' ? 'status-badge-absent' : r.statusLabel === 'Waitlisted' ? 'status-badge-late' : 'status-badge-present' %>"><%= r.statusLabel %></span></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } else if (tab === 'missedduty') { %>
+        <%# A real request: "Create a co-op admin log for each day of
+            scheduled classes that makes a list of the parent members who
+            don't scan a setup/cleanup badge and parent who don't check
+            in or submit an absence form and are a no show completely...
+            organized by the date and next to each member it will show
+            how many times they have missed scanning the setup/cleanup
+            badge and how many times they didn't checkin or submit an
+            absence for[m] for the day." Same "calendar bar" date filter
+            and family-accordion-by-day pattern as the Absence tab above
+            (routes/admin-logs.js's own missedDutyRows/
+            groupMissedDutyRowsByDate), grouped by DATE rather than
+            family here since the thing an admin is scanning for is "who
+            tripped on this day," not "which family." Both running totals
+            (routes/admin-logs.js's own missedDutyRows comment on why
+            both numbers show on every row, not just whichever one that
+            date's own flag was for) show on every member row regardless
+            of which reason(s) that specific date flagged them for. %>
+        <div class="roster-toolbar no-print">
+          <form method="GET" action="/admin/logs" class="dashboard-date-picker">
+            <input type="hidden" name="tab" value="missedduty" />
+            <svg class="icon"><use href="#icon-calendar-check"/></svg>
+            <span class="dashboard-date-picker-label"><%= dateFilterLabel %></span>
+            <svg class="icon"><use href="#icon-chevron-down"/></svg>
+            <input type="date" name="date" value="<%= dateFilter %>" aria-label="Filter by date" onchange="this.form.requestSubmit()" />
+          </form>
+          <% if (dateFilter) { %><a class="roster-action-btn" href="/admin/logs?tab=missedduty">Clear</a><% } %>
+          <div class="roster-btn-row">
+            <a class="roster-action-btn file-action-btn" href="/admin/logs/missedduty/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
+            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+          </div>
+        </div>
+
+        <% if (dateGroups.length === 0) { %>
+          <p class="roster-empty no-print">No missed setup/cleanup scans or no-shows<%= dateFilter ? ' for this date' : ' yet' %>.</p>
+        <% } else { %>
+          <div class="absence-family-groups no-print">
+            <% dateGroups.forEach(function(g, i) { %>
+              <div class="absence-family-group">
+                <button type="button" class="absence-family-toggle" aria-expanded="false" aria-controls="missedduty-date-<%= i %>">
+                  <span class="absence-family-name"><%= g.dateLabel %></span>
+                  <span class="absence-family-count"><%= g.members.length %> member<%= g.members.length === 1 ? '' : 's' %></span>
+                  <svg class="icon absence-family-chevron"><use href="#icon-chevron-down"/></svg>
+                </button>
+                <div class="absence-family-members" id="missedduty-date-<%= i %>" hidden>
+                  <% g.members.forEach(function(r) { %>
+                    <div class="absence-member-row">
+                      <span class="absence-member-name"><%= r.memberName %></span>
+                      <% if (r.missedScan) { %><span class="status-badge status-badge-absent">Missed Setup/Cleanup</span><% } %>
+                      <% if (r.noShow) { %><span class="status-badge status-badge-absent">No-Show</span><% } %>
+                      <span class="absence-member-detail"><%= r.familyName || '—' %></span>
+                      <span class="absence-member-detail">Missed Setup/Cleanup total: <%= r.scanCount %></span>
+                      <span class="absence-member-detail">No-Show total: <%= r.noShowCount %></span>
+                    </div>
+                  <% }); %>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+
+        <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref }) %>
+
+        <table class="roster-table members-table condensed-table logs-print-table">
+          <thead>
+            <tr><th>Date</th><th>Name</th><th>Family</th><th>Flagged For</th><th>Missed Setup/Cleanup Total</th><th>No-Show Total</th></tr>
+          </thead>
+          <tbody>
+            <% if (allSubmissions.length === 0) { %>
+              <tr><td colspan="6" class="roster-empty">No missed setup/cleanup scans or no-shows<%= dateFilter ? ' for this date' : ' yet' %>.</td></tr>
+            <% } %>
+            <% allSubmissions.forEach(function(r) { %>
+              <tr>
+                <td><%= r.dateLabel %></td>
+                <td><%= r.memberName %></td>
+                <td><%= r.familyName || '—' %></td>
+                <td><%= [r.missedScan ? 'Missed Setup/Cleanup' : null, r.noShow ? 'No-Show' : null].filter(Boolean).join(' + ') %></td>
+                <td><%= r.scanCount %></td>
+                <td><%= r.noShowCount %></td>
               </tr>
             <% }); %>
           </tbody>
@@ -412,7 +495,7 @@
       <% } %>
     </div>
   </main>
-  <% if (tab === 'absence' || tab === 'classregistration') { %>
+  <% if (tab === 'absence' || tab === 'classregistration' || tab === 'missedduty') { %>
     <script src="/js/absence-log-accordion.js"></script>
   <% } %>
 </body>
