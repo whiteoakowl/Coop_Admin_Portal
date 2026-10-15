@@ -10378,10 +10378,35 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
   flex: 1 1 0;
 }
 
-@page {
-  size: landscape;
-  margin: 1cm;
-}
+/* A real bug report, reproduced live: "an older desktop with outdated
+   Chrome, the 2nd page being printed always starts on the first page[,]
+   continues overlapping on the wrong pages" for name tags/badges/every
+   print page in the app. Root cause traced to a stray, completely
+   unscoped `@page { size: landscape; margin: 1cm; }` that used to sit
+   right here - this stylesheet is shared by every single page in the
+   app (every view links it via partials/head.ejs), so an unscoped @page
+   rule in it is a global default for ALL of them, not just whichever
+   one feature it was meant for. The one view that genuinely wants
+   landscape (admin-events-registrations-print.ejs, "wide roster" print)
+   already declares its own properly scoped `@page { size: letter
+   landscape; ... }` in its own <style> tag - the established, correct
+   pattern every portrait print view in this app already follows (see
+   admin-name-tag-print.ejs and friends). Confirmed live via Playwright
+   (page.pdf) that this stray rule alone was enough to flip a portrait
+   badge sheet to a landscape physical page - its own 10in-tall content
+   no longer fit the now-8.5in-tall page, so it split mid-sheet onto an
+   extra physical page, matching the reported symptom exactly. For the
+   several views below that never declared their own @page override at
+   all (student-diploma.ejs, events-ticket-print.ejs, the Members roster
+   print, etc.) this was a guaranteed landscape default on ANY browser,
+   not just an old one - for the views that DO override it, correctness
+   depended on every browser engine resolving a shared-stylesheet-vs-
+   inline-style cascade the same way, exactly the kind of cross-engine
+   inconsistency an older browser is most likely to get wrong. Deleted
+   outright rather than re-scoped: @page has no class/attribute selector
+   to scope it with the normal way, and the one view that actually wants
+   landscape already owns its own override - a shared stylesheet should
+   never carry a page-wide default like this at all. */
 
 /* ============================================================
    Training & Learning module (admin Training Builder/Report,

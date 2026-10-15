@@ -46,3 +46,35 @@ test('the Members print-swap rule is scoped to the page-specific class', () => {
     'no rule should hide every .members-table sitewide - that blanks out every other page reusing that class for styling (see git history for the real bug this caught)'
   );
 });
+
+// A real bug report, reproduced live: "an older desktop with outdated
+// Chrome, the 2nd page being printed always starts on the first page[,]
+// continues overlapping on the wrong pages" - for name tags, badges, every
+// print page in the app, not any one page in particular. Root cause: a
+// bare, completely unscoped `@page { size: landscape; margin: 1cm; }` used
+// to sit in this file with no selector to scope it with (CSS gives @page
+// no class/attribute selector) - this stylesheet is shared by literally
+// every page in the app (every view links it via partials/head.ejs), so an
+// unscoped @page rule here is a global default for ALL of them, not just
+// whichever one feature it was meant for. Several print views never
+// declared their own @page override at all, so for those this was a
+// guaranteed landscape default on ANY browser; for the ones that DO
+// override it with their own `<style>@page{...}</style>`, correctness
+// depended on every browser engine resolving the shared-stylesheet-vs-
+// inline-style cascade identically - exactly the kind of cross-engine
+// inconsistency an older browser is most likely to get wrong. Confirmed
+// live via Playwright (page.pdf) that this stray rule alone was enough to
+// flip a portrait badge sheet to a landscape physical page, overflowing
+// its content onto a spurious extra page mid-sheet - the exact reported
+// symptom. The real fix is architectural (every @page override belongs in
+// its own view's <style> tag, never the shared stylesheet - see
+// admin-name-tag-print.ejs and friends for the established pattern this
+// restores), so the regression to guard against is simply this shared
+// file ever declaring an @page rule of its own again, for any reason.
+test('the shared stylesheet never declares its own @page rule', () => {
+  assert.doesNotMatch(
+    css,
+    /@page\s*(\w+\s*)?\{/,
+    'public/css/styles.css is linked by every single page in the app - an @page rule here is a global default for all of them, not just whichever feature it was meant for. Put it in that view\'s own <style> tag instead (see admin-name-tag-print.ejs and friends)'
+  );
+});
