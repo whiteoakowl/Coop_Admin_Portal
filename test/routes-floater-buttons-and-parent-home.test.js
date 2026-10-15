@@ -55,7 +55,7 @@ test('Floater Assignments: Add/Edit Dates and Add/Edit Permanent Positions use r
 });
 
 test('Parent Portal homepage buttons are scoped to fit-to-text sizing (not stretched full-width)', async () => {
-  assert.match(fs.readFileSync(path.join(__dirname, '..', 'public', 'css', 'styles.css'), 'utf8'), /\.parent-home-main \.roster-action-btn \{ align-self: flex-start; \}/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'public', 'css', 'styles.css'), 'utf8'), /\.parent-home-main \.roster-action-btn \{ align-self: flex-start; flex-grow: 0; \}/);
 });
 
 async function loginAsPortalParent() {
