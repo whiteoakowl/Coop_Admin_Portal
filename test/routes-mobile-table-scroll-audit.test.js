@@ -65,7 +65,6 @@ test('Every real (non-print) page whose table had no .roster-scroll wrapper now 
     { url: '/main-admin/notifications', cookie: mainAdminCookie },
     { url: '/main-admin/publications', cookie: mainAdminCookie },
     { url: '/notifications/preferences', cookie: mainAdminCookie },
-    { url: '/contact-admins', cookie: adminCookie },
   ];
   for (const { url, cookie } of alwaysRendered) {
     const res = await request(app).get(url).set('Cookie', cookie);

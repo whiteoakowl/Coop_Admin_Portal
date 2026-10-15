@@ -309,6 +309,25 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
       </div>
     <% } %>
 
+    <%# A real bug report: "When duplicating classes, editing a class,
+        etc it should stay on that semester. It keeps falling back to
+        fall semesters." This dialog has no Semester field of its own
+        (a brand new class always starts untagged - see this file's own
+        comment above the Add/Edit Grid dialog's Semester <select> for
+        why that one's different), but the admin still opened it from a
+        specific semester's own grid view - echoing that back as
+        gridSemesterId (not semesterId - this route never reads that
+        name for anything else, so there's no ambiguity with "which
+        semester to tag the new class with") is enough for
+        routes/admin-class-schedule.js's own POST /classes/new to land
+        back on the same semester view instead of silently falling
+        back to Settings > Kiosk's active semester. %>
+    <%# selectedSemesterId arrives here already run through qsSemester
+        (admin-schedule.js's own render call) - either a real semester id
+        or the literal string 'none', never raw null - so it's safe to
+        drop straight into the query string server-side with no further
+        conversion. %>
+    <input type="hidden" name="gridSemesterId" value="<%= typeof selectedSemesterId !== 'undefined' ? selectedSemesterId : '' %>" />
     <div class="class-form-dialog-footer">
       <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
       <button type="submit" class="primary-btn"><svg class="icon"><use href="#icon-check"/></svg> Create Class</button>
@@ -401,6 +420,10 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
     <h3>Import</h3>
     <a class="btn-secondary import-sample-link" href="/admin/class-schedule/import-template.xlsx">Download Sample File</a>
     <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+    <%# Same "stay on that semester" fix as every other dialog on this
+        grid - echoes back whichever semester's grid Import was opened
+        from so the redirect after it lands back there. %>
+    <input type="hidden" name="gridSemesterId" value="<%= typeof selectedSemesterId !== 'undefined' ? selectedSemesterId : '' %>" />
     <div class="notes-dialog-actions">
       <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
       <button type="submit" class="primary-btn">Import</button>
@@ -601,6 +624,12 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 <dialog id="bulk-edit-dialog-<%= day %>" class="class-form-dialog">
   <form method="POST" action="/admin/class-schedule/<%= day %>/bulk-edit" class="member-form-grid">
     <input type="hidden" name="classIds" data-bulk-edit-ids value="" />
+    <%# gridSemesterId (distinct from this dialog's own Semester <select>
+        below, which PATCHES the selected classes' semester) echoes back
+        whichever semester's grid this Bulk Edit was opened from, so
+        Save lands back on it - same "stay on that semester" fix as the
+        Create New Class dialog above. %>
+    <input type="hidden" name="gridSemesterId" value="<%= typeof selectedSemesterId !== 'undefined' ? selectedSemesterId : '' %>" />
     <h3>Bulk Edit <span data-bulk-edit-count>0</span> Selected Class(es)</h3>
     <p class="hint">Leave a field blank (or "Don't change") to leave that field as-is on every selected class.</p>
     <label class="member-form-full">Title

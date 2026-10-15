@@ -126,7 +126,10 @@ test('Mobile orange bar: every subpages-bearing item gets its own popup trigger 
   const sections = [
     { slug: 'members', tabCount: 4 },
     { slug: 'accounting', tabCount: 7 },
-    { slug: 'communication', tabCount: 4 },
+    // Contact Admin Messages (the new admin-facing inbox for the
+    // Parent/Student/Teacher-facing Contact Admins page) added a 5th
+    // subpage here.
+    { slug: 'communication', tabCount: 5 },
     { slug: 'events', tabCount: 5 },
     { slug: 'chat', tabCount: 3 },
     { slug: 'volunteers', tabCount: 3 },

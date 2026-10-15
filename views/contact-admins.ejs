@@ -4,7 +4,7 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body class="admin-page">
-  <%- include('partials/admin-nav') %>
+  <%- include('partials/portal-nav', { portalTitle }) %>
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Contact Admins</h1>
     <p class="subtitle">Contact leadership teams for support with classes, finances, events, volunteer positions, attendance, yearbook, and general co-op questions.</p>
@@ -13,49 +13,31 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <div class="manage-section">
-      <h2>Leadership Contacts</h2>
-      <% if (contacts.length === 0) { %>
-        <p class="hint">No leadership contacts yet.</p>
-      <% } else { %>
-        <div class="roster-scroll">
-          <table class="roster-table">
-            <thead><tr><th>Role</th><th>Name</th><th>Email</th></tr></thead>
-            <tbody>
-              <% contacts.forEach(function(c) { %>
-                <tr>
-                  <td><%= c.role %></td>
-                  <td><%= c.name || '—' %></td>
-                  <td><% if (c.email) { %><a href="mailto:<%= c.email %>"><%= c.email %></a><% } else { %>—<% } %></td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
-      <% } %>
-    </div>
-
-    <div class="manage-section">
       <h2>Send Message</h2>
-      <form method="POST" action="/contact-admins" class="stack-form">
-        <label>Leadership Team
-          <select name="leadershipTeam" required>
-            <option value="General Leadership">General Leadership</option>
-            <% contacts.forEach(function(c) { %>
-              <option value="<%= c.role %>"><%= c.role %></option>
-            <% }); %>
-          </select>
-        </label>
-        <label>Your Email
-          <input type="email" name="senderEmail" placeholder="Enter your email" required />
-        </label>
-        <label>Message Title
-          <input type="text" name="title" placeholder="Enter message title" required />
-        </label>
-        <label>Message
-          <textarea name="message" rows="5" placeholder="Type your message here..." required></textarea>
-        </label>
-        <button type="submit" class="primary-btn">Submit Message</button>
-      </form>
+      <% if (departments.length === 0) { %>
+        <p class="hint">No admin departments are set up to receive messages yet.</p>
+      <% } else { %>
+        <form method="POST" action="/contact-admins<%= portalQueryString %>" class="stack-form dialog-label-stack">
+          <label>Department
+            <select name="positionId" required>
+              <option value="">Choose a department&hellip;</option>
+              <% departments.forEach(function(d) { %>
+                <option value="<%= d.id %>"><%= d.title %></option>
+              <% }); %>
+            </select>
+          </label>
+          <label>Your Email
+            <input type="email" value="<%= senderEmail %>" readonly />
+          </label>
+          <label>Message Title
+            <input type="text" name="title" placeholder="Enter message title" required />
+          </label>
+          <label>Message
+            <textarea name="message" rows="5" placeholder="Type your message here..." required></textarea>
+          </label>
+          <button type="submit" class="primary-btn">Submit Message</button>
+        </form>
+      <% } %>
     </div>
   </main>
 </body>

@@ -105,7 +105,13 @@ test('creating a class redirects back to the tabbed page, not the bare duplicate
       .type('form')
       .send({ day: 'monday', className: 'Regression Test Class', hourPosition: '1', color: '#EE9A4D', _csrf: csrfToken });
     assert.equal(res.status, 302);
-    assert.match(res.headers.location, /^\/admin\/class-schedule\/monday\?notice=/, 'still redirects through the shim URL...');
+    // A real bug report since this test was written: "When duplicating
+    // classes, editing a class, etc it should stay on that semester. It
+    // keeps falling back to fall semesters." - this redirect now also
+    // carries ?semesterId= (routes/admin-class-schedule.js), which the
+    // shim at /admin/class-schedule/:day still forwards through
+    // unchanged on its own second hop below.
+    assert.match(res.headers.location, /^\/admin\/class-schedule\/monday\?semesterId=none&notice=/, 'still redirects through the shim URL...');
     // ...which itself immediately redirects again to the real tabbed page - confirm that second hop too.
     const followed = await request(app).get(res.headers.location).set('Cookie', cookie);
     assert.equal(followed.status, 302);

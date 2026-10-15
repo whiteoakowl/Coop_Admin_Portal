@@ -6,7 +6,15 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle no-print"><a href="/admin/schedule?tab=<%= cls.day %>">&larr; <%= dayLabel %> Class Schedule</a></p>
+    <%# A real bug report: "When duplicating classes, editing a class, etc
+        it should stay on that semester. It keeps falling back to fall
+        semesters." - carrying this class's own semester_id through to
+        the grid link (same as every redirect routes/admin-class-schedule.js
+        now sends back here after an edit/delete/duplicate) keeps this
+        link landing back on the semester this class actually belongs to,
+        instead of routes/admin-schedule.js's own resolveSemesterId
+        falling back to Settings > Kiosk's active semester. %>
+    <p class="subtitle no-print"><a href="/admin/schedule?tab=<%= cls.day %>&semesterId=<%= cls.semester_id == null ? 'none' : cls.semester_id %>">&larr; <%= dayLabel %> Class Schedule</a></p>
 
     <div class="roster-toolbar">
       <div><h1><%= cls.class_name %></h1></div>

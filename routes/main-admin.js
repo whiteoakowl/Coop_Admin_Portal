@@ -28,6 +28,7 @@ const {
   setPositionPermissions,
   addAdminPositionForMember,
   removeAdminPositionForMember,
+  setMemberAdminPositionContactEmail,
   membersByAdminPosition,
 } = require('../utils/adminPositions');
 const { activeMemberOptions } = require('../utils/members');
@@ -260,6 +261,7 @@ router.post('/admins/positions/:id/update', requirePortalPermission('manage_user
     const email = (req.body.email || '').trim();
     const phone = (req.body.phone || '').trim();
     await db.prepare('UPDATE members SET email = ?, phone = ? WHERE id = ?').run(email || null, phone || null, memberId);
+    await setMemberAdminPositionContactEmail(memberId, positionId, req.body.contactEmail);
   }
 
   await renderAdmins(req, res, null, 'Saved.');

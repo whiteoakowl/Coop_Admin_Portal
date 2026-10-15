@@ -345,8 +345,18 @@ router.post('/class-schedule/classes/new', requireFullAdmin, async (req, res) =>
   const day = isValidClassDay(req.body.day) ? req.body.day : null;
   const className = (req.body.className || '').trim();
   const hourPosition = parseInt(req.body.hourPosition, 10);
+  // A real bug report: "When duplicating classes, editing a class, etc
+  // it should stay on that semester. It keeps falling back to fall
+  // semesters." This dialog has no Semester field of its own (a brand
+  // new class always starts untagged), but gridSemesterId (the Create
+  // New Class dialog's own hidden field, class-schedule-grid.ejs) echoes
+  // back whichever semester's grid the admin had open when they clicked
+  // Add Class - carried through on the redirect below so Save lands back
+  // there instead of routes/admin-schedule.js's own resolveSemesterId
+  // falling back to Settings > Kiosk's active semester.
+  const gridSemesterId = req.body.gridSemesterId || 'none';
   if (!day || !className || !HOUR_POSITIONS.includes(hourPosition)) {
-    return res.redirect(`/admin/class-schedule/${day || 'monday'}?error=` + encodeURIComponent('Class day, name, and hour are required.'));
+    return res.redirect(`/admin/class-schedule/${day || 'monday'}?semesterId=${gridSemesterId}&error=` + encodeURIComponent('Class day, name, and hour are required.'));
   }
   const id = await createClass({
     day,
@@ -386,7 +396,7 @@ router.post('/class-schedule/classes/new', requireFullAdmin, async (req, res) =>
   // Land back on the day's schedule grid (where the dialog was opened
   // from) instead of jumping to the class's own Manage page - the dialog
   // just closes and the newly created class shows up on the grid.
-  res.redirect(`/admin/class-schedule/${day}?notice=` + encodeURIComponent(`"${className}" created.`));
+  res.redirect(`/admin/class-schedule/${day}?semesterId=${gridSemesterId}&notice=` + encodeURIComponent(`"${className}" created.`));
 });
 
 // Powers the "View" button's dialog on the day grid - fetched as an HTML
@@ -873,11 +883,22 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single(
   const id = parseInt(req.params.id, 10);
   const cls = await getClass(id);
   if (!cls) return res.status(404).send('Not found');
+  // A real bug report: "When duplicating classes, editing a class, etc
+  // it should stay on that semester. It keeps falling back to fall
+  // semesters." Every redirect in this route used to land on
+  // /admin/class-schedule/<day> with no ?semesterId= at all, which
+  // routes/admin-schedule.js's own resolveSemesterId then re-resolves to
+  // Settings > Kiosk's active semester (Fall, for this co-op) instead of
+  // the semester the admin was actually looking at/editing into. The
+  // class's own semester (new value once a save succeeds, its existing
+  // one for an error that happens before anything changes) is always the
+  // right answer to redirect back to - no query-string plumbing needed.
+  const newSemesterId = req.body.semesterId ? parseInt(req.body.semesterId, 10) : null;
 
   const className = (req.body.className || '').trim();
   const hourPosition = parseInt(req.body.hourPosition, 10);
   if (!className || !HOUR_POSITIONS.includes(hourPosition)) {
-    return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent('Class name and hour are required.'));
+    return res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(cls.semester_id)}&error=` + encodeURIComponent('Class name and hour are required.'));
   }
 
   try {
@@ -934,7 +955,7 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single(
       allowParentCompleteLessons: req.body.allowParentCompleteLessons === '1',
       allowParentChat: req.body.allowParentChat === '1',
     });
-    await setClassSemester(id, req.body.semesterId ? parseInt(req.body.semesterId, 10) : null);
+    await setClassSemester(id, newSemesterId);
     // A real request: "remove sections" (from Class Details) - this save
     // no longer touches class_sections at all, same "preserve whatever
     // isn't on this form" reasoning as capacity/minCapacity/slots above;
@@ -952,9 +973,9 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single(
     // underlying setRosterMembership bug, now fixed at its source).
     // Surfacing the real reason here too if anything else ever goes
     // wrong in this same save path.
-    return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not save class: ${err.message}`));
+    return res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(cls.semester_id)}&error=` + encodeURIComponent(`Could not save class: ${err.message}`));
   }
-  res.redirect(`/admin/class-schedule/${cls.day}?notice=` + encodeURIComponent(`"${className}" updated.`));
+  res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(newSemesterId)}&notice=` + encodeURIComponent(`"${className}" updated.`));
 });
 
 // A real request: "Add bulk edit button on classes, class schedules...
@@ -967,12 +988,18 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single(
 // selected class's existing value).
 router.post('/class-schedule/:day/bulk-edit', requireFullAdmin, async (req, res) => {
   const day = isValidClassDay(req.params.day) ? req.params.day : 'monday';
+  // gridSemesterId is the grid's own "which semester was I viewing"
+  // signal (class-schedule-grid.ejs's own hidden field) - kept separate
+  // from req.body.semesterId below, which is this dialog's "set this
+  // semester on the selected classes" field. Same "stay on that
+  // semester" bug fix as every other redirect in this file.
+  const gridSemesterId = req.body.gridSemesterId || 'none';
   const ids = (req.body.classIds || '')
     .split(',')
     .map((v) => parseInt(v, 10))
     .filter(Boolean);
   if (ids.length === 0) {
-    return res.redirect(`/admin/schedule?tab=${day}&error=` + encodeURIComponent('No classes were selected.'));
+    return res.redirect(`/admin/schedule?tab=${day}&semesterId=${gridSemesterId}&error=` + encodeURIComponent('No classes were selected.'));
   }
 
   const patch = {};
@@ -994,7 +1021,7 @@ router.post('/class-schedule/:day/bulk-edit', requireFullAdmin, async (req, res)
   else if (req.body.semesterId) patch.semesterId = parseInt(req.body.semesterId, 10);
 
   const updated = await bulkUpdateClasses(ids, patch);
-  res.redirect(`/admin/schedule?tab=${day}&notice=` + encodeURIComponent(`Updated ${updated} class${updated === 1 ? '' : 'es'}.`));
+  res.redirect(`/admin/schedule?tab=${day}&semesterId=${gridSemesterId}&notice=` + encodeURIComponent(`Updated ${updated} class${updated === 1 ? '' : 'es'}.`));
 });
 
 // A real request: "# of students, # of teachers, # of class assistants
@@ -1020,7 +1047,7 @@ router.post('/class-schedule/classes/:id/delete', requireFullAdmin, async (req, 
   const cls = await getClass(id);
   if (!cls) return res.status(404).send('Not found');
   await deleteClass(id);
-  res.redirect(`/admin/class-schedule/${cls.day}?notice=` + encodeURIComponent(`Deleted "${cls.class_name}".`));
+  res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(cls.semester_id)}&notice=` + encodeURIComponent(`Deleted "${cls.class_name}".`));
 });
 
 // A real request: "Individual class editing. Add a duplicate class
@@ -1139,7 +1166,7 @@ router.post('/class-schedule/classes/:id/enrollment/add', requireFullAdmin, asyn
     await setEnrollment(id, [...new Set([...existingIds, ...addIds])]);
   } catch (err) {
     if (wantsJson) return res.status(500).json({ ok: false, error: err.message });
-    return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
+    return res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(cls.semester_id)}&error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
   }
   if (wantsJson) {
     const updatedClass = await getClass(id);
@@ -1149,7 +1176,7 @@ router.post('/class-schedule/classes/:id/enrollment/add', requireFullAdmin, asyn
     );
     return res.json({ ok: true, rowsHtml: rowsHtml.join(''), addedIds: newStudents.map((s) => s.id) });
   }
-  res.redirect(`/admin/class-schedule/${cls.day}`);
+  res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(cls.semester_id)}`);
 });
 
 router.post('/class-schedule/classes/:id/enrollment/:studentId/remove', requireFullAdmin, async (req, res) => {
@@ -1169,10 +1196,10 @@ router.post('/class-schedule/classes/:id/enrollment/:studentId/remove', requireF
     await adminRemoveStudentFromClass(id, studentId, null);
   } catch (err) {
     if (wantsJson) return res.status(500).json({ ok: false, error: err.message });
-    return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
+    return res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(cls.semester_id)}&error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
   }
   if (wantsJson) return res.json({ ok: true });
-  res.redirect(`/admin/class-schedule/${cls.day}`);
+  res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(cls.semester_id)}`);
 });
 
 router.post('/class-schedule/classes/:id/staff/add', requireFullAdmin, async (req, res) => {
@@ -1184,9 +1211,9 @@ router.post('/class-schedule/classes/:id/staff/add', requireFullAdmin, async (re
   try {
     if (memberId) await addStaff(id, memberId, role);
   } catch (err) {
-    return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
+    return res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(cls.semester_id)}&error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
   }
-  res.redirect(`/admin/class-schedule/${cls.day}`);
+  res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(cls.semester_id)}`);
 });
 
 router.post('/class-schedule/classes/:id/staff/:memberId/remove', requireFullAdmin, async (req, res) => {
@@ -1196,9 +1223,9 @@ router.post('/class-schedule/classes/:id/staff/:memberId/remove', requireFullAdm
   try {
     await removeStaff(id, parseInt(req.params.memberId, 10));
   } catch (err) {
-    return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
+    return res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(cls.semester_id)}&error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
   }
-  res.redirect(`/admin/class-schedule/${cls.day}`);
+  res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(cls.semester_id)}`);
 });
 
 // Combined "+ Add Member" dialog on the View popup's roster - one form,
@@ -1242,10 +1269,10 @@ router.post('/class-schedule/classes/:id/roster/add', requireFullAdmin, async (r
     // real reason instead of a blank "Something went wrong" no matter
     // which path handles it.
     if (wantsJson) return res.status(500).json({ ok: false, error: err.message });
-    return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not add member: ${err.message}`));
+    return res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(cls.semester_id)}&error=` + encodeURIComponent(`Could not add member: ${err.message}`));
   }
   if (wantsJson) return res.json({ ok: true });
-  res.redirect(`/admin/class-schedule/${cls.day}`);
+  res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(cls.semester_id)}`);
 });
 
 router.get('/class-schedule/classes/:id/roster/export.csv', requireFullAdmin, async (req, res) => {
@@ -1295,14 +1322,14 @@ router.post('/class-schedule/classes/:id/roster/import', requireFullAdmin, uploa
   const cls = await getClass(id);
   if (!cls) return res.status(404).send('Not found');
   if (!req.file) {
-    return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent('Please choose a file to import.'));
+    return res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(cls.semester_id)}&error=` + encodeURIComponent('Please choose a file to import.'));
   }
 
   let rows;
   try {
     rows = await readRowsFromFile(req.file.buffer);
   } catch (err) {
-    return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
+    return res.redirect(`/admin/class-schedule/${cls.day}?semesterId=${qsSemester(cls.semester_id)}&error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }
 
   const names = rows
@@ -1424,15 +1451,19 @@ function buildAutoHourPositions(rows) {
 
 router.post('/class-schedule/:day/import', requireFullAdmin, requireClassDay, upload.single('file'), async (req, res) => {
   const day = req.params.day;
+  // Same "stay on that semester" fix as every other redirect in this
+  // file - gridSemesterId echoes back whichever semester's grid Import
+  // was opened from (class-schedule-grid.ejs's own hidden field).
+  const gridSemesterId = req.body.gridSemesterId || 'none';
   if (!req.file) {
-    return res.redirect(`/admin/class-schedule/${day}?error=` + encodeURIComponent('Please choose a file to import.'));
+    return res.redirect(`/admin/class-schedule/${day}?semesterId=${gridSemesterId}&error=` + encodeURIComponent('Please choose a file to import.'));
   }
 
   let rows;
   try {
     rows = (await readRowsFromFile(req.file.buffer)).map(normalizeImportRow).filter((r) => r.className);
   } catch (err) {
-    return res.redirect(`/admin/class-schedule/${day}?error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
+    return res.redirect(`/admin/class-schedule/${day}?semesterId=${gridSemesterId}&error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }
   // Day tolerates any day-of-week abbreviation, not just the full word
   // (see utils/classDays.js's parseClassDayValue) - falls back to
@@ -1522,7 +1553,7 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireClassDay, up
   for (const d of touchedDays) await syncDayMemberRosters(d);
 
   res.redirect(
-    `/admin/class-schedule/${day}?notice=` +
+    `/admin/class-schedule/${day}?semesterId=${gridSemesterId}&notice=` +
       encodeURIComponent(
         `Imported ${created} class(es)` +
           (skipped ? `, ${skipped} row(s) skipped.` : '.') +

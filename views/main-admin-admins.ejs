@@ -134,6 +134,10 @@
           <label for="edit-position-phone-<%= p.id %>">Phone
             <input id="edit-position-phone-<%= p.id %>" type="text" name="phone" placeholder="Chosen member's phone" />
           </label>
+          <label for="edit-position-contact-email-<%= p.id %>">Contact Email (for Contact Admins messages)
+            <input id="edit-position-contact-email-<%= p.id %>" type="email" name="contactEmail" placeholder="Leave blank to use the member's own email" />
+          </label>
+          <p class="hint">Where messages sent to <%= p.title %> through Contact Admins go. Leave blank to deliver to the chosen member's own email above.</p>
 
           <h4>Roles &amp; Permissions</h4>
           <p class="hint">Shared by everyone currently assigned to <%= p.title %>.</p>

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Contact Admin Messages</h1>
+    <p class="subtitle">Messages sent from the Parent/Student/Teacher Contact Admins page, grouped by the department they were sent to.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="roster-btn-row">
+      <a class="roster-action-btn archived-toggle-btn<%= showArchived ? ' active' : '' %>" href="/main-admin/contact-admin-messages<%= showArchived ? '' : '?archived=1' %>">Archived</a>
+    </div>
+
+    <% if (messages.length === 0) { %>
+      <p class="hint"><%= showArchived ? 'No archived messages.' : 'No messages yet.' %></p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Department</th>
+              <th>From</th>
+              <th>Title</th>
+              <th>Message</th>
+              <th>Sent To</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% messages.forEach(function(m) { %>
+              <tr>
+                <td><%= m.created_at %></td>
+                <td><%= m.leadership_team %></td>
+                <td><%= m.sender_name || '—' %><% if (m.sender_email) { %> &lt;<a href="mailto:<%= m.sender_email %>"><%= m.sender_email %></a>&gt;<% } %></td>
+                <td><%= m.title %></td>
+                <td><%= m.message %></td>
+                <td><%= m.recipient_email || '—' %></td>
+                <td>
+                  <% if (showArchived) { %>
+                    <form method="POST" action="/main-admin/contact-admin-messages/<%= m.id %>/unarchive">
+                      <button type="submit" class="btn-secondary">Restore</button>
+                    </form>
+                  <% } else { %>
+                    <form method="POST" action="/main-admin/contact-admin-messages/<%= m.id %>/archive">
+                      <button type="submit" class="btn-secondary">Archive</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

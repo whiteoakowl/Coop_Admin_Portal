@@ -74,6 +74,44 @@ test('Main Admin Settings: Admins tab', async (t) => {
     assert.doesNotMatch(res.text, /No admin positions added yet\./);
   });
 
+  // A real request: "Under admin settings we can control where the
+  // messages go to for each admin member such as a specific email
+  // address" (Contact Admins feature) - the per-member contactEmail
+  // override lives on member_admin_positions itself, set via this same
+  // position-update form.
+  await t.test('setting a Contact Email for a chosen member persists on member_admin_positions', async () => {
+    // A position of its own (not 'President') - the leaders table's own
+    // delete button only ever shows for a position with zero members
+    // (views/main-admin-admins.ejs), so assigning a member to 'President'
+    // here would otherwise break the later "deleting a position" test's
+    // own assumption that President still has no leader.
+    await request(app)
+      .post('/main-admin/admins/positions/bulk-save')
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ newPositionTitle: 'Treasurer (Contact Email Test)', _csrf: csrfToken });
+    const position = await db.prepare('SELECT id FROM admin_positions WHERE title = ?').get('Treasurer (Contact Email Test)');
+    const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('ContactEmailOverrideFamily') RETURNING id").get()).id;
+    const member = await db
+      .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, active) VALUES ('Contact Email Parent', 'CONTACTEMAILOVERRIDE', 'CONTACTEMAILOVERRIDE', 'parent', ?, 1) RETURNING id")
+      .get(familyId);
+
+    const res = await request(app)
+      .post(`/main-admin/admins/positions/${position.id}/update`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ memberId: member.id, email: 'treasurer@example.com', contactEmail: 'treasurer-department@example.com', _csrf: csrfToken });
+    assert.equal(res.status, 200);
+
+    const link = await db.prepare('SELECT contact_email FROM member_admin_positions WHERE member_id = ? AND admin_position_id = ?').get(member.id, position.id);
+    assert.equal(link.contact_email, 'treasurer-department@example.com');
+
+    // Clean up this test's own scratch position so later subtests (which
+    // assume 'President' is the only position on the list) aren't thrown
+    // off by it sticking around.
+    await db.prepare('DELETE FROM admin_positions WHERE id = ?').run(position.id);
+  });
+
   // A real bug report: "the list of admin positions and names drifts off
   // the page to the right. Fit to page on mobile." html/body have
   // overflow-x:hidden as a page-wide backstop (public/css/styles.css), so

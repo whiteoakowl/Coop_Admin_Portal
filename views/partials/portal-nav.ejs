@@ -29,6 +29,18 @@ const settingsHref = portalTitle === 'Main Admin' ? '/main-admin/settings' : '/p
 // same ?portal=parent|student is enough, no guessing needed at all.
 const cornerPortalQuery = portalTitle === 'Parent Portal' ? '?portal=parent' : portalTitle === 'Student Portal' ? '?portal=student' : '';
 
+// A real request: "On parent, student and teacher portal on mobile add an
+// email icon at the top for contacting group leaders. On desktop it says
+// contact admins." Main Admin already has every admin department's own
+// contact info and isn't who this feature is for, so it's left out here -
+// the Co-op Admin portal doesn't render this partial at all.
+const showContactAdmins = portalTitle === 'Parent Portal' || portalTitle === 'Student Portal' || portalTitle === 'Teacher Portal';
+// cornerPortalQuery above only ever distinguishes parent vs. student (the
+// one ambiguity /portal/profile and settingsHref's shared URLs have) - this
+// link's own target (routes/contact-admins.js) needs to know Teacher too,
+// since sharedPortalTitle doesn't cover it, so it gets its own query value.
+const contactAdminsPortalQuery = portalTitle === 'Parent Portal' ? '?portal=parent' : portalTitle === 'Student Portal' ? '?portal=student' : portalTitle === 'Teacher Portal' ? '?portal=teacher' : '';
+
 // Main Admin's own primary nav - a real request: "there are many
 // duplicate tabs, these should be the tabs and in this order." Every
 // views/main-admin-*.ejs/admin-<feature>-*.ejs file used to pass its OWN
@@ -91,6 +103,7 @@ const MAIN_ADMIN_NAV_LINKS = [
     { href: '/main-admin/announcements/email', label: 'Email' },
     { href: '/main-admin/announcements/text', label: 'Text' },
     { href: '/main-admin/newsletter', label: 'Newsletter' },
+    { href: '/main-admin/contact-admin-messages', label: 'Contact Admin Messages' },
   ] },
   { href: '/main-admin/events', icon: 'calendar-check', label: 'Events', subpages: [
     { href: '/main-admin/events', label: 'Calendar' },
@@ -523,6 +536,12 @@ const communityLinks =
     own separate, untouched copy. No search form here (unlike
     admin-nav.ejs's own corner) - that's a Co-op-Admin-only feature. %>
 <header class="admin-page-corner-actions no-print">
+  <% if (showContactAdmins) { %>
+    <a class="admin-corner-link" href="/contact-admins<%= contactAdminsPortalQuery %>">
+      <svg class="icon"><use href="#icon-mail"/></svg>
+      Contact Admins
+    </a>
+  <% } %>
   <a class="admin-corner-link" href="/portal/profile<%= cornerPortalQuery %>">
     <svg class="icon"><use href="#icon-user-circle"/></svg>
     My Profile
@@ -548,6 +567,9 @@ const communityLinks =
       <%= portalTitle %>
     </a>
     <div class="admin-nav-right admin-nav-right-mobile">
+      <% if (showContactAdmins) { %>
+        <a class="admin-nav-right-link" href="/contact-admins<%= contactAdminsPortalQuery %>" aria-label="Contact Admins"><svg class="icon"><use href="#icon-mail"/></svg></a>
+      <% } %>
       <a class="admin-nav-right-link" href="/portal/profile<%= cornerPortalQuery %>" aria-label="My Profile"><svg class="icon"><use href="#icon-user-circle"/></svg></a>
       <a class="admin-nav-right-link" href="<%= settingsHref %><%= cornerPortalQuery %>" aria-label="Settings"><svg class="icon"><use href="#icon-gear"/></svg></a>
       <% if (showSwitcher) { %>

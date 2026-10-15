@@ -204,17 +204,32 @@ async function removeAdminPositionForMember(memberId, positionId) {
   await syncMemberAdminStatus(memberId);
 }
 
+// A real request: "Under admin settings we can control where the messages
+// go to for each admin member such as a specific email address" - this is
+// an override on the member<->position LINK itself (member_admin_positions.
+// contact_email), not on the member record, since the same person could
+// hold two positions and want Contact Admins messages for one routed
+// somewhere other than their own account email.
+async function setMemberAdminPositionContactEmail(memberId, positionId, contactEmail) {
+  const trimmed = (contactEmail || '').trim();
+  await db
+    .prepare('UPDATE member_admin_positions SET contact_email = ? WHERE member_id = ? AND admin_position_id = ?')
+    .run(trimmed || null, memberId, positionId);
+}
+
 // Every current member<->position assignment, grouped by position - powers
 // the Admins page's "each admin name next to their position" listing
 // (and its own per-name Remove button). Returns { [positionId]: [{ id,
-// name, email, phone }, ...] }, each list ordered by member name. email/
-// phone are included for the Committees "pick a leader" dropdown
-// (routes/main-admin-volunteers.js) and for the Admins grid's own Phone/
-// Email columns, without a second query per row.
+// name, email, phone, contactEmail }, ...] }, each list ordered by member
+// name. email/phone are included for the Committees "pick a leader"
+// dropdown (routes/main-admin-volunteers.js) and for the Admins grid's own
+// Phone/Email columns, without a second query per row. contactEmail is the
+// per-position override described on setMemberAdminPositionContactEmail
+// above - null/empty means "use this member's own account email."
 async function membersByAdminPosition() {
   const rows = await db
     .prepare(
-      `SELECT map.admin_position_id AS "positionId", m.id, m.name, m.email, m.phone
+      `SELECT map.admin_position_id AS "positionId", map.contact_email AS "contactEmail", m.id, m.name, m.email, m.phone
        FROM member_admin_positions map JOIN members m ON m.id = map.member_id
        ORDER BY LOWER(m.name)`
     )
@@ -222,9 +237,39 @@ async function membersByAdminPosition() {
   const byPosition = {};
   for (const row of rows) {
     if (!byPosition[row.positionId]) byPosition[row.positionId] = [];
-    byPosition[row.positionId].push({ id: row.id, name: row.name, email: row.email, phone: row.phone });
+    byPosition[row.positionId].push({ id: row.id, name: row.name, email: row.email, phone: row.phone, contactEmail: row.contactEmail });
   }
   return byPosition;
+}
+
+// Admin Positions that currently have at least one member holding them -
+// what the Contact Admins "choose a department" dropdown lists (a position
+// nobody holds has nobody to deliver a message to, so it's left off rather
+// than shown as a dead end). Returns [{ id, title, recipientEmails }, ...]
+// in the same configured order listAdminPositions already uses.
+async function activeAdminPositionsWithRecipients() {
+  const [positions, byPosition] = await Promise.all([listAdminPositions(), membersByAdminPosition()]);
+  return positions
+    .map((position) => ({
+      id: position.id,
+      title: position.title,
+      recipientEmails: recipientEmailsForMembers(byPosition[position.id] || []),
+    }))
+    .filter((position) => position.recipientEmails.length > 0);
+}
+
+// contact_email override wins when set; otherwise falls back to the
+// member's own account email. Members with neither are dropped rather than
+// sending to a blank address. De-duplicated since the same contact_email
+// could be set on more than one holder of the same position.
+function recipientEmailsForMembers(members) {
+  const emails = members.map((m) => (m.contactEmail || m.email || '').trim()).filter(Boolean);
+  return [...new Set(emails)];
+}
+
+async function recipientEmailsForPosition(positionId) {
+  const byPosition = await membersByAdminPosition();
+  return recipientEmailsForMembers(byPosition[positionId] || []);
 }
 
 module.exports = {
@@ -242,5 +287,8 @@ module.exports = {
   syncMemberAdminPositions,
   addAdminPositionForMember,
   removeAdminPositionForMember,
+  setMemberAdminPositionContactEmail,
   membersByAdminPosition,
+  activeAdminPositionsWithRecipients,
+  recipientEmailsForPosition,
 };
