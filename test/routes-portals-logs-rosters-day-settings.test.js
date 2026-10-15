@@ -217,13 +217,40 @@ test("the Membership Form's Setup/Cleanup Team dropdown shows \"Tuesday\" for a 
   assert.match(page.text, /Tuesday &ndash; Tuesday Crew/);
 });
 
-test('Logs: Class Cancellation Risk and Substitutes Needed tabs work for Tuesday, not just Monday/Wednesday', async () => {
+// A real request rebuilt the Class Cancellation Risk tab into a by-date
+// log that replays classesAtRiskForDay across every day of the week with
+// a real absence-form submission (routes/admin-logs.js's own
+// classCancellationRiskRows), rather than a day-of-week tab an admin
+// picks by hand - the thing this test originally guarded ("not just
+// Monday/Wednesday") is still a real concern in the new shape, just
+// expressed differently: a genuinely at-risk Tuesday class must still
+// show up, not get silently skipped because something assumed only
+// Monday/Wednesday are real class days.
+test('Logs: Class Cancellation Risk tab replays a genuinely at-risk Tuesday class, not just Monday/Wednesday', async () => {
   const admin = await loginAsAdmin();
   await activateTuesday(admin);
 
-  const riskPage = await request(app).get('/admin/logs?tab=classrisk&day=tuesday').set('Cookie', admin.cookie);
+  const classId = (
+    await db.prepare("INSERT INTO classes (class_name, day, hour_position) VALUES ('Tuesday Risk Test Class', 'tuesday', 1)").run()
+  ).lastInsertRowid;
+  const studentId = (
+    await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Tuesday Risk Student', 'tuesday-risk-student', 'student')").run()
+  ).lastInsertRowid;
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId, studentId);
+
+  const tuesdayStudentRosterId = (
+    await db.prepare("SELECT id FROM rosters WHERE category = 'Class Schedule' AND schedule_day = 'tuesday' AND name LIKE '%Student%'").get()
+  ).id;
+  const tuesdayDate = '2026-05-05';
+  await db
+    .prepare(
+      "INSERT INTO absence_submissions (member_id, roster_id, session_date, status, reason_category, reason_text) VALUES (?, ?, ?, 'absent', 'personal', 'testing')"
+    )
+    .run(studentId, tuesdayStudentRosterId, tuesdayDate);
+
+  const riskPage = await request(app).get('/admin/logs?tab=classrisk').set('Cookie', admin.cookie);
   assert.equal(riskPage.status, 200);
-  assert.match(riskPage.text, /class="day-toggle-option active" href="\/admin\/logs\?tab=classrisk&day=tuesday"/);
+  assert.match(riskPage.text, /Tuesday Risk Test Class/);
 
   const subsPage = await request(app).get('/admin/logs?tab=substitutes&day=tuesday').set('Cookie', admin.cookie);
   assert.equal(subsPage.status, 200);

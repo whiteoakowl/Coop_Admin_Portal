@@ -2618,6 +2618,19 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 .absence-member-name { font-weight: 600; min-width: 8rem; }
 .absence-member-detail { color: var(--muted); font-size: 0.85rem; }
 
+/* Main Admin > Events > Event Registration Log and Co-op Admin > Classes
+   > Class Registration Log: both use true two-level grouping (routes/
+   admin-events.js's own groupEventRegistrationActionsByDate, routes/
+   admin-schedule.js's own groupClassRegistrationActionsByDate) - each
+   date's .absence-family-members panel holds its own family sub-
+   headings above that family's own .absence-member-row lines, instead of
+   the flatter one-row-per-(family,date) shape the Co-op Admin Absence/
+   Class Registration LOGS-PAGE tab uses (see either grouping function's
+   own comment on why). Shared class name - purely cosmetic, nothing
+   about this rule depends on which entity (event or class) is involved. */
+.reglog-family-heading { font-weight: 700; margin: 0.6rem 0 0.2rem; }
+.reglog-family-heading:first-child { margin-top: 0; }
+
 @media (max-width: 640px) {
   .absence-family-toggle { padding: 0.7rem 0.8rem; gap: 0.5rem; flex-wrap: wrap; }
   .absence-family-date { font-size: 0.75rem; }
@@ -3276,6 +3289,69 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   text-align: left;
   white-space: nowrap;
 }
+
+/* Main Admin > Events > Event Registration Log: a real request, "shrink
+   table to fit properly in mobile view." Confirmed live via Playwright
+   (a long family/member/event name at a 390px mobile print pass, see
+   views/admin-events-list.ejs's own tab==='registrationlog' comment):
+   without table-layout:fixed, the browser's default table layout sizes
+   columns to each cell's own preferred (unwrapped) width first, growing
+   the table past its own 100%-of-container width (846px measured
+   against a 720px pinned container) instead of ever wrapping text to
+   stay inside it - the same bug (and the same fix) .event-calendar-
+   table's own comment documents for the Events Calendar grid. MUST live
+   AFTER the plain .roster-table th/td rule just above, not merely have
+   a more specific selector than it (both are exactly one class + one
+   element, i.e. equal specificity) - confirmed live the first version of
+   this rule, placed earlier in the file with identical selector weight,
+   lost the cascade to that rule's own white-space: nowrap and text
+   still visibly overflowed into the next column; source order is what
+   actually wins a specificity tie, not merely writing white-space:
+   normal somewhere else in the file. */
+.event-reglog-print-table { table-layout: fixed; }
+.event-reglog-print-table th, .event-reglog-print-table td { white-space: normal; overflow-wrap: break-word; }
+.event-reglog-print-table th:nth-child(1), .event-reglog-print-table td:nth-child(1) { width: 12%; }
+.event-reglog-print-table th:nth-child(2), .event-reglog-print-table td:nth-child(2) { width: 18%; }
+.event-reglog-print-table th:nth-child(3), .event-reglog-print-table td:nth-child(3) { width: 18%; }
+.event-reglog-print-table th:nth-child(4), .event-reglog-print-table td:nth-child(4) { width: 28%; }
+.event-reglog-print-table th:nth-child(5), .event-reglog-print-table td:nth-child(5) { width: 14%; }
+.event-reglog-print-table th:nth-child(6), .event-reglog-print-table td:nth-child(6) { width: 10%; }
+
+/* Co-op Admin > Classes > Class Registration Log: same request, same
+   root cause and fix as .event-reglog-print-table just above (a long
+   family/member/class name overflowing a fixed-width mobile print
+   column) - own column shares since the content shape differs (Day is a
+   short word like "Monday", nothing like Event Registration Log's full
+   date+time "Event Date" column). MUST also live after the plain
+   .roster-table th/td rule above for the exact same equal-specificity-
+   tie reason. */
+.class-reglog-print-table { table-layout: fixed; }
+.class-reglog-print-table th, .class-reglog-print-table td { white-space: normal; overflow-wrap: break-word; }
+.class-reglog-print-table th:nth-child(1), .class-reglog-print-table td:nth-child(1) { width: 12%; }
+.class-reglog-print-table th:nth-child(2), .class-reglog-print-table td:nth-child(2) { width: 18%; }
+.class-reglog-print-table th:nth-child(3), .class-reglog-print-table td:nth-child(3) { width: 20%; }
+.class-reglog-print-table th:nth-child(4), .class-reglog-print-table td:nth-child(4) { width: 30%; }
+.class-reglog-print-table th:nth-child(5), .class-reglog-print-table td:nth-child(5) { width: 12%; }
+.class-reglog-print-table th:nth-child(6), .class-reglog-print-table td:nth-child(6) { width: 8%; }
+
+/* Co-op Admin > Logs > Class Cancellation Risk: same request, same root
+   cause and fix as .event-reglog-print-table/.class-reglog-print-table
+   above (a long class name overflowing a fixed-width mobile print
+   column) - own column shares for this table's own shape (Date/Hour/
+   Class/Room/Expected/Enrolled/Times At Risk, 7 columns). MUST also live
+   after the plain .roster-table th/td rule above for the exact same
+   equal-specificity-tie reason - see either sibling rule's own comment.
+   No separate width pin needed - this table already lives on the Logs
+   page, which pins .admin-main itself (.logs-page .admin-main below). */
+.class-risk-print-table { table-layout: fixed; }
+.class-risk-print-table th, .class-risk-print-table td { white-space: normal; overflow-wrap: break-word; }
+.class-risk-print-table th:nth-child(1), .class-risk-print-table td:nth-child(1) { width: 12%; }
+.class-risk-print-table th:nth-child(2), .class-risk-print-table td:nth-child(2) { width: 12%; }
+.class-risk-print-table th:nth-child(3), .class-risk-print-table td:nth-child(3) { width: 28%; }
+.class-risk-print-table th:nth-child(4), .class-risk-print-table td:nth-child(4) { width: 14%; }
+.class-risk-print-table th:nth-child(5), .class-risk-print-table td:nth-child(5) { width: 12%; }
+.class-risk-print-table th:nth-child(6), .class-risk-print-table td:nth-child(6) { width: 12%; }
+.class-risk-print-table th:nth-child(7), .class-risk-print-table td:nth-child(7) { width: 10%; }
 
 .roster-table thead th { background: var(--brand-soft); color: var(--ink); font-weight: 700; }
 
@@ -9479,7 +9555,27 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      this doesn't widen anything on the dozens of OTHER admin pages that
      also happen to use plain `.admin-page .admin-main`. */
   .setup-teams-print-page .admin-main,
-  .floater-teams-print-page .admin-main { width: 7.5in; } /* @page margin: 0.5in */
+  .floater-teams-print-page .admin-main,
+  /* Main Admin > Events > Event Registration Log: a real request, same
+     class of bug as the Logs page comment just above - "make sure the
+     table for this log shrinks to fit properly in mobile view."
+     views/admin-events-list.ejs deliberately has no @page override of
+     its own (unlike the Logs page) - it's shared by the Calendar tab's
+     own existing Print button too, and adding one here would change that
+     tab's print margins as a side effect nobody asked for. Pinned to the
+     same conservative 7.5in this group already uses (a safe width under
+     ordinary browser-default print margins, not tied to a specific
+     @page rule this page doesn't have) rather than inventing a new
+     number. */
+  .events-registrationlog-print-page .admin-main,
+  /* Co-op Admin > Classes > Class Registration Log: same reasoning as
+     .events-registrationlog-print-page just above - views/admin-
+     schedule.ejs has no @page override of its own either (it's shared
+     by the Class Schedule grid's own already-tuned print layout and the
+     Member Schedules tab's print, neither of which this should touch),
+     so this is scoped to a tab-specific body class, not the page's own
+     already-present `schedule-page` class every tab shares. */
+  .class-reglog-print-page .admin-main { width: 7.5in; } /* @page margin: 0.5in, or browser default */
   .setup-assignments-print-page .admin-main,
   .floater-assignments-print-page .admin-main,
   .logs-page .admin-main { width: 7.7in; } /* @page margin: 0.4in */

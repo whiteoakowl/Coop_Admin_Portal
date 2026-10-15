@@ -78,3 +78,43 @@ test('the shared stylesheet never declares its own @page rule', () => {
     'public/css/styles.css is linked by every single page in the app - an @page rule here is a global default for all of them, not just whichever feature it was meant for. Put it in that view\'s own <style> tag instead (see admin-name-tag-print.ejs and friends)'
   );
 });
+
+// A real request: "shrink table to fit properly in mobile view" (Main
+// Admin > Events > Event Registration Log). Confirmed live via Playwright
+// that long family/member/event names rendered overlapping, illegible
+// text until two things were both true: table-layout:fixed (so the
+// browser respects the table's own declared width instead of growing it
+// to fit content), AND an explicit white-space:normal override that
+// comes AFTER .roster-table th/td's own sitewide white-space:nowrap rule
+// in the file - the two selectors are exactly equal specificity (one
+// class + one element each), so whichever is written LATER in the file
+// wins a tied cascade, not whichever "looks like" the more specific
+// override. A version of this same rule placed earlier in the file (by
+// line number) lost that tie and the overlap bug came right back despite
+// looking identical on paper - this guards the actual relative order,
+// not just that the rule exists somewhere.
+test('the Event Registration Log print table\'s white-space override comes after .roster-table th/td\'s own nowrap rule (equal specificity - source order decides)', () => {
+  const baseRuleIndex = css.indexOf('.roster-table th, .roster-table td {');
+  const overrideIndex = css.indexOf('.event-reglog-print-table th, .event-reglog-print-table td');
+  assert.ok(baseRuleIndex !== -1, 'expected to find the sitewide .roster-table th/td base rule');
+  assert.ok(overrideIndex !== -1, 'expected to find the .event-reglog-print-table white-space override');
+  assert.ok(
+    overrideIndex > baseRuleIndex,
+    'the .event-reglog-print-table white-space:normal override must come AFTER .roster-table th/td\'s own white-space:nowrap in the file - equal specificity means a tie goes to whichever is written later, so moving this rule earlier (even with identical selector text) silently loses the cascade and brings back the overlapping-text bug'
+  );
+});
+
+// Same regression, same reasoning, for Co-op Admin > Classes > Class
+// Registration Log's own print table (routes/admin-schedule.js) - a
+// separate class/CSS rule from the Event Registration Log's, but built
+// from the exact same real request and the exact same cascade trap.
+test('the Class Registration Log print table\'s white-space override comes after .roster-table th/td\'s own nowrap rule (equal specificity - source order decides)', () => {
+  const baseRuleIndex = css.indexOf('.roster-table th, .roster-table td {');
+  const overrideIndex = css.indexOf('.class-reglog-print-table th, .class-reglog-print-table td');
+  assert.ok(baseRuleIndex !== -1, 'expected to find the sitewide .roster-table th/td base rule');
+  assert.ok(overrideIndex !== -1, 'expected to find the .class-reglog-print-table white-space override');
+  assert.ok(
+    overrideIndex > baseRuleIndex,
+    'the .class-reglog-print-table white-space:normal override must come AFTER .roster-table th/td\'s own white-space:nowrap in the file - equal specificity means a tie goes to whichever is written later'
+  );
+});

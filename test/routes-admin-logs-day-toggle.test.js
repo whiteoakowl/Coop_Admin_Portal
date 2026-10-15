@@ -37,20 +37,21 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
-function assertDayToggle(html, basePath) {
-  assert.match(html, /class="day-toggle"/, 'expected the shared pill day-toggle, not a bare <select>');
-  assert.doesNotMatch(html, /id="day-select"/, 'the old "Viewing Monday/Wednesday" <select> should be gone');
-  assert.match(html, new RegExp(`class="day-toggle-option active" href="${basePath}&day=monday`));
-}
-
-test('Logs: Class Cancellation Risk tab uses the pill day-toggle', async () => {
+// A real request rebuilt this tab entirely into a by-date log with a
+// running per-class risk tally (routes/admin-logs.js's own
+// classCancellationRiskRows) - the day-of-week picker this test
+// originally covered is gone (a class is now identified by name/date,
+// not by which weekday tab you happened to have open), replaced by a
+// Date/Class filter-mode toggle that reuses the exact same pill
+// .day-toggle/.day-toggle-option markup this test already asserted on,
+// just switching filterBy instead of day.
+test('Logs: Class Cancellation Risk tab uses a pill toggle to switch between Date and Class filtering', async () => {
   const cookie = await loginAsAdmin();
-  // day pinned explicitly - the route's own default (utils/days.js's
-  // defaultDay()) is today's actual weekday, which would make this
-  // flaky depending what day the suite happens to run on.
-  const res = await request(app).get('/admin/logs?tab=classrisk&day=monday').set('Cookie', cookie);
+  const res = await request(app).get('/admin/logs?tab=classrisk').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assertDayToggle(res.text, '/admin/logs\\?tab=classrisk');
+  assert.match(res.text, /class="day-toggle"/);
+  assert.match(res.text, /href="\/admin\/logs\?tab=classrisk&amp;filterBy=date"/);
+  assert.match(res.text, /href="\/admin\/logs\?tab=classrisk&amp;filterBy=class"/);
 });
 
 test('Logs: Substitutes Needed tab uses the pill day-toggle and preserves the date filter across days', async () => {

@@ -23,6 +23,7 @@ const { eventSectionIds, memberSatisfiesRestriction, sectionIdsForMember } = req
 const { createCharge, amountPaidForCharge, cancelCharge } = require('./payments');
 const { GRADE_OPTIONS } = require('./membership');
 const { lastNameOf, primaryParentForBilling } = require('./members');
+const { formatDateLabel, formatFriendlyTimestamp } = require('./dates');
 const notifications = require('./notifications');
 const { toCsvRow } = require('./spreadsheet');
 const { findMemberByBarcodeOrName } = require('./memberLookup');
@@ -984,6 +985,87 @@ async function familyGroupedRegistrationsForEvent(eventId) {
     return lastNameOf(aName).localeCompare(lastNameOf(bName), undefined, { sensitivity: 'base' }) || aName.localeCompare(bName, undefined, { sensitivity: 'base' });
   });
   return groupList;
+}
+
+// A real request: "add a subpage called event registration log. Here it
+// will record every time a member registers for an event or cancels[,]
+// organized by date and then by family." event_registrations is NOT an
+// append-only audit table the way class_registrations is (unique(event_id,
+// member_id) - see that table's own migration comment) - a cancel flips
+// `status`/`cancelled_at` IN PLACE on the same row that registration
+// created, rather than inserting a new one. So each real row here can
+// represent up to two distinct "a member did something" moments the log
+// needs to show separately: the original registration (created_at) and,
+// only if it happened, a later cancellation (cancelled_at) - synthesized
+// into up to two flat entries per row rather than the one-row-per-action
+// shape allClassRegistrations (routes/admin-logs.js) gets for free from
+// its own append-only table. Once cancelled, the row's single `status`
+// column no longer remembers whether the original registration had
+// landed confirmed or waitlisted (overwritten by 'cancelled') - the
+// Registered entry's own label is deliberately generic ("Registered") in
+// that case rather than guessing; "Waitlisted" only ever labels a
+// registration that is STILL waitlisted (never promoted, never
+// cancelled), the one case the current status column actually still
+// tells the truth about.
+async function allEventRegistrationActions() {
+  const rows = await db
+    .prepare(
+      `SELECT e.title AS "eventTitle", e.starts_at AS "eventStartsAt",
+              m.name AS "memberName", m.family_id AS "familyId", f.name AS "familyName",
+              er.status, er.created_at AS "createdAt", er.cancelled_at AS "cancelledAt"
+       FROM event_registrations er
+       JOIN events e ON e.id = er.event_id
+       JOIN members m ON m.id = er.member_id
+       LEFT JOIN families f ON f.id = m.family_id`
+    )
+    .all();
+
+  const actions = [];
+  for (const r of rows) {
+    const date = r.createdAt.slice(0, 10);
+    actions.push({
+      memberName: r.memberName,
+      familyId: r.familyId,
+      familyName: r.familyName,
+      eventTitle: r.eventTitle,
+      eventStartsLabel: formatFriendlyTimestamp(r.eventStartsAt),
+      actionLabel: r.status === 'waitlisted' ? 'Waitlisted' : 'Registered',
+      date,
+      dateLabel: formatDateLabel(date),
+    });
+    if (r.cancelledAt) {
+      const cancelDate = r.cancelledAt.slice(0, 10);
+      actions.push({
+        memberName: r.memberName,
+        familyId: r.familyId,
+        familyName: r.familyName,
+        eventTitle: r.eventTitle,
+        eventStartsLabel: formatFriendlyTimestamp(r.eventStartsAt),
+        actionLabel: 'Cancelled',
+        date: cancelDate,
+        dateLabel: formatDateLabel(cancelDate),
+      });
+    }
+  }
+
+  // Date desc (newest first, same convention routes/admin-logs.js's own
+  // allClassRegistrations/allAbsenceSubmissions use), last name only
+  // breaking ties within the same date.
+  return actions.sort(
+    (a, b) =>
+      b.date.localeCompare(a.date) ||
+      lastNameOf(a.memberName).localeCompare(lastNameOf(b.memberName), undefined, { sensitivity: 'base' }) ||
+      a.memberName.localeCompare(b.memberName, undefined, { sensitivity: 'base' })
+  );
+}
+
+const EVENT_REGISTRATION_LOG_EXPORT_HEADER = ['Date', 'Family', 'Name', 'Event', 'Event Date', 'Action'];
+
+function buildEventRegistrationLogExportCsvLines(actions) {
+  return [
+    toCsvRow(EVENT_REGISTRATION_LOG_EXPORT_HEADER),
+    ...actions.map((a) => toCsvRow([a.dateLabel, a.familyName || '', a.memberName, a.eventTitle, a.eventStartsLabel, a.actionLabel])),
+  ];
 }
 
 // "Add Registration" popup's own member checklist (a real request: "pop
@@ -2068,6 +2150,8 @@ module.exports = {
   deleteRegistrationCompletely,
   registrationsForEvent,
   eventRegistrationsForMembers,
+  allEventRegistrationActions,
+  buildEventRegistrationLogExportCsvLines,
   eventTicketDetailsForMember,
   familyGroupedRegistrationsForEvent,
   buildRegistrationsExportCsvLines,

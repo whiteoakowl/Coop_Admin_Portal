@@ -65,6 +65,7 @@
         // "first entry has no query string" convention, both already
         // working) fixes it without touching the route itself.
         { href: '/admin/schedule', label: 'Class Schedules' },
+        { href: '/admin/schedule?tab=classregistrationlog', label: 'Class Registration Log' },
         ...(isFullAdmin ? [
           { href: '/admin/schedule?tab=members', label: 'Member Schedules' },
           { href: '/admin/schedule?tab=settings', label: 'Settings' },

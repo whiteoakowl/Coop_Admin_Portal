@@ -405,6 +405,97 @@ function groupMissedDutyRowsByDate(rows) {
   return Array.from(groups.values());
 }
 
+// A real request: "Class cancelation log should be a log by date[,] on
+// each class row that is a class cancelation risk it shows a tally
+// number of how many times this class has been at risk for
+// cancelation[.] Add a filter button for choosing date or class."
+// classesAtRiskForDay (utils/classSchedule.js) is a pure, on-demand
+// computation - there has never been a table recording past risk flags,
+// and no way to reconstruct a class's actual historical enrollment
+// (class_enrollments has no date dimension at all - see that table's own
+// migration). Rather than start a new table that could only ever log
+// going forward (an empty log today, no past dates ever possible),
+// this REPLAYS the real question - "would this class have shown as at
+// risk on date X?" - for every date that could possibly have flagged
+// one: classesAtRiskForDay can only ever return something for a date
+// with at least one qualifying absence form submission, so every other
+// date is skipped outright rather than run through the full computation
+// for nothing. The one honest approximation this makes: it checks each
+// PAST date's real absence-form history (absence_submissions genuinely
+// is per-date, append-only) against TODAY's current class roster, not
+// that day's actual roster - the same tradeoff classesAtRiskForDay
+// already makes for any date handed to it directly, not something new
+// this log introduces.
+async function classCancellationRiskRows() {
+  // Real, append-only absence-form history (member_id + the date it was
+  // FOR), grouped by date up front in one query - the signal
+  // classesAtRiskForDay's own default lookup can't give a past date a
+  // reliable answer on, since it reads the live, overwritable
+  // `attendance` row instead (see that function's own absentIdsOverride
+  // comment for the full story on why).
+  const submissionRows = await db
+    .prepare(`SELECT session_date, member_id FROM absence_submissions WHERE status = 'absent'`)
+    .all();
+  if (submissionRows.length === 0) return [];
+  const absentIdsByDate = new Map();
+  for (const r of submissionRows) {
+    if (!absentIdsByDate.has(r.session_date)) absentIdsByDate.set(r.session_date, new Set());
+    absentIdsByDate.get(r.session_date).add(r.member_id);
+  }
+  const submissionDates = Array.from(absentIdsByDate.keys()).sort();
+
+  const activeDays = new Set(await listActiveClassDays());
+  const dayNameForWeekday = {};
+  Object.entries(CLASS_DAY_WEEKDAY_FULL).forEach(([name, num]) => {
+    dayNameForWeekday[num] = name;
+  });
+
+  const rows = [];
+  for (const date of submissionDates) {
+    const dayName = dayNameForWeekday[weekdayOf(date)];
+    if (!dayName || !activeDays.has(dayName)) continue;
+    const atRisk = await classesAtRiskForDay(dayName, date, absentIdsByDate.get(date));
+    for (const c of atRisk) {
+      rows.push({
+        date,
+        dateLabel: formatDateLabel(date),
+        classId: c.classId,
+        className: c.className,
+        hourLabel: c.hourLabel,
+        room: c.room,
+        enrolledCount: c.enrolledCount,
+        expectedCount: c.expectedCount,
+      });
+    }
+  }
+
+  // Running tally per class, computed in true chronological order (the
+  // loop above already walked submissionDates ascending) - same "stamp
+  // the running total onto every row, right when it's processed" shape
+  // routes/admin-logs.js's own missedDutyRows already established.
+  const tallies = new Map();
+  for (const r of rows) {
+    const tally = (tallies.get(r.classId) || 0) + 1;
+    tallies.set(r.classId, tally);
+    r.riskTally = tally;
+  }
+
+  // Newest-first for display, same convention every other tab on this
+  // page uses - after the running tally above was computed in true
+  // ascending order, which is the only order "running total" means
+  // anything in.
+  return rows.sort((a, b) => b.date.localeCompare(a.date) || a.className.localeCompare(b.className, undefined, { sensitivity: 'base' }));
+}
+
+function groupClassRiskRowsByDate(rows) {
+  const groups = new Map();
+  for (const r of rows) {
+    if (!groups.has(r.date)) groups.set(r.date, { date: r.date, dateLabel: r.dateLabel, classes: [] });
+    groups.get(r.date).classes.push(r);
+  }
+  return Array.from(groups.values());
+}
+
 router.get('/logs', requireAdmin, async (req, res) => {
   const tab = LOG_TABS.includes(req.query.tab) ? req.query.tab : 'absence';
   const dateFilter = req.query.date || '';
@@ -469,18 +560,51 @@ router.get('/logs', requireAdmin, async (req, res) => {
   }
 
   if (tab === 'classrisk') {
-    const activeDays = await listActiveClassDays();
-    const day = isValidClassDay(req.query.day) ? req.query.day : (activeDays[0] || 'monday');
-    const alertDate = todayIfSessionDay(day);
+    // "Add a filter button for choosing date or class" - two mutually
+    // exclusive filter modes on the same log, not two separate filters
+    // both active at once (filtering to one specific date AND one
+    // specific class at the same time would almost always show nothing,
+    // since a class is rarely at risk on more than a handful of dates).
+    const filterBy = req.query.filterBy === 'class' ? 'class' : 'date';
+    const classIdFilter = req.query.classId ? parseInt(req.query.classId, 10) : null;
+    const riskDateFilter = filterBy === 'date' ? req.query.date || '' : '';
+
+    const allRows = await classCancellationRiskRows();
+    // Already newest-first (classCancellationRiskRows' own sort) - a Map
+    // keyed by date/classId preserves first-seen order, so both filter
+    // dropdowns stay newest-first/already-sorted too without a separate
+    // sort pass.
+    const dates = Array.from(new Map(allRows.map((r) => [r.date, { date: r.date, label: r.dateLabel }])).values());
+    const classOptions = Array.from(new Map(allRows.map((r) => [r.classId, { classId: r.classId, className: r.className }])).values()).sort(
+      (a, b) => a.className.localeCompare(b.className, undefined, { sensitivity: 'base' })
+    );
+
+    const filteredRows =
+      filterBy === 'class' && classIdFilter != null
+        ? allRows.filter((r) => r.classId === classIdFilter)
+        : riskDateFilter
+          ? allRows.filter((r) => r.date === riskDateFilter)
+          : allRows;
+    const dateGroups = groupClassRiskRowsByDate(filteredRows);
+    const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+    const pagination = paginate(dateGroups, parsePage(req.query.page), pageSize);
+    const classNameFilter = classIdFilter != null ? (classOptions.find((c) => c.classId === classIdFilter) || {}).className : null;
+
     return res.render('admin-logs', {
       title: 'Class Cancellation Risk',
       tab,
-      day,
-      activeDays,
-      dayLabels: CLASS_DAY_LABELS_FULL,
-      dayLabel: CLASS_DAY_LABELS_FULL[day],
-      alertDateLabel: alertDate ? formatDateLabel(alertDate) : null,
-      classesAtRisk: await classesAtRiskForDay(day, alertDate),
+      filterBy,
+      dateGroups: pagination.items,
+      allSubmissions: filteredRows,
+      pagination,
+      viewingAll: pageSize === Infinity,
+      baseHref: `/admin/logs?tab=classrisk&filterBy=${filterBy}${riskDateFilter ? `&date=${encodeURIComponent(riskDateFilter)}` : ''}${classIdFilter != null ? `&classId=${classIdFilter}` : ''}&`,
+      dates,
+      classOptions,
+      dateFilter: riskDateFilter,
+      dateFilterLabel: riskDateFilter ? formatDateLabel(riskDateFilter) : 'All dates',
+      classIdFilter,
+      classNameFilter,
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -623,6 +747,24 @@ router.get('/logs/absence/export.csv', requireAdmin, async (req, res) => {
     ),
   ];
   sendCsv(res, 'absence-late-log.csv', lines);
+});
+
+router.get('/logs/classrisk/export.csv', requireAdmin, async (req, res) => {
+  const filterBy = req.query.filterBy === 'class' ? 'class' : 'date';
+  const classIdFilter = req.query.classId ? parseInt(req.query.classId, 10) : null;
+  const dateFilter = filterBy === 'date' ? req.query.date || '' : '';
+  const allRows = await classCancellationRiskRows();
+  const rows =
+    filterBy === 'class' && classIdFilter != null
+      ? allRows.filter((r) => r.classId === classIdFilter)
+      : dateFilter
+        ? allRows.filter((r) => r.date === dateFilter)
+        : allRows;
+  const lines = [
+    toCsvRow(['Date', 'Hour', 'Class', 'Room', 'Expected', 'Enrolled', 'Times At Risk (this class)']),
+    ...rows.map((r) => toCsvRow([r.dateLabel, r.hourLabel, r.className, r.room || '', String(r.expectedCount), String(r.enrolledCount), String(r.riskTally)])),
+  ];
+  sendCsv(res, 'class-cancellation-risk-log.csv', lines);
 });
 
 router.get('/logs/missedduty/export.csv', requireAdmin, async (req, res) => {

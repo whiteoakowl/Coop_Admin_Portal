@@ -1321,9 +1321,21 @@ async function staffListForDay(day, role) {
 // absent. Counts both students who've already checked in and those who
 // haven't checked in yet, only excluding those with an absence form on
 // file for that date.
-async function classesAtRiskForDay(day, date) {
+// absentIdsOverride lets a caller supply its own absent-member-id set
+// instead of the live default (absenceFormAbsentMemberIdsForDate, below)
+// - a real need for routes/admin-logs.js's own classCancellationRiskRows
+// (the Class Cancellation Risk log), which replays this function against
+// PAST dates: the default lookup reads the mutable `attendance` row
+// (source='absence_form'), which gets silently overwritten to
+// 'present'/'kiosk' the moment that member ever checks in for real (see
+// absenceFormAbsentMemberIdsForDate's own comment) - genuinely correct
+// for "is this absence still in effect right now," but wrong for "did
+// this class look at-risk back on that date," which needs the real,
+// append-only absence_submissions record instead. undefined (every
+// existing caller) keeps the exact original live-attendance behavior.
+async function classesAtRiskForDay(day, date, absentIdsOverride) {
   const hours = await gridForDay(day);
-  const absentIds = date ? await absenceFormAbsentMemberIdsForDate(date) : new Set();
+  const absentIds = absentIdsOverride || (date ? await absenceFormAbsentMemberIdsForDate(date) : new Set());
   const result = [];
   hours.forEach((h) => {
     h.classes.forEach((cls) => {
@@ -1332,6 +1344,17 @@ async function classesAtRiskForDay(day, date) {
       const expectedCount = cls.students.length - absentCount;
       if (absentCount > 0 && expectedCount <= 3) {
         result.push({
+          // A real request: "Class cancelation log should be a log by
+          // date[,] on each class row that is a class cancelation risk
+          // it shows a tally number of how many times this class has
+          // been at risk for cancelation" - routes/admin-logs.js's own
+          // classCancellationRiskLog needs a stable identity to tally
+          // by, since className alone isn't guaranteed unique across
+          // different days/hours. Purely additive - every existing
+          // caller of this function (Floater Assignments' own Class
+          // Cancellation Risk box, routes/admin.js, routes/admin-
+          // rosters.js) ignores a field it doesn't ask for.
+          classId: cls.id,
           hourLabel: h.label,
           className: cls.class_name,
           room: cls.room,

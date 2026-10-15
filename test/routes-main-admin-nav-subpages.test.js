@@ -127,7 +127,7 @@ test('Mobile orange bar: every subpages-bearing item gets its own popup trigger 
     { slug: 'members', tabCount: 4 },
     { slug: 'accounting', tabCount: 7 },
     { slug: 'communication', tabCount: 4 },
-    { slug: 'events', tabCount: 5 },
+    { slug: 'events', tabCount: 6 },
     { slug: 'chat', tabCount: 3 },
     { slug: 'volunteers', tabCount: 3 },
     { slug: 'name-tags', tabCount: 3 },
