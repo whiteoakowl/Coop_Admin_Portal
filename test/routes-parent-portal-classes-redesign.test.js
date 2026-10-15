@@ -104,7 +104,12 @@ async function createParentWithChild() {
 test('Parent Portal homepage: "Classroom Dashboard" links to /parent/classes/dashboard', async () => {
   const parent = await createParentWithChild();
   const home = await request(app).get('/parent').set('Cookie', parent.cookie);
-  assert.match(home.text, /<a class="roster-action-btn" href="\/parent\/classes\/dashboard">Classroom Dashboard<\/a>/);
+  // A real request rebuilt this card's button into a dedicated
+  // .parent-home-cta (see views/parent-home.ejs's own "Change the parent
+  // portal dashboard to have cards exactly like this" comment) - no
+  // longer a plain .roster-action-btn, but still the same real link.
+  assert.match(home.text, /<a class="parent-home-cta parent-home-cta-outline-indigo" href="\/parent\/classes\/dashboard">/);
+  assert.match(home.text, /Classroom Dashboard/);
 });
 
 // A real request removed the "View/Cancel Classes" subpage entirely
