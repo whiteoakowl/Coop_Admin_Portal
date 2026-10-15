@@ -11400,6 +11400,121 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
    its own card. */
 .parent-home-main .roster-action-btn { align-self: flex-start; flex-grow: 0; }
 
+/* A real request: "Change the parent portal dashboard to have cards
+   exactly like this [reference image]" - a colored icon badge + title +
+   "View All" link in each card's own header, a tinted card background
+   matching that color, and a deeper per-card redesign (date badges for
+   Upcoming Events, thumbnails for Classifieds, a colored category icon
+   for Business Directory, a real weekly-goal progress bar for Reading
+   Challenge - see routes/parent-portal.js's own comments on exactly
+   what real data backs each one). A dedicated class set, not
+   .portal-dashboard-card/.portal-dashboard-grid above - those are
+   shared by every OTHER portal's own home dashboard (Main Admin,
+   Teacher, Student...), so reusing/overriding them here would have
+   restyled pages nobody asked to change. views/parent-home.ejs is the
+   only view that uses any of the following. */
+.parent-home-cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.5rem; margin: 1.5rem 0; }
+
+.parent-home-card-v2 { border-radius: 16px; box-shadow: var(--shadow-md); overflow: hidden; display: flex; flex-direction: column; border: 1px solid transparent; }
+.parent-home-card-v2-head { display: flex; align-items: flex-start; gap: 0.85rem; padding: 1.25rem 1.5rem 1rem; }
+.parent-home-card-v2-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; }
+.parent-home-card-v2-icon svg { width: 22px; height: 22px; }
+.parent-home-card-v2-titles { flex: 1; min-width: 0; }
+.parent-home-card-v2-titles h2 { margin: 0; font-size: 1.15rem; font-weight: 800; }
+.parent-home-card-v2-titles p { margin: 0.15rem 0 0; font-size: 0.8rem; color: var(--muted); }
+.parent-home-card-v2-viewall { font-size: 0.85rem; font-weight: 700; white-space: nowrap; display: flex; align-items: center; gap: 0.2rem; text-decoration: none; flex-shrink: 0; margin-top: 0.3rem; }
+.parent-home-card-v2-viewall svg { width: 15px; height: 15px; }
+.parent-home-card-v2-body { padding: 0 1.5rem 1.5rem; display: flex; flex-direction: column; gap: 0.6rem; flex: 1; }
+
+.parent-home-card-v2-green { background: #effaf3; border-color: #cdebd6; }
+.parent-home-card-v2-green .parent-home-card-v2-icon { background: #1fa355; }
+.parent-home-card-v2-green .parent-home-card-v2-viewall { color: #1fa355; }
+.parent-home-card-v2-blue { background: #eef5fe; border-color: #cfe3fb; }
+.parent-home-card-v2-blue .parent-home-card-v2-icon { background: #2f7fe0; }
+.parent-home-card-v2-blue .parent-home-card-v2-viewall { color: #2f7fe0; }
+.parent-home-card-v2-amber { background: #fdf7ec; border-color: #f3e3bf; }
+.parent-home-card-v2-amber .parent-home-card-v2-icon { background: #c7912a; }
+.parent-home-card-v2-amber .parent-home-card-v2-viewall { color: #c7912a; }
+.parent-home-card-v2-purple { background: #f6f0fc; border-color: #e3d2f4; }
+.parent-home-card-v2-purple .parent-home-card-v2-icon { background: #8148c2; }
+.parent-home-card-v2-purple .parent-home-card-v2-viewall { color: #8148c2; }
+.parent-home-card-v2-indigo { background: #eef0fd; border-color: #d4d8f7; }
+.parent-home-card-v2-indigo .parent-home-card-v2-icon { background: #4f55c7; }
+.parent-home-card-v2-indigo .parent-home-card-v2-viewall { color: #4f55c7; }
+.parent-home-card-v2-slate { background: #f3f4f6; border-color: #dfe2e7; }
+.parent-home-card-v2-slate .parent-home-card-v2-icon { background: #55617a; }
+.parent-home-card-v2-slate .parent-home-card-v2-viewall { color: #55617a; }
+.parent-home-card-v2-rose { background: #fdf0f2; border-color: #f6d4da; }
+.parent-home-card-v2-rose .parent-home-card-v2-icon { background: #d0486a; }
+.parent-home-card-v2-rose .parent-home-card-v2-viewall { color: #d0486a; }
+
+/* Dedicated CTA buttons for these cards (not .roster-action-btn - that
+   class's own background/color/border triplet is already a fixed,
+   sitewide look, not meant to flex into the mockup's "solid green" /
+   "outline amber" / "outline purple" per-card button looks). */
+.parent-home-cta {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  border-radius: 8px; padding: 0.6rem 1rem; font-size: 0.9rem; font-weight: 700;
+  font-family: inherit; cursor: pointer; text-decoration: none; margin-top: 0.2rem;
+}
+.parent-home-cta svg { width: 16px; height: 16px; }
+.parent-home-cta-outline-amber { background: transparent; border: 1.5px solid #c7912a; color: #c7912a; }
+.parent-home-cta-outline-purple { background: transparent; border: 1.5px solid #8148c2; color: #8148c2; }
+.parent-home-cta-outline-blue { background: transparent; border: 1.5px solid #2f7fe0; color: #2f7fe0; }
+.parent-home-cta-outline-indigo { background: transparent; border: 1.5px solid #4f55c7; color: #4f55c7; }
+.parent-home-cta-outline-rose { background: transparent; border: 1.5px solid #d0486a; color: #d0486a; }
+
+/* Upcoming Events: a colored date-badge (month abbreviation stacked over
+   the day number) instead of a plain text date line. */
+.parent-home-event-list, .parent-home-classified-list, .parent-home-directory-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.parent-home-row { display: flex; align-items: center; gap: 0.85rem; text-decoration: none; color: inherit; background: rgba(255,255,255,0.6); border-radius: 10px; padding: 0.6rem 0.7rem; transition: background 0.15s ease; }
+.parent-home-row:hover { background: #fff; }
+.parent-home-chevron { flex-shrink: 0; width: 16px; height: 16px; color: var(--muted); }
+
+.parent-home-date-badge { flex-shrink: 0; width: 46px; border-radius: 9px; background: #2f7fe0; color: #fff; text-align: center; padding: 0.3rem 0; line-height: 1.1; }
+.parent-home-date-badge-month { display: block; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; opacity: 0.9; }
+.parent-home-date-badge-day { display: block; font-size: 1.05rem; font-weight: 800; }
+.parent-home-row-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.parent-home-row-title { font-weight: 700; font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.parent-home-row-sub { font-size: 0.78rem; color: var(--muted); display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.parent-home-row-sub svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+/* Classifieds: a thumbnail (or a plain placeholder box when the listing
+   has no photo - classifieds image_key is genuinely optional). */
+.parent-home-classified-thumb { flex-shrink: 0; width: 46px; height: 46px; border-radius: 9px; object-fit: cover; background: var(--surface-alt, #f3f4f6); }
+.parent-home-classified-thumb-empty { display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.parent-home-classified-price { font-weight: 700; color: #c7912a; font-size: 0.82rem; }
+
+/* Business Directory: a colored circle icon per listing - a real request
+   ("business directory listing" card), with each listing's own color
+   picked deterministically from its category name (routes/parent-
+   portal.js's own colorForCategory - business_directory_categories has
+   no color/icon column of its own to read one from). */
+.parent-home-directory-icon { flex-shrink: 0; width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #fff; }
+.parent-home-directory-icon svg { width: 18px; height: 18px; }
+.parent-home-directory-icon-teal { background: #0f9488; }
+.parent-home-directory-icon-amber { background: #c7912a; }
+.parent-home-directory-icon-green { background: #1fa355; }
+.parent-home-directory-icon-purple { background: #8148c2; }
+.parent-home-directory-icon-blue { background: #2f7fe0; }
+.parent-home-directory-icon-rose { background: #d0486a; }
+
+/* Reading Challenge: "only show the parent reading challenge
+   leaderboard" (a real follow-up request - an earlier weekly-goal-
+   progress-bar version of this card is gone, see git history) - a plain
+   ranked list, same .parent-home-row shape as every other card's own
+   list, with a rank badge in place of a date-badge/thumbnail/category
+   icon and each leader's hours right-aligned. */
+.parent-home-leaderboard-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.parent-home-rank-badge { flex-shrink: 0; width: 36px; height: 36px; border-radius: 999px; background: #1fa355; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.8rem; }
+.parent-home-leaderboard-hours { flex-shrink: 0; font-weight: 700; font-size: 0.85rem; color: var(--muted); }
+
+@media (max-width: 640px) {
+  .parent-home-cards-grid { grid-template-columns: 1fr; }
+  .parent-home-card-v2-head { padding: 1rem 1.1rem 0.8rem; }
+  .parent-home-card-v2-body { padding: 0 1.1rem 1.1rem; }
+}
+
 /* Student Portal home: Announcements + Word of the Week side by side - a
    real request: "desktop it should be smaller width. announcements first,
    vocab word next to it on right." Announcements gets the wider column

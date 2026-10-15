@@ -66,7 +66,13 @@ test('Parent Portal homepage: Classroom Dashboard button replaces Browse Classes
   const { cookie } = await loginAsPortalParent();
   const page = await request(app).get('/parent').set('Cookie', cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /<a class="roster-action-btn" href="\/parent\/classes\/dashboard">Classroom Dashboard<\/a>/);
+  // A real request rebuilt this card's button into a dedicated .parent-
+  // home-cta (see views/parent-home.ejs/public/css/styles.css's own
+  // "Change the parent portal dashboard to have cards exactly like this"
+  // comment) - no longer a plain .roster-action-btn, but still the same
+  // real link to the same real destination.
+  assert.match(page.text, /<a class="parent-home-cta parent-home-cta-outline-indigo" href="\/parent\/classes\/dashboard">/);
+  assert.match(page.text, /Classroom Dashboard/);
   assert.doesNotMatch(page.text, /Browse Classes/);
 });
 
@@ -82,27 +88,45 @@ test('Parent Portal homepage: My Family card is gone, replaced by an Upcoming Ev
   assert.match(page.text, /<h2>Upcoming Events<\/h2>/);
   assert.match(page.text, /Fall Fest/);
   // A real bug report: "event calendar should land on calendar view, not
-  // list view" - this button (and every other parent-facing Events link)
-  // now forces view=calendar&portal=parent instead of a bare /events,
-  // which otherwise falls back to whatever the org-wide default view
-  // setting happens to be (see routes/events.js's own comment).
-  assert.match(page.text, /<a class="roster-action-btn" href="\/events\?view=calendar&(?:amp;)?portal=parent">View Event Calendar<\/a>/);
+  // list view" - this link (and every other parent-facing Events link)
+  // forces view=calendar&portal=parent instead of a bare /events, which
+  // otherwise falls back to whatever the org-wide default view setting
+  // happens to be (see routes/events.js's own comment). A real request
+  // later rebuilt this into the card's own header "View All" link (see
+  // the Classroom Dashboard test above's own comment on the class
+  // rename) rather than a bottom "View Event Calendar" button - same
+  // real destination.
+  assert.match(page.text, /<a class="parent-home-card-v2-viewall" href="\/events\?view=calendar&(?:amp;)?portal=parent">/);
 });
 
-test('Parent Portal homepage: Committees card has the new description', async () => {
+test('Parent Portal homepage: Join a Committee is a Quick Links item, not its own card', async () => {
   const { cookie } = await loginAsPortalParent();
   const page = await request(app).get('/parent').set('Cookie', cookie);
-  assert.match(page.text, /Signup for a Committee and help us create fun events for the group!/);
+  // A real request: "Join a Committee should just be a link under quick
+  // links" - the earlier standalone Committees card is gone; it's now a
+  // plain list item alongside the other Quick Links.
+  assert.match(page.text, /<h2>Quick Links<\/h2>/);
+  assert.match(page.text, /<li><a href="\/committees">Join a Committee<\/a><\/li>/);
+  assert.doesNotMatch(page.text, /<h2>Committees<\/h2>/);
 });
 
-test('Parent Portal homepage: Parent Reading Challenge card shows rankings', async () => {
+test('Parent Portal homepage: Reading Challenge card shows a plain ranked leaderboard', async () => {
   const { cookie, parentId } = await loginAsPortalParent();
   await db.prepare("INSERT INTO reading_logs (member_id, book_title, hours, log_date) VALUES (?, 'A Book', 3, now_text())").run(parentId);
 
   const page = await request(app).get('/parent').set('Cookie', cookie);
-  assert.match(page.text, /<h2>Parent Reading Challenge<\/h2>/);
-  assert.match(page.text, /#1 Cards Parent/);
-  assert.match(page.text, /<a class="roster-action-btn" href="\/parent\/leaderboard">View Reading Challenge<\/a>/);
+  // A real request pinned the Reading Challenge card back to "only show
+  // the parent reading challenge leaderboard" - no weekly-goal progress
+  // bar, no "Top Reader" callout, no Log Reading button, just the ranked
+  // list (see views/parent-home.ejs's own comment).
+  assert.match(page.text, /<h2>Reading Challenge<\/h2>/);
+  assert.match(page.text, /parent-home-leaderboard-list/);
+  assert.match(page.text, /parent-home-rank-badge">#1</);
+  assert.match(page.text, /Cards Parent/);
+  assert.match(page.text, /<a class="parent-home-card-v2-viewall" href="\/parent\/leaderboard">/);
+  assert.doesNotMatch(page.text, /Top Reader/);
+  assert.doesNotMatch(page.text, /This week's goal/);
+  assert.doesNotMatch(page.text, /Log Reading/);
 });
 
 test('Parent Portal homepage: Business Directory and Classifieds cards show active listings', async () => {
@@ -115,11 +139,20 @@ test('Parent Portal homepage: Business Directory and Classifieds cards show acti
     .run();
 
   const page = await request(app).get('/parent').set('Cookie', cookie);
+  // A real request rebuilt each card's bottom button into its own real
+  // "post/add a listing" destination (/directory/mine, /classifieds/mine
+  // - the same pages' own real "My Listings + new listing form" route),
+  // moving the plain "View Business Directory"/"View Classifieds" links
+  // up into each card's header "View All" link instead (see views/
+  // parent-home.ejs/public/css/styles.css's own "Change the parent
+  // portal dashboard to have cards exactly like this" comment).
   assert.match(page.text, /<h2>Business Directory<\/h2>/);
   assert.match(page.text, /Sunny Bakery/);
-  assert.match(page.text, /<a class="roster-action-btn" href="\/directory">View Business Directory<\/a>/);
+  assert.match(page.text, /<a class="parent-home-card-v2-viewall" href="\/directory">/);
+  assert.match(page.text, /<a class="parent-home-cta parent-home-cta-outline-purple" href="\/directory\/mine">/);
 
   assert.match(page.text, /<h2>Classifieds<\/h2>/);
   assert.match(page.text, /Used Piano/);
-  assert.match(page.text, /<a class="roster-action-btn" href="\/classifieds">View Classifieds<\/a>/);
+  assert.match(page.text, /<a class="parent-home-card-v2-viewall" href="\/classifieds">/);
+  assert.match(page.text, /<a class="parent-home-cta parent-home-cta-outline-amber" href="\/classifieds\/mine">/);
 });

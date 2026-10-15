@@ -238,6 +238,37 @@ function formatTimestamp(sqlTimestamp) {
 }
 
 const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// A real request: redesign the Parent Portal homepage's Upcoming Events
+// card with a colored date-badge (month abbreviation stacked over the
+// day number) next to each event, instead of a plain text line - same
+// Eastern-zoned Intl.DateTimeFormat approach formatFriendlyTimestamp
+// above already uses, just returning the two pieces separately for the
+// template to lay out in its own box rather than one joined string.
+function eventDateBadge(sqlTimestamp) {
+  if (!sqlTimestamp) return null;
+  const d = new Date(sqlTimestamp.replace(' ', 'T') + 'Z');
+  const parts = {};
+  for (const p of new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric' }).formatToParts(d)) {
+    parts[p.type] = p.value;
+  }
+  return { monthShort: MONTHS_SHORT[Number(parts.month) - 1], day: parts.day };
+}
+
+// Same Eastern-zoned hour/minute/ampm extraction as formatFriendlyTimestamp
+// above, just the time alone ("6:30pm") - the Upcoming Events card shows
+// its own date via eventDateBadge above instead, so repeating the full
+// date here would be redundant.
+function formatTimeOnly(sqlTimestamp) {
+  if (!sqlTimestamp) return null;
+  const d = new Date(sqlTimestamp.replace(' ', 'T') + 'Z');
+  const parts = {};
+  for (const p of new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', hour12: true }).formatToParts(d)) {
+    parts[p.type] = p.value;
+  }
+  return `${parts.hour}:${parts.minute}${parts.dayPeriod.toLowerCase()}`;
+}
 
 // Formats a `now_text()` timestamp string (UTC, "YYYY-MM-DD HH:MM:SS") as
 // "December 1, 2025 9:52am" in Eastern time - used for the library's scan
@@ -435,6 +466,8 @@ module.exports = {
   formatFriendlyDateAndTime,
   formatDateAndTime,
   formatNumericDateAndTime,
+  eventDateBadge,
+  formatTimeOnly,
   ageFromBirthday,
   isChildAge,
   ageAsOfDate,
