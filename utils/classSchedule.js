@@ -554,8 +554,25 @@ async function roomGridForDay(day, semesterId) {
       // has its own real end_time crossing into a later column - reflects
       // what the class actually says about itself, not an inference from
       // a second matching row.
+      //
+      // A real bug report: "If a class is created or duplicated and it
+      // happens to fit in the same time frame and room as another class
+      // it should still show up on the class list so it can be edited."
+      // The span used to be taken straight from endTimeSpan with no
+      // regard for what else occupies this room's later hour columns -
+      // a class ending late enough to cross into hour 2 would claim that
+      // whole column for itself even when hour 2 in this SAME room
+      // already had its own, entirely different class sitting there,
+      // silently dropping that second class out of `cells` altogether
+      // (never rendered in Grid or List view, so it couldn't be opened
+      // to edit). The span is now capped at the first later column this
+      // room's own byHour map shows as actually occupied, so that
+      // column still gets its own cell on the next loop iteration
+      // instead of being swallowed.
       if (here.length === 1 && here[0].endTimeSpan > 1) {
-        const span = Math.min(here[0].endTimeSpan, HOUR_POSITIONS.length - h + 1);
+        const maxSpan = Math.min(here[0].endTimeSpan, HOUR_POSITIONS.length - h + 1);
+        let span = 1;
+        while (span < maxSpan && byHour[h + span].length === 0) span++;
         cells.push({ span, classes: [here[0]] });
         h += span;
         continue;

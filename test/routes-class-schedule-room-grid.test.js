@@ -95,6 +95,53 @@ test('a class with an end_time crossing into a later column spans it, without a 
   });
 });
 
+// A real bug report: "If a class is created or duplicated and it happens
+// to fit in the same time frame and room as another class it should
+// still show up on the class list so It can be edited." The span test
+// above only ever exercised a long class spanning into a LATER column
+// that had nothing else in it; this covers the actual bug - the SAME
+// room, with a different class already sitting in the later column the
+// long class's own end_time would otherwise claim.
+test('a class spanning into a later hour based on its own end_time does not swallow a different class already occupying that hour, in the same room', async (t) => {
+  // Hour 2's real (derived) start time, from this class's own 10:00 AM
+  // start - the long class below spans into hour 2 purely because its
+  // 10:30 AM end_time crosses this.
+  const collidingClassId = await createClass({
+    day: 'monday', hourPosition: 2, className: 'Pottery (Hour 2)', room: 'Shared Room', startTime: '10:00 AM',
+  });
+  const longClassId = await createClass({
+    day: 'monday', hourPosition: 1, className: 'Long Span Class', room: 'Shared Room', startTime: '9:00 AM', endTime: '10:30 AM',
+  });
+
+  await t.test('both classes still appear in the room grid, each in their own cell', async () => {
+    const grid = await roomGridForDay('monday');
+    const sharedRow = grid.rows.find((r) => r.room === 'Shared Room');
+    assert.ok(sharedRow, 'expected a Shared Room row');
+
+    const longCell = sharedRow.cells.find((c) => c.classes.some((cls) => cls.id === longClassId));
+    assert.ok(longCell, 'expected a cell containing the long class');
+    assert.equal(longCell.span, 1, 'should NOT span into hour 2 - that column already has a different class in this same room');
+
+    const collidingCell = sharedRow.cells.find((c) => c.classes.some((cls) => cls.id === collidingClassId));
+    assert.ok(collidingCell, 'the class created in hour 2 should still have its own cell, not be swallowed by the long class\'s span');
+    assert.equal(collidingCell.classes[0].id, collidingClassId);
+  });
+
+  await t.test('the colliding class is editable - its own Manage page renders', async () => {
+    const admin = await loginAsAdmin();
+    const res = await request(app).get(`/admin/class-schedule/classes/${collidingClassId}/manage`).set('Cookie', admin.cookie);
+    assert.equal(res.status, 200);
+    assert.match(res.text, /Pottery \(Hour 2\)/);
+  });
+
+  await t.test('the colliding class also shows up in the List view', async () => {
+    const admin = await loginAsAdmin();
+    const res = await request(app).get('/admin/schedule?tab=monday').set('Cookie', admin.cookie);
+    assert.equal(res.status, 200);
+    assert.match(res.text, /Pottery \(Hour 2\)/);
+  });
+});
+
 test('room row drag-reorder', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
   await createClass({ day: 'wednesday', hourPosition: 1, className: 'Order Test A', room: 'Zebra Room' });
