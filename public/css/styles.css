@@ -450,6 +450,34 @@ textarea:focus-visible,
   .documents-grid .landing-label { font-size: 1.15rem; }
 }
 
+/* A real request: "Edit icon top right corner of every document" - a
+   plain positioning wrapper around each document's own .landing-card
+   (which already fills this wrapper, see .landing-card's own flex: 1)
+   so the edit button can sit in its top-right corner as a SIBLING of the
+   card's <a>, never nested inside it - nesting a <button> inside an <a>
+   is invalid HTML and would make every click on the icon also navigate
+   to the document's view page. */
+.document-card-wrap { position: relative; display: flex; }
+.document-card-edit-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+.document-card-edit-btn:hover { border-color: var(--brand); color: var(--brand-dark); background: var(--brand-soft); }
+.document-card-edit-btn .icon { width: 1rem; height: 1rem; }
+
 .library-checkout-section input[type="text"] {
   width: 100%;
   max-width: 420px;
@@ -1475,10 +1503,37 @@ body.public-page .roster-empty {
    .checkbox-option in the app is a short one-line "checkbox + label"
    pair that never needed to wrap, so .checkbox-option's own flex row has
    always been nowrap by default. Scoped to this one composite control
-   rather than changing .checkbox-option's own default everywhere it's
-   used. */
+   (:has(select), the only .checkbox-option on this tab with an embedded
+   <select>) rather than changing .checkbox-option's own default
+   everywhere it's used.
+
+   A real follow-up request: "all check boxes and radio buttons should
+   start at the first letter of the first sentence" - flex-wrap: wrap on
+   a flex row doesn't make long text reflow around the input the way
+   normal inline text does; it moves whole ITEMS to a new flex line once
+   a row runs out of room, so on a narrow screen the radio input (too
+   small to share a line with the first flex-item after it) ended up
+   alone on its own line, floating above "Consider the student's age
+   on..." instead of starting it - exactly the opposite of what both
+   requests above asked for, and (since this selector's specificity
+   covers every .checkbox-option under .class-settings-question-control,
+   not just the composite one) it was quietly doing the same thing to
+   the plain single-checkbox rows in "When are credit adjustments are
+   automatically given?" too. display: block + a floated input lets the
+   browser's own normal text reflow (used by every other .checkbox-option
+   in the app already, via nowrap not wrap) handle this one's embedded
+   <select> elements the same way - the input floats to where the first
+   letter of the label naturally starts, and everything after it
+   (including the two <select>s) just wraps around it like text around a
+   drop cap, with no separate flex-wrap behavior left for the plain
+   checkboxes under the same parent to inherit by accident. */
 @media (max-width: 640px) {
-  .class-settings-question-control .checkbox-option { flex-wrap: wrap; }
+  .class-settings-question-control .checkbox-option:has(select) { display: block; }
+  .class-settings-question-control .checkbox-option:has(select) input[type="radio"] {
+    float: left;
+    margin-top: 0.2rem;
+    margin-right: 0.4rem;
+  }
 }
 
 /* A real request: "There should be adequate space between each section.
@@ -6072,16 +6127,41 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .volunteer-sections-row { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; width: 100%; }
 .volunteer-sections-row input { width: 10ch; text-align: center; }
 
-/* Class Schedule's "Edit" dialog: one card per hour, each with its own
-   Label/Start Time/End Time - the shared time every class in that hour
-   uses unless a class sets its own (see utils/classSchedule.js's
-   derivedHourTimeRanges). Wraps to 2 rows on narrow/mobile via the flex
-   container below rather than one cramped row of 4. */
-.edit-hours-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; width: 100%; margin-bottom: 0.5rem; }
-.edit-hour-block { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.6rem; border: 1px solid var(--border); border-radius: var(--control-radius); min-width: 130px; }
+/* The Edit Schedule Grids dialog (views/partials/class-schedule-grid.ejs):
+   one card per hour, each with its own Label/Start Time/End Time - the
+   shared time every class in that hour uses unless a class sets its own
+   (see utils/classSchedule.js's derivedHourTimeRanges). Wraps to 2 rows
+   on narrow/mobile via the flex container below rather than one cramped
+   row of 4. A real request: "adequate space between buttons, text
+   boxes and features" bumped the gap up from a tight 0.75rem and gave
+   the dialog's own major sections (Start/End Date, the two visibility
+   checkboxes, the hours grid, the rooms list) consistent breathing room
+   via .grid-editor-section below, instead of everything running
+   straight into the next thing with no separation. */
+.grid-editor-dialog .grid-editor-section { margin-bottom: 1.5rem; }
+.grid-editor-dialog .grid-editor-section:last-of-type { margin-bottom: 0; }
+.grid-editor-visibility { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.edit-hours-grid { display: flex; flex-wrap: wrap; gap: 1.1rem; justify-content: center; width: 100%; margin-bottom: 0.75rem; }
+.edit-hour-block { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--control-radius); min-width: 150px; }
 .edit-hour-field { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.8rem; }
 .edit-hour-field .hint { margin: 0; }
 .edit-hour-field input { width: 100%; text-align: center; }
+/* A real request: "Start time and end time should be on the same row
+   next to each other" - Label stays its own full-width row above (the
+   column's own title), Start/End share a row below it instead of all 3
+   stacking one per line. */
+.edit-hour-time-row { display: flex; gap: 0.5rem; }
+.edit-hour-time-row .edit-hour-field { flex: 1 1 0; min-width: 0; }
+/* A real request: "Bold column title and row title for editing section" -
+   the Label input (the hour/column's own title) and each room's name
+   input (the row's own title) are the two fields whose VALUE literally
+   becomes the title shown on the real grid, so they're visually called
+   out from the plain Start/End Time inputs next to them. */
+.edit-hour-title-input { font-weight: 700; }
+/* A real request: "Add column and add row buttons" - these sit right
+   under their own list instead of floating loose at the dialog's edge. */
+.grid-editor-section > [data-grid-editor-add-column],
+.grid-editor-section > [data-grid-editor-add-room] { margin-top: 0.6rem; }
 
 .volunteer-date-add-form { margin-top: 0.5rem; }
 .volunteer-date-add-form input[type="date"] { width: 192px; }
@@ -11320,6 +11400,17 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
 .site-announcement-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1.5rem; text-align: left; }
 .site-announcement-card h3 { margin: 0 0 0.35rem; font-size: 1.05rem; color: var(--ink); }
 .site-announcement-date { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+
+/* The public homepage's own read-only classes showcase (a real request:
+   "Check box to be viewable to public on public homepage") - same card
+   shape as .site-announcement-card above, in a responsive grid (like
+   .admin-card-grid elsewhere) instead of one column, since these are
+   short at-a-glance cards rather than long-form announcement bodies. */
+.site-class-showcase-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.site-class-showcase-card { background: var(--surface); border: 1px solid var(--border); border-left-width: 4px; border-radius: var(--radius); padding: 1rem 1.25rem; text-align: left; }
+.site-class-showcase-card h3 { margin: 0.25rem 0 0.35rem; font-size: 1rem; color: var(--ink); }
+.site-class-showcase-day { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; font-weight: 700; }
+.site-class-showcase-time { margin: 0; font-size: 0.85rem; color: var(--muted); }
 
 .site-faq-list { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.6rem; }
 .site-faq-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.25rem 1.25rem; }

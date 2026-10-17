@@ -11,39 +11,71 @@
       <%# A real request: "document upload is currently under settings.
           It should move to the documents page and be a button called
           add/edit documents." Replaces the old Settings > Documents tab
-          (views/admin-settings.ejs) entirely - upload, the existing
-          list, Copy Link, and delete all live in this one popup now. %>
-      <button type="button" class="primary-btn" onclick="document.getElementById('manage-documents-dialog').showModal()">Add/Edit Documents</button>
+          (views/admin-settings.ejs) entirely - upload and the existing
+          list (with Copy Link/delete) live in this one popup. A later
+          real request moved per-document editing onto each card's own
+          edit icon instead (see the visibility dialog below) - "Add/edit
+          documents should only say add documents" - this popup is upload-
+          only now. %>
+      <button type="button" class="primary-btn" onclick="document.getElementById('manage-documents-dialog').showModal()">Add Documents</button>
     </div>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <% if (documents.length === 0) { %>
-      <p class="hint">No documents uploaded yet. Add one with Add/Edit Documents above.</p>
+      <p class="hint">No documents uploaded yet. Add one with Add Documents above.</p>
     <% } else { %>
       <%
         var docColors = ['landing-card-orange', 'landing-card-purple', 'landing-card-green'];
       %>
       <div class="landing-grid documents-grid">
         <% documents.forEach(function(d, i) { %>
-          <a class="landing-card <%= docColors[i % docColors.length] %>" href="/admin/documents/<%= d.id %>/view">
+          <div class="document-card-wrap">
             <%# A real request: "on the document click card with title
                 below it, all one card" - the image (when set) replaces
                 the generic file icon, title stays below it either way. %>
-            <% if (d.image_path) { %>
-              <img class="landing-card-image" src="/admin/documents/<%= d.id %>/image" alt="" />
-            <% } else { %>
-              <span class="landing-icon"><svg class="icon"><use href="#icon-file-text"/></svg></span>
-            <% } %>
-            <span class="landing-label"><%= d.title %></span>
-          </a>
+            <a class="landing-card <%= docColors[i % docColors.length] %>" href="/admin/documents/<%= d.id %>/view">
+              <% if (d.image_path) { %>
+                <img class="landing-card-image" src="/admin/documents/<%= d.id %>/image" alt="" />
+              <% } else { %>
+                <span class="landing-icon"><svg class="icon"><use href="#icon-file-text"/></svg></span>
+              <% } %>
+              <span class="landing-label"><%= d.title %></span>
+            </a>
+            <%# A real request: "edit icon top right corner of every
+                document... when clicking edit icon you can control which
+                portals can view the documents" - a sibling of the card's
+                own <a> (not nested inside it) so clicking the icon never
+                also navigates to the document's view page. %>
+            <button type="button" class="document-card-edit-btn" aria-label="Edit who can view &quot;<%= d.title %>&quot;" title="Edit visibility" onclick="document.getElementById('doc-roles-dialog-<%= d.id %>').showModal()">
+              <svg class="icon"><use href="#icon-edit"/></svg>
+            </button>
+          </div>
         <% }); %>
       </div>
+
+      <% documents.forEach(function(d) { %>
+        <dialog id="doc-roles-dialog-<%= d.id %>" class="member-picker-dialog">
+          <h3>Who Can View &quot;<%= d.title %>&quot;?</h3>
+          <form method="POST" action="/admin/documents/<%= d.id %>/roles">
+            <p class="hint">Leave every box unchecked to show this document to every portal (today's default). Check one or more to limit it to just those portals.</p>
+            <div class="checkbox-group-boxed">
+              <% roles.forEach(function(r) { %>
+                <label class="checkbox-option"><input type="checkbox" name="roleKeys" value="<%= r.key %>" <%= d.roleKeys.includes(r.key) ? 'checked' : '' %> /> <%= r.label %></label>
+              <% }); %>
+            </div>
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Save</button>
+            </div>
+          </form>
+        </dialog>
+      <% }); %>
     <% } %>
 
     <dialog id="manage-documents-dialog" class="member-picker-dialog">
-      <h3>Add/Edit Documents</h3>
+      <h3>Add Documents</h3>
 
       <div class="manage-section">
         <h4>Upload Document</h4>

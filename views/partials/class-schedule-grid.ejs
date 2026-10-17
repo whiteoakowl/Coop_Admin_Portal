@@ -125,7 +125,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
   <div class="roster-btn-row">
     <% if (!gridReadOnly) { %>
       <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog-<%= day %>').showModal()">+ Add Class</button>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-schedule-dialog-<%= day %>').showModal()">Add/Edit Class Schedule Grid</button>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-schedule-dialog-<%= day %>').showModal()">Edit Schedule Grids</button>
       <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog-<%= day %>').showModal()">Import</button>
       <button type="button" class="roster-action-btn" data-bulk-edit-toggle="class-bulk-edit-form-<%= day %>" data-bulk-edit-dialog="bulk-edit-dialog-<%= day %>" aria-pressed="false">Bulk Edit</button>
     <% } %>
@@ -344,30 +344,34 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
   </form>
 </dialog>
 
-<dialog id="edit-schedule-dialog-<%= day %>" class="volunteer-edit-dialog" data-grid-editor-dialog>
-  <h3>Add/Edit Class Schedule Grid - <%= dayLabel %></h3>
+<dialog id="edit-schedule-dialog-<%= day %>" class="volunteer-edit-dialog grid-editor-dialog" data-grid-editor-dialog>
+  <h3>Edit Schedule Grids - <%= dayLabel %></h3>
   <%
-    var gridEditorSemesters = typeof semesters !== 'undefined' ? semesters : [];
     var gridEditorCombos = (typeof combos !== 'undefined' ? combos : []).filter(function (c) { return c.day === day; });
     var gridEditorCombo = gridEditorCombos.find(function (c) { return c.semesterId === (typeof selectedSemesterId !== 'undefined' ? selectedSemesterId : null); });
+    // A real request: "Add/edit class schedule grid should be called
+    // edit schedule grids. Adding only happening when adding semesters
+    // under other settings" - a grid only exists here once Add/Edit
+    // Semester (Settings > Semesters) has already created its own
+    // class_schedules row for this day, so the Semester picker below
+    // only ever offers semesters that already cover this day instead of
+    // every semester co-op-wide (picking one used to silently create a
+    // brand new grid on Save - that's Add Semester's job now).
+    var gridEditorSemesters = (typeof semesters !== 'undefined' ? semesters : []).filter(function (s) {
+      return gridEditorCombos.some(function (c) { return c.semesterId === s.id; });
+    });
     // gridBasePath already carries its own &semesterId= (admin-schedule.js
     // always passes one) - stripped here so the Semester <select> below
     // can append its own without ending up with two.
     var gridEditorBasePath = gridBasePath.replace(/([?&])semesterId=[^&]*(&)?/, function (m, lead, trail) { return trail ? lead : ''; });
+    // Defaults a never-saved combo to visible to members (today's
+    // behavior everywhere else) and hidden from the public homepage
+    // (nothing was ever public before this checkbox existed).
+    var gridEditorVisibleToMembers = !gridEditorCombo || gridEditorCombo.visibleToMembers !== false;
+    var gridEditorVisibleToPublic = !!(gridEditorCombo && gridEditorCombo.visibleToPublic);
   %>
   <form method="POST" action="/admin/class-schedule/<%= day %>/edit" data-grid-editor-form>
     <% if (gridEditorSemesters.length > 0) { %>
-      <%# A real request: "create a new schedule grid, choose a semester/
-          day." Day is fixed to this tab (same as the button it opens
-          from); switching Semester here reloads the page on that
-          semester (same combo-picker-style option-carries-its-own-url
-          shape as partials/schedule-combo-picker.ejs) so the rest of
-          this form reflects ITS OWN hours/rooms (or the shared defaults,
-          if it's never had its own) instead of silently saving whatever
-          this dialog happened to be pre-filled with for a different
-          semester. A semester with no class_schedules row for this day
-          yet still gets an option - picking one just means "create a
-          brand new grid for this combo" once Save is clicked. %>
       <label class="member-form-full">Semester
         <select onchange="window.fullscreenNavigate(this.value)">
           <option value="<%= gridEditorBasePath %><%= gridEditorBasePath.includes('?') ? '&' : '?' %>semesterId=none" <%= !selectedSemesterId ? 'selected' : '' %>>No Semester</option>
@@ -379,7 +383,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
       <input type="hidden" name="semesterId" value="<%= selectedSemesterId || '' %>" />
     <% } %>
 
-    <div class="member-form-row">
+    <div class="member-form-row grid-editor-section">
       <label>Start Date
         <input type="date" name="startDate" value="<%= gridEditorCombo && gridEditorCombo.startDate ? gridEditorCombo.startDate : '' %>" />
       </label>
@@ -388,34 +392,52 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
       </label>
     </div>
 
-    <p class="hint">Column titles - the 4 hour blocks used to organize <%= dayLabel %>'s classes<% if (selectedSemesterId) { %> for <%= gridEditorSemesters.find(function(s) { return s.id === selectedSemesterId; }) ? gridEditorSemesters.find(function(s) { return s.id === selectedSemesterId; }).title : 'this semester' %><% } %>, with each hour's Start/End Time - every class in that hour uses it unless that class sets its own on its own Manage page. Needed for accurate Arrival/Departure times on rosters.</p>
-    <div class="edit-hours-grid">
-      <% hours.forEach(function(h) { %>
-        <div class="edit-hour-block">
-          <label class="edit-hour-field"><span class="hint">Label</span>
-            <input type="text" name="labels" value="<%= h.label %>" maxlength="20" />
-          </label>
-          <label class="edit-hour-field"><span class="hint">Start Time</span>
-            <input type="text" name="startTimes" value="<%= h.start_time || '' %>" placeholder="9:00 AM" />
-          </label>
-          <label class="edit-hour-field"><span class="hint">End Time</span>
-            <input type="text" name="endTimes" value="<%= h.end_time || '' %>" placeholder="9:45 AM" />
-          </label>
-        </div>
-      <% }); %>
+    <%# A real request: "Check box to lock grid to be viewable to
+        members. Check box to be viewable to public on public homepage.
+        If these boxes aren't checked then members or non-members can't
+        register" - grid-level gates (utils/classRegistration.js's own
+        registerForClass/joinClassAsStaff, Parent/Student Portal's own
+        browse-time hide, and the public homepage's new classes
+        showcase), on top of each class's own Close Registration
+        checkbox. %>
+    <div class="grid-editor-section grid-editor-visibility">
+      <label class="checkbox-option"><input type="checkbox" name="visibleToMembers" value="1" <%= gridEditorVisibleToMembers ? 'checked' : '' %> /> Viewable to Members (required to register)</label>
+      <label class="checkbox-option"><input type="checkbox" name="visibleToPublic" value="1" <%= gridEditorVisibleToPublic ? 'checked' : '' %> /> Viewable to Public on Public Homepage</label>
     </div>
 
-    <p class="hint">Row titles - the rooms shown on <%= dayLabel %>'s grid. Renaming one updates every class currently using it; removing one just stops reserving it an empty row (any class still using that name keeps showing up). Add a row for a room with no classes yet.</p>
-    <div class="volunteer-sections-row" data-grid-editor-rooms>
-      <% (typeof roomGrid !== 'undefined' && roomGrid.rows ? roomGrid.rows.map(function(r) { return r.room; }) : (rooms || [])).forEach(function(r) { %>
-        <div data-grid-editor-room-row>
-          <input type="hidden" name="oldNames" value="<%= r %>" />
-          <input type="text" name="newNames" value="<%= r %>" />
-          <button type="button" class="icon-btn icon-btn-danger" aria-label="Remove room" data-grid-editor-remove-room><svg class="icon"><use href="#icon-trash"/></svg></button>
-        </div>
-      <% }); %>
+    <div class="grid-editor-section">
+      <div class="edit-hours-grid">
+        <% hours.forEach(function(h) { %>
+          <div class="edit-hour-block">
+            <label class="edit-hour-field"><span class="hint">Label</span>
+              <input type="text" class="edit-hour-title-input" name="labels" value="<%= h.label %>" maxlength="20" />
+            </label>
+            <div class="edit-hour-time-row">
+              <label class="edit-hour-field"><span class="hint">Start Time</span>
+                <input type="text" name="startTimes" value="<%= h.start_time || '' %>" placeholder="9:00 AM" />
+              </label>
+              <label class="edit-hour-field"><span class="hint">End Time</span>
+                <input type="text" name="endTimes" value="<%= h.end_time || '' %>" placeholder="9:45 AM" />
+              </label>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+      <button type="button" class="btn-secondary" data-grid-editor-add-column>+ Add Column</button>
     </div>
-    <button type="button" class="btn-secondary" data-grid-editor-add-room>+ Add Room</button>
+
+    <div class="grid-editor-section">
+      <div class="volunteer-sections-row" data-grid-editor-rooms>
+        <% (typeof roomGrid !== 'undefined' && roomGrid.rows ? roomGrid.rows.map(function(r) { return r.room; }) : (rooms || [])).forEach(function(r) { %>
+          <div data-grid-editor-room-row>
+            <input type="hidden" name="oldNames" value="<%= r %>" />
+            <input type="text" class="edit-hour-title-input" name="newNames" value="<%= r %>" />
+            <button type="button" class="icon-btn icon-btn-danger" aria-label="Remove room" data-grid-editor-remove-room><svg class="icon"><use href="#icon-trash"/></svg></button>
+          </div>
+        <% }); %>
+      </div>
+      <button type="button" class="btn-secondary" data-grid-editor-add-room>+ Add Row</button>
+    </div>
 
     <div class="notes-dialog-actions">
       <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>

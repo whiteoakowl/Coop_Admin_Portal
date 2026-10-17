@@ -33,7 +33,31 @@ function classImageUrl(key) {
   return createStorageClient() ? publicUrl(CLASS_IMAGES_BUCKET, key) : `/uploads/classes/${key}`;
 }
 
+// A real request: "add column and add row buttons" on the Edit Schedule
+// Grids popup - "add column" raises this shared count (one number for
+// every day/grid at once, same as how Rooms already work) rather than
+// each grid having its own independent column count, which would mean
+// reworking the colspan/merge math below, CSV import/export, and the
+// public Class Schedule page's own rendering. HOUR_POSITIONS stays a
+// plain array (not a function) so every existing caller across the app
+// keeps working completely unchanged - growHourPositions mutates this
+// SAME array object in place (push, never reassign), so every module
+// that destructured HOUR_POSITIONS out of this file at require time is
+// still holding a reference to the one array that just grew.
 const HOUR_POSITIONS = [1, 2, 3, 4];
+const HOUR_COLUMN_COUNT_KEY = 'class_schedule_hour_column_count';
+
+function growHourPositions(count) {
+  while (HOUR_POSITIONS.length < count) HOUR_POSITIONS.push(HOUR_POSITIONS.length + 1);
+}
+
+// Restores a previously-saved column count on boot (server.js's own
+// bootReady chain) - a no-op (stays at the default 4) until an admin has
+// ever actually added a column.
+async function loadHourColumnCount() {
+  const saved = parseInt(await appSetting(HOUR_COLUMN_COUNT_KEY, '4'), 10);
+  if (Number.isFinite(saved)) growHourPositions(saved);
+}
 
 // Every grade a class's Age Group can be checked for (create/edit class
 // form) - classes.age_group stores whichever of these are checked as a
@@ -178,6 +202,15 @@ async function hoursForDay(day, semesterId) {
 // rows; a real semesterId saves that one semester's own customized copy
 // instead, leaving every other semester's (or the shared) rows untouched.
 async function saveHourLabels(day, labels, startTimes = [], endTimes = [], semesterId = null) {
+  // A real request: "+ Add Column" on the Edit Schedule Grids popup adds
+  // a new blank hour block client-side (public/js/class-schedule-grid-
+  // editor.js), so a save can submit more labels than HOUR_POSITIONS
+  // currently has - grow the shared count first so the loop below (and
+  // every other page reading HOUR_POSITIONS) picks up the new column too.
+  if (labels.length > HOUR_POSITIONS.length) {
+    growHourPositions(labels.length);
+    await setAppSetting(HOUR_COLUMN_COUNT_KEY, String(HOUR_POSITIONS.length));
+  }
   const upsert = db.prepare(
     `INSERT INTO class_schedule_hours (day, position, label, start_time, end_time, semester_id) VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(day, coalesce(semester_id, -1), position) DO UPDATE SET label = excluded.label, start_time = excluded.start_time, end_time = excluded.end_time`
@@ -992,6 +1025,81 @@ async function classScheduleIdsForClass(cls) {
   return row ? [row.id] : [];
 }
 
+// The single class_schedules row (Schedule Grid) this specific class's
+// own (day, semester_id) exactly matches - used only for the Edit
+// Schedule Grids popup's own visible_to_members/visible_to_public
+// checkboxes, unlike classScheduleIdsForClass's own "an untagged class
+// matches every grid on the day" leniency above: an untagged class
+// (semester_id null) isn't really "on" any one specific grid, so it's
+// never gated by a grid's own visibility flags - only a class explicitly
+// tagged with a semester is.
+async function primaryClassScheduleForClass(cls) {
+  if (cls.semester_id == null) return null;
+  return db.prepare('SELECT * FROM class_schedules WHERE day_of_week = ? AND semester_id = ?').get(cls.day, cls.semester_id);
+}
+
+// A real request: "Check box to lock grid to be viewable to members...
+// if these boxes aren't checked then members... can't register." Members
+// browsing Parent/Student Portal's own Class Registration grid/list
+// shouldn't see a class whose grid is locked away from them at all, not
+// just be blocked once they try to register for it - registerForClass/
+// joinClassAsStaff (utils/classRegistration.js) are the actual
+// registration-time gate; this is the matching browse-time hide. Scoped
+// to roomGridForDay's own shape (rows -> cells -> classes) rather than a
+// shared filter on classesForDaySemester itself, since every OTHER
+// caller of that function (the admin's own Class Schedules grid,
+// Floater/Substitute matching, name tags, etc.) should keep seeing every
+// class regardless of this members-only flag.
+async function hideClassesNotVisibleToMembers(roomGrid) {
+  const rows = await Promise.all(
+    roomGrid.rows.map(async (row) => ({
+      ...row,
+      cells: await Promise.all(
+        row.cells.map(async (cell) => {
+          const keep = await Promise.all(
+            cell.classes.map(async (cls) => {
+              const grid = await primaryClassScheduleForClass(cls);
+              return !grid || grid.visible_to_members ? cls : null;
+            })
+          );
+          return { ...cell, classes: keep.filter(Boolean) };
+        })
+      ),
+    }))
+  );
+  return { ...roomGrid, rows };
+}
+
+// The public homepage's own read-only classes showcase (a real request:
+// "Check box to be viewable to public on public homepage") - every class
+// under a grid explicitly marked visible_to_public, flattened into one
+// list and sorted day-then-time rather than grouped per grid, since a
+// prospective family browsing the public site doesn't care which admin-
+// side "grid" a class happens to live on. No registration action here -
+// non-members still go through Member Registration/Login like today;
+// this is purely "what do you offer," not a new guest-checkout flow.
+async function publicShowcaseClasses() {
+  const grids = await db.prepare('SELECT * FROM class_schedules WHERE visible_to_public = 1').all();
+  const results = [];
+  for (const grid of grids) {
+    const classes = await classesForDaySemester(grid.day_of_week, grid.semester_id);
+    for (const cls of classes) {
+      results.push({
+        id: cls.id,
+        className: cls.class_name,
+        day: grid.day_of_week,
+        dayLabel: CLASS_DAY_LABELS_FULL[grid.day_of_week],
+        startTime: cls.start_time,
+        endTime: cls.end_time,
+        color: cls.color,
+      });
+    }
+  }
+  return results.sort(
+    (a, b) => CLASS_DAY_ORDER[a.day] - CLASS_DAY_ORDER[b.day] || (a.startTime || '').localeCompare(b.startTime || '') || a.className.localeCompare(b.className)
+  );
+}
+
 // The Classes grid's own tab list - every day_of_week that's ever been
 // activated via a class_schedules row, in calendar order (not creation
 // order, so a newly-added Tuesday lands between Monday and Wednesday
@@ -1017,7 +1125,7 @@ async function listActiveClassDays() {
 async function listScheduleCombos() {
   const rows = await db
     .prepare(
-      `SELECT cs.id AS id, cs.day_of_week AS day, cs.semester_id AS semester_id, cs.start_date AS start_date, cs.end_date AS end_date, s.title AS semester_title
+      `SELECT cs.id AS id, cs.day_of_week AS day, cs.semester_id AS semester_id, cs.start_date AS start_date, cs.end_date AS end_date, cs.visible_to_members AS visible_to_members, cs.visible_to_public AS visible_to_public, s.title AS semester_title
        FROM class_schedules cs
        LEFT JOIN semesters s ON s.id = cs.semester_id`
     )
@@ -1030,6 +1138,8 @@ async function listScheduleCombos() {
       semesterTitle: r.semester_title,
       startDate: r.start_date,
       endDate: r.end_date,
+      visibleToMembers: !!r.visible_to_members,
+      visibleToPublic: !!r.visible_to_public,
       label: r.semester_title ? `${r.semester_title} - ${CLASS_DAY_LABELS_FULL[r.day]}` : CLASS_DAY_LABELS_FULL[r.day],
     }))
     .sort((a, b) => {
@@ -1054,7 +1164,7 @@ async function ensureClassScheduleHours(day) {
   }
 }
 
-async function createClassSchedule({ title, dayOfWeek, semesterId, startDate, endDate }) {
+async function createClassSchedule({ title, dayOfWeek, semesterId, startDate, endDate, visibleToMembers, visibleToPublic }) {
   const trimmedTitle = (title || '').trim();
   if (!trimmedTitle) throw new Error('A title is required.');
   if (!CLASS_DAYS.includes(dayOfWeek)) throw new Error('Choose a valid day of the week.');
@@ -1062,12 +1172,19 @@ async function createClassSchedule({ title, dayOfWeek, semesterId, startDate, en
   const existing = await db.prepare('SELECT 1 FROM class_schedules WHERE day_of_week = ? AND semester_id IS NOT DISTINCT FROM ?').get(dayOfWeek, sid);
   if (existing) throw new Error(`A ${CLASS_DAY_LABELS_FULL[dayOfWeek]} schedule already exists for that semester.`);
   await ensureClassScheduleHours(dayOfWeek);
+  // Every existing caller (Add/Edit Semester) omits visibleToMembers/
+  // visibleToPublic entirely - defaults to visible-to-members (today's
+  // behavior, unchanged) and hidden from the public homepage (nothing
+  // was ever public before the Edit Schedule Grids popup's own new
+  // checkboxes).
   await db
-    .prepare('INSERT INTO class_schedules (title, day_of_week, semester_id, start_date, end_date) VALUES (?, ?, ?, ?, ?)')
-    .run(trimmedTitle, dayOfWeek, sid, startDate || null, endDate || null);
+    .prepare(
+      'INSERT INTO class_schedules (title, day_of_week, semester_id, start_date, end_date, visible_to_members, visible_to_public) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    )
+    .run(trimmedTitle, dayOfWeek, sid, startDate || null, endDate || null, visibleToMembers === false ? 0 : 1, visibleToPublic ? 1 : 0);
 }
 
-async function updateClassSchedule(id, { title, dayOfWeek, semesterId, startDate, endDate }) {
+async function updateClassSchedule(id, { title, dayOfWeek, semesterId, startDate, endDate, visibleToMembers, visibleToPublic }) {
   const trimmedTitle = (title || '').trim();
   if (!trimmedTitle) throw new Error('A title is required.');
   if (!CLASS_DAYS.includes(dayOfWeek)) throw new Error('Choose a valid day of the week.');
@@ -1077,9 +1194,16 @@ async function updateClassSchedule(id, { title, dayOfWeek, semesterId, startDate
     .get(dayOfWeek, sid, id);
   if (existing) throw new Error(`A ${CLASS_DAY_LABELS_FULL[dayOfWeek]} schedule already exists for that semester.`);
   await ensureClassScheduleHours(dayOfWeek);
+  // visibleToMembers/visibleToPublic are omitted entirely by callers that
+  // don't touch them (Add/Edit Semester) - "don't change" in that case,
+  // not "turn it off", so this reads the row's own current value instead
+  // of silently clobbering it with a default.
+  const current = await db.prepare('SELECT visible_to_members, visible_to_public FROM class_schedules WHERE id = ?').get(id);
+  const vm = visibleToMembers !== undefined ? (visibleToMembers ? 1 : 0) : current ? current.visible_to_members : 1;
+  const vp = visibleToPublic !== undefined ? (visibleToPublic ? 1 : 0) : current ? current.visible_to_public : 0;
   await db
-    .prepare('UPDATE class_schedules SET title = ?, day_of_week = ?, semester_id = ?, start_date = ?, end_date = ? WHERE id = ?')
-    .run(trimmedTitle, dayOfWeek, sid, startDate || null, endDate || null, id);
+    .prepare('UPDATE class_schedules SET title = ?, day_of_week = ?, semester_id = ?, start_date = ?, end_date = ?, visible_to_members = ?, visible_to_public = ? WHERE id = ?')
+    .run(trimmedTitle, dayOfWeek, sid, startDate || null, endDate || null, vm, vp, id);
 }
 
 async function deleteClassSchedule(id) {
@@ -2456,6 +2580,10 @@ async function membersForSectionRaw(listId, sectionId) {
 
 module.exports = {
   HOUR_POSITIONS,
+  loadHourColumnCount,
+  primaryClassScheduleForClass,
+  hideClassesNotVisibleToMembers,
+  publicShowcaseClasses,
   UNASSIGNED_ROOM,
   COLOR_PALETTE,
   GRADE_LEVELS,

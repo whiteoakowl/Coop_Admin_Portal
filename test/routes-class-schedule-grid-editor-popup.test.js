@@ -44,20 +44,46 @@ async function loginAsAdmin() {
   return { cookie, csrfToken: extractCsrf(page.text) };
 }
 
-test('the Classes grid button is now "Add/Edit Class Schedule Grid", with a Semester picker, Start/End Date, hour labels, and a Rooms list in its popup', async () => {
+test('the Classes grid button is now "Edit Schedule Grids", with a Semester picker, Start/End Date, hour labels, a Rooms list, and the new visibility checkboxes in its popup', async () => {
   const admin = await loginAsAdmin();
-  await request(app).post('/admin/schedule/semesters').set('Cookie', admin.cookie).type('form').send({ title: 'Grid Popup Fall', _csrf: admin.csrfToken });
+  // A real request: "Adding only happening when adding semesters under
+  // other settings" - the popup's own Semester picker only offers a
+  // semester that already covers this day, same as Add/Edit Semester's
+  // own "Add a Schedule" day checkboxes create.
+  await request(app)
+    .post('/admin/schedule/semesters')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Grid Popup Fall', days: 'monday', _csrf: admin.csrfToken });
   const semester = await db.prepare("SELECT * FROM semesters WHERE title = 'Grid Popup Fall'").get();
 
   const page = await request(app).get(`/admin/schedule?tab=monday&semesterId=${semester.id}`).set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, />Add\/Edit Class Schedule Grid</);
-  assert.match(page.text, /<h3>Add\/Edit Class Schedule Grid - Monday<\/h3>/);
+  assert.match(page.text, />Edit Schedule Grids</);
+  assert.match(page.text, /<h3>Edit Schedule Grids - Monday<\/h3>/);
   assert.match(page.text, new RegExp(`<option value="[^"]*semesterId=${semester.id}"[^>]*selected>Grid Popup Fall</option>`));
   assert.match(page.text, /name="startDate"/);
   assert.match(page.text, /name="endDate"/);
   assert.match(page.text, /name="labels" value="Hour 1"/);
   assert.match(page.text, /data-grid-editor-add-room/);
+  assert.match(page.text, /data-grid-editor-add-column/);
+  assert.match(page.text, /name="visibleToMembers" value="1" checked/);
+  assert.match(page.text, /name="visibleToPublic" value="1"\s*\/>/);
+});
+
+test('a semester that has never added this day does not show up in the Edit Schedule Grids popup\'s own Semester picker', async () => {
+  const admin = await loginAsAdmin();
+  await request(app).post('/admin/schedule/semesters').set('Cookie', admin.cookie).type('form').send({ title: 'Wednesday Only Fall', days: 'wednesday', _csrf: admin.csrfToken });
+
+  const page = await request(app).get('/admin/schedule?tab=monday').set('Cookie', admin.cookie);
+  assert.equal(page.status, 200);
+  // The page-wide Semester/Day combo picker (partials/schedule-combo-
+  // picker.ejs) legitimately lists every real combo across every day, so
+  // "Wednesday Only Fall" DOES appear there - this checks only the Edit
+  // Schedule Grids dialog's own, narrower Semester <select> instead.
+  const dialogMatch = /<dialog id="edit-schedule-dialog-monday"[\s\S]*?<\/dialog>/.exec(page.text);
+  assert.ok(dialogMatch, 'expected the Edit Schedule Grids dialog on the page');
+  assert.doesNotMatch(dialogMatch[0], /Wednesday Only Fall/);
 });
 
 test('saving the popup for one semester customizes that semester\'s own hours/rooms/dates without touching the shared (No Semester) ones', async () => {

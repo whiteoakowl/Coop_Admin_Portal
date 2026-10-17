@@ -20,7 +20,7 @@
 // Registration Schedule's own role-scoped windows already cover that.
 const db = require('../db');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('./sections');
-const { ageGroupList, classGlobalSettings, classScheduleIdsForClass, CLASS_DAY_LABELS_FULL } = require('./classSchedule');
+const { ageGroupList, classGlobalSettings, classScheduleIdsForClass, primaryClassScheduleForClass, CLASS_DAY_LABELS_FULL } = require('./classSchedule');
 const { ageAsOfDate, todayISO, formatDateLabel } = require('./dates');
 const { createCharge, amountPaidForCharge, cancelCharge, recordPayment } = require('./payments');
 const { lastNameOf } = require('./members');
@@ -106,6 +106,10 @@ async function joinClassAsStaff({ classId, member, accountId, portalRoles, role 
   if (!member) return { ok: false, error: 'No profile found for your account.' };
   const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
   if (!cls || !cls.registration_open) return { ok: false, error: 'Self-signup is not open for that class.' };
+  // A real request: "Check box to lock grid to be viewable to members...
+  // if these boxes aren't checked then members... can't register."
+  const staffGrid = await primaryClassScheduleForClass(cls);
+  if (staffGrid && !staffGrid.visible_to_members) return { ok: false, error: 'Self-signup is not open for that class.' };
 
   // A real request: a window's own Section scoping should gate by which
   // Section(s) the person signing up themselves belongs to, not by
@@ -181,6 +185,10 @@ async function leaveClassAsStaff({ classId, member, accountId }) {
 async function registerForClass({ classId, studentId, accountId, portalRoles, registrantType }) {
   const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
   if (!cls || !cls.registration_open) return { ok: false, error: 'Registration is not open for that class.' };
+  // A real request: "Check box to lock grid to be viewable to members...
+  // if these boxes aren't checked then members... can't register."
+  const grid = await primaryClassScheduleForClass(cls);
+  if (grid && !grid.visible_to_members) return { ok: false, error: 'Registration is not open for that class.' };
 
   const settings = await classGlobalSettings();
   // restriction is the CLASS's own lock-by-section setting (unrelated to

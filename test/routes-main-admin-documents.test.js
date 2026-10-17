@@ -41,11 +41,15 @@ async function loginAsMainAdmin() {
   return { cookie, csrfToken };
 }
 
-test('GET /main-admin/documents shows the Add/Edit Documents button and upload form', async () => {
+test('GET /main-admin/documents shows the Add Documents button and upload form', async () => {
   const { cookie } = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/documents').set('Cookie', cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, />Add\/Edit Documents</);
+  // A real request: "Add/edit documents should only say add documents" -
+  // per-document editing moved onto each card's own edit icon instead
+  // (see the visibility test below).
+  assert.match(page.text, />Add Documents</);
+  assert.doesNotMatch(page.text, /Add\/Edit Documents/);
   assert.match(page.text, /id="manage-documents-dialog"/);
   assert.match(page.text, /<form[^>]*action="\/main-admin\/documents\/upload"/);
 
@@ -208,4 +212,40 @@ test('Parent Portal Documents page has no upload/edit controls - view only', asy
   assert.doesNotMatch(res.text, /action="[^"]*documents[^"]*\/(upload|delete)/);
   assert.doesNotMatch(res.text, /Add\/Edit Documents/);
   assert.doesNotMatch(res.text, /type="file"/);
+});
+
+// A real request: "edit icon top right corner of every document on main
+// admin portal and co-op admin portal. When clicking edit icon you can
+// control which portals can view the documents."
+test('each document card has its own edit icon, and scoping it to a few portals hides it from Parent Portal', async () => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+  await request(app)
+    .post('/main-admin/documents/upload?_csrf=' + encodeURIComponent(csrfToken))
+    .set('Cookie', cookie)
+    .field('title', 'Admins Only Doc')
+    .attach('file', Buffer.from('%PDF-1.4 fake pdf content'), { filename: 'admins-only.pdf', contentType: 'application/pdf' });
+  const doc = await db.prepare("SELECT * FROM documents WHERE title = 'Admins Only Doc'").get();
+
+  const listPage = await request(app).get('/main-admin/documents').set('Cookie', cookie);
+  assert.match(listPage.text, /class="document-card-edit-btn"/);
+  assert.match(listPage.text, new RegExp(`id="doc-roles-dialog-${doc.id}"`));
+
+  const saveRes = await request(app)
+    .post(`/main-admin/documents/${doc.id}/roles?_csrf=${encodeURIComponent(csrfToken)}`)
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ roleKeys: ['coop_admin', 'main_admin'] });
+  assert.equal(saveRes.status, 302);
+  assert.match(saveRes.headers.location, /notice=/);
+
+  const roleRows = await db.prepare('SELECT role_key FROM document_roles WHERE document_id = ? ORDER BY role_key').all(doc.id);
+  assert.deepEqual(roleRows.map((r) => r.role_key), ['coop_admin', 'main_admin']);
+
+  // A family created in a previous test ('docs-view-parent@example.com')
+  // already exists - its own login is reused here rather than seeding a
+  // second one.
+  const loginRes = await request(app).post('/login').type('form').send({ email: 'docs-view-parent@example.com', password: 'testpassword123', next: '/parent' });
+  const parentCookie = loginRes.headers['set-cookie'];
+  const parentPage = await request(app).get('/parent/documents').set('Cookie', parentCookie);
+  assert.doesNotMatch(parentPage.text, /Admins Only Doc/, 'a document scoped to coop_admin/main_admin only should not show up for a parent');
 });
