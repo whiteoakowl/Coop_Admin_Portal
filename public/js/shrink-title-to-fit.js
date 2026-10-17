@@ -44,8 +44,16 @@
 // last resort - "don't split words" stays the preference every other
 // case already relies on, but it can't come at the cost of visibly
 // spilling off the card, which is what was actually reported.
+// A real follow-up request: "Class name are breaking onto multiple rows.
+// Words should stay together at least on a row. Shrink the font to fit" -
+// a normal-width class card (not the extreme ~35-60px mobile case phase 3
+// above is for) was falling into phase 2's 2-line wrap for an ordinary
+// multi-word title with one longish word ("Intermediate Conversational
+// Spanish") well before it actually ran out of readable font size -
+// lowered from 10 so phase 1 tries harder to keep a title on its one,
+// preferred line before ever wrapping it at all.
 (function () {
-  var MIN_FONT_SIZE_PX = 10;
+  var MIN_FONT_SIZE_PX = 8;
 
   function shrinkToFit(el) {
     el.style.fontSize = ''; // back to the CSS default (already breakpoint-correct) before measuring.
@@ -100,7 +108,7 @@
   }
 
   function shrinkAll() {
-    document.querySelectorAll('.class-card-header h3, .class-schedule-room-name, .grade-level-report-col-title, .grade-level-bar-label').forEach(shrinkToFit);
+    document.querySelectorAll('.class-card-header h3, .class-schedule-room-name, .grade-level-report-col-title, .grade-level-bar-label, .grade-level-report-name').forEach(shrinkToFit);
   }
 
   // document.fonts.ready, not a plain 'load' listener - same reasoning as
