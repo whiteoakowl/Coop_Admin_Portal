@@ -3492,6 +3492,25 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      same idea as .table-stack-heading, just without the heading look. */
   .table-stack-mobile td.table-stack-full { display: block; text-align: left; }
   .table-stack-mobile td.table-stack-full::before { content: none; }
+  /* A real bug report: "edit and delete buttons should be on the same
+     row next to each other" (the Registration Schedule tab's own windows
+     table, views/admin-schedule.ejs - Edit is a plain button, Delete is
+     its own small <form>, both inside one shared td.actions-cell
+     td.table-stack-full). .table-stack-full's own display: block just
+     above (specificity 0,2,1) was beating .actions-cell's own
+     display: flex (0,1,0) on a cell that's both - stacking Edit above
+     Delete on a phone instead of keeping them side by side like every
+     other .actions-cell already renders everywhere else. This selector's
+     extra class brings it back ahead (0,3,1). */
+  .table-stack-mobile td.table-stack-full.actions-cell { display: flex; }
+  /* .roster-action-btn's own flex: 1 0 auto (styles.css, tuned for a
+     narrow desktop table column) grows to fill 100% of this now-full-
+     card-width cell once display: flex is restored just above - with 2
+     buttons that pushes the 2nd one (Delete's own <form>) off the right
+     edge of the card instead of sitting next to Edit. Same fix as every
+     other .actions-cell already needs once its own td goes full-card-
+     width on a phone: stop growing past its own natural width. */
+  .table-stack-mobile td.table-stack-full.actions-cell .roster-action-btn { flex: 0 1 auto; }
   /* This class takes over the "no overflow" job itself, so the shared
      .roster-scroll wrapper around it shouldn't still reserve a
      horizontal scrollbar/track. */
