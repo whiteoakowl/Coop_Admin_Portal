@@ -118,8 +118,12 @@ test('Grade Level Report: grouping, ages, bar graph, Ungraded, Print button, non
   });
 
   await t.test('grade level columns are laid out as a CSS grid, not a table, sized to exactly how many grade levels have students (and half that, rounded up, on mobile so columns wrap onto a 2nd row)', () => {
-    // Kindergarten, 3rd, Ungraded = 3 non-empty columns.
-    assert.match(res.text, /<div class="grade-level-report-fit-inner" style="--grade-level-cols: 3; --grade-level-cols-mobile: 2;">/);
+    // Kindergarten, 3rd, Ungraded = 3 non-empty columns. The bar chart's
+    // own --grade-level-cols/-mobile still reflect all 3 in one row (2 on
+    // mobile); the Names by Grade Level grid's own --grade-level-names-
+    // cols/-mobile spread those same 3 columns across up to 4/8 rows -
+    // with only 3 non-empty columns that's 1 column wide either way.
+    assert.match(res.text, /<div class="grade-level-report-fit-inner" style="--grade-level-cols: 3; --grade-level-cols-mobile: 2; --grade-level-names-cols: 1; --grade-level-names-cols-mobile: 1;">/);
     assert.match(res.text, /<div class="grade-level-report-grid">/);
   });
 

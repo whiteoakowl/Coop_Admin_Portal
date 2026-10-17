@@ -13489,19 +13489,22 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .grade-level-bar-label { margin-top: 0.4rem; font-size: 0.75rem; text-align: center; white-space: nowrap; overflow: hidden; overflow-wrap: normal; max-width: 100%; }
 
 /* Each grade level is its own grid column (not a <table> column - see
-   the view's own comment on why). --grade-level-cols (set inline on the
-   .grade-level-report-fit-inner ancestor, inherited down to here) is
-   however many grade levels actually have a student in them. Shrinking
-   to keep every one of those columns on screen at once (the actual
-   "shrink to fit all grade levels" request) is table-layout: fixed's
-   exact same job for a CSS grid: equal 1fr columns split whatever width
-   is available rather than each one sizing to its own longest name, the
-   same principle the Classes grid's own Room/Hour columns already use
-   (views/partials/class-schedule-grid.ejs). The @media (max-width: 480px)
-   override below switches to --grade-level-cols-mobile instead (half as
-   many columns, wrapping the same columns onto a 2nd row) - see that
-   custom property's own comment in the view. */
-.grade-level-report-grid { display: grid; grid-template-columns: repeat(var(--grade-level-cols), minmax(0, 1fr)); gap: 0.6rem; align-items: start; }
+   the view's own comment on why). --grade-level-names-cols (set inline
+   on the .grade-level-report-fit-inner ancestor, inherited down to here -
+   its own comment in the view explains why it's a separate custom
+   property from the bar chart's --grade-level-cols rather than the same
+   one) spreads however many grade levels actually have a student in them
+   across (at most) 4 rows instead of cramming them all into one, giving
+   each column more width for a real request: "Names by grade level
+   should be broke into 4 rows to allow more space for name." Equal 1fr
+   columns split whatever width is available rather than each one sizing
+   to its own longest name, the same principle the Classes grid's own
+   Room/Hour columns already use (views/partials/class-schedule-grid.ejs).
+   The @media (max-width: 480px) override below switches to
+   --grade-level-names-cols-mobile instead (half as many columns again,
+   doubling to 8 rows) - see that custom property's own comment in the
+   view. */
+.grade-level-report-grid { display: grid; grid-template-columns: repeat(var(--grade-level-names-cols), minmax(0, 1fr)); gap: 0.6rem; align-items: start; }
 .grade-level-report-col { border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.4rem; min-width: 0; }
 /* white-space/overflow-wrap here match .class-card-header h3's own exact
    reasoning (styles.css) - public/js/shrink-title-to-fit.js shrinks this
@@ -13520,10 +13523,15 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
   padding-bottom: 0.3rem;
   margin-bottom: 0.3rem;
 }
-/* overflow-wrap: normal (never break-word), same "don't split words"
-   reasoning as .class-card-header h3's own comment above - a name wraps
-   between words (most names have at least one space to wrap at) rather
-   than ever splitting one in half. */
+/* A real follow-up request: "Shrink font for name and age" - each name
+   (already including its own age in parens, see the view) is run
+   through public/js/shrink-title-to-fit.js same as the column title
+   above it, shrinking down to fit its own column on one line before
+   ever wrapping. overflow-wrap: normal (never break-word) is that
+   script's own CSS starting point, same "don't split words" reasoning as
+   .class-card-header h3's own comment above - a name wraps between
+   words (most names have at least one space to wrap at) rather than
+   ever splitting one in half. */
 .grade-level-report-name { margin: 0 0 0.25rem; font-size: 0.85rem; overflow-wrap: normal; }
 .grade-level-report-name:last-child { margin-bottom: 0; }
 
@@ -13550,11 +13558,11 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
   .grade-level-bar-col { flex: 0 1 calc(100% / var(--grade-level-cols-mobile) - 0.3rem); height: 130px; }
   .grade-level-bar-count { font-size: 0.68rem; }
   .grade-level-bar-label { font-size: 0.58rem; }
-  /* Half the one-row column count, wrapping onto a 2nd row instead of
-     squeezing every grade level into a single row that's too narrow to
-     read on a phone - see --grade-level-cols-mobile's own comment in the
+  /* Half the --grade-level-names-cols column count again (8 rows total),
+     same reasoning as the bar chart's own --grade-level-cols-mobile just
+     above - see --grade-level-names-cols-mobile's own comment in the
      view. */
-  .grade-level-report-grid { grid-template-columns: repeat(var(--grade-level-cols-mobile), minmax(0, 1fr)); gap: 0.25rem; }
+  .grade-level-report-grid { grid-template-columns: repeat(var(--grade-level-names-cols-mobile), minmax(0, 1fr)); gap: 0.25rem; }
   .grade-level-report-col { padding: 0.3rem 0.2rem; border-radius: 6px; }
   .grade-level-report-col-title { font-size: 0.68rem; padding-bottom: 0.2rem; margin-bottom: 0.2rem; }
   .grade-level-report-name { font-size: 0.68rem; }
