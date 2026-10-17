@@ -371,22 +371,32 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
     var gridEditorVisibleToPublic = !!(gridEditorCombo && gridEditorCombo.visibleToPublic);
   %>
   <form method="POST" action="/admin/class-schedule/<%= day %>/edit" data-grid-editor-form>
+    <%# A real request: "Semester, start date and end date should be on 3
+        separate rows with space between the rows" - each its own
+        .grid-editor-section (same spaced-block treatment every other
+        section of this dialog already uses - see that class's own
+        comment below), instead of Start/End Date previously sharing one
+        row side by side. %>
     <% if (gridEditorSemesters.length > 0) { %>
-      <label class="member-form-full">Semester
-        <select onchange="window.fullscreenNavigate(this.value)">
-          <option value="<%= gridEditorBasePath %><%= gridEditorBasePath.includes('?') ? '&' : '?' %>semesterId=none" <%= !selectedSemesterId ? 'selected' : '' %>>No Semester</option>
-          <% gridEditorSemesters.forEach(function(s) { %>
-            <option value="<%= gridEditorBasePath %><%= gridEditorBasePath.includes('?') ? '&' : '?' %>semesterId=<%= s.id %>" <%= selectedSemesterId === s.id ? 'selected' : '' %>><%= s.title %></option>
-          <% }); %>
-        </select>
-      </label>
+      <div class="grid-editor-section">
+        <label class="member-form-full">Semester
+          <select onchange="window.fullscreenNavigate(this.value)">
+            <option value="<%= gridEditorBasePath %><%= gridEditorBasePath.includes('?') ? '&' : '?' %>semesterId=none" <%= !selectedSemesterId ? 'selected' : '' %>>No Semester</option>
+            <% gridEditorSemesters.forEach(function(s) { %>
+              <option value="<%= gridEditorBasePath %><%= gridEditorBasePath.includes('?') ? '&' : '?' %>semesterId=<%= s.id %>" <%= selectedSemesterId === s.id ? 'selected' : '' %>><%= s.title %></option>
+            <% }); %>
+          </select>
+        </label>
+      </div>
       <input type="hidden" name="semesterId" value="<%= selectedSemesterId || '' %>" />
     <% } %>
 
-    <div class="member-form-row grid-editor-section">
+    <div class="grid-editor-section">
       <label>Start Date
         <input type="date" name="startDate" value="<%= gridEditorCombo && gridEditorCombo.startDate ? gridEditorCombo.startDate : '' %>" />
       </label>
+    </div>
+    <div class="grid-editor-section">
       <label>End Date
         <input type="date" name="endDate" value="<%= gridEditorCombo && gridEditorCombo.endDate ? gridEditorCombo.endDate : '' %>" />
       </label>
