@@ -1269,10 +1269,10 @@ async function setEnrollment(classId, studentIds, { skipSync } = {}) {
   // comment on why this also covers a position the class overlaps but
   // isn't literally filed under. Computed once for the whole class, not
   // once per student.
-  const { day, positions } = await floaterPositionsCoveredByClass(classId);
+  const { day, semesterId, positions } = await floaterPositionsCoveredByClass(classId);
   if (day) {
     for (const studentId of studentIds) {
-      for (const position of positions) await removeFromFloaterForHour(day, position, studentId);
+      for (const position of positions) await removeFromFloaterForHour(day, position, studentId, semesterId);
     }
     if (newlyEnrolled.length > 0) {
       const studentRosterId = await ensureDayRoster(day, 'student');
@@ -1290,8 +1290,22 @@ async function setEnrollment(classId, studentIds, { skipSync } = {}) {
 // hours) so they don't read as double-booked. A no-op if they weren't on
 // that list/hour to begin with, or if the day has no Floater Assignments
 // list set up yet.
-async function removeFromFloaterForHour(day, hourPosition, memberId) {
-  const list = await getListByDay(day);
+//
+// A real bug report: "Fall Wednesday and fall Monday is pulling emptying
+// teaching and assistant positions from spring Monday and spring
+// Wednesday" - semesterId used to be left out here, so getListByDay fell
+// back to whichever semester Settings > Kiosk currently has active
+// (utils/volunteers.js's own comment on why that's its default). That's
+// fine when only one semester's classes are ever staffed at a time, but
+// once an admin duplicates a day's classes into a 2nd semester and staffs
+// BOTH ahead of time (this bug report's own "could also be because I
+// duplicated the classes" guess - exactly right), assigning a teacher to
+// a Fall class while Spring happens to be the active kiosk semester wiped
+// that same day/hour's floater assignment on SPRING's own list instead of
+// Fall's. Callers now thread the class's own semester_id through instead
+// of leaving it to that global default.
+async function removeFromFloaterForHour(day, hourPosition, memberId, semesterId) {
+  const list = await getListByDay(day, semesterId);
   if (!list) return;
   const section = (await sectionsForList(list.id)).find((s) => s.position === hourPosition);
   if (!section) return;
@@ -1301,23 +1315,26 @@ async function removeFromFloaterForHour(day, hourPosition, memberId) {
 // A class's own hour_position, plus every OTHER position its own
 // effective time genuinely overlaps (see positionsOverlappingRange) - the
 // full set of positions a member picked up for this class needs clearing
-// off the Floater Assignments list for. { day, positions: Set<number> },
-// or { day: null, positions: new Set() } if the class doesn't exist.
+// off the Floater Assignments list for. { day, semesterId, positions:
+// Set<number> }, or { day: null, semesterId: null, positions: new Set() }
+// if the class doesn't exist. semesterId is the class's own (possibly
+// null, for an untagged "No Semester" class) - see removeFromFloaterForHour's
+// own comment on why that matters more than it used to.
 async function floaterPositionsCoveredByClass(classId) {
   const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
-  if (!cls) return { day: null, positions: new Set() };
+  if (!cls) return { day: null, semesterId: null, positions: new Set() };
   const hours = await hoursForDay(cls.day);
   const hourByPosition = {};
   hours.forEach((h) => { hourByPosition[h.position] = h; });
   const positions = positionsOverlappingRange(effectiveClassRange(cls, hourByPosition), hourByPosition);
   positions.add(cls.hour_position);
-  return { day: cls.day, positions };
+  return { day: cls.day, semesterId: cls.semester_id, positions };
 }
 
 async function removeFromFloaterForOverlappingHours(classId, memberId) {
-  const { day, positions } = await floaterPositionsCoveredByClass(classId);
+  const { day, semesterId, positions } = await floaterPositionsCoveredByClass(classId);
   if (!day) return;
-  for (const position of positions) await removeFromFloaterForHour(day, position, memberId);
+  for (const position of positions) await removeFromFloaterForHour(day, position, memberId, semesterId);
 }
 
 // Adds one teacher/assistant - used by both the admin manage form (one at

@@ -25,8 +25,9 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 
 const app = require('../server');
 const db = require('../db');
-const { createClass, addStaff } = require('../utils/classSchedule');
+const { createClass, addStaff, createSemester } = require('../utils/classSchedule');
 const { getListByDay, sectionsForList, addMemberToSection, membersForSection } = require('../utils/volunteers');
+const { setActiveKioskSemesterId } = require('../utils/kioskSettings');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -84,4 +85,44 @@ test('addStaff is a no-op against the floater list when the new staff member was
 
   const staff = await db.prepare('SELECT * FROM class_staff WHERE class_id = ? AND member_id = ?').get(classId, parentId);
   assert.equal(staff.role, 'assistant');
+});
+
+// A real bug report: "Fall Wednesday and fall Monday is pulling emptying
+// teaching and assistant positions from spring Monday and spring
+// Wednesday... Could also be because I duplicated the classes from one
+// grid to the other?" - exactly right. addStaff used to always clear the
+// new teacher/assistant off whichever semester Settings > Kiosk currently
+// has ACTIVE, not off the class's own semester, so staffing a Fall class
+// while Spring happened to be the active kiosk semester wiped that same
+// day/hour's floater assignment on Spring's own list instead of Fall's.
+test('addStaff only touches the floater list for the CLASS\'s own semester, never a different semester that happens to be active', async (t) => {
+  const springSemester = await createSemester('Spring Test');
+  const fallSemester = await createSemester('Fall Test');
+  const parentId = await makeMember('Cross Semester Parent', 'cross-semester-parent');
+
+  const springList = await getListByDay('monday', springSemester.id);
+  const fallList = await getListByDay('monday', fallSemester.id);
+  const springHour1 = (await sectionsForList(springList.id)).find((s) => s.position === 1);
+  const fallHour1 = (await sectionsForList(fallList.id)).find((s) => s.position === 1);
+
+  // The same parent floats Monday hour 1 on BOTH semesters' own lists -
+  // a real admin duplicating a day's classes across semesters would have
+  // duplicated its floater list membership right along with it.
+  await addMemberToSection(springList.id, parentId, springHour1.id);
+  await addMemberToSection(fallList.id, parentId, fallHour1.id);
+
+  // Spring is the active kiosk semester while we staff a FALL class -
+  // the exact scenario the bug report describes.
+  await setActiveKioskSemesterId(springSemester.id);
+
+  const fallClassId = await createClass({ day: 'monday', hourPosition: 1, className: 'Fall Monday Class', semesterId: fallSemester.id });
+  await addStaff(fallClassId, parentId, 'teacher');
+
+  await t.test('the parent is removed from FALL\'s own Monday hour 1 floater section (now teaching it there)', async () => {
+    assert.ok(!(await membersForSection(fallList.id, fallHour1.id)).some((m) => m.id === parentId));
+  });
+
+  await t.test('the parent is STILL on SPRING\'s own Monday hour 1 floater section, untouched', async () => {
+    assert.ok((await membersForSection(springList.id, springHour1.id)).some((m) => m.id === parentId));
+  });
 });
