@@ -6126,6 +6126,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    compact instead of stretching to fill the dialog. */
 .volunteer-sections-row { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; width: 100%; }
 .volunteer-sections-row input { width: 10ch; text-align: center; }
+/* A real follow-up request: "edit schedule grid should... have adequate
+   space between buttons... text boxes and features" - each room row
+   (views/partials/class-schedule-grid.ejs's own [data-grid-editor-room-
+   row], reusing .volunteer-sections-row as its wrapping list) had no
+   layout rule of its own at all, so its name input and Remove button sat
+   with zero gap between them, the button's edge touching the input's
+   border. */
+[data-grid-editor-room-row] { display: inline-flex; align-items: center; gap: 0.5rem; }
+[data-grid-editor-room-row] input { width: 14ch; }
 
 /* The Edit Schedule Grids dialog (views/partials/class-schedule-grid.ejs):
    one card per hour, each with its own Label/Start Time/End Time - the
