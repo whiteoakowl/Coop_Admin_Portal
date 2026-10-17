@@ -22,16 +22,35 @@
 // before it runs out of readable font size; a confirmed follow-up on the
 // original request chose wrapping to a 2nd line at a word boundary over
 // clipping the end of the text in that case - overflow-wrap stays
-// 'normal' in CSS the whole time (never break-word), so a word is never
+// 'normal' through phases 1-2 (never break-word), so a word is never
 // split, only ever wrapped BETWEEN words. Same proven measure-and-shrink
 // loop public/js/barcode-print-shrink-name.js already uses for an
 // identical class of problem (a name below a barcode).
+//
+// A later, more direct real bug report - "Class schedule on mobile, the
+// titles are trailing off the class card. Shrink to fit." - traced to a
+// case phases 1-2 alone can't solve at all: a Classes-grid card column on
+// the narrowest phones measures only ~35-60px wide (4 hour columns on one
+// screen), and plenty of ordinary English words ("Conversational",
+// "Homeschoolers") are themselves wider than that even at the 10px floor
+// font size. overflow-wrap: normal refuses to break a word mid-way no
+// matter how long it is, so that ONE word (not just a single-word title -
+// confirmed live: it also happens to one long word inside an otherwise
+// normal multi-word title) just overflows sideways past the card's own
+// edge - exactly "trailing off." Phase 3 below is the one case this
+// script allows a mid-word break at all: only once phases 1-2 have
+// already shrunk to the floor AND tried wrapping and the title STILL
+// doesn't fit either dimension, overflow-wrap switches to 'anywhere' as a
+// last resort - "don't split words" stays the preference every other
+// case already relies on, but it can't come at the cost of visibly
+// spilling off the card, which is what was actually reported.
 (function () {
   var MIN_FONT_SIZE_PX = 10;
 
   function shrinkToFit(el) {
     el.style.fontSize = ''; // back to the CSS default (already breakpoint-correct) before measuring.
     el.style.whiteSpace = 'nowrap';
+    el.style.overflowWrap = ''; // back to the CSS default ('normal') - a previous pass may have set 'anywhere' (phase 3 below).
     var fontSize = parseFloat(getComputedStyle(el).fontSize);
 
     // Phase 1: shrink while trying to keep the whole title on one line -
@@ -51,8 +70,7 @@
     // avoids a 3rd line; it's always stripped again afterward, so the
     // worst case (an extremely long title even 2 lines at the floor size
     // can't hold) is a title that wraps across however many lines it
-    // actually needs rather than one that's ever truncated or split
-    // mid-word.
+    // actually needs rather than one that's ever truncated.
     if (el.scrollWidth > el.clientWidth) {
       el.style.whiteSpace = 'normal';
       el.style.display = '-webkit-box';
@@ -65,6 +83,19 @@
       el.style.display = '';
       el.style.webkitBoxOrient = '';
       el.style.webkitLineClamp = '';
+    }
+
+    // Phase 3 (last resort - see this file's own top comment): phases 1-2
+    // only ever check horizontal overflow while nowrap, then vertical
+    // overflow while wrapped - neither one catches a single WORD that's
+    // still wider than the box even once wrapping is on (scrollHeight
+    // matches clientHeight exactly, since there's nowhere for a lone
+    // unbreakable word to wrap TO), which is exactly what let a real
+    // title keep trailing off the edge of a narrow mobile card. Checked
+    // last, after whatever phases 1-2 already did, so it only ever
+    // engages for a title phases 1-2 genuinely couldn't fit at all.
+    if (el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight) {
+      el.style.overflowWrap = 'anywhere';
     }
   }
 

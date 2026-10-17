@@ -7765,14 +7765,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   font-size: 0.85rem;
 }
 /* A real request: "Make sure row titles shrink to fit in box" - the room
-   name (each row's own "title") gets the exact same shrink-to-one-line,
-   fall-back-to-2-lines-at-a-word-break treatment as a class card's own
-   title (see .class-card-header h3's own comment and public/js/
-   class-card-title-fit.js, which targets both). .class-schedule-room-
-   col-inner lays the optional drag handle and the name side by side so
-   the name's own min-width: 0 can actually shrink below its natural
-   width inside the flex row, instead of the handle's fixed icon width
-   being squeezed first. */
+   name (each row's own "title") gets the exact same shrink/wrap/last-
+   resort-break treatment as a class card's own title (see .class-card-
+   header h3's own comment and public/js/shrink-title-to-fit.js, which
+   targets both). .class-schedule-room-col-inner lays the optional drag
+   handle and the name side by side so the name's own min-width: 0 can
+   actually shrink below its natural width inside the flex row, instead
+   of the handle's fixed icon width being squeezed first. */
 .class-schedule-room-col-inner { display: flex; align-items: flex-start; gap: 0.3rem; min-width: 0; }
 .class-schedule-room-name { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; overflow-wrap: normal; }
 .class-schedule-cell { background: #fff; overflow: hidden; }
@@ -7878,21 +7877,26 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 /* A real request: "make sure title shrink to fit in in class colored box/
    card," later sharpened to "shrink text to fit class title words on the
    same row, don't split words" - a title stays on ONE line whenever it
-   reasonably can: public/js/class-card-title-fit.js shrinks this h3's own
+   reasonably can: public/js/shrink-title-to-fit.js shrinks this h3's own
    font-size down (never up) until its natural, unwrapped width fits the
    card. white-space: nowrap here is just the STARTING point the script
    measures from, not a hard rule - on the narrowest mobile cards (styles
    below), even a realistic title can run out of card width before it
    runs out of readable font size, and a follow-up on this same request
    confirmed wrapping to a 2nd line beats clipping the end of the title in
-   that case. overflow-wrap stays 'normal' (the browser default, stated
-   here so nobody adds overflow-wrap: break-word back) in both the
-   single-line and the 2-line-wrap-fallback case the script applies -
-   wrapping only ever happens BETWEEN words, never splits one in half.
-   overflow: hidden is a belt-and-suspenders CSS-only backstop for the
-   no-JS case (same containment .class-schedule-cell's own overflow:
-   hidden already relies on) - a title with JS disabled just clips at the
-   card edge instead of spilling into the next column. */
+   that case. overflow-wrap stays 'normal' here (never break-word in the
+   CSS) - wrapping only ever happens BETWEEN words by default. A later,
+   more direct bug report ("the titles are trailing off the class card.
+   Shrink to fit.") traced to a single WORD still being wider than a
+   ~35-60px mobile card column even at the floor font size - the script's
+   own phase 3 (see its file-level comment) is the one place that's
+   allowed to switch THIS element to overflow-wrap: anywhere, and only
+   ever as its own last resort once shrinking/wrapping alone genuinely
+   couldn't make the title fit. overflow: hidden is a belt-and-suspenders
+   CSS-only backstop for the no-JS case (same containment .class-
+   schedule-cell's own overflow: hidden already relies on) - a title with
+   JS disabled just clips at the card edge instead of spilling into the
+   next column. */
 .class-card-header h3 {
   margin: 0;
   font-size: 0.92rem;
@@ -13402,7 +13406,10 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 /* white-space/overflow-wrap here match .class-card-header h3's own exact
    reasoning (styles.css) - public/js/shrink-title-to-fit.js shrinks this
    down to fit on one line first, falling back to a word-boundary-only
-   2-line wrap (never a mid-word break) only once it genuinely has to. */
+   2-line wrap, and only as its own last resort (phase 3 - see that
+   file's own comment) a mid-word break, once a single word genuinely
+   can't fit any other way (e.g. "Kindergarten" in an 18-column mobile
+   grid). */
 .grade-level-report-col-title {
   font-weight: 700;
   white-space: nowrap;
@@ -13458,18 +13465,23 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    profile-edit.ejs) - a real request: "Add a tab called Teachers/
    Assistants after the classes tab... If a teacher teaches multiple
    classes they will all be listed under the members name with a
-   dropdown arrow and minimize feature." <details>/<summary> is used
-   as-is for that arrow/collapse behavior (see the view's own comment on
-   why) - no marker-hiding override here, unlike .filter-details
-   elsewhere in this file, since the native disclosure triangle IS the
-   requested affordance this time. */
+   dropdown arrow and minimize feature." A real follow-up request then
+   extended that same <details>/<summary> treatment to EVERY member
+   regardless of class count ("even if the member is only teaching or
+   assisting 1 class it should still show as a drop down minimize
+   system so that you see just a list of member names") - so there's no
+   longer a separate single-class inline link style here, just one
+   .teacher-class-list used for every member's own (collapsed-by-
+   default) class list. <details>/<summary> is used as-is for the
+   arrow/collapse behavior (see the view's own comment on why) - no
+   marker-hiding override here, unlike .filter-details elsewhere in this
+   file, since the native disclosure triangle IS the requested
+   affordance this time. */
 .teacher-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .teacher-list-item { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.8rem; }
 .teacher-list-item summary { cursor: pointer; font-weight: 600; }
 .teacher-class-count { font-weight: 400; color: var(--muted); font-size: 0.85rem; }
-.teacher-list-name { font-weight: 600; margin-right: 0.5rem; }
 .teacher-class-list { list-style: none; margin: 0.5rem 0 0; padding: 0 0 0 1.25rem; display: flex; flex-direction: column; gap: 0.4rem; }
-.teacher-single-class,
 .teacher-class-list a {
   display: flex;
   flex-wrap: wrap;
@@ -13480,7 +13492,6 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
   border-radius: 6px;
   padding: 0.2rem 0.4rem;
 }
-.teacher-single-class:hover,
 .teacher-class-list a:hover { background: var(--brand-soft); text-decoration: underline; }
 .teacher-class-name { font-weight: 600; }
 .teacher-class-role { font-size: 0.8rem; color: var(--muted); }

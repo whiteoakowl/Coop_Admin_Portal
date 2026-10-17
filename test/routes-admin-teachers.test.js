@@ -78,7 +78,7 @@ test('Classes tab is immediately followed by Teachers/Assistants in the Co-op Ad
   assert.equal(chevronLabels[classesIndex + 1], 'Teachers/Assistants');
 });
 
-test('Teachers/Assistants list: alphabetical by last name, single-class member shown inline (no dropdown), multi-class member gets a collapsible details', async () => {
+test('Teachers/Assistants list: alphabetical by last name, every member (including a single-class one) gets a collapsible details dropdown', async () => {
   const { cookie } = await loginAsAdmin();
 
   const zebraId = await createMember('Amy Zebra');
@@ -97,15 +97,21 @@ test('Teachers/Assistants list: alphabetical by last name, single-class member s
   // "Organized alphabetical by last name" - Apple before Zebra.
   assert.ok(res.text.indexOf('Bob Apple') < res.text.indexOf('Amy Zebra'), 'Bob Apple (last name Apple) should come before Amy Zebra (last name Zebra)');
 
-  // Single-class member: shown inline, no <details> wrapper.
-  const zebraSection = res.text.slice(res.text.indexOf('Amy Zebra'), res.text.indexOf('Amy Zebra') + 400);
-  assert.doesNotMatch(zebraSection, /<details>/, 'a member with only one class should not get a collapsible dropdown');
+  // A real follow-up request: "even if the member is only teaching or
+  // assisting 1 class it should still show as a drop down minimize
+  // system so that you see just a list of member names" - a single-class
+  // member now also gets a real <details>/<summary> wrapper, same as a
+  // multi-class member, just with one <li> once expanded.
+  const zebraSection = res.text.slice(res.text.indexOf('Amy Zebra') - 150, res.text.indexOf('Amy Zebra') + 400);
+  assert.match(zebraSection, /<details>/, 'a member with only one class should still get a collapsible dropdown');
+  assert.match(zebraSection, /1 class</, 'the summary should show a singular "1 class" count, not "1 classes"');
   assert.match(zebraSection, /Art/);
 
   // Multi-class member: real <details>/<summary> dropdown listing both
   // classes with their own role label.
   const appleSection = res.text.slice(res.text.indexOf('Bob Apple') - 150, res.text.indexOf('Bob Apple') + 1200);
   assert.match(appleSection, /<details>/, 'a member staffed on more than one class should get a collapsible dropdown');
+  assert.match(appleSection, /2 classes</, 'the summary should show a plural "2 classes" count');
   assert.match(appleSection, /Science/);
   assert.match(appleSection, /History/);
   assert.match(appleSection, /Teacher/);
