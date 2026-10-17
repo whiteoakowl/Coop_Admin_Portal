@@ -303,13 +303,17 @@ router.post('/class-schedule/:day/edit', requireFullAdmin, requireClassDay, asyn
 
   const startDate = isValidISODate(req.body.startDate) ? req.body.startDate : null;
   const endDate = isValidISODate(req.body.endDate) ? req.body.endDate : null;
+  // A real request: "Check box to lock grid to be viewable to members...
+  // Check box to be viewable to public on public homepage."
+  const visibleToMembers = req.body.visibleToMembers === '1';
+  const visibleToPublic = req.body.visibleToPublic === '1';
   const existingCombo = (await listClassSchedules()).find((cs) => cs.day_of_week === day && cs.semester_id === semesterId);
   if (existingCombo) {
-    await updateClassSchedule(existingCombo.id, { title: existingCombo.title, dayOfWeek: day, semesterId, startDate, endDate });
+    await updateClassSchedule(existingCombo.id, { title: existingCombo.title, dayOfWeek: day, semesterId, startDate, endDate, visibleToMembers, visibleToPublic });
   } else {
     const semester = semesterId ? (await listSemesters()).find((s) => s.id === semesterId) : null;
     const title = semester ? `${semester.title} - ${CLASS_DAY_LABELS_FULL[day]}` : CLASS_DAY_LABELS_FULL[day];
-    await createClassSchedule({ title, dayOfWeek: day, semesterId, startDate, endDate });
+    await createClassSchedule({ title, dayOfWeek: day, semesterId, startDate, endDate, visibleToMembers, visibleToPublic });
   }
 
   // Every schedule row (class or floater) that falls back to the hour's

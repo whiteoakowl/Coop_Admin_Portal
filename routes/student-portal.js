@@ -16,7 +16,7 @@ const fs = require('fs');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
-const { allClassesList, attendanceHistoryForRoster, CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
+const { allClassesList, attendanceHistoryForRoster, CLASS_DAY_LABELS_FULL, primaryClassScheduleForClass } = require('../utils/classSchedule');
 const { CLASS_DAY_ORDER } = require('../utils/classDays');
 const { formatFriendlyTimestamp, formatTimestamp } = require('../utils/dates');
 const {
@@ -159,11 +159,18 @@ router.get('/classes', async (req, res) => {
   // only ones a Main/Co-op Admin has actually opened to students (most
   // classes stay parent-registers-on-your-behalf, unaffected by any of
   // this - allow_student_register defaults off).
-  const openClasses = member
+  let openClasses = member
     ? (await allClassesList(null))
         .filter((c) => c.allow_student_register && !enrolledIds.has(c.id))
         .map((c) => ({ ...c, seatsLeft: c.capacity == null ? null : Math.max(0, c.capacity - Number(c.studentCount)), isFull: c.capacity != null && Number(c.studentCount) >= c.capacity }))
     : [];
+  // A real request: "Check box to lock grid to be viewable to members...
+  // if these boxes aren't checked then members... can't register" -
+  // same browse-time hide as Parent Portal's own Class Registration grid.
+  if (openClasses.length) {
+    const visibility = await Promise.all(openClasses.map((c) => primaryClassScheduleForClass(c)));
+    openClasses = openClasses.filter((c, i) => !visibility[i] || visibility[i].visible_to_members);
+  }
   const eligibleClassIds = [];
   if (member) {
     const mySectionIds = await sectionIdsForMember(member.id);

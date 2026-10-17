@@ -51,6 +51,30 @@
       </div>
     </section>
 
+    <%# A real request: "Check box to be viewable to public on public
+        homepage" - a read-only showcase of whichever Schedule Grids an
+        admin opted into (Co-op Admin > Classes > Edit Schedule Grids'
+        own new checkbox, routes/public-site.js's own publicShowcaseClasses).
+        Registering still requires Member Registration/Login, same as the
+        "Ready to join" CTA already at the bottom of this page. %>
+    <% if (showcaseClasses.length > 0) { %>
+      <section class="site-section site-section-alt">
+        <div class="site-section-inner">
+          <h2>Classes We Offer</h2>
+          <div class="site-class-showcase-list">
+            <% showcaseClasses.forEach(function(c) { %>
+              <div class="site-class-showcase-card" style="border-left-color: <%= c.color || '#EE9A4D' %>;">
+                <span class="site-class-showcase-day"><%= c.dayLabel %></span>
+                <h3><%= c.className %></h3>
+                <% if (c.timeLabel) { %><p class="site-class-showcase-time"><%= c.timeLabel %></p><% } %>
+              </div>
+            <% }); %>
+          </div>
+          <a class="primary-btn" href="/register">Member Registration to Enroll</a>
+        </div>
+      </section>
+    <% } %>
+
     <% if (announcements.length > 0) { %>
       <section class="site-section">
         <div class="site-section-inner">
