@@ -439,6 +439,21 @@ router.post('/settings/grade-levels', async (req, res) => {
   res.redirect('/main-admin/members?tab=settings&settingsTab=grade-levels&notice=' + encodeURIComponent('Grade Level Settings saved.'));
 });
 
+// A real follow-up request: "Grade level settings under members should
+// set the grade level for all members according to their birthday" -
+// applies the saved rules above to every student with a birthday on
+// file (utils/gradeLevelSettings.js's own applyGradeLevelRulesToMembers),
+// reporting back how many were actually changed vs. how many matched a
+// rule but were already correct.
+router.post('/settings/grade-levels/apply', async (req, res) => {
+  const { totalStudents, matched, changed } = await gradeLevelSettings.applyGradeLevelRulesToMembers();
+  const notice =
+    matched === 0
+      ? `No student's age matched a configured rule (checked ${totalStudents} student(s) with a birthday on file).`
+      : `Updated ${changed} of ${matched} matching student(s)' grade level${changed === 1 ? '' : 's'} (${totalStudents} student(s) with a birthday on file checked in all).`;
+  res.redirect('/main-admin/members?tab=settings&settingsTab=grade-levels&notice=' + encodeURIComponent(notice));
+});
+
 // --- Edit mode bulk actions (checkboxes + Actions dropdown on the
 // Members tab) - a real request: "there should be an edit button on
 // member page that says edit. when you click it it will show check

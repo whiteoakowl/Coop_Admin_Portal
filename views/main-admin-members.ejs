@@ -537,6 +537,23 @@
             </div>
             <button type="submit" class="primary-btn">Save Grade Level Settings</button>
           </form>
+
+          <%# A real follow-up request: "Grade level settings under
+              members should set the grade level for all members
+              according to their birthday" - a separate form/action from
+              Save above, since applying is a distinct, reviewable step
+              (the notice above reports how many actually changed) rather
+              than something that happens silently every time a rule row
+              is saved. data-confirm-safe since this only ever SETS a
+              grade level it's confident about (a student matching no
+              rule is left untouched - see the util's own comment), never
+              blanks one out - not the same risk class as a delete. %>
+          <form method="POST" action="/main-admin/members/settings/grade-levels/apply" class="roster-btn-row" data-confirm="Set every matching student's grade level from their birthday, using the rules above? This overwrites their current Grade Level on the member form." data-confirm-yes-label="Apply" data-confirm-icon="icon-refresh" data-confirm-safe="1">
+            <button type="submit" class="roster-action-btn">
+              <svg class="icon"><use href="#icon-refresh"/></svg>
+              Apply to All Members
+            </button>
+          </form>
         </div>
       <% } else if (settingsTab === 'fee-payment') { %>
         <%# A real request: "place at the bottom of the application for
