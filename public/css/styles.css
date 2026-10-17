@@ -7479,6 +7479,29 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   box-shadow: 0 8px 30px rgba(0,0,0,0.15);
 }
 .class-form-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+/* A real bug report: "You can't click save changes in bulk class edit"
+   on a phone - this dialog's own long list of fields (Title, Room,
+   Semester, Start/End Time, Start/End Date, Open/Close, Description)
+   pushes Save Changes/Cancel below the phone's visible viewport, worse
+   once the on-screen keyboard is also covering part of the screen while
+   typing into one of those fields - nothing on screen hints the dialog
+   itself still scrolls to reach them. Pinning this footer to the bottom
+   of .class-form-dialog's own scroll area (position: sticky, not the
+   page) keeps Save/Cancel in view the moment the admin scrolls the
+   dialog at all, instead of requiring them to scroll past every field
+   first. The negative margins/matching padding below cancel out this
+   dialog's own 1.75rem/2rem padding so the sticky bar spans the dialog's
+   full width and sits flush with its real bottom edge, with no gap below
+   it; bottom: -1.75rem anchors it exactly there rather than 1.75rem shy
+   of it. */
+.bulk-edit-dialog-actions {
+  position: sticky;
+  bottom: -1.75rem;
+  margin: 1.5rem -2rem -1.75rem;
+  padding: 0.9rem 2rem 1.75rem;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
 /* A real bug report: "Record in person sale. X to close windows overlaps
    title and it shouldn't." .class-form-dialog-close (below) is
    absolutely positioned over the header's own top-right corner, outside

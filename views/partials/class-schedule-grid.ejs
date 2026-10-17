@@ -709,7 +709,16 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
     <label class="member-form-full">Description
       <textarea name="description" rows="3" placeholder="Don't change"></textarea>
     </label>
-    <div class="member-form-full roster-btn-row">
+    <%# A real bug report: "You can't click save changes in bulk class
+        edit" (on a phone) - this dialog's own long list of fields (Title,
+        Room, Semester, Start/End Time, Start/End Date, Open/Close,
+        Description) pushes Save Changes/Cancel below the visible
+        viewport on a phone, worse once the on-screen keyboard is also
+        covering part of the screen - sticking this footer to the bottom
+        of the dialog's own scroll area (see .bulk-edit-dialog-actions,
+        styles.css) keeps it in view as soon as the admin scrolls the
+        dialog at all. %>
+    <div class="member-form-full roster-btn-row bulk-edit-dialog-actions">
       <button type="submit" class="primary-btn">Save Changes</button>
       <button type="button" class="btn-secondary" onclick="document.getElementById('bulk-edit-dialog-<%= day %>').close()">Cancel</button>
     </div>
