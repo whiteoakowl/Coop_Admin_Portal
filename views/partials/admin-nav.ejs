@@ -71,6 +71,15 @@
           { href: '/admin/schedule?tab=settings', label: 'Settings' },
         ] : []),
       ] },
+      // A real request: "Add a tab called Teachers/Assistants after the
+      // classes tab" - same adminNavLinks visibility as Classes itself
+      // (every Co-op Admin, not just a full Admin), since the Classes
+      // grid it's built from is read-only-but-visible to a non-full
+      // admin too (see class-schedule-grid.ejs's own gridReadOnly).
+      { href: '/admin/teachers', icon: 'user-check', label: 'Teachers/Assistants', subpages: [
+        { href: '/admin/teachers', label: 'Teachers/Assistants' },
+        { href: '/admin/teachers/instructor-profiles', label: 'Instructor Profiles' },
+      ] },
       { href: '/admin/logs', icon: 'clipboard-list', label: 'Logs', subpages: [
         // Same bug/fix as Classes' own identical comment above - GET
         // /admin/logs with no ?tab= renders the Absence/Late tab

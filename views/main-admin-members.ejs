@@ -109,6 +109,9 @@
           <button type="button" class="roster-action-btn" data-permissions-toggle="members-table" aria-pressed="false" data-archive-hide-while="members-select-form">Edit Permissions</button>
           <button type="submit" form="permissions-bulk-form" class="roster-action-btn" data-permissions-save="members-table" hidden>Save Permissions</button>
           <a class="roster-action-btn" href="/main-admin/sections" data-archive-hide-while="members-select-form">Add/Edit Sections</a>
+          <%# A real request: "Add a button that's says grade level
+              report." %>
+          <a class="roster-action-btn" href="/main-admin/members/grade-level-report" data-archive-hide-while="members-select-form">Grade Level Report</a>
           <span class="roster-btn-row-break" aria-hidden="true"></span>
           <%- include('partials/members-type-filter', { activeTab, typeFilter, familyFilter, families }) %>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('main-admin-import-dialog').showModal()" data-archive-hide-while="members-select-form">Import</button>

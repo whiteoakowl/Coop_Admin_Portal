@@ -8,13 +8,13 @@
 // still isn't "one row" when there's a long badge next to a long name on
 // a narrow phone. This shrinks the name pill's font-size first so there's
 // more often room for the badge to stay right next to the name after
-// all, same measure-and-shrink loop public/js/class-card-title-fit.js
+// all, same measure-and-shrink loop public/js/shrink-title-to-fit.js
 // already uses for an identical class of problem (a title that needs to
 // fit without breaking words).
 (function () {
   var MIN_FONT_SIZE_PX = 10;
 
-  // scrollHeight vs clientHeight (class-card-title-fit.js's own trick)
+  // scrollHeight vs clientHeight (shrink-title-to-fit.js's own trick)
   // only detects overflow against a FIXED height - this pill has none,
   // it just grows to fit whatever wraps. Comparing the badge's own
   // offsetTop against the name text's instead directly answers "are they
@@ -45,7 +45,7 @@
     document.querySelectorAll('.class-view-register-box .parent-class-child-name').forEach(shrinkToFit);
   }
 
-  // document.fonts.ready - same reasoning as class-card-title-fit.js's
+  // document.fonts.ready - same reasoning as shrink-title-to-fit.js's
   // own comment: measuring against a fallback font's metrics before the
   // real web font swaps in can leave a pill sized for the wrong font.
   function ready(fn) {
@@ -62,6 +62,6 @@
   // dispatch right after injecting the fragment's HTML is what re-runs
   // this on every fresh class popup, not just the page's own initial
   // load. Also covers a real browser resize/breakpoint crossing, same as
-  // class-card-title-fit.js.
+  // shrink-title-to-fit.js.
   window.addEventListener('resize', shrinkAll);
 })();

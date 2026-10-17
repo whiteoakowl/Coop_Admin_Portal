@@ -279,6 +279,15 @@ const TEACHER_NAV_LINKS = [
   { href: '/teacher/classes', icon: 'graduation-cap', label: 'Class Schedule' },
   { href: '/training', icon: 'graduation-cap', label: 'Training' },
   { href: '/teacher/assignments', icon: 'clipboard-list', label: 'Assignments' },
+  // A real request: "Teachers can edit their instructor profile on the
+  // teacher portal if they are given permission to view that portal and
+  // if their profile has been enabled" - the link is always offered to
+  // everyone with the teacher role (same as every other static nav
+  // entry here); the enabled check itself happens on the page (routes/
+  // teacher-portal.js's own GET /instructor-profile), which shows a
+  // plain "not enabled yet" message instead of the edit form rather than
+  // this nav conditionally disappearing.
+  { href: '/teacher/instructor-profile', icon: 'user-check', label: 'Instructor Profile' },
 ];
 // Student Portal's own primary nav - a real request: "dashboard panel
 // tabs. They should be these titles and in this order," plus a labeled

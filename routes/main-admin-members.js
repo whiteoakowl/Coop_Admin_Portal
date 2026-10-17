@@ -709,6 +709,85 @@ router.get('/schedule-print', async (req, res) => {
   });
 });
 
+// A real request: "Add a button that says grade level report. When you
+// click this page will show a bar bargraph members on every grade
+// level. Also a grade level chart with names and ages in parenthesis.
+// Column titles are grade levels." One column per GRADE_LEVELS entry (in
+// that same order, same canonical list the Grade Level Settings tab and
+// every class Age Group checkbox already share - see utils/
+// gradeLevelSettings.js's own comment), plus a trailing "Ungraded"
+// column for an active student with no grade_level set at all, but only
+// when at least one actually needs it - unlike the real grade levels,
+// showing an always-present 18th column for a state nobody's currently
+// in would just be noise. Students only (not parents/admins) - a grade
+// level is a student concept. Registered ahead of GET /:id below so
+// "grade-level-report" is never swallowed as a member id, same reasoning
+// schedule-print above already documents.
+// A real follow-up request: "Add a filter for grade level report, orange
+// button. Filter by section, schedule grid signup, family etc" - same
+// roster-action-btn ("orange button" - every toolbar action button
+// already uses that brand-colored class, nothing new to style) + Filter
+// dialog shape the Member Schedules tab's own Filter popup already
+// established (views/admin-schedule.ejs), GET params read back here and
+// re-selected in the dialog on return. "Schedule grid signup" reads as a
+// student's class_enrollments membership - the Classes grid's own
+// student roster, not Grade Level Settings - so "Signed Up" here means
+// "enrolled in at least one class," independent of which grade/semester.
+router.get('/grade-level-report', async (req, res) => {
+  const sectionId = req.query.sectionId ? parseInt(req.query.sectionId, 10) : null;
+  const signup = ['signedUp', 'notSignedUp'].includes(req.query.signup) ? req.query.signup : '';
+  const familyId = req.query.familyId ? parseInt(req.query.familyId, 10) : null;
+
+  let students = (await membersWithDetails('student'))
+    .filter((m) => Number(m.active) === 1)
+    .map((m) => ({ id: m.id, name: m.name, age: ageFromBirthday(m.birthday), gradeLevel: m.grade_level, familyId: m.family_id }));
+
+  if (familyId) students = students.filter((s) => s.familyId === familyId);
+
+  if (sectionId) {
+    const sectionIdsByMember = await sectionIdsForMembers(students.map((s) => s.id));
+    students = students.filter((s) => (sectionIdsByMember[s.id] || new Set()).has(sectionId));
+  }
+
+  if (signup) {
+    const enrolledRows = await db.prepare('SELECT DISTINCT student_id AS "studentId" FROM class_enrollments').all();
+    const enrolledIds = new Set(enrolledRows.map((r) => r.studentId));
+    students = students.filter((s) => (signup === 'signedUp' ? enrolledIds.has(s.id) : !enrolledIds.has(s.id)));
+  }
+
+  students = students.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+  const columns = GRADE_LEVELS.map((gradeLevel) => ({
+    gradeLevel,
+    students: students.filter((s) => s.gradeLevel === gradeLevel),
+  }));
+  const ungraded = students.filter((s) => !GRADE_LEVELS.includes(s.gradeLevel));
+  if (ungraded.length > 0) columns.push({ gradeLevel: 'Ungraded', students: ungraded });
+
+  const filterLabelParts = [];
+  if (sectionId) {
+    const section = await db.prepare('SELECT name FROM sections WHERE id = ?').get(sectionId);
+    if (section) filterLabelParts.push(section.name);
+  }
+  if (signup) filterLabelParts.push(signup === 'signedUp' ? 'Signed Up' : 'Not Signed Up');
+  if (familyId) {
+    const family = await db.prepare('SELECT name FROM families WHERE id = ?').get(familyId);
+    if (family) filterLabelParts.push(`${family.name} Family`);
+  }
+
+  res.render('main-admin-members-grade-level-report', {
+    title: 'Grade Level Report',
+    columns,
+    maxCount: Math.max(1, ...columns.map((c) => c.students.length)),
+    sections: await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all(),
+    families: await db.prepare('SELECT * FROM families ORDER BY LOWER(name)').all(),
+    selectedSectionId: sectionId,
+    selectedSignup: signup,
+    selectedFamilyId: familyId,
+    filterLabelParts,
+  });
+});
+
 const PROFILE_TABS = ['profile', 'schedule', 'attendance'];
 
 // A real request: "class schedule and attendance should be tabs" (the

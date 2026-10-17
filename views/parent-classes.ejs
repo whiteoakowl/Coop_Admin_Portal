@@ -102,7 +102,7 @@
             <% } %>
             <% roomGrid.rows.forEach(function(row) { %>
               <tr>
-                <td class="class-schedule-room-col"><%= row.room %></td>
+                <td class="class-schedule-room-col"><span class="class-schedule-room-name" title="<%= row.room %>"><%= row.room %></span></td>
                 <% row.cells.forEach(function(cell) { %>
                   <td colspan="<%= cell.span %>" class="class-schedule-cell">
                     <% if (cell.classes.length === 0) { %>
@@ -127,7 +127,7 @@
   <script src="/js/parent-class-view.js"></script>
   <script src="/js/parent-class-filters.js"></script>
   <script src="/js/filter-details-dismiss.js"></script>
-  <script src="/js/class-card-title-fit.js"></script>
+  <script src="/js/shrink-title-to-fit.js"></script>
   <script src="/js/parent-class-row-fit.js"></script>
   <script src="/js/parent-class-register-withdraw.js"></script>
 </body>

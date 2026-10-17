@@ -2540,4 +2540,5 @@ module.exports = {
   addManualRosterMember,
   allClassesList,
   attendanceHistoryForRoster,
+  staffForClass,
 };

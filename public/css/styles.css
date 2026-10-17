@@ -7764,6 +7764,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   background: var(--brand-soft);
   font-size: 0.85rem;
 }
+/* A real request: "Make sure row titles shrink to fit in box" - the room
+   name (each row's own "title") gets the exact same shrink-to-one-line,
+   fall-back-to-2-lines-at-a-word-break treatment as a class card's own
+   title (see .class-card-header h3's own comment and public/js/
+   class-card-title-fit.js, which targets both). .class-schedule-room-
+   col-inner lays the optional drag handle and the name side by side so
+   the name's own min-width: 0 can actually shrink below its natural
+   width inside the flex row, instead of the handle's fixed icon width
+   being squeezed first. */
+.class-schedule-room-col-inner { display: flex; align-items: flex-start; gap: 0.3rem; min-width: 0; }
+.class-schedule-room-name { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; overflow-wrap: normal; }
 .class-schedule-cell { background: #fff; overflow: hidden; }
 /* Teacher Portal's own read-only Class Schedule grid (views/teacher-
    classes.ejs, Calendar view) reuses .class-schedule-room-grid/
@@ -7865,33 +7876,31 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    buttons to their own line, staying inside this card, instead. */
 .class-card-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
 /* A real request: "make sure title shrink to fit in in class colored box/
-   card" - the old unlimited-wrap approach once broke titles like "Brain
-   Games and Logic" ONE CHARACTER PER LINE on a narrow mobile column;
-   public/js/class-card-title-fit.js shrinks this h3's own font-size down
-   (never up) to try to fit it in 2 lines, so a long title reads smaller
-   instead of wrapping the card tall and uneven next to its neighbors.
-   A later real bug report ("should be able to read the full title of each
-   class on schedule grid view mobile") found that fit attempt wasn't the
-   whole story: a permanent -webkit-line-clamp: 2 used to live here as the
-   static/no-JS fallback, and on the narrowest mobile breakpoint (480px,
-   below) the starting font-size was already at/under the JS shrink
-   script's own floor, so for any title that still didn't fit at that tiny
-   size the clamp just silently cut it off with "..." - a parent could no
-   longer tell which class was which. white-space: normal here is that
-   fallback now instead: an unclamped title just wraps across however many
-   lines it actually needs (growing the card/row a little), which is
-   worse for even row heights but strictly better than losing real class
-   names. The JS still applies its own TEMPORARY 2-line clamp purely to
-   measure whether shrinking the font would avoid that growth, then always
-   removes it before leaving the title on screen - see that file's own
-   comment. */
+   card," later sharpened to "shrink text to fit class title words on the
+   same row, don't split words" - a title stays on ONE line whenever it
+   reasonably can: public/js/class-card-title-fit.js shrinks this h3's own
+   font-size down (never up) until its natural, unwrapped width fits the
+   card. white-space: nowrap here is just the STARTING point the script
+   measures from, not a hard rule - on the narrowest mobile cards (styles
+   below), even a realistic title can run out of card width before it
+   runs out of readable font size, and a follow-up on this same request
+   confirmed wrapping to a 2nd line beats clipping the end of the title in
+   that case. overflow-wrap stays 'normal' (the browser default, stated
+   here so nobody adds overflow-wrap: break-word back) in both the
+   single-line and the 2-line-wrap-fallback case the script applies -
+   wrapping only ever happens BETWEEN words, never splits one in half.
+   overflow: hidden is a belt-and-suspenders CSS-only backstop for the
+   no-JS case (same containment .class-schedule-cell's own overflow:
+   hidden already relies on) - a title with JS disabled just clips at the
+   card edge instead of spilling into the next column. */
 .class-card-header h3 {
   margin: 0;
   font-size: 0.92rem;
   flex: 1;
   min-width: 0;
-  white-space: normal;
-  overflow-wrap: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  overflow-wrap: normal;
 }
 /* Belt-and-suspenders for the same bug: even with the wrap fix above,
    nothing clips a card that somehow still renders wider than its cell
@@ -7962,6 +7971,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .class-schedule-room-grid td { padding: 0.15rem 0.15rem; }
   .class-schedule-room-grid th { font-size: 0.6rem; }
   .class-schedule-room-grid .class-schedule-room-col { width: 42px; font-size: 0.58rem; }
+  /* At this width the drag handle alone ate most of the room column's own
+     42px, leaving the room NAME almost no space to shrink into (a real
+     problem surfaced while testing "Make sure row titles shrink to fit in
+     box" - a room name could still end up clipped even at the shrink
+     script's floor size). Reordering by drag is also awkward at phone
+     width regardless - hiding the handle here hands that space back to
+     the name, which is the part that actually needs to stay readable. */
+  .class-schedule-room-grid .room-row-drag-handle { display: none; }
   .class-schedule-room-grid .class-card { padding: 0.2rem 0.25rem; border-left-width: 3px; }
   .class-schedule-room-grid .class-card-header { gap: 0.2rem; }
   .class-schedule-room-grid .class-card-header h3 { font-size: 0.62rem; }
@@ -13340,3 +13357,137 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
   .signup-list-items-table .roster-name-col { max-width: 7rem; white-space: normal; }
   .signup-list-items-table td:nth-child(4) { max-width: 6.5rem; white-space: normal; }
 }
+
+/* Main Admin > Members > Grade Level Report (views/main-admin-members-
+   grade-level-report.ejs) - a real request: "Add a button that's says
+   grade level report. When you click this page will show a bar
+   bargraph members on every grade level. Also a grade level chart with
+   names and ages in parenthesis. Column titles are grade levels. Shrink
+   to fit all grade levels. Add print button to this page." */
+.grade-level-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  height: 220px;
+  padding: 1rem 0.25rem 0;
+  margin: 0 0 2rem;
+}
+.grade-level-bar-col { display: flex; flex-direction: column; align-items: center; flex: 1 1 0; min-width: 0; height: 100%; }
+.grade-level-bar-count { font-weight: 700; font-size: 0.85rem; margin-bottom: 0.25rem; }
+/* The track is the full-height gray backdrop every bar sits inside -
+   .grade-level-bar's own height: <percent>% (set inline per column, see
+   the view) is relative to THIS box's height, not the column's, so a
+   grade level with only 1 student still gets a tiny, visible sliver of
+   a bar instead of one computed against the column's own
+   count-label-plus-bar-plus-caption total height. */
+.grade-level-bar-track { flex: 1; width: 100%; max-width: 44px; display: flex; align-items: flex-end; background: var(--brand-soft); border-radius: 4px 4px 0 0; }
+.grade-level-bar { width: 100%; background: var(--brand); border-radius: 4px 4px 0 0; min-height: 3px; }
+.grade-level-bar-label { margin-top: 0.4rem; font-size: 0.75rem; text-align: center; white-space: nowrap; overflow: hidden; overflow-wrap: normal; max-width: 100%; }
+
+/* Each grade level is its own grid column (not a <table> column - see
+   the view's own comment on why). --grade-level-cols (set inline on the
+   .grade-level-report-fit-inner ancestor, inherited down to here) is
+   however many grade levels actually have a student in them. Shrinking
+   to keep every one of those columns on screen at once (the actual
+   "shrink to fit all grade levels" request) is table-layout: fixed's
+   exact same job for a CSS grid: equal 1fr columns split whatever width
+   is available rather than each one sizing to its own longest name, the
+   same principle the Classes grid's own Room/Hour columns already use
+   (views/partials/class-schedule-grid.ejs). The @media (max-width: 480px)
+   override below switches to --grade-level-cols-mobile instead (half as
+   many columns, wrapping the same columns onto a 2nd row) - see that
+   custom property's own comment in the view. */
+.grade-level-report-grid { display: grid; grid-template-columns: repeat(var(--grade-level-cols), minmax(0, 1fr)); gap: 0.6rem; align-items: start; }
+.grade-level-report-col { border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.4rem; min-width: 0; }
+/* white-space/overflow-wrap here match .class-card-header h3's own exact
+   reasoning (styles.css) - public/js/shrink-title-to-fit.js shrinks this
+   down to fit on one line first, falling back to a word-boundary-only
+   2-line wrap (never a mid-word break) only once it genuinely has to. */
+.grade-level-report-col-title {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.3rem;
+  margin-bottom: 0.3rem;
+}
+/* overflow-wrap: normal (never break-word), same "don't split words"
+   reasoning as .class-card-header h3's own comment above - a name wraps
+   between words (most names have at least one space to wrap at) rather
+   than ever splitting one in half. */
+.grade-level-report-name { margin: 0 0 0.25rem; font-size: 0.85rem; overflow-wrap: normal; }
+.grade-level-report-name:last-child { margin-bottom: 0; }
+
+@media (max-width: 860px) {
+  .grade-level-bar-chart { height: 170px; gap: 0.5rem; }
+  .grade-level-bar-label { font-size: 0.68rem; }
+  .grade-level-report-grid { gap: 0.4rem; }
+  .grade-level-report-col { padding: 0.4rem 0.3rem; }
+  .grade-level-report-col-title { font-size: 0.8rem; }
+  .grade-level-report-name { font-size: 0.78rem; }
+}
+@media (max-width: 480px) {
+  /* Same "wrap onto a 2nd row instead of squeezing every grade level into
+     one row" fix as .grade-level-report-grid below, applied to the bar
+     chart too - a real follow-up request after a live mobile check found
+     both this chart's own bars and the names grid unreadably narrow (as
+     many as 18 grade levels wide) on a phone screen. height moves off
+     the chart itself (flex-wrap needs it free to size around however
+     many wrapped rows there actually are) and onto each column instead,
+     so a wrapped 2nd row of bars gets the same fixed height the first
+     row already had rather than splitting one shared height between
+     them. */
+  .grade-level-bar-chart { flex-wrap: wrap; height: auto; gap: 0.3rem; row-gap: 1.25rem; padding-top: 0.5rem; }
+  .grade-level-bar-col { flex: 0 1 calc(100% / var(--grade-level-cols-mobile) - 0.3rem); height: 130px; }
+  .grade-level-bar-count { font-size: 0.68rem; }
+  .grade-level-bar-label { font-size: 0.58rem; }
+  /* Half the one-row column count, wrapping onto a 2nd row instead of
+     squeezing every grade level into a single row that's too narrow to
+     read on a phone - see --grade-level-cols-mobile's own comment in the
+     view. */
+  .grade-level-report-grid { grid-template-columns: repeat(var(--grade-level-cols-mobile), minmax(0, 1fr)); gap: 0.25rem; }
+  .grade-level-report-col { padding: 0.3rem 0.2rem; border-radius: 6px; }
+  .grade-level-report-col-title { font-size: 0.68rem; padding-bottom: 0.2rem; margin-bottom: 0.2rem; }
+  .grade-level-report-name { font-size: 0.68rem; }
+}
+
+/* Co-op Admin Portal > Teachers/Assistants (views/admin-teachers.ejs,
+   admin-teachers-instructor-profiles.ejs, admin-teachers-instructor-
+   profile-edit.ejs) - a real request: "Add a tab called Teachers/
+   Assistants after the classes tab... If a teacher teaches multiple
+   classes they will all be listed under the members name with a
+   dropdown arrow and minimize feature." <details>/<summary> is used
+   as-is for that arrow/collapse behavior (see the view's own comment on
+   why) - no marker-hiding override here, unlike .filter-details
+   elsewhere in this file, since the native disclosure triangle IS the
+   requested affordance this time. */
+.teacher-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.teacher-list-item { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.8rem; }
+.teacher-list-item summary { cursor: pointer; font-weight: 600; }
+.teacher-class-count { font-weight: 400; color: var(--muted); font-size: 0.85rem; }
+.teacher-list-name { font-weight: 600; margin-right: 0.5rem; }
+.teacher-class-list { list-style: none; margin: 0.5rem 0 0; padding: 0 0 0 1.25rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.teacher-single-class,
+.teacher-class-list a {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 6px;
+  padding: 0.2rem 0.4rem;
+}
+.teacher-single-class:hover,
+.teacher-class-list a:hover { background: var(--brand-soft); text-decoration: underline; }
+.teacher-class-name { font-weight: 600; }
+.teacher-class-role { font-size: 0.8rem; color: var(--muted); }
+.teacher-class-meta { font-size: 0.8rem; color: var(--muted); }
+
+.instructor-profile-form { display: flex; flex-direction: column; gap: 0.9rem; max-width: 36rem; }
+.instructor-profile-form label:not(.checkbox-option) { display: flex; flex-direction: column; gap: 0.3rem; font-weight: 600; }
+.instructor-profile-form input[type="email"],
+.instructor-profile-form input[type="text"],
+.instructor-profile-form textarea { font-weight: 400; }

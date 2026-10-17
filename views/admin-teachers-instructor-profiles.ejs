@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle no-print"><a href="/admin/teachers">&larr; Teachers/Assistants</a></p>
+    <div class="roster-toolbar no-print">
+      <h1>Instructor Profiles</h1>
+    </div>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (members.length === 0) { %>
+      <p class="roster-empty">No members are staffed as a teacher or assistant on any class yet.</p>
+    <% } else { %>
+      <table class="roster-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <%# A real request: "list of members who are signed up as
+                teachers with check mark for enable/disable instructors
+                profile" - same auto-submitting checkbox-per-row pattern
+                views/admin-events-list.ejs's own Allow Sync column
+                already established (onchange="this.form.submit()"),
+                rather than a separate Save button per row. %>
+            <th>Profile Enabled</th>
+            <th>Edit</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% members.forEach(function(m) { %>
+            <tr>
+              <td><%= m.name %></td>
+              <td>
+                <form method="POST" action="/admin/teachers/instructor-profiles/<%= m.id %>/enabled">
+                  <input type="checkbox" name="enabled" value="1" <%= m.profile && m.profile.enabled ? 'checked' : '' %> onchange="this.form.submit()" aria-label="Enable instructor profile for <%= m.name %>" />
+                </form>
+              </td>
+              <td><a class="roster-action-btn" href="/admin/teachers/instructor-profiles/<%= m.id %>/edit">Edit</a></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    <% } %>
+  </main>
+</body>
+</html>

@@ -38,6 +38,7 @@ const {
 const { formatDateLabel, formatFriendlyTimestamp, todayISO, formatDateLong } = require('../utils/dates');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const { byLastName } = require('../utils/members');
+const { instructorProfile, saveInstructorProfile } = require('../utils/instructorProfiles');
 const { buildRosterGridData } = require('../utils/rosterGrid');
 const { lessonAttachmentFileFilter } = require('../utils/uploads');
 const notifications = require('../utils/notifications');
@@ -637,6 +638,46 @@ router.get('/reports', async (req, res) => {
     reports.push({ cls, assignmentReports });
   }
   res.render('teacher-reports', { title: 'Reports', reports });
+});
+
+// --- Instructor Profile: a teacher's own self-editable bio ---
+//
+// A real request: "Teachers can edit their instructor profile on the
+// teacher portal if they are given permission to view that portal and
+// if their profile has been enabled." Being inside this router at all
+// already proves the first half (router.use(requirePortalAuth,
+// requirePortal('teacher')) above - no page here is reachable without
+// the 'teacher' role); the second half (profile.enabled, admin-only -
+// see routes/admin-teachers.js's own setInstructorProfileEnabled) is
+// checked here on every request rather than trusted from a stale page
+// render, same as every other "is this actually still allowed" check
+// elsewhere in this app.
+router.get('/instructor-profile', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const profile = await instructorProfile(member.id);
+  res.render('teacher-instructor-profile', {
+    title: 'Instructor Profile',
+    enabled: !!(profile && profile.enabled),
+    profile: profile || {},
+    notice: req.query.notice || null,
+  });
+});
+
+router.post('/instructor-profile', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const profile = await instructorProfile(member.id);
+  // A direct POST replay after an admin disables the profile mid-session
+  // shouldn't still be able to write - re-checked here, not just hidden
+  // on the GET form.
+  if (!profile || !profile.enabled) return res.redirect('/teacher/instructor-profile');
+  await saveInstructorProfile(member.id, {
+    email: (req.body.email || '').trim(),
+    phone: (req.body.phone || '').trim(),
+    aboutMe: (req.body.aboutMe || '').trim(),
+    qualifications: (req.body.qualifications || '').trim(),
+    qualificationsVisible: !!req.body.qualificationsVisible,
+  });
+  res.redirect('/teacher/instructor-profile?notice=' + encodeURIComponent('Instructor profile saved.'));
 });
 
 module.exports = router;

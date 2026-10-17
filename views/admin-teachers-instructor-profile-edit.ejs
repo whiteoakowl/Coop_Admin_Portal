@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle no-print"><a href="<%= backTo %>">&larr; Instructor Profiles</a></p>
+    <div class="roster-toolbar no-print">
+      <h1>Instructor Profile - <%= member.name %></h1>
+    </div>
+
+    <%# A real request: "Click on each member and you can edit their
+        instructor profile. It asks email, phone number, about me,
+        experience/qualifications (check box for include this)." Same
+        label-wraps-input convention views/main-admin-admins.ejs's own
+        Admin Position edit fields already use. This form never touches
+        `enabled` - that's the list page's own checkbox column (routes/
+        admin-teachers.js's own setInstructorProfileEnabled), kept
+        deliberately separate so editing a bio can't accidentally
+        enable/disable someone. %>
+    <form method="POST" action="<%= formAction %>" class="instructor-profile-form">
+      <label for="instructor-profile-email">Email
+        <input id="instructor-profile-email" type="email" name="email" value="<%= profile.email || '' %>" />
+      </label>
+      <label for="instructor-profile-phone">Phone
+        <input id="instructor-profile-phone" type="text" name="phone" value="<%= profile.phone || '' %>" />
+      </label>
+      <label for="instructor-profile-about-me">About Me
+        <textarea id="instructor-profile-about-me" name="aboutMe" rows="4"><%= profile.about_me || '' %></textarea>
+      </label>
+      <label for="instructor-profile-qualifications">Experience/Qualifications
+        <textarea id="instructor-profile-qualifications" name="qualifications" rows="4"><%= profile.qualifications || '' %></textarea>
+      </label>
+      <label class="checkbox-option">
+        <input type="checkbox" name="qualificationsVisible" value="1" <%= profile.qualifications_visible ? 'checked' : '' %> />
+        Include Experience/Qualifications
+      </label>
+
+      <div class="roster-btn-row">
+        <a class="btn-secondary" href="<%= backTo %>">Cancel</a>
+        <button type="submit" class="primary-btn">Save</button>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

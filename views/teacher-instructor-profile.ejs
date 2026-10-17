@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Teacher Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Instructor Profile</h1>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (!enabled) { %>
+      <%# A real request: "Teachers can edit their instructor profile on
+          the teacher portal if they are given permission to view that
+          portal and if their profile has been enabled." Reaching this
+          page at all already proves the portal-permission half (see
+          routes/teacher-portal.js's own router.use requirePortal -
+          nothing in this router is reachable without it); this is the
+          "and if their profile has been enabled" half, admin-only (Co-op
+          Admin Portal > Teachers/Assistants > Instructor Profiles). %>
+      <p class="roster-empty">Your instructor profile hasn't been enabled yet. Contact an admin to have it turned on.</p>
+    <% } else { %>
+      <form method="POST" action="/teacher/instructor-profile" class="instructor-profile-form">
+        <label for="teacher-instructor-profile-email">Email
+          <input id="teacher-instructor-profile-email" type="email" name="email" value="<%= profile.email || '' %>" />
+        </label>
+        <label for="teacher-instructor-profile-phone">Phone
+          <input id="teacher-instructor-profile-phone" type="text" name="phone" value="<%= profile.phone || '' %>" />
+        </label>
+        <label for="teacher-instructor-profile-about-me">About Me
+          <textarea id="teacher-instructor-profile-about-me" name="aboutMe" rows="4"><%= profile.about_me || '' %></textarea>
+        </label>
+        <label for="teacher-instructor-profile-qualifications">Experience/Qualifications
+          <textarea id="teacher-instructor-profile-qualifications" name="qualifications" rows="4"><%= profile.qualifications || '' %></textarea>
+        </label>
+        <label class="checkbox-option">
+          <input type="checkbox" name="qualificationsVisible" value="1" <%= profile.qualifications_visible ? 'checked' : '' %> />
+          Include Experience/Qualifications
+        </label>
+
+        <div class="roster-btn-row">
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </form>
+    <% } %>
+  </main>
+</body>
+</html>

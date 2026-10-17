@@ -206,6 +206,48 @@ test('a class with a blank room surfaces as "Unassigned" and can be renamed to a
   });
 });
 
+// A real bug report: "Class schedule grid shrink text to fit class title
+// words on the same row, don't split words. Make sure row titles shrink
+// to fit in box." Both the class card's own title and each row's room
+// name try to shrink their own font-size down to stay on ONE line, the
+// common case at normal/tablet/desktop card widths - a confirmed
+// follow-up established that on the narrowest mobile cards, where even a
+// realistic title can run out of width before it runs out of readable
+// font size, wrapping to a 2nd line at a word boundary (never splitting
+// a word) beats clipping the end of the title. Covers: the markup wraps
+// both pieces of text in their own shrinkable element with a native-
+// tooltip fallback, the CSS never allows mid-word breaking in either the
+// single-line or the 2-line-wrap-fallback state, and the script
+// implements both the single-line shrink attempt (scrollWidth) and the
+// 2-line wrap-and-shrink fallback (scrollHeight) it falls back to.
+test('class titles and room names try to stay on one line via JS shrink, with no mid-word breaking possible in CSS even in the 2-line wrap fallback', async () => {
+  const { cookie } = await loginAsAdmin();
+  await createClass({ day: 'monday', hourPosition: 1, className: 'Super Duper Extra Long Class Title', room: 'A Fairly Long Room Name' });
+
+  const res = await request(app).get('/admin/schedule?tab=monday').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /<span class="class-schedule-room-name" title="A Fairly Long Room Name">A Fairly Long Room Name<\/span>/, 'room name should be wrapped in its own shrinkable span, with a native-tooltip fallback for the rare clipped case');
+  assert.match(res.text, /<h3 title="Super Duper Extra Long Class Title">Super Duper Extra Long Class Title<\/h3>/, 'the full title should still render, unclamped/untruncated in markup, with a native-tooltip fallback too');
+  assert.match(res.text, /<script src="\/js\/shrink-title-to-fit\.js">/);
+
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'css', 'styles.css'), 'utf8');
+  const titleRule = /\.class-card-header h3\s*\{([^}]*)\}/.exec(css);
+  assert.ok(titleRule, 'expected a .class-card-header h3 rule');
+  assert.match(titleRule[1], /white-space:\s*nowrap/, 'single-line is the starting point the script measures from');
+  assert.match(titleRule[1], /overflow-wrap:\s*normal/, 'no mid-word breaking, even once the script switches white-space to normal for its 2-line wrap fallback');
+
+  const roomNameRule = /\.class-schedule-room-name\s*\{([^}]*)\}/.exec(css);
+  assert.ok(roomNameRule, 'expected a .class-schedule-room-name rule');
+  assert.match(roomNameRule[1], /white-space:\s*nowrap/);
+  assert.match(roomNameRule[1], /overflow-wrap:\s*normal/);
+
+  const js = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'shrink-title-to-fit.js'), 'utf8');
+  assert.match(js, /\.class-card-header h3,\s*\.class-schedule-room-name/, 'the shrink script should target both the title and the room name');
+  assert.match(js, /scrollWidth/, 'phase 1: measure horizontal overflow to try to fit on one line');
+  assert.match(js, /scrollHeight/, 'phase 2 fallback: measure 2-line height overflow once single-line shrinking alone was not enough');
+  assert.match(js, /webkitLineClamp/, 'phase 2 fallback uses the same temporary 2-line clamp measurement technique as before');
+});
+
 test('print view uses a condensed grade range and "<Day> Schedule" header text', async () => {
   const { cookie } = await loginAsAdmin();
   await createClass({ day: 'monday', hourPosition: 3, className: 'Print Grade Class', room: 'Print Room', ageGroup: '1st, 2nd, 3rd' });
@@ -216,4 +258,15 @@ test('print view uses a condensed grade range and "<Day> Schedule" header text',
   assert.doesNotMatch(res.text, /Monday Class Schedule/);
   assert.match(res.text, /Grades 1-3/, 'should show a condensed grade range, not every individual grade listed out');
   assert.doesNotMatch(res.text, /1st, 2nd, 3rd/);
+});
+
+test('Classes grid toolbar offers an Export button next to Print, wired to the existing per-day export.csv route', async () => {
+  const { cookie } = await loginAsAdmin();
+  const res = await request(app).get('/admin/schedule').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /<a class="roster-action-btn file-action-btn" href="\/admin\/class-schedule\/monday\/export\.csv">Export<\/a>/);
+
+  const exportRes = await request(app).get('/admin/class-schedule/monday/export.csv').set('Cookie', cookie);
+  assert.equal(exportRes.status, 200);
+  assert.match(exportRes.headers['content-type'], /text\/csv/);
 });

@@ -129,6 +129,15 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
       <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog-<%= day %>').showModal()">Import</button>
       <button type="button" class="roster-action-btn" data-bulk-edit-toggle="class-bulk-edit-form-<%= day %>" data-bulk-edit-dialog="bulk-edit-dialog-<%= day %>" aria-pressed="false">Bulk Edit</button>
     <% } %>
+    <%# A real request: "Class schedules, add an export button." The CSV
+        route itself (/class-schedule/:day/export.csv, routes/admin-
+        class-schedule.js) already existed - this file's own top comment
+        already documented "Export/Print for viewers who aren't a full
+        Admin" as the intended readOnly behavior, but only the Print link
+        below was ever actually wired up here. requireAdmin (not
+        requireFullAdmin) on that route, same as Print just beside it, so
+        it's available outside the !gridReadOnly block above too. %>
+    <a class="roster-action-btn file-action-btn" href="/admin/class-schedule/<%= day %>/export.csv">Export</a>
     <a class="roster-action-btn print-action-btn" href="/admin/class-schedule/<%= day %>/print" target="_blank">Print</a>
   </div>
 </div>
@@ -449,10 +458,12 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
       <% roomGrid.rows.forEach(function(row) { %>
         <tr data-room-row="<%= row.room %>">
           <td class="class-schedule-room-col">
-            <% if (!gridReadOnly) { %>
-              <span class="room-row-drag-handle no-print" aria-label="Drag to reorder <%= row.room %>" title="Drag to reorder"><svg class="icon"><use href="#icon-menu"/></svg></span>
-            <% } %>
-            <%= row.room %>
+            <div class="class-schedule-room-col-inner">
+              <% if (!gridReadOnly) { %>
+                <span class="room-row-drag-handle no-print" aria-label="Drag to reorder <%= row.room %>" title="Drag to reorder"><svg class="icon"><use href="#icon-menu"/></svg></span>
+              <% } %>
+              <span class="class-schedule-room-name" title="<%= row.room %>"><%= row.room %></span>
+            </div>
           </td>
           <% row.cells.forEach(function(cell) { %>
             <td colspan="<%= cell.span %>" class="class-schedule-cell">
@@ -504,7 +515,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
                       <% if (!gridReadOnly) { %>
                         <input type="checkbox" class="class-card-checkbox" name="classIds" value="<%= cls.id %>" form="class-bulk-edit-form-<%= day %>" aria-label="Select <%= cls.class_name %> for bulk edit" hidden />
                       <% } %>
-                      <h3><%= cls.class_name %></h3>
+                      <h3 title="<%= cls.class_name %>"><%= cls.class_name %></h3>
                     </div>
                     <%# Grade/teacher/assistant only - no student roster here;
                         View opens the full roster (locals gradeLabel/

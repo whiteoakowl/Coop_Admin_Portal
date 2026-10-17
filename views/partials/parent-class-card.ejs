@@ -32,7 +32,7 @@
     <% } %>
     <div class="class-card-thumb-content">
       <div class="class-card-header">
-        <h3><%= cls.class_name %></h3>
+        <h3 title="<%= cls.class_name %>"><%= cls.class_name %></h3>
         <% if (enrolledClassIds.indexOf(cls.id) !== -1) { %>
           <span class="badge-pill badge-pill-present" title="One of your children is enrolled">Registered</span>
         <% } %>
