@@ -17,6 +17,7 @@ const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const { documentFileFilter, imageFileFilter, DOCUMENT_MIME_BY_EXT } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, downloadFile, generateKey, createSignedUploadUrl } = require('../utils/storage');
+const { roleKeysByDocument, setDocumentRoleKeys } = require('../utils/documents');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_documents'));
 
@@ -59,9 +60,18 @@ function generatePublicToken() {
 
 router.get('/', async (req, res) => {
   const documents = await db.prepare('SELECT * FROM documents ORDER BY LOWER(title)').all();
+  // A real request: "when clicking edit icon you can control which
+  // portals can view the documents" - every document's own role keys,
+  // pre-filling each one's edit popup's checkboxes.
+  const rolesByDoc = await roleKeysByDocument();
+  documents.forEach((d) => {
+    d.roleKeys = rolesByDoc.get(d.id) || [];
+  });
+  const roles = await db.prepare('SELECT key, label FROM roles ORDER BY label').all();
   res.render('main-admin-documents', {
     title: 'Documents',
     documents,
+    roles,
     storageConfigured: !!createStorageClient(),
     publicOrigin: `${req.protocol}://${req.get('host')}`,
     error: req.query.error || null,
@@ -185,6 +195,19 @@ router.post('/upload', uploadDocument, async (req, res) => {
     .run(title, fileKey, fileUpload.originalname, mimeType, imageKey, imageUpload ? imageUpload.mimetype : null, generatePublicToken());
 
   res.redirect('/main-admin/documents?notice=' + encodeURIComponent(`"${title}" uploaded.`));
+});
+
+// A real request: "edit icon top right corner of every document... when
+// clicking edit icon you can control which portals can view the
+// documents" - the edit popup's only field, scoped to just this (empty =
+// every portal, same convention as every other role-scoped list in this
+// app).
+router.post('/:id/roles', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const doc = await db.prepare('SELECT title FROM documents WHERE id = ?').get(id);
+  if (!doc) return res.redirect('/main-admin/documents?error=' + encodeURIComponent('That document no longer exists.'));
+  await setDocumentRoleKeys(id, [].concat(req.body.roleKeys || []));
+  res.redirect('/main-admin/documents?notice=' + encodeURIComponent(`Updated who can view "${doc.title}".`));
 });
 
 router.post('/:id/delete', async (req, res) => {

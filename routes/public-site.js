@@ -9,6 +9,7 @@ const router = express.Router();
 const db = require('../db');
 const { formatFriendlyTimestamp } = require('../utils/dates');
 const homepage = require('../utils/homepage');
+const { publicShowcaseClasses } = require('../utils/classSchedule');
 
 router.get('/', async (req, res) => {
   const settings = await db.prepare('SELECT * FROM site_settings WHERE id = 1').get();
@@ -18,6 +19,19 @@ router.get('/', async (req, res) => {
   const announcements = announcementRows.map((a) => ({ ...a, publishedLabel: formatFriendlyTimestamp(a.published_at) }));
   const faqs = await db.prepare('SELECT * FROM faqs WHERE is_public = 1 ORDER BY position, id').all();
   const blocks = await homepage.listBlocks();
+  // A real request: "Check box to be viewable to public on public
+  // homepage" - a read-only showcase of whichever Schedule Grids an
+  // admin has opted into (Edit Schedule Grids popup's own new checkbox).
+  // No registration here - a non-member still goes through Member
+  // Registration/Login like today, same as every other "Ready to join"
+  // CTA on this page.
+  // start_time/end_time are free-text labels (e.g. "9:00 AM", typed on
+  // the Create Class form), not real SQL timestamps - used as-is rather
+  // than run through a timestamp formatter.
+  const showcaseClasses = (await publicShowcaseClasses()).map((c) => ({
+    ...c,
+    timeLabel: c.startTime ? c.startTime + (c.endTime ? ` – ${c.endTime}` : '') : null,
+  }));
 
   res.render('public-home', {
     title: settings.org_name,
@@ -25,6 +39,7 @@ router.get('/', async (req, res) => {
     announcements,
     faqs,
     blocks,
+    showcaseClasses,
   });
 });
 

@@ -15,6 +15,7 @@ const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth')
 const { memberForAccount, familyForAccount } = require('../utils/portalAuth');
 const {
   roomGridForDay,
+  hideClassesNotVisibleToMembers,
   hoursForDay,
   ageGroupList,
   getClass,
@@ -34,6 +35,7 @@ const {
 const { CLASS_DAY_ORDER } = require('../utils/classDays');
 const { comboSemesterId, findComboId } = require('../utils/scheduleComboLinks');
 const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
+const { listDocumentsForRole } = require('../utils/documents');
 const { getHandbookHtml } = require('../utils/membershipHandbook');
 const { getTemplate, badgeDataForMembers } = require('../utils/nameTagData');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
@@ -357,7 +359,11 @@ router.get('/classes', async (req, res) => {
   const windowOpen = await isRegistrationOpenForAccount(req.portalRoles, { actionType: 'parent_register_student' });
   const nextWindow = windowOpen ? null : await nextWindowForAccount(req.portalRoles, { actionType: 'parent_register_student' });
 
-  const roomGrid = await roomGridForDay(day);
+  // A real request: "Check box to lock grid to be viewable to members...
+  // if these boxes aren't checked then members... can't register" -
+  // members shouldn't see a class whose grid is locked away from them at
+  // all, not just be blocked once they try to register for it.
+  const roomGrid = await hideClassesNotVisibleToMembers(await roomGridForDay(day));
   const classList =
     view === 'list'
       ? roomGrid.rows
@@ -1168,7 +1174,12 @@ router.post('/resources/submit', async (req, res) => {
 // code - each card link goes straight to the existing public
 // /documents/<token> page rather than duplicating its file-streaming.
 router.get('/documents', async (req, res) => {
-  const documents = await db.prepare('SELECT id, title, image_path, public_token FROM documents ORDER BY LOWER(title)').all();
+  // A real request: "when clicking edit icon you can control which
+  // portals can view the documents" - a document scoped away from
+  // 'parent' (utils/documents.js's own document_roles) simply never
+  // shows up here, same empty-means-everyone convention as every other
+  // role-scoped list in this app.
+  const documents = await listDocumentsForRole('parent');
   res.render('parent-documents', { title: 'Documents', documents });
 });
 

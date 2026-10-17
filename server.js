@@ -60,12 +60,17 @@ const db = require('./db'); // constructs the db handle; db.ready resolves once 
 // newly-activated 3rd+ day never got this boot-time backfill - only
 // Monday/Wednesday's own roster membership/member_schedules stayed in
 // sync across a restart without someone manually clicking Resync.
-const { ensureDayRoster, syncDayMemberRosters, listActiveClassDays } = require('./utils/classSchedule');
+const { ensureDayRoster, syncDayMemberRosters, listActiveClassDays, loadHourColumnCount } = require('./utils/classSchedule');
 async function bootRosters() {
   for (const day of await listActiveClassDays()) {
     for (const role of ['parent', 'student']) await ensureDayRoster(day, role);
     await syncDayMemberRosters(day);
   }
+  // Restores a previously-saved "+ Add Column" count (a real request) -
+  // HOUR_POSITIONS is a plain shared array every other module destructures
+  // at require time, so this has to grow it before any route below can
+  // possibly run.
+  await loadHourColumnCount();
 }
 
 // `require('./server')` can no longer hand back a fully-bootstrapped `app`

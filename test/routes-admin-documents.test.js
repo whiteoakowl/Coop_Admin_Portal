@@ -54,11 +54,16 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
-test('a real request: "document upload... should move to the documents page and be a button called add/edit documents"', async () => {
+test('a real request: "document upload... should move to the documents page and be a button called add/edit documents" (later renamed to just "Add Documents")', async () => {
   const { cookie } = await loginAsAdmin();
   const page = await request(app).get('/admin/documents').set('Cookie', cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, />Add\/Edit Documents</);
+  // A later real request: "Add/edit documents should only say add
+  // documents" - per-document editing moved onto each card's own edit
+  // icon (see the visibility test below), so this button/popup is
+  // upload-only now.
+  assert.match(page.text, />Add Documents</);
+  assert.doesNotMatch(page.text, /Add\/Edit Documents/);
   assert.match(page.text, /id="manage-documents-dialog"/);
   assert.match(page.text, /<form[^>]*action="\/admin\/documents\/upload"/);
 
@@ -223,4 +228,53 @@ test('deleting a document with an image removes both, and the public link stops 
 
   const publicPage = await request(app).get(`/documents/${row.public_token}`);
   assert.equal(publicPage.status, 404);
+});
+
+// A real request: "edit icon top right corner of every document on main
+// admin portal and co-op admin portal. When clicking edit icon you can
+// control which portals can view the documents."
+test('each document card has its own edit icon, and the page lists every portal role as a checkbox', async () => {
+  const { cookie, csrfToken } = await loginAsAdmin();
+  await request(app)
+    .post('/admin/documents/upload?_csrf=' + encodeURIComponent(csrfToken))
+    .set('Cookie', cookie)
+    .field('title', 'Visibility Doc')
+    .attach('file', Buffer.from('%PDF-1.4 fake pdf content'), { filename: 'visibility-doc.pdf', contentType: 'application/pdf' });
+  const doc = await db.prepare("SELECT * FROM documents WHERE title = 'Visibility Doc'").get();
+
+  const page = await request(app).get('/admin/documents').set('Cookie', cookie);
+  assert.match(page.text, /class="document-card-edit-btn"/);
+  assert.match(page.text, new RegExp(`id="doc-roles-dialog-${doc.id}"`));
+  assert.match(page.text, new RegExp(`action="/admin/documents/${doc.id}/roles"`));
+  // Every unscoped document (no document_roles rows yet) starts with
+  // every box unchecked - visible to every portal, today's default.
+  ['coop_admin', 'main_admin', 'parent', 'student', 'teacher'].forEach((key) => {
+    assert.match(page.text, new RegExp(`name="roleKeys" value="${key}"(?! checked)`));
+  });
+});
+
+test('POST /admin/documents/:id/roles scopes a document to just the checked portals', async () => {
+  const { cookie, csrfToken } = await loginAsAdmin();
+  await request(app)
+    .post('/admin/documents/upload?_csrf=' + encodeURIComponent(csrfToken))
+    .set('Cookie', cookie)
+    .field('title', 'Staff Only Doc')
+    .attach('file', Buffer.from('%PDF-1.4 fake pdf content'), { filename: 'staff-only.pdf', contentType: 'application/pdf' });
+  const doc = await db.prepare("SELECT * FROM documents WHERE title = 'Staff Only Doc'").get();
+
+  const res = await request(app)
+    .post(`/admin/documents/${doc.id}/roles?_csrf=${encodeURIComponent(csrfToken)}`)
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ roleKeys: ['coop_admin', 'main_admin'] });
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /notice=/);
+
+  const roleRows = await db.prepare('SELECT role_key FROM document_roles WHERE document_id = ? ORDER BY role_key').all(doc.id);
+  assert.deepEqual(roleRows.map((r) => r.role_key), ['coop_admin', 'main_admin']);
+
+  const page = await request(app).get('/admin/documents').set('Cookie', cookie);
+  assert.match(page.text, new RegExp(`name="roleKeys" value="coop_admin" checked`));
+  assert.match(page.text, new RegExp(`name="roleKeys" value="main_admin" checked`));
+  assert.doesNotMatch(page.text, new RegExp(`name="roleKeys" value="parent" checked`));
 });

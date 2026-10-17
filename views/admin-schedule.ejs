@@ -149,7 +149,12 @@
             <p class="roster-empty">No registration windows yet - every open class is available to every family immediately.</p>
           <% } else { %>
             <div class="roster-scroll">
-              <table class="roster-table members-table condensed-table">
+              <%# A real request: "shrink table to fit" - .table-stack-mobile
+                  drops the real columns below 640px in favor of one bordered
+                  "card" per window with "Label: value" rows, same pattern
+                  every other wide admin table in this app already uses
+                  (public/css/styles.css's own .table-stack-mobile). %>
+              <table class="roster-table members-table condensed-table table-stack-mobile">
                 <thead>
                   <tr>
                     <th>Label</th>
@@ -171,13 +176,13 @@
                       if (w.open_for_student_register_self) actionLabels.push('Student: Register Self');
                     %>
                     <tr>
-                      <td class="roster-name-col"><%= w.label %></td>
-                      <td><%= actionLabels.length ? actionLabels.join(', ') : 'Every action' %></td>
-                      <td><%= w.scheduleTitle || 'Every schedule grid' %></td>
-                      <td><%= w.sectionNames.length ? w.sectionNames.join(', ') : 'All sections' %></td>
-                      <td><%= w.opensLabel %></td>
-                      <td><%= w.closesLabel || 'Stays open' %></td>
-                      <td class="actions-cell">
+                      <td class="roster-name-col table-stack-heading"><%= w.label %></td>
+                      <td data-label="Open For"><%= actionLabels.length ? actionLabels.join(', ') : 'Every action' %></td>
+                      <td data-label="Schedule Grid"><%= w.scheduleTitle || 'Every schedule grid' %></td>
+                      <td data-label="Sections"><%= w.sectionNames.length ? w.sectionNames.join(', ') : 'All sections' %></td>
+                      <td data-label="Opens At"><%= w.opensLabel %></td>
+                      <td data-label="Closes At"><%= w.closesLabel || 'Stays open' %></td>
+                      <td class="actions-cell table-stack-full">
                         <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-window-dialog-<%= w.id %>').showModal()">Edit</button>
                         <form method="POST" action="/admin/schedule/registration-windows/<%= w.id %>/delete" class="inline-block-form" data-confirm="Delete the &quot;<%= w.label %>&quot; window?">
                           <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
