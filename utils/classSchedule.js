@@ -1425,8 +1425,8 @@ async function activeMembersForStaff() {
 // make it today counts, same "missing" signal substituteBoard uses to
 // decide a slot needs a floater. No date (or nothing missing yet) means
 // nothing needs covering.
-async function classesNeedingStaffForDay(day, date) {
-  const hours = await gridForDay(day);
+async function classesNeedingStaffForDay(day, date, semesterId) {
+  const hours = await gridForDay(day, semesterId);
   const missingById = date ? await missingMemberIdsForDate(date) : new Map();
   const result = [];
   hours.forEach((h) => {
@@ -1491,8 +1491,8 @@ async function staffListForDay(day, role) {
 // this class look at-risk back on that date," which needs the real,
 // append-only absence_submissions record instead. undefined (every
 // existing caller) keeps the exact original live-attendance behavior.
-async function classesAtRiskForDay(day, date, absentIdsOverride) {
-  const hours = await gridForDay(day);
+async function classesAtRiskForDay(day, date, absentIdsOverride, semesterId) {
+  const hours = await gridForDay(day, semesterId);
   const absentIds = absentIdsOverride || (date ? await absenceFormAbsentMemberIdsForDate(date) : new Set());
   const result = [];
   hours.forEach((h) => {

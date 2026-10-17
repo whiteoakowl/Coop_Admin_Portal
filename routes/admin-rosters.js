@@ -348,8 +348,8 @@ router.get('/rosters', requireAdmin, async (req, res) => {
     // has no day-level "who needs a sub/is at risk" concept of its own -
     // see the view), so skip computing it for a class tab entirely.
     absenceAlerts: classId ? null : await absenceFormSubmissionsForRoster(rosterId, alertDate),
-    classesAtRisk: classId ? null : await classesAtRiskForDay(day, alertDate),
-    classesNeedingStaff: classId ? null : await classesNeedingStaffForDay(day, alertDate),
+    classesAtRisk: classId ? null : await classesAtRiskForDay(day, alertDate, undefined, resolvedSemesterId),
+    classesNeedingStaff: classId ? null : await classesNeedingStaffForDay(day, alertDate, resolvedSemesterId),
     availableMembers: await availableMembersForRoster(rosterId, memberTypeForTab(tab)),
     error: req.query.error || null,
     notice: req.query.notice || null,

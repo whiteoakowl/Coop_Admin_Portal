@@ -109,8 +109,8 @@ router.get('/volunteers', requireAdmin, async (req, res) => {
 // "already picked elsewhere this hour"/"still needs an infant flag"/"how
 // many other hour cards today" work) for every slot, on every hour, for
 // one day+date.
-async function buildHourSections(day, selectedDate) {
-  const hourSections = selectedDate ? await substituteBoard(day, selectedDate) : [];
+async function buildHourSections(day, selectedDate, semesterId) {
+  const hourSections = selectedDate ? await substituteBoard(day, selectedDate, semesterId) : [];
   // A real request: "when someone is assigned it should show (1) next to
   // their name... if they are assigned a job on 2 hour cards that day it
   // will say (2)." One lookup for the whole day rather than per-hour,
@@ -217,10 +217,14 @@ router.get('/volunteers/:day/manage', requireAdmin, requireClassDay, async (req,
   // utils/classSchedule.js, both already scoped to `date`). See
   // buildHourSections above for the candidate-list decoration itself
   // (shared with the /fragment route below).
-  const hourSections = await buildHourSections(day, selectedDate);
+  // list.semester_id (not the raw semesterId query param, which can be
+  // undefined) is the semester getListByDay just actually resolved this
+  // page to - using it here keeps the Substitutes Needed board/Position
+  // groups in exact lockstep with whichever Floater list is on screen.
+  const hourSections = await buildHourSections(day, selectedDate, list.semester_id);
 
-  const positionGroups = await groupedPermanentJobsForDay(day);
-  const temporaryPositionGroups = selectedDate ? await groupedTemporaryJobsForDayDate(day, selectedDate) : [];
+  const positionGroups = await groupedPermanentJobsForDay(day, list.semester_id);
+  const temporaryPositionGroups = selectedDate ? await groupedTemporaryJobsForDayDate(day, selectedDate, list.semester_id) : [];
   const combos = await listScheduleCombos();
 
   res.render('admin-volunteers', {
@@ -268,7 +272,7 @@ router.get('/volunteers/:day/fragment', requireAdmin, requireClassDay, async (re
   const upcomingActiveDates = activeDates.filter((d) => d >= today);
   const defaultDate = upcomingActiveDates[0] || activeDates[activeDates.length - 1] || null;
   const selectedDate = activeDates.includes(req.query.date) ? req.query.date : defaultDate;
-  const hourSections = await buildHourSections(day, selectedDate);
+  const hourSections = await buildHourSections(day, selectedDate, list.semester_id);
   res.render('floater-chart-cards-fragment', { day, dayLabel: DAY_LABELS[day], selectedDate, hourSections, semesterId: qsSemester(list.semester_id) });
 });
 
@@ -303,7 +307,7 @@ router.get('/volunteers/:day/export.csv', requireAdmin, requireClassDay, async (
   const list = await getListByDay(day, comboSemesterId(req));
   if (!list) return res.status(404).send('Not found');
   const dates = await datesForList(list.id);
-  const grid = await jobAssignmentGrid(day, dates);
+  const grid = await jobAssignmentGrid(day, dates, list.semester_id);
   const hours = await hoursForDay(day);
   const hourLabel = {};
   hours.forEach((h) => { hourLabel[h.position] = h.label; });
@@ -344,16 +348,8 @@ router.get('/volunteers/:day/risk', requireAdmin, requireClassDay, async (req, r
     dayLabels: DAY_LABELS,
     combos,
     semesterId: qsSemester(resolvedSemesterId),
-    // Risk's own classesAtRiskForDay (utils/classSchedule.js) still loads
-    // every class for the day regardless of semester - the same "load
-    // everything, filter client-side" model the Classes grid itself still
-    // uses today (not yet converted to a real per-semester query - a
-    // separate, bigger change tracked for the Classes grid's own picker
-    // pass). The combo picker here is for navigation consistency with its
-    // Floater Assignments/Teams siblings; it doesn't yet change
-    // which classes this one list considers at risk.
     selectedComboId: findComboId(combos, day, resolvedSemesterId),
-    classesAtRisk: await classesAtRiskForDay(day, alertDate),
+    classesAtRisk: await classesAtRiskForDay(day, alertDate, undefined, resolvedSemesterId),
   });
 });
 
