@@ -75,11 +75,20 @@ async function saveGradeLevelRules(rows) {
 // assigns the FIRST one whose own age-as-of-its-own-cutoff-date matches
 // that student's actual age-as-of-that-same-date - if an admin leaves
 // two rules' own date windows overlapping for the same age, the
-// youngest-grade rule wins rather than leaving it to chance. A student
-// who matches no configured rule at all (too young/old for every row,
-// or no rules configured yet) is left exactly as they were - this only
-// ever sets a grade level it's actually confident about, never clears
-// one out from under an admin's own manual choice.
+// youngest-grade rule wins rather than leaving it to chance.
+//
+// A real follow-up request: "the grade level settings should
+// automatically put all students in a grade level" - an admin rarely
+// fills in every one of GRADE_LEVELS' 17 rows, so an exact age match
+// above often doesn't exist even for a perfectly ordinary student (their
+// age just falls in a gap between two configured rows, or past the
+// youngest/oldest one anybody bothered to set). Rather than leaving a
+// student like that Ungraded, fall back to the CLOSEST configured rule
+// by age difference - ties (equally close on both sides) go to the
+// first/youngest one found, same bias as the exact match above. The
+// only student this can still never place is one with no birthday on
+// file at all (nothing to compute an age from) or when literally no
+// rule is configured yet - those are left exactly as they were.
 async function applyGradeLevelRulesToMembers() {
   const rules = (await listGradeLevelRules()).filter((r) => r.age != null && r.cutoffDate);
   const students = await db.prepare("SELECT id, birthday, grade_level FROM members WHERE member_type = 'student' AND birthday IS NOT NULL").all();
@@ -87,7 +96,17 @@ async function applyGradeLevelRulesToMembers() {
   let matched = 0;
   let changed = 0;
   for (const student of students) {
-    const rule = rules.find((r) => ageAsOfDate(student.birthday, r.cutoffDate) === r.age);
+    let rule = rules.find((r) => ageAsOfDate(student.birthday, r.cutoffDate) === r.age);
+    if (!rule) {
+      let bestDiff = Infinity;
+      for (const r of rules) {
+        const diff = Math.abs(ageAsOfDate(student.birthday, r.cutoffDate) - r.age);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          rule = r;
+        }
+      }
+    }
     if (!rule) continue;
     matched++;
     if (rule.gradeLevel !== student.grade_level) {

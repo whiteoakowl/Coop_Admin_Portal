@@ -140,17 +140,19 @@ test('POST /settings/grade-levels/apply sets each matching student\'s grade leve
   const firstId = await createStudent({ name: 'Grade Apply First', birthday: '2020-09-01', gradeLevel: '2nd' });
   // Already correctly Kindergarten - matched but not actually changed.
   const alreadyCorrectId = await createStudent({ name: 'Grade Apply Already Right', birthday: '2021-08-15', gradeLevel: 'Kindergarten' });
-  // Age 10 by the cutoff date - no configured rule covers that age, so
-  // this student's own hand-set grade level must be left untouched.
-  const noMatchId = await createStudent({ name: 'Grade Apply No Match', birthday: '2016-01-01', gradeLevel: '5th' });
-  // No birthday on file at all - never considered.
+  // Age 10 by the cutoff date - no EXACT rule covers that age (only
+  // Kindergarten=5 and 1st=6 are configured), but 1st is the closer of
+  // the two (|10-6| < |10-5|), so this student should land on 1st
+  // instead of staying Ungraded.
+  const noExactMatchId = await createStudent({ name: 'Grade Apply No Exact Match', birthday: '2016-01-01', gradeLevel: '5th' });
+  // No birthday on file at all - never considered, even though rules exist.
   const noBirthdayId = await createStudent({ name: 'Grade Apply No Birthday', birthday: null, gradeLevel: '3rd' });
   await createParent('Grade Apply Parent');
 
   const res = await request(app).post('/main-admin/members/settings/grade-levels/apply').set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
   assert.equal(res.status, 302);
   assert.match(res.headers.location, /settingsTab=grade-levels/);
-  assert.match(decodeURIComponent(res.headers.location), /Updated 2 of 3 matching student\(s\)/);
+  assert.match(decodeURIComponent(res.headers.location), /Updated 3 of 4 matching student\(s\)/);
 
   await t.test('a student matching Kindergarten gets it set', async () => {
     const row = await db.prepare('SELECT grade_level FROM members WHERE id = ?').get(kidId);
@@ -167,9 +169,9 @@ test('POST /settings/grade-levels/apply sets each matching student\'s grade leve
     assert.equal(row.grade_level, 'Kindergarten');
   });
 
-  await t.test('a student whose age matches no configured rule keeps their own hand-set grade level', async () => {
-    const row = await db.prepare('SELECT grade_level FROM members WHERE id = ?').get(noMatchId);
-    assert.equal(row.grade_level, '5th');
+  await t.test('a student whose age matches no exact rule lands on the closest configured one instead of staying Ungraded', async () => {
+    const row = await db.prepare('SELECT grade_level FROM members WHERE id = ?').get(noExactMatchId);
+    assert.equal(row.grade_level, '1st');
   });
 
   await t.test('a student with no birthday on file is never touched', async () => {
