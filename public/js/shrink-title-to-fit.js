@@ -52,8 +52,20 @@
 // Spanish") well before it actually ran out of readable font size -
 // lowered from 10 so phase 1 tries harder to keep a title on its one,
 // preferred line before ever wrapping it at all.
+// A real follow-up request: "Words are still being split into separate
+// rows. A word should stay together. Shrink more to fit if necessary" -
+// on the narrowest mobile cards, phases 1-2 below used to give up at the
+// normal-readability floor (MIN_FONT_SIZE_PX) and hand a still-too-wide
+// single word straight to phase 3's mid-word split, even though shrinking
+// it further still - well past normal readability - would often have let
+// it fit intact instead. Phase 2.5 is that extra, more aggressive attempt:
+// it only ever runs once a single word is still wider than the box at the
+// normal floor, and only shrinks further, down to ABSOLUTE_MIN_FONT_SIZE_PX,
+// trying to avoid ever reaching phase 3 at all. Phase 3 itself stays as the
+// true last resort for the rare word that doesn't fit even that small.
 (function () {
   var MIN_FONT_SIZE_PX = 8;
+  var ABSOLUTE_MIN_FONT_SIZE_PX = 5;
 
   function shrinkToFit(el) {
     el.style.fontSize = ''; // back to the CSS default (already breakpoint-correct) before measuring.
@@ -93,15 +105,23 @@
       el.style.webkitLineClamp = '';
     }
 
-    // Phase 3 (last resort - see this file's own top comment): phases 1-2
-    // only ever check horizontal overflow while nowrap, then vertical
-    // overflow while wrapped - neither one catches a single WORD that's
-    // still wider than the box even once wrapping is on (scrollHeight
-    // matches clientHeight exactly, since there's nowhere for a lone
-    // unbreakable word to wrap TO), which is exactly what let a real
-    // title keep trailing off the edge of a narrow mobile card. Checked
-    // last, after whatever phases 1-2 already did, so it only ever
-    // engages for a title phases 1-2 genuinely couldn't fit at all.
+    // Phase 2.5 (see this file's own top comment): with whiteSpace/display
+    // already back to their normal, freely-wrapping state (either never
+    // left it, if phase 1 alone was enough, or phase 2 just reset it), any
+    // remaining scrollWidth > clientWidth can only mean one unbreakable
+    // word is still wider than the box at every possible wrap point - not
+    // a "needs a 3rd/4th line" problem, which free wrapping already
+    // solves on its own. Keep shrinking that one case, past the normal
+    // floor, before ever handing it to phase 3's mid-word split.
+    while (el.scrollWidth > el.clientWidth && fontSize > ABSOLUTE_MIN_FONT_SIZE_PX) {
+      fontSize -= 1;
+      el.style.fontSize = Math.max(fontSize, ABSOLUTE_MIN_FONT_SIZE_PX) + 'px';
+    }
+
+    // Phase 3 (last resort - see this file's own top comment): the one
+    // case even Phase 2.5 couldn't fix - a single word still wider than
+    // the box even at ABSOLUTE_MIN_FONT_SIZE_PX. Checked last, so it only
+    // ever engages for a title nothing above could fit any other way.
     if (el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight) {
       el.style.overflowWrap = 'anywhere';
     }
