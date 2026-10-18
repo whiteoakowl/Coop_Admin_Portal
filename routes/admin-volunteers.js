@@ -174,74 +174,77 @@ async function buildHourSections(day, selectedDate, semesterId) {
 router.get('/volunteers/:day/teachers', requireAdmin, requireClassDay, (req, res) => res.redirect(`/admin/class-schedule/${req.params.day}`));
 router.get('/volunteers/:day/assistants', requireAdmin, requireClassDay, (req, res) => res.redirect(`/admin/class-schedule/${req.params.day}`));
 
-// TEMPORARY diagnostic route (same pattern as the one that found the
-// Contact Admins column-missing bug - see MIGRATION.md's "first real
-// production deployment" notes) - a real bug report: the live Floater
-// Assignments page ("Manage") shows the generic "Something went wrong"
-// error after the semester-separation fix deployed, even though the
-// admin already ran the permanent_jobs migration. Deliberately open (no
-// requireAdmin) and walks through every step /volunteers/:day/manage
-// itself depends on, one at a time, reporting which one actually fails
-// and why in plain text. Defaults to Monday; pass ?day=wednesday etc. to
-// check a different day. Remove this route once the real cause is found.
-router.get('/volunteers-diagnostic', async (req, res) => {
+// TEMPORARY diagnostic route - the earlier column-missing bug this same
+// route used to trace (see git history) is fixed; replaced with a
+// diagnostic for the NEXT real bug report: on the live site, viewing the
+// Floater Assignments page's own next-upcoming date still shows a
+// teacher/assistant as absent from an Absence form submission that was
+// actually for a PAST date that's already passed, even though nothing
+// was submitted for the upcoming one. A direct test of substituteBoard
+// with the right date came back correct locally, so this traces the
+// REAL live request: what date string it actually received, what
+// selectedDate it resolved to (mirroring /volunteers/:day/manage's own
+// exact logic), what missingMemberIdsForDate(selectedDate) returns for
+// that resolved date, and (with ?className=) every raw attendance row
+// on file for that class's own teacher/assistant, so a genuine logic bug
+// and a genuine two-separate-absences data situation are both visible
+// directly instead of guessed at. Remove this route once the real cause
+// is found.
+router.get('/volunteers-absence-diagnostic', async (req, res) => {
   res.type('text/plain');
   const lines = [];
   const day = CLASS_DAYS.includes(req.query.day) ? req.query.day : 'monday';
+  const requestedDate = req.query.date || '';
+  const className = req.query.className || '';
   const semesterId = req.query.semesterId ? Number(req.query.semesterId) : undefined;
-  lines.push(`Checking day=${day}, semesterId=${semesterId === undefined ? '(active kiosk default)' : semesterId}`);
+  lines.push(`day=${day}, req.query.date="${requestedDate}" (raw, exactly as received)`);
 
-  let list;
-  try {
-    list = await getListByDay(day, semesterId);
-    lines.push(`1. getListByDay: OK (list.id=${list ? list.id : 'null'}, list.semester_id=${list ? list.semester_id : 'n/a'})`);
-    if (!list) return res.send(lines.join('\n'));
-  } catch (err) {
-    lines.push(`1. getListByDay: FAILED - ${err.message}`);
+  const list = await getListByDay(day, semesterId);
+  if (!list) {
+    lines.push('No volunteer list found for this day/semester.');
     return res.send(lines.join('\n'));
   }
+  lines.push(`list.id=${list.id}, list.semester_id=${list.semester_id}`);
 
-  try {
-    const dates = await datesForList(list.id);
-    lines.push(`2. datesForList: OK (${dates.length} date(s))`);
-  } catch (err) {
-    lines.push(`2. datesForList: FAILED - ${err.message}`);
-    return res.send(lines.join('\n'));
+  const archivedSet = new Set(await archivedDatesForList(list.id));
+  const dates = await datesForList(list.id);
+  const activeDates = dates.filter((d) => !archivedSet.has(d));
+  const today = todayISO();
+  const upcomingActiveDates = activeDates.filter((d) => d >= today);
+  const defaultDate = upcomingActiveDates[0] || activeDates[activeDates.length - 1] || null;
+  const selectedDate = activeDates.includes(requestedDate) ? requestedDate : defaultDate;
+
+  lines.push(`server's own todayISO() right now = ${today}`);
+  lines.push(`activeDates = ${JSON.stringify(activeDates)}`);
+  lines.push(`upcomingActiveDates = ${JSON.stringify(upcomingActiveDates)}`);
+  lines.push(`defaultDate (used only if requestedDate isn't a valid active date) = ${defaultDate}`);
+  lines.push(`activeDates.includes(requestedDate) = ${activeDates.includes(requestedDate)}`);
+  lines.push(`=> selectedDate actually used for this request = ${selectedDate}`);
+  lines.push('');
+
+  const { missingMemberIdsForDate } = require('../utils/classSchedule');
+  const missing = await missingMemberIdsForDate(selectedDate);
+  lines.push(`missingMemberIdsForDate("${selectedDate}") has ${missing.size} entr${missing.size === 1 ? 'y' : 'ies'}: ${JSON.stringify([...missing.entries()])}`);
+  lines.push('');
+
+  if (className) {
+    const cls = await db.prepare('SELECT * FROM classes WHERE class_name = ? AND day = ?').get(className, day);
+    if (!cls) {
+      lines.push(`No class named "${className}" found on ${day}.`);
+    } else {
+      const staff = await db.prepare("SELECT member_id, role FROM class_staff WHERE class_id = ?").all(cls.id);
+      lines.push(`Class "${className}" (id=${cls.id}) staff: ${JSON.stringify(staff)}`);
+      for (const s of staff) {
+        const rows = await db
+          .prepare('SELECT session_date, status, source, roster_id, recorded_at FROM attendance WHERE member_id = ? ORDER BY session_date')
+          .all(s.member_id);
+        lines.push(`  member ${s.member_id} (${s.role}) - every attendance row on file: ${JSON.stringify(rows)}`);
+      }
+    }
+  } else {
+    lines.push('Pass &className=Junk Tinkers (URL-encoded) to also dump that class\'s own staff attendance history.');
   }
 
-  try {
-    const hourSections = await substituteBoard(day, todayISO(), list.semester_id);
-    lines.push(`3. substituteBoard (powers the hour-by-hour chart): OK (${hourSections.length} hour section(s))`);
-  } catch (err) {
-    lines.push(`3. substituteBoard (powers the hour-by-hour chart): FAILED - ${err.message}`);
-    return res.send(lines.join('\n'));
-  }
-
-  try {
-    const positionGroups = await groupedPermanentJobsForDay(day, list.semester_id);
-    lines.push(`4. groupedPermanentJobsForDay (the Positions list): OK (${positionGroups.length} group(s))`);
-  } catch (err) {
-    lines.push(`4. groupedPermanentJobsForDay (the Positions list): FAILED - ${err.message}`);
-    return res.send(lines.join('\n'));
-  }
-
-  try {
-    const temporaryPositionGroups = await groupedTemporaryJobsForDayDate(day, todayISO(), list.semester_id);
-    lines.push(`5. groupedTemporaryJobsForDayDate: OK (${temporaryPositionGroups.length} group(s))`);
-  } catch (err) {
-    lines.push(`5. groupedTemporaryJobsForDayDate: FAILED - ${err.message}`);
-    return res.send(lines.join('\n'));
-  }
-
-  try {
-    const combos = await listScheduleCombos();
-    lines.push(`6. listScheduleCombos: OK (${combos.length} combo(s))`);
-  } catch (err) {
-    lines.push(`6. listScheduleCombos: FAILED - ${err.message}`);
-    return res.send(lines.join('\n'));
-  }
-
-  lines.push('', 'All checks passed - the error is likely in buildHourSections\' own extra decoration (hasInfantChild, checked-in highlighting) or the view template itself, not these core queries.');
   res.send(lines.join('\n'));
 });
 
