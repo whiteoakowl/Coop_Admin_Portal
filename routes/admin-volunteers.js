@@ -174,6 +174,77 @@ async function buildHourSections(day, selectedDate, semesterId) {
 router.get('/volunteers/:day/teachers', requireAdmin, requireClassDay, (req, res) => res.redirect(`/admin/class-schedule/${req.params.day}`));
 router.get('/volunteers/:day/assistants', requireAdmin, requireClassDay, (req, res) => res.redirect(`/admin/class-schedule/${req.params.day}`));
 
+// TEMPORARY diagnostic route (same pattern as the one that found the
+// Contact Admins column-missing bug - see MIGRATION.md's "first real
+// production deployment" notes) - a real bug report: the live Floater
+// Assignments page ("Manage") shows the generic "Something went wrong"
+// error after the semester-separation fix deployed, even though the
+// admin already ran the permanent_jobs migration. Deliberately open (no
+// requireAdmin) and walks through every step /volunteers/:day/manage
+// itself depends on, one at a time, reporting which one actually fails
+// and why in plain text. Defaults to Monday; pass ?day=wednesday etc. to
+// check a different day. Remove this route once the real cause is found.
+router.get('/volunteers-diagnostic', async (req, res) => {
+  res.type('text/plain');
+  const lines = [];
+  const day = CLASS_DAYS.includes(req.query.day) ? req.query.day : 'monday';
+  const semesterId = req.query.semesterId ? Number(req.query.semesterId) : undefined;
+  lines.push(`Checking day=${day}, semesterId=${semesterId === undefined ? '(active kiosk default)' : semesterId}`);
+
+  let list;
+  try {
+    list = await getListByDay(day, semesterId);
+    lines.push(`1. getListByDay: OK (list.id=${list ? list.id : 'null'}, list.semester_id=${list ? list.semester_id : 'n/a'})`);
+    if (!list) return res.send(lines.join('\n'));
+  } catch (err) {
+    lines.push(`1. getListByDay: FAILED - ${err.message}`);
+    return res.send(lines.join('\n'));
+  }
+
+  try {
+    const dates = await datesForList(list.id);
+    lines.push(`2. datesForList: OK (${dates.length} date(s))`);
+  } catch (err) {
+    lines.push(`2. datesForList: FAILED - ${err.message}`);
+    return res.send(lines.join('\n'));
+  }
+
+  try {
+    const hourSections = await substituteBoard(day, todayISO(), list.semester_id);
+    lines.push(`3. substituteBoard (powers the hour-by-hour chart): OK (${hourSections.length} hour section(s))`);
+  } catch (err) {
+    lines.push(`3. substituteBoard (powers the hour-by-hour chart): FAILED - ${err.message}`);
+    return res.send(lines.join('\n'));
+  }
+
+  try {
+    const positionGroups = await groupedPermanentJobsForDay(day, list.semester_id);
+    lines.push(`4. groupedPermanentJobsForDay (the Positions list): OK (${positionGroups.length} group(s))`);
+  } catch (err) {
+    lines.push(`4. groupedPermanentJobsForDay (the Positions list): FAILED - ${err.message}`);
+    return res.send(lines.join('\n'));
+  }
+
+  try {
+    const temporaryPositionGroups = await groupedTemporaryJobsForDayDate(day, todayISO(), list.semester_id);
+    lines.push(`5. groupedTemporaryJobsForDayDate: OK (${temporaryPositionGroups.length} group(s))`);
+  } catch (err) {
+    lines.push(`5. groupedTemporaryJobsForDayDate: FAILED - ${err.message}`);
+    return res.send(lines.join('\n'));
+  }
+
+  try {
+    const combos = await listScheduleCombos();
+    lines.push(`6. listScheduleCombos: OK (${combos.length} combo(s))`);
+  } catch (err) {
+    lines.push(`6. listScheduleCombos: FAILED - ${err.message}`);
+    return res.send(lines.join('\n'));
+  }
+
+  lines.push('', 'All checks passed - the error is likely in buildHourSections\' own extra decoration (hasInfantChild, checked-in highlighting) or the view template itself, not these core queries.');
+  res.send(lines.join('\n'));
+});
+
 // --- Floater Assignments: position/room/name planning grid + Substitutes Needed ---
 
 router.get('/volunteers/:day/manage', requireAdmin, requireClassDay, async (req, res) => {
