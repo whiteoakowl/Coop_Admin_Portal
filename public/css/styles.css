@@ -11043,6 +11043,18 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
    line, and a title" so this is new, but reuses the same tokens/border/
    radius/shadow every other card family here already uses. */
 .event-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.25rem; margin-top: 1.5rem; }
+
+/* A real request: "Parent portal events, list view... Add the title
+   upcoming events" plus a Past Events section - the heading itself
+   (margin-top: 0 since .event-card-grid above already adds its own
+   1.5rem of space below whichever heading precedes it), a divider line
+   with real room on both sides so it doesn't crowd the Upcoming cards
+   above it, and the Past Events heading gets its own extra top margin on
+   top of that for "spacing between past events title and the list of
+   events" - .event-card-grid's own margin-top handles the gap below it. */
+.event-list-section-heading { margin: 0; }
+.event-list-section-divider { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0 0; }
+.event-list-section-heading-past { margin-top: 1.5rem; }
 .event-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); overflow: hidden; text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: transform 0.15s ease; }
 .event-card:hover { transform: translateY(-2px); }
 /* A real request: "when they click on an event it shows a popup" - the

@@ -60,18 +60,33 @@ function wantsJson(req) {
 // button). approvalStatus:'approved' is a safety net for a member-
 // submitted event a Main Admin published without first deciding its
 // submission - see utils/events.js's own createEvent comment.
-router.get('/', async (req, res) => {
-  const upcoming = await events.listEvents({ status: 'published', upcomingOnly: true, approvalStatus: 'approved' });
-  let visible = req.portalAccount ? upcoming : upcoming.filter((e) => e.visibility === 'public');
+// Shared by the upcoming and (list-view-only) past event sets below -
+// same "signed out sees public only, a signed-in account sees every
+// published event minus any section-restricted one none of their family
+// belongs to" filtering, just reused for both.
+async function visibleEventsFor(req, rawEvents) {
+  let visible = req.portalAccount ? rawEvents : rawEvents.filter((e) => e.visibility === 'public');
   if (req.portalAccount) {
     const family = await familyForAccount(req.portalAccount.id);
     const flags = await Promise.all(visible.map((e) => events.eventVisibleToFamily(e.id, family)));
     visible = visible.filter((e, i) => flags[i]);
   }
+  return visible.map((e) => ({ ...withImageUrl(e), startsLabel: formatFriendlyTimestamp(e.starts_at) }));
+}
+
+router.get('/', async (req, res) => {
+  const upcoming = await events.listEvents({ status: 'published', upcomingOnly: true, approvalStatus: 'approved' });
+  const mapped = await visibleEventsFor(req, upcoming);
   const settings = await db.prepare('SELECT * FROM site_settings WHERE id = 1').get();
   const eventSettings = await events.getEventSettings();
   const view = req.query.view ? (req.query.view === 'calendar' ? 'calendar' : 'list') : eventSettings.default_calendar_view;
-  const mapped = visible.map((e) => ({ ...withImageUrl(e), startsLabel: formatFriendlyTimestamp(e.starts_at) }));
+  // A real request: "Parent portal events, list view... add the title
+  // upcoming events" (with a Past Events section below it) - only
+  // fetched for list view; calendar view already shows a past month's
+  // own events when navigated to directly (events.monthGrid), so it
+  // doesn't need this second set.
+  const pastMapped =
+    view === 'list' ? await visibleEventsFor(req, await events.listEvents({ status: 'published', pastOnly: true, approvalStatus: 'approved' })) : [];
   // A real bug report: "on the parent portal when you click on browse
   // events it switches to student portal. It should stay in parent
   // portal." This page is shared across every portal (see events-list.ejs's
@@ -87,6 +102,7 @@ router.get('/', async (req, res) => {
     view,
     portalParam,
     events: mapped,
+    pastEvents: pastMapped,
     calendar: view === 'calendar' ? events.monthGrid(req.query.month, mapped) : null,
   });
 });
