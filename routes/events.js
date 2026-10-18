@@ -61,8 +61,20 @@ function wantsJson(req) {
 // submitted event a Main Admin published without first deciding its
 // submission - see utils/events.js's own createEvent comment.
 router.get('/', async (req, res) => {
-  const upcoming = await events.listEvents({ status: 'published', upcomingOnly: true, approvalStatus: 'approved' });
-  let visible = req.portalAccount ? upcoming : upcoming.filter((e) => e.visibility === 'public');
+  // A real request: "Calendar event view, past events shouldn't
+  // disappear. They should always remain on the calendar. In list view
+  // past events should be moved to the bottom under past events." This
+  // used to fetch upcomingOnly: true, so a published event vanished
+  // from both views entirely the moment its own start time passed -
+  // fine for Calendar view's old simple list but wrong once Calendar
+  // view navigates to a past month (nothing to show there) and wrong
+  // for List view too (no way to ever look a past event up again).
+  // Every published/approved event is fetched now; Calendar view hands
+  // the whole set to monthGrid unfiltered (same as Main Admin's own
+  // Calendar tab already does - see routes/admin-events.js), and List
+  // view below splits it into upcomingEvents/pastEvents instead.
+  const all = await events.listEvents({ status: 'published', approvalStatus: 'approved' });
+  let visible = req.portalAccount ? all : all.filter((e) => e.visibility === 'public');
   if (req.portalAccount) {
     const family = await familyForAccount(req.portalAccount.id);
     const flags = await Promise.all(visible.map((e) => events.eventVisibleToFamily(e.id, family)));
@@ -72,6 +84,17 @@ router.get('/', async (req, res) => {
   const eventSettings = await events.getEventSettings();
   const view = req.query.view ? (req.query.view === 'calendar' ? 'calendar' : 'list') : eventSettings.default_calendar_view;
   const mapped = visible.map((e) => ({ ...withImageUrl(e), startsLabel: formatFriendlyTimestamp(e.starts_at) }));
+  // Plain string comparison against now_text()'s own exact format -
+  // matches how upcomingOnly's own SQL clause (starts_at >= now_text())
+  // already decided "upcoming" vs not, just done once in JS instead of
+  // in the query now that the query itself fetches everything.
+  // listEvents already sorts ascending (soonest first) - upcomingEvents
+  // keeps that order, pastEvents is reversed so the most recently
+  // passed event reads first, same as any other "past" list/log in this
+  // app (newest first).
+  const nowText = (await db.prepare('SELECT now_text() AS "now"').get()).now;
+  const upcomingEvents = mapped.filter((e) => e.starts_at >= nowText);
+  const pastEvents = mapped.filter((e) => e.starts_at < nowText).reverse();
   // A real bug report: "on the parent portal when you click on browse
   // events it switches to student portal. It should stay in parent
   // portal." This page is shared across every portal (see events-list.ejs's
@@ -86,7 +109,8 @@ router.get('/', async (req, res) => {
     settings,
     view,
     portalParam,
-    events: mapped,
+    events: upcomingEvents,
+    pastEvents,
     calendar: view === 'calendar' ? events.monthGrid(req.query.month, mapped) : null,
   });
 });

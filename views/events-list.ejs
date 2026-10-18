@@ -109,11 +109,14 @@
             monthLinkBase: `/events?view=calendar${portalQuerySuffix}`,
             eventHref: function (e) { return `/events/${e.id}${effectivePortal ? '?portal=' + effectivePortal : ''}`; },
           }) %>
-        <% } else if (events.length === 0) { %>
-          <p class="roster-empty">No upcoming events right now &mdash; check back soon.</p>
         <% } else { %>
-          <div class="event-card-grid">
-            <% events.forEach(function(e) { %>
+          <%
+            // A real request: "In list view past events should be moved
+            // to the bottom under past events." pastEvents (already
+            // newest-passed-first, see routes/events.js) renders as its
+            // own second section below the upcoming grid instead of
+            // being dropped from the page entirely.
+            function renderEventCard(e) { %>
               <button type="button" class="event-card event-card-clickable" data-view-event="<%= e.id %>">
                 <% if (e.imageUrl) { %>
                   <div class="event-card-image"><img src="<%= e.imageUrl %>" alt="" /></div>
@@ -125,8 +128,21 @@
                   <% if (e.location) { %><p class="event-card-location"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= e.location %></p><% } %>
                 </div>
               </button>
-            <% }); %>
-          </div>
+          <% }
+          %>
+          <% if (events.length === 0) { %>
+            <p class="roster-empty">No upcoming events right now &mdash; check back soon.</p>
+          <% } else { %>
+            <div class="event-card-grid">
+              <% events.forEach(renderEventCard); %>
+            </div>
+          <% } %>
+          <% if (pastEvents.length > 0) { %>
+            <h2 class="events-past-heading">Past Events</h2>
+            <div class="event-card-grid event-card-grid-past">
+              <% pastEvents.forEach(renderEventCard); %>
+            </div>
+          <% } %>
         <% } %>
       </div>
     </section>

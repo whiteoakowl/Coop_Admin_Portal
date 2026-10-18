@@ -11118,6 +11118,14 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
    line, and a title" so this is new, but reuses the same tokens/border/
    radius/shadow every other card family here already uses. */
 .event-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.25rem; margin-top: 1.5rem; }
+/* A real request: "In list view past events should be moved to the
+   bottom under past events" - a plain section heading separates the
+   newest-passed-first past-events grid below from the upcoming one
+   above; a slight opacity dip on the past cards themselves is the same
+   "still fully visible/clickable, just visually secondary" treatment
+   already used elsewhere in this app for past-tense items. */
+.events-past-heading { margin: 2rem 0 0; }
+.event-card-grid-past .event-card { opacity: 0.75; }
 .event-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); overflow: hidden; text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: transform 0.15s ease; }
 .event-card:hover { transform: translateY(-2px); }
 /* A real request: "when they click on an event it shows a popup" - the
