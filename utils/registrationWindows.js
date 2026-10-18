@@ -1,11 +1,15 @@
 // Staged, action-type-and-section-targeted class registration windows
 // (see the registration_windows migrations' own header comments for the
-// full rationale). A window can target one specific Schedule Grid
-// (class_schedules row - null means every grid), any number of Sections
-// (registration_window_sections - none means everyone), and any
-// combination of the four concrete self-service actions this app
-// actually gates (none checked means every action, same "empty means
-// unrestricted" rule sections/schedule grid already follow):
+// full rationale). A window can target any number of Schedule Grids
+// (registration_window_schedules - none means every grid; a real request,
+// "schedule grid should be a dropdown menu with check boxes to select
+// multiple," moved this off a single class_schedule_id column onto its
+// own join table, the same move Section got in the action-types
+// migration), any number of Sections (registration_window_sections - none
+// means everyone), and any combination of the four concrete self-service
+// actions this app actually gates (none checked means every action, same
+// "empty means unrestricted" rule sections/schedule grids already
+// follow):
 //   - open_for_parent_teacher: a parent/staff member signing themselves
 //     up to teach (Teacher Portal's own /classes/:id/join, role=teacher)
 //   - open_for_parent_assistant: same route, role=assistant
@@ -34,14 +38,17 @@ async function sectionIdsByWindow() {
   return byWindow;
 }
 
+async function scheduleIdsByWindow() {
+  const rows = await db.prepare('SELECT window_id AS "windowId", class_schedule_id AS "classScheduleId" FROM registration_window_schedules').all();
+  const byWindow = {};
+  rows.forEach((r) => {
+    (byWindow[r.windowId] = byWindow[r.windowId] || []).push(r.classScheduleId);
+  });
+  return byWindow;
+}
+
 async function listWindows() {
-  const windows = await db
-    .prepare(
-      `SELECT w.*, cs.title AS "scheduleTitle" FROM registration_windows w
-       LEFT JOIN class_schedules cs ON cs.id = w.class_schedule_id
-       ORDER BY w.opens_at`
-    )
-    .all();
+  const windows = await db.prepare('SELECT * FROM registration_windows ORDER BY opens_at').all();
   const sectionRows = await db
     .prepare(
       `SELECT rws.window_id AS "windowId", s.name AS "sectionName" FROM registration_window_sections rws
@@ -53,40 +60,59 @@ async function listWindows() {
   sectionRows.forEach((r) => {
     (sectionNamesByWindow[r.windowId] = sectionNamesByWindow[r.windowId] || []).push(r.sectionName);
   });
+  const scheduleRows = await db
+    .prepare(
+      `SELECT rwc.window_id AS "windowId", cs.title AS "scheduleTitle" FROM registration_window_schedules rwc
+       JOIN class_schedules cs ON cs.id = rwc.class_schedule_id
+       ORDER BY cs.title`
+    )
+    .all();
+  const scheduleTitlesByWindow = {};
+  scheduleRows.forEach((r) => {
+    (scheduleTitlesByWindow[r.windowId] = scheduleTitlesByWindow[r.windowId] || []).push(r.scheduleTitle);
+  });
   const sectionIdsByWindowMap = await sectionIdsByWindow();
-  return windows.map((w) => ({ ...w, sectionNames: sectionNamesByWindow[w.id] || [], sectionIds: sectionIdsByWindowMap[w.id] || [] }));
+  const scheduleIdsByWindowMap = await scheduleIdsByWindow();
+  return windows.map((w) => ({
+    ...w,
+    sectionNames: sectionNamesByWindow[w.id] || [],
+    sectionIds: sectionIdsByWindowMap[w.id] || [],
+    scheduleTitles: scheduleTitlesByWindow[w.id] || [],
+    scheduleIds: scheduleIdsByWindowMap[w.id] || [],
+  }));
 }
 
-async function createWindow({ label, opensAt, closesAt, classScheduleId, sectionIds, actionTypes }) {
+async function createWindow({ label, opensAt, closesAt, classScheduleIds, sectionIds, actionTypes }) {
   await db.withTransaction(async (tx) => {
     const columns = Object.values(ACTION_TYPE_COLUMNS);
     const values = Object.keys(ACTION_TYPE_COLUMNS).map((key) => (actionTypes || []).includes(key));
     const info = await tx
-      .prepare(
-        `INSERT INTO registration_windows (label, opens_at, closes_at, class_schedule_id, ${columns.join(', ')})
-         VALUES (?, ?, ?, ?, ${columns.map(() => '?').join(', ')})`
-      )
-      .run(label, opensAt, closesAt || null, classScheduleId || null, ...values);
+      .prepare(`INSERT INTO registration_windows (label, opens_at, closes_at, ${columns.join(', ')}) VALUES (?, ?, ?, ${columns.map(() => '?').join(', ')})`)
+      .run(label, opensAt, closesAt || null, ...values);
     const windowId = info.lastInsertRowid;
     for (const sectionId of [...new Set(sectionIds || [])]) {
       await tx.prepare('INSERT INTO registration_window_sections (window_id, section_id) VALUES (?, ?)').run(windowId, sectionId);
     }
+    for (const classScheduleId of [...new Set(classScheduleIds || [])]) {
+      await tx.prepare('INSERT INTO registration_window_schedules (window_id, class_schedule_id) VALUES (?, ?)').run(windowId, classScheduleId);
+    }
   });
 }
 
-async function updateWindow(id, { label, opensAt, closesAt, classScheduleId, sectionIds, actionTypes }) {
+async function updateWindow(id, { label, opensAt, closesAt, classScheduleIds, sectionIds, actionTypes }) {
   await db.withTransaction(async (tx) => {
     const columns = Object.values(ACTION_TYPE_COLUMNS);
     const values = Object.keys(ACTION_TYPE_COLUMNS).map((key) => (actionTypes || []).includes(key));
     await tx
-      .prepare(
-        `UPDATE registration_windows SET label = ?, opens_at = ?, closes_at = ?, class_schedule_id = ?, ${columns.map((c) => `${c} = ?`).join(', ')}
-         WHERE id = ?`
-      )
-      .run(label, opensAt, closesAt || null, classScheduleId || null, ...values, id);
+      .prepare(`UPDATE registration_windows SET label = ?, opens_at = ?, closes_at = ?, ${columns.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`)
+      .run(label, opensAt, closesAt || null, ...values, id);
     await tx.prepare('DELETE FROM registration_window_sections WHERE window_id = ?').run(id);
     for (const sectionId of [...new Set(sectionIds || [])]) {
       await tx.prepare('INSERT INTO registration_window_sections (window_id, section_id) VALUES (?, ?)').run(id, sectionId);
+    }
+    await tx.prepare('DELETE FROM registration_window_schedules WHERE window_id = ?').run(id);
+    for (const classScheduleId of [...new Set(classScheduleIds || [])]) {
+      await tx.prepare('INSERT INTO registration_window_schedules (window_id, class_schedule_id) VALUES (?, ?)').run(id, classScheduleId);
     }
   });
 }
@@ -150,8 +176,10 @@ async function isRegistrationOpenForAccount(accountRoles, { classScheduleIds, se
 
   const nowText = (await db.prepare('SELECT now_text() AS now').get()).now;
   const sectionsByWindow = await sectionIdsByWindow();
+  const schedulesByWindow = await scheduleIdsByWindow();
   return windows.some((w) => {
-    if (w.class_schedule_id && classScheduleIds !== undefined && !classScheduleIds.includes(w.class_schedule_id)) return false;
+    const requiredSchedules = schedulesByWindow[w.id] || [];
+    if (requiredSchedules.length && classScheduleIds !== undefined && !classScheduleIds.some((id) => requiredSchedules.includes(id))) return false;
     const requiredSections = sectionsByWindow[w.id] || [];
     if (requiredSections.length && sectionIds !== undefined && !sectionIds.some((id) => requiredSections.includes(id))) return false;
     if (!windowAppliesToAction(w, actionType)) return false;
@@ -170,8 +198,12 @@ async function nextWindowForAccount(accountRoles, { classScheduleIds, sectionIds
   const windows = await db.prepare('SELECT * FROM registration_windows').all();
   const nowText = (await db.prepare('SELECT now_text() AS now').get()).now;
   const sectionsByWindow = await sectionIdsByWindow();
+  const schedulesByWindow = await scheduleIdsByWindow();
   const applicable = windows
-    .filter((w) => !w.class_schedule_id || classScheduleIds === undefined || classScheduleIds.includes(w.class_schedule_id))
+    .filter((w) => {
+      const requiredSchedules = schedulesByWindow[w.id] || [];
+      return !requiredSchedules.length || classScheduleIds === undefined || classScheduleIds.some((id) => requiredSchedules.includes(id));
+    })
     .filter((w) => {
       const requiredSections = sectionsByWindow[w.id] || [];
       return !requiredSections.length || sectionIds === undefined || sectionIds.some((id) => requiredSections.includes(id));
@@ -186,25 +218,32 @@ async function nextWindowForAccount(accountRoles, { classScheduleIds, sectionIds
 // over to new semesters]" - the same "clone from whichever semester most
 // recently existed before this one" shape utils/taskList.js's own
 // cloneTaskListFromMostRecentSemester already uses. Only windows tied to
-// a SPECIFIC Schedule Grid (class_schedule_id not null) belong to one
-// semester and need a next-semester counterpart; a window with no
-// Schedule Grid at all already applies to every semester by definition
-// (isRegistrationOpenForAccount's own "null means every grid" rule), so
-// re-cloning it would just create a confusing duplicate entry. Per a real
-// request, this copies every field EXACTLY, opens_at/closes_at included
-// - the admin is expected to edit each clone's dates afterward, same as
-// they'd have to re-create it by hand otherwise. The one field that
-// can't be copied verbatim is class_schedule_id itself: the old semester's
-// own Schedule Grid row doesn't exist in the new semester, so this maps
-// it to the new semester's own grid for the SAME day of week - skipping a
-// window outright if the new semester doesn't meet that day at all.
+// at least one SPECIFIC Schedule Grid belonging to the previous semester
+// need a next-semester counterpart; a window with no Schedule Grid at all
+// already applies to every semester by definition (isRegistrationOpen-
+// ForAccount's own "none selected means every grid" rule), so re-cloning
+// it would just create a confusing duplicate entry. Per a real request,
+// this copies every field EXACTLY, opens_at/closes_at included - the
+// admin is expected to edit each clone's dates afterward, same as they'd
+// have to re-create it by hand otherwise. A window's own Schedule Grid
+// id(s) can't be copied verbatim: the old semester's own grid rows don't
+// exist in the new semester, so each one tied to the previous semester
+// maps onto the new semester's own grid for the SAME day of week,
+// dropping that one grid (not the whole window) if the new semester
+// doesn't meet that day at all - a grid id belonging to some OTHER,
+// unrelated semester (a window can target grids spanning more than one
+// semester at once, unlike the old single-column version) carries
+// through unchanged. A window ends up with no Schedule Grid left to
+// clone onto at all is skipped entirely, same as the old "no matching
+// day" skip.
 async function cloneRegistrationWindowsFromMostRecentSemester(newSemesterId) {
   const previous = await db.prepare('SELECT id FROM semesters WHERE id != ? ORDER BY id DESC LIMIT 1').get(newSemesterId);
   if (!previous) return;
   const windows = await db
     .prepare(
-      `SELECT w.*, cs.day_of_week AS "dayOfWeek" FROM registration_windows w
-       JOIN class_schedules cs ON cs.id = w.class_schedule_id
+      `SELECT DISTINCT w.* FROM registration_windows w
+       JOIN registration_window_schedules rws ON rws.window_id = w.id
+       JOIN class_schedules cs ON cs.id = rws.class_schedule_id
        WHERE cs.semester_id = ?`
     )
     .all(previous.id);
@@ -212,16 +251,30 @@ async function cloneRegistrationWindowsFromMostRecentSemester(newSemesterId) {
 
   const newSchedules = await db.prepare('SELECT * FROM class_schedules WHERE semester_id = ?').all(newSemesterId);
   const newScheduleIdByDay = new Map(newSchedules.map((s) => [s.day_of_week, s.id]));
+  const allSchedules = await db.prepare('SELECT id, day_of_week, semester_id FROM class_schedules').all();
+  const scheduleById = new Map(allSchedules.map((s) => [s.id, s]));
   const sectionsByWindow = await sectionIdsByWindow();
+  const scheduleIdsByWindowMap = await scheduleIdsByWindow();
 
   for (const w of windows) {
-    const newClassScheduleId = newScheduleIdByDay.get(w.dayOfWeek);
-    if (!newClassScheduleId) continue;
+    const oldScheduleIds = scheduleIdsByWindowMap[w.id] || [];
+    const newScheduleIds = [];
+    for (const oldId of oldScheduleIds) {
+      const schedule = scheduleById.get(oldId);
+      if (!schedule) continue;
+      if (schedule.semester_id === previous.id) {
+        const mapped = newScheduleIdByDay.get(schedule.day_of_week);
+        if (mapped) newScheduleIds.push(mapped);
+      } else {
+        newScheduleIds.push(oldId);
+      }
+    }
+    if (newScheduleIds.length === 0) continue;
     await createWindow({
       label: w.label,
       opensAt: w.opens_at,
       closesAt: w.closes_at,
-      classScheduleId: newClassScheduleId,
+      classScheduleIds: [...new Set(newScheduleIds)],
       sectionIds: sectionsByWindow[w.id] || [],
       actionTypes: Object.keys(ACTION_TYPE_COLUMNS).filter((key) => !!w[ACTION_TYPE_COLUMNS[key]]),
     });

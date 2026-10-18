@@ -161,14 +161,21 @@ test('Classes > Settings tab: Add a Window form has Schedule Grid, Section, and 
   // visible inline form.
   assert.match(page.text, /id="add-window-dialog"/);
   assert.match(page.text, /\+ Add a Window/);
-  assert.match(page.text, /<select name="classScheduleId">/);
+  // Schedule Grid and Section are both the same closed-by-default
+  // checkbox-dropdown-with-chips widget now (a real request: "schedule
+  // grid should be a dropdown menu with check boxes to select multiple.
+  // Section should be a dropdown menu with checkboxes to choose
+  // multiple") - views/partials/multi-select-checkbox.ejs, not a plain
+  // <select>/always-open checkbox list.
+  assert.match(page.text, /class="multi-select-checkbox"/);
+  assert.match(page.text, new RegExp(`name="classScheduleIds" value="${mondayScheduleId}"`));
   assert.match(page.text, /name="sectionIds" value="[^"]*"/);
   assert.match(page.text, /name="actionTypes" value="parent_teacher"/);
   assert.match(page.text, /name="actionTypes" value="parent_assistant"/);
   assert.match(page.text, /name="actionTypes" value="parent_register_student"/);
   assert.match(page.text, /name="actionTypes" value="student_register_self"/);
   assert.match(page.text, /Teen Co-op/);
-  assert.match(page.text, />Monday</);
+  assert.match(page.text, />\s*Monday\s*</);
 
   await request(app)
     .post('/admin/schedule/registration-windows')
@@ -176,7 +183,7 @@ test('Classes > Settings tab: Add a Window form has Schedule Grid, Section, and 
     .type('form')
     .send({
       label: 'Monday Teen Window',
-      classScheduleId: String(mondayScheduleId),
+      classScheduleIds: String(mondayScheduleId),
       sectionIds: String(sectionId),
       actionTypes: 'parent_register_student',
       opensAt: '2020-01-01T00:00',
@@ -195,12 +202,88 @@ test('Classes > Settings tab: Add a Window form has Schedule Grid, Section, and 
   assert.match(after.text, new RegExp(`action="/admin/schedule/registration-windows/${win.id}/update"`));
   const editDialog = /<dialog id="edit-window-dialog-\d+"[^]*?<\/dialog>/.exec(after.text)[0];
   assert.match(editDialog, /value="Monday Teen Window"/);
+  assert.match(editDialog, new RegExp(`name="classScheduleIds" value="${mondayScheduleId}" checked`));
   assert.match(editDialog, new RegExp(`name="sectionIds" value="${sectionId}" checked`));
   assert.match(editDialog, /name="actionTypes" value="parent_register_student" checked/);
 });
 
+// A real request ("remove description") dropped the explanatory
+// paragraph that used to sit above the Current Windows table; a real
+// request ("edit button fit to text") shrank that table's own Edit
+// button to its own text instead of stretching to fill its actions cell
+// alongside Delete (the same bug class as the Committees/Events/
+// Accounting pages' own .roster-action-btn-fit, just reached through a
+// plain .actions-cell parent instead of one that already zeroes
+// flex-grow on its own - see that class's own CSS comment).
+test('Registration Schedule: the old explanatory paragraph is gone, and the Current Windows table\'s Edit/Delete buttons fit their own text instead of stretching', async () => {
+  await clearWindows();
+  const admin = await loginAsAdmin();
+  await request(app)
+    .post('/admin/schedule/registration-windows')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ label: 'Fit Text Window', opensAt: '2020-01-01T00:00', _csrf: admin.csrfToken });
+
+  const page = await request(app).get('/admin/schedule?tab=settings&settingsTab=registration-schedule').set('Cookie', admin.cookie);
+  assert.doesNotMatch(page.text, /Stage class registration in rounds/);
+  assert.match(page.text, /roster-action-btn roster-action-btn-fit"[^>]*>Edit</);
+  assert.match(page.text, /roster-action-btn roster-action-btn-fit roster-action-btn-danger">Delete</);
+});
+
+// A real request: "schedule grid should be a dropdown menu with check
+// boxes to select multiple" - a window can now target more than one
+// Schedule Grid at once (registration_window_schedules, a join table
+// replacing the old single class_schedule_id column).
+test('A registration window can target multiple Schedule Grids at once, gating registration for classes on ANY of them', async () => {
+  await clearWindows();
+  const admin = await loginAsAdmin();
+  const mondayScheduleId = await classScheduleIdForDay('monday');
+  const wednesdayScheduleId = await classScheduleIdForDay('wednesday');
+
+  const page = await request(app).get('/admin/schedule?tab=settings&settingsTab=registration-schedule').set('Cookie', admin.cookie);
+  const csrfToken = extractCsrf(page.text);
+  await request(app)
+    .post('/admin/schedule/registration-windows')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({
+      label: 'Monday And Wednesday',
+      classScheduleIds: [String(mondayScheduleId), String(wednesdayScheduleId)],
+      opensAt: '2020-01-01T00:00',
+      _csrf: csrfToken,
+    });
+
+  const { listWindows: listWindowsForMulti } = require('../utils/registrationWindows');
+  const windows = await listWindowsForMulti();
+  const multi = windows.find((w) => w.label === 'Monday And Wednesday');
+  assert.deepEqual([...multi.scheduleIds].sort(), [mondayScheduleId, wednesdayScheduleId].sort());
+  assert.deepEqual([...multi.scheduleTitles].sort(), ['Monday', 'Wednesday']);
+
+  const after = await request(app).get('/admin/schedule?tab=settings&settingsTab=registration-schedule').set('Cookie', admin.cookie);
+  assert.match(after.text, /Monday, Wednesday/);
+
+  const mondayClass = await createClass(admin, { day: 'monday', className: 'Multi Grid Monday Class' });
+  const wednesdayClass = await createClass(admin, { day: 'wednesday', className: 'Multi Grid Wednesday Class' });
+  const parent = await createParentWithChild();
+
+  const mondayReg = await request(app)
+    .post(`/parent/classes/${mondayClass.id}/register`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
+  assert.match(mondayReg.headers.location, /notice=/);
+
+  const wednesdayReg = await request(app)
+    .post(`/parent/classes/${wednesdayClass.id}/register`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: String(parent.childId), day: 'wednesday', _csrf: parent.csrfToken });
+  assert.match(wednesdayReg.headers.location, /notice=/);
+});
+
 test('Editing a registration window updates its fields', async () => {
   await clearWindows();
+  const { listWindows } = require('../utils/registrationWindows');
   const admin = await loginAsAdmin();
   const wednesdayScheduleId = await classScheduleIdForDay('wednesday');
   await request(app)
@@ -216,7 +299,7 @@ test('Editing a registration window updates its fields', async () => {
     .type('form')
     .send({
       label: 'Renamed Window',
-      classScheduleId: String(wednesdayScheduleId),
+      classScheduleIds: String(wednesdayScheduleId),
       actionTypes: 'student_register_self',
       opensAt: '2021-02-02T00:00',
       _csrf: admin.csrfToken,
@@ -227,8 +310,8 @@ test('Editing a registration window updates its fields', async () => {
   assert.doesNotMatch(after.text, /Editable Window</);
   assert.match(after.text, /Student: Register Self/);
 
-  const updated = await db.prepare('SELECT * FROM registration_windows WHERE id = ?').get(win.id);
-  assert.equal(updated.class_schedule_id, wednesdayScheduleId);
+  const updated = (await listWindows()).find((w) => w.id === win.id);
+  assert.deepEqual(updated.scheduleIds, [wednesdayScheduleId]);
   assert.equal(updated.open_for_student_register_self, true);
 });
 
@@ -251,7 +334,7 @@ test('A schedule-grid-scoped registration window only gates registration for cla
   await clearWindows();
   const { createWindow } = require('../utils/registrationWindows');
   const mondayScheduleId = await classScheduleIdForDay('monday');
-  await createWindow({ label: 'Monday Only', opensAt: '2020-01-01 00:00:00', closesAt: null, classScheduleId: mondayScheduleId });
+  await createWindow({ label: 'Monday Only', opensAt: '2020-01-01 00:00:00', closesAt: null, classScheduleIds: [mondayScheduleId] });
 
   const admin = await loginAsAdmin();
   const mondayClass = await createClass(admin, { day: 'monday', className: 'Monday Gated Class' });
@@ -373,7 +456,7 @@ test('A registration window scoped to a specific semester\'s Schedule Grid still
   const taggedScheduleId = (await db.prepare("SELECT id FROM class_schedules WHERE day_of_week = 'monday' AND semester_id = ?").get(semesterId)).id;
 
   const { createWindow } = require('../utils/registrationWindows');
-  await createWindow({ label: 'Fall Monday Only', opensAt: '2020-01-01 00:00:00', closesAt: null, classScheduleId: taggedScheduleId, actionTypes: ['parent_teacher'] });
+  await createWindow({ label: 'Fall Monday Only', opensAt: '2020-01-01 00:00:00', closesAt: null, classScheduleIds: [taggedScheduleId], actionTypes: ['parent_teacher'] });
 
   const parent = await createParentWithChild();
   const joined = await request(app)

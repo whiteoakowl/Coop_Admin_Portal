@@ -38,7 +38,18 @@
         Include Experience/Qualifications
       </label>
 
-      <div class="roster-btn-row">
+      <%# A real request: "cancel and save button should be on the same
+          row and fit to text better." On mobile, .roster-btn-row's own
+          grid (styles.css) only ever counts .roster-action-btn/
+          .btn-secondary toward a column count (public/js/roster-btn-row-
+          grid.js) - this row's Save is .primary-btn, so that count was
+          effectively "find nothing to size a grid for", leaving the
+          implicit single-column grid default and stacking Cancel/Save
+          each on their own full-width row instead of side by side.
+          roster-btn-row-fit-text (now covering .btn-secondary/
+          .primary-btn too, see its own CSS comment) sizes each button to
+          its own text instead. %>
+      <div class="roster-btn-row roster-btn-row-fit-text">
         <a class="btn-secondary" href="<%= backTo %>">Cancel</a>
         <button type="submit" class="primary-btn">Save</button>
       </div>

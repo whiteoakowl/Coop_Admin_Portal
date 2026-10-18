@@ -193,6 +193,13 @@ test('Instructor Profile edit form: saves email/phone/about me/qualifications + 
     assert.equal(res.status, 200);
     assert.match(res.text, /Instructor Profile - Edit Form Instructor/);
     assert.match(res.text, /name="qualificationsVisible"/);
+    // A real request: "cancel and save button should be on the same row
+    // and fit to text better" - roster-btn-row-fit-text sizes each
+    // button to its own text instead of .roster-btn-row's mobile grid
+    // (which used to stack them one per row here, since neither
+    // .btn-secondary's Cancel nor .primary-btn's Save counted toward
+    // roster-btn-row-grid.js's own column count).
+    assert.match(res.text, /class="roster-btn-row roster-btn-row-fit-text"/);
   });
 
   await t.test('POST saves every field', async () => {

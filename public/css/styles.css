@@ -4783,7 +4783,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    .roster-action-btn's own min-width: 5.5rem, sized for a toolbar row of
    several buttons side by side, forcing a short one-word label like
    "Edit" noticeably wider than its own text needs. */
-.roster-action-btn-fit { min-width: 0; padding: 0.5rem 0.75rem; }
+/* flex: 0 1 auto added for a later bug report (Registration Schedule's
+   own Edit button, views/admin-schedule.ejs): unlike the Committees/
+   Events/Accounting cases above (each already sitting in a context that
+   separately zeroes flex-grow back to 0), this one's parent is a plain
+   .actions-cell (flex: 1 0 auto still active from .roster-action-btn's
+   own base rule), so min-width: 0 alone just let it shrink below 5.5rem
+   while flex-grow: 1 still stretched it to fill the row's remaining
+   space evenly with Delete beside it - the exact "fit to text" ask this
+   class exists for. Folding the override in here instead of relying on
+   each caller's own context to have already zeroed it makes the class
+   self-sufficient wherever it's used next. */
+.roster-action-btn-fit { min-width: 0; padding: 0.5rem 0.75rem; flex: 0 1 auto; }
 
 /* Events' own Add/Edit Category/Add/Edit Location toolbar - a real
    request: "events, desktop, add/edit category and add/edit location
@@ -8255,8 +8266,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     flex-wrap: wrap;
     justify-content: center;
   }
+  /* .btn-secondary/.primary-btn added for a later bug report (the
+     Instructor Profile edit dialog's own Cancel/Save row): same stacked-
+     one-per-row symptom as the Floater Assignments Edit Dates/Add-Edit
+     Position row that taught roster-btn-row-grid.js to count
+     .btn-secondary (styles.css's own mobile grid rules above), but here
+     the ask was for text-width sizing, not an equal-width grid, so the
+     fix is this class picking them up instead. */
   .roster-btn-row-fit-text.roster-btn-row > .roster-action-btn,
-  .roster-btn-row-fit-text.roster-btn-row > form > .roster-action-btn {
+  .roster-btn-row-fit-text.roster-btn-row > form > .roster-action-btn,
+  .roster-btn-row-fit-text.roster-btn-row > .btn-secondary,
+  .roster-btn-row-fit-text.roster-btn-row > .primary-btn {
     width: auto;
     flex: 0 1 auto;
     white-space: nowrap;

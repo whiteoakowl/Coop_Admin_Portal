@@ -423,7 +423,7 @@ router.post('/schedule/registration-windows', requireFullAdmin, async (req, res)
     label,
     opensAt,
     closesAt,
-    classScheduleId: req.body.classScheduleId ? Number(req.body.classScheduleId) : null,
+    classScheduleIds: [].concat(req.body.classScheduleIds || []).map((id) => Number(id)).filter(Boolean),
     sectionIds: [].concat(req.body.sectionIds || []).map((id) => Number(id)).filter(Boolean),
     actionTypes: [].concat(req.body.actionTypes || []),
   });
@@ -442,7 +442,7 @@ router.post('/schedule/registration-windows/:id/update', requireFullAdmin, async
     label,
     opensAt,
     closesAt,
-    classScheduleId: req.body.classScheduleId ? Number(req.body.classScheduleId) : null,
+    classScheduleIds: [].concat(req.body.classScheduleIds || []).map((id) => Number(id)).filter(Boolean),
     sectionIds: [].concat(req.body.sectionIds || []).map((id) => Number(id)).filter(Boolean),
     actionTypes: [].concat(req.body.actionTypes || []),
   });
