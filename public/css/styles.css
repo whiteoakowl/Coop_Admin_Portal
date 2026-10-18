@@ -11606,7 +11606,7 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
    only view that uses any of the following. */
 .parent-home-cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.5rem; margin: 1.5rem 0; }
 
-.parent-home-card-v2 { border-radius: 16px; box-shadow: var(--shadow-md); overflow: hidden; display: flex; flex-direction: column; border: 1px solid transparent; }
+.parent-home-card-v2 { border-radius: 16px; box-shadow: var(--shadow-md); overflow: hidden; display: flex; flex-direction: column; border: 1px solid transparent; background: var(--surface); }
 .parent-home-card-v2-head { display: flex; align-items: flex-start; gap: 0.85rem; padding: 1.25rem 1.5rem 1rem; }
 .parent-home-card-v2-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; }
 .parent-home-card-v2-icon svg { width: 22px; height: 22px; }
@@ -11626,14 +11626,29 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
    site uses for its info banners, kiosk home, etc. - see their own
    :root comments) instead of a one-off color per card. The selectors
    themselves are untouched (still one rule per card) so the markup in
-   views/parent-home.ejs needs no change at all. */
+   views/parent-home.ejs needs no change at all.
+
+   A follow-up request: "Only the title bar on the cards should be
+   blue, not the whole card" - the tinted --brand-soft background used
+   to cover the whole card (head AND body); it's scoped to just
+   .parent-home-card-v2-head now, with the card's own base rule above
+   giving the body its plain --surface background back. The border
+   stays blue all the way around (still one visual "this card belongs
+   to this family" accent), just the fill inside it isn't. */
 .parent-home-card-v2-green,
 .parent-home-card-v2-blue,
 .parent-home-card-v2-amber,
 .parent-home-card-v2-purple,
 .parent-home-card-v2-indigo,
 .parent-home-card-v2-slate,
-.parent-home-card-v2-rose { background: var(--brand-soft); border-color: var(--brand); }
+.parent-home-card-v2-rose { border-color: var(--brand); }
+.parent-home-card-v2-green .parent-home-card-v2-head,
+.parent-home-card-v2-blue .parent-home-card-v2-head,
+.parent-home-card-v2-amber .parent-home-card-v2-head,
+.parent-home-card-v2-purple .parent-home-card-v2-head,
+.parent-home-card-v2-indigo .parent-home-card-v2-head,
+.parent-home-card-v2-slate .parent-home-card-v2-head,
+.parent-home-card-v2-rose .parent-home-card-v2-head { background: var(--brand-soft); }
 .parent-home-card-v2-green .parent-home-card-v2-icon,
 .parent-home-card-v2-blue .parent-home-card-v2-icon,
 .parent-home-card-v2-amber .parent-home-card-v2-icon,
@@ -11652,18 +11667,24 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
 /* Dedicated CTA buttons for these cards (not .roster-action-btn - that
    class's own background/color/border triplet is already a fixed,
    sitewide look, not meant to flex into the mockup's "solid green" /
-   "outline amber" / "outline purple" per-card button looks). */
+   "outline amber" / "outline purple" per-card button looks). A real
+   request: "The buttons on the cards should be blue as well" - every
+   variant now uses the same --brand/--brand-dark tokens the cards
+   themselves were already unified to, instead of each keeping its own
+   one-off color; the class names stay (still one per button in
+   views/parent-home.ejs) in case a future card wants its own color
+   back. */
 .parent-home-cta {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
   border-radius: 8px; padding: 0.6rem 1rem; font-size: 0.9rem; font-weight: 700;
   font-family: inherit; cursor: pointer; text-decoration: none; margin-top: 0.2rem;
 }
 .parent-home-cta svg { width: 16px; height: 16px; }
-.parent-home-cta-outline-amber { background: transparent; border: 1.5px solid #c7912a; color: #c7912a; }
-.parent-home-cta-outline-purple { background: transparent; border: 1.5px solid #8148c2; color: #8148c2; }
-.parent-home-cta-outline-blue { background: transparent; border: 1.5px solid #2f7fe0; color: #2f7fe0; }
-.parent-home-cta-outline-indigo { background: transparent; border: 1.5px solid #4f55c7; color: #4f55c7; }
-.parent-home-cta-outline-rose { background: transparent; border: 1.5px solid #d0486a; color: #d0486a; }
+.parent-home-cta-outline-amber,
+.parent-home-cta-outline-purple,
+.parent-home-cta-outline-blue,
+.parent-home-cta-outline-indigo,
+.parent-home-cta-outline-rose { background: transparent; border: 1.5px solid var(--brand); color: var(--brand-dark); }
 
 /* Upcoming Events: a colored date-badge (month abbreviation stacked over
    the day number) instead of a plain text date line. */
