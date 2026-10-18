@@ -11609,27 +11609,37 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
 .parent-home-card-v2-viewall svg { width: 15px; height: 15px; }
 .parent-home-card-v2-body { padding: 0 1.5rem 1.5rem; display: flex; flex-direction: column; gap: 0.6rem; flex: 1; }
 
-.parent-home-card-v2-green { background: #effaf3; border-color: #cdebd6; }
-.parent-home-card-v2-green .parent-home-card-v2-icon { background: #1fa355; }
-.parent-home-card-v2-green .parent-home-card-v2-viewall { color: #1fa355; }
-.parent-home-card-v2-blue { background: #eef5fe; border-color: #cfe3fb; }
-.parent-home-card-v2-blue .parent-home-card-v2-icon { background: #2f7fe0; }
-.parent-home-card-v2-blue .parent-home-card-v2-viewall { color: #2f7fe0; }
-.parent-home-card-v2-amber { background: #fdf7ec; border-color: #f3e3bf; }
-.parent-home-card-v2-amber .parent-home-card-v2-icon { background: #c7912a; }
-.parent-home-card-v2-amber .parent-home-card-v2-viewall { color: #c7912a; }
-.parent-home-card-v2-purple { background: #f6f0fc; border-color: #e3d2f4; }
-.parent-home-card-v2-purple .parent-home-card-v2-icon { background: #8148c2; }
-.parent-home-card-v2-purple .parent-home-card-v2-viewall { color: #8148c2; }
-.parent-home-card-v2-indigo { background: #eef0fd; border-color: #d4d8f7; }
-.parent-home-card-v2-indigo .parent-home-card-v2-icon { background: #4f55c7; }
-.parent-home-card-v2-indigo .parent-home-card-v2-viewall { color: #4f55c7; }
-.parent-home-card-v2-slate { background: #f3f4f6; border-color: #dfe2e7; }
-.parent-home-card-v2-slate .parent-home-card-v2-icon { background: #55617a; }
-.parent-home-card-v2-slate .parent-home-card-v2-viewall { color: #55617a; }
-.parent-home-card-v2-rose { background: #fdf0f2; border-color: #f6d4da; }
-.parent-home-card-v2-rose .parent-home-card-v2-icon { background: #d0486a; }
-.parent-home-card-v2-rose .parent-home-card-v2-viewall { color: #d0486a; }
+/* A real request: "The colored cards should all be the same blue that
+   is found in the rest of the website. The pastel soft blue" - each
+   card used to get its own color (green/blue/amber/purple/indigo/slate/
+   rose) to visually tell the sections apart; now every one of them
+   uses this app's own established soft-blue tokens (--brand-soft/
+   --brand/--brand-dark, already the background/border/text this same
+   site uses for its info banners, kiosk home, etc. - see their own
+   :root comments) instead of a one-off color per card. The selectors
+   themselves are untouched (still one rule per card) so the markup in
+   views/parent-home.ejs needs no change at all. */
+.parent-home-card-v2-green,
+.parent-home-card-v2-blue,
+.parent-home-card-v2-amber,
+.parent-home-card-v2-purple,
+.parent-home-card-v2-indigo,
+.parent-home-card-v2-slate,
+.parent-home-card-v2-rose { background: var(--brand-soft); border-color: var(--brand); }
+.parent-home-card-v2-green .parent-home-card-v2-icon,
+.parent-home-card-v2-blue .parent-home-card-v2-icon,
+.parent-home-card-v2-amber .parent-home-card-v2-icon,
+.parent-home-card-v2-purple .parent-home-card-v2-icon,
+.parent-home-card-v2-indigo .parent-home-card-v2-icon,
+.parent-home-card-v2-slate .parent-home-card-v2-icon,
+.parent-home-card-v2-rose .parent-home-card-v2-icon { background: var(--brand-dark); }
+.parent-home-card-v2-green .parent-home-card-v2-viewall,
+.parent-home-card-v2-blue .parent-home-card-v2-viewall,
+.parent-home-card-v2-amber .parent-home-card-v2-viewall,
+.parent-home-card-v2-purple .parent-home-card-v2-viewall,
+.parent-home-card-v2-indigo .parent-home-card-v2-viewall,
+.parent-home-card-v2-slate .parent-home-card-v2-viewall,
+.parent-home-card-v2-rose .parent-home-card-v2-viewall { color: var(--brand-dark); }
 
 /* Dedicated CTA buttons for these cards (not .roster-action-btn - that
    class's own background/color/border triplet is already a fixed,

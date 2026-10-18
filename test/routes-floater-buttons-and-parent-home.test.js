@@ -58,6 +58,22 @@ test('Parent Portal homepage buttons are scoped to fit-to-text sizing (not stret
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'public', 'css', 'styles.css'), 'utf8'), /\.parent-home-main \.roster-action-btn \{ align-self: flex-start; flex-grow: 0; \}/);
 });
 
+// A real request: "Parent portal homepage. The colored cards should all
+// be the same blue that is found in the rest of the website. The pastel
+// soft blue" - every card (green/blue/amber/purple/indigo/slate/rose)
+// now shares this app's own established soft-blue tokens instead of its
+// own one-off color.
+test('Parent Portal homepage: every dashboard card color variant uses the site-wide soft-blue tokens, not its own distinct color', async () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'css', 'styles.css'), 'utf8');
+  // The comma-separated selector list names every variant once, and all of them resolve to the same shared blue tokens.
+  assert.match(css, /\.parent-home-card-v2-green,\s*\n\s*\.parent-home-card-v2-blue,\s*\n\s*\.parent-home-card-v2-amber,\s*\n\s*\.parent-home-card-v2-purple,\s*\n\s*\.parent-home-card-v2-indigo,\s*\n\s*\.parent-home-card-v2-slate,\s*\n\s*\.parent-home-card-v2-rose \{ background: var\(--brand-soft\); border-color: var\(--brand\); \}/);
+  assert.match(css, /\.parent-home-card-v2-rose \.parent-home-card-v2-icon \{ background: var\(--brand-dark\); \}/);
+  assert.match(css, /\.parent-home-card-v2-rose \.parent-home-card-v2-viewall \{ color: var\(--brand-dark\); \}/);
+  // None of the old one-off hex colors should remain on these selectors.
+  assert.doesNotMatch(css, /\.parent-home-card-v2-green \{ background: #effaf3/);
+  assert.doesNotMatch(css, /\.parent-home-card-v2-purple \{ background: #f6f0fc/);
+});
+
 async function loginAsPortalParent() {
   const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('Registration Count Family') RETURNING id").get()).id;
   const parentId = (
