@@ -3,6 +3,12 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
+<% if (typeof portalTitle !== 'undefined' && portalTitle) { %>
+<body>
+  <%- include('partials/portal-nav', { portalTitle }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>My Training</h1>
+<% } else { %>
 <body class="public-page">
   <%- include('partials/icon-sprite') %>
   <main id="main-content" tabindex="-1" class="form-wrap">
@@ -12,6 +18,7 @@
         <h1>My Training</h1>
       </div>
       <p class="hint">Hi, <%= member.name %>. <form method="POST" action="/training/switch" class="inline-block-form"><button type="submit" class="link-btn">Not you?</button></form></p>
+<% } %>
 
       <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
@@ -41,7 +48,12 @@
           </div>
         <% }); %>
       </div>
+<% if (typeof portalTitle !== 'undefined' && portalTitle) { %>
+  </main>
+</body>
+<% } else { %>
     </div>
   </main>
 </body>
+<% } %>
 </html>

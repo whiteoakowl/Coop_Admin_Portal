@@ -3,6 +3,13 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
+<% if (typeof portalTitle !== 'undefined' && portalTitle) { %>
+<body>
+  <%- include('partials/portal-nav', { portalTitle }) %>
+  <main id="main-content" tabindex="-1" class="admin-main training-player-wrap">
+    <h1><%= state.assignment.title %></h1>
+    <p class="hint"><a class="link-btn" href="<%= portalTitle === 'Parent Portal' ? '/parent/training' : '/training/mine' %>">All my training</a></p>
+<% } else { %>
 <body class="public-page">
   <%- include('partials/icon-sprite') %>
   <main id="main-content" tabindex="-1" class="form-wrap training-player-wrap">
@@ -12,6 +19,7 @@
       <h1><%= state.assignment.title %></h1>
     </div>
     <p class="hint"><%= member.name %> &middot; <form method="POST" action="/training/switch" class="inline-block-form"><button type="submit" class="link-btn">Not you?</button></form> &middot; <a class="link-btn" href="/training/mine">All my training</a></p>
+<% } %>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
@@ -156,7 +164,9 @@
         <% } %>
       </div>
     </div>
+<% if (!(typeof portalTitle !== 'undefined' && portalTitle)) { %>
     </div>
+<% } %>
   </main>
   <script src="/js/training-player.js"></script>
 </body>

@@ -26,6 +26,30 @@ const router = express.Router();
 const T = require('../utils/training');
 const db = require('../db');
 
+// A real bug report: "On mobile it goes to a page that asks for the
+// members name and then goes to their training without any dashboard
+// menus... it should stay in the app when member is signed in and on the
+// website and clicks the training tab. You should still see all
+// dashboard menus." routes/parent-portal.js's own /training already sets
+// trainingMemberId and renders a nav-shelled list (parent-training.ejs),
+// but its "Start/Continue Training" buttons hand off into these shared,
+// originally-anonymous-only routes (see this file's own header comment)
+// for the actual lesson content - training-mine.ejs/training-play.ejs,
+// both plain public-page shells with no portal-nav. That's the page with
+// no dashboard menus; its own "Not you?" link (training-play.ejs/
+// training-mine.ejs) is what sends a confused signed-in member back to
+// the "ask for your name" picker. Same fix as events-list.ejs's own
+// effectivePortal pattern: a signed-in parent or teacher gets their own
+// portal-nav shell on these same shared pages instead of the bare one,
+// while an anonymous shared-link visitor (no portalAccount) still gets
+// exactly the bare kiosk-style page this was built for.
+function signedInPortalTitle(req) {
+  const roles = req.portalRoles || [];
+  if (roles.some((r) => r.key === 'parent')) return 'Parent Portal';
+  if (roles.some((r) => r.key === 'teacher')) return 'Teacher Portal';
+  return null;
+}
+
 // Every route below this point needs a picked identity except the picker
 // itself and the identify action - redirect to the picker instead of
 // 403ing, since "you haven't picked your name yet" is an expected state
@@ -74,6 +98,7 @@ router.get('/training/mine', requireTrainingIdentity, async (req, res) => {
     member: req.trainingMember,
     error: req.query.error || null,
     assignments: await T.myAssignments(req.trainingMember.id),
+    portalTitle: signedInPortalTitle(req),
   });
 });
 
@@ -126,6 +151,7 @@ router.get('/training/:assignmentId/play', requireTrainingIdentity, async (req, 
     resources,
     questions,
     error: req.query.error || null,
+    portalTitle: signedInPortalTitle(req),
   });
 });
 
