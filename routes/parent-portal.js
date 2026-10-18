@@ -24,6 +24,7 @@ const {
   CLASS_DAY_LABELS_FULL,
   isValidClassDay,
   listActiveClassDays,
+  listSemesters,
   allClassesList,
   attendanceHistoryForRoster,
   GRADE_LEVELS,
@@ -342,6 +343,15 @@ router.get('/classes', async (req, res) => {
   const activeDays = await listActiveClassDays();
   const day = activeDays.includes(req.query.day) ? req.query.day : (activeDays[0] || 'monday');
   const view = req.query.view === 'list' ? 'list' : 'grid';
+  // A real request: "Parent portal should have a semester dropdown picker
+  // too" - same All Semesters/one-semester select as Teacher Portal's own
+  // Class Schedule page (routes/teacher-portal.js's own GET /classes).
+  // null (All Semesters) becomes undefined for roomGridForDay/
+  // classesForDaySemester, same leniency every other caller of that
+  // function already gets - the grid's prior, pre-dropdown behavior.
+  const semesters = await listSemesters();
+  const selectedSemesterId = req.query.semesterId ? parseInt(req.query.semesterId, 10) : null;
+  const gridSemesterId = selectedSemesterId === null ? undefined : selectedSemesterId;
   const children = await childrenForAccount(req.portalAccount);
   const childIds = children.map((c) => c.id);
 
@@ -363,7 +373,7 @@ router.get('/classes', async (req, res) => {
   // if these boxes aren't checked then members... can't register" -
   // members shouldn't see a class whose grid is locked away from them at
   // all, not just be blocked once they try to register for it.
-  const roomGrid = await hideClassesNotVisibleToMembers(await roomGridForDay(day));
+  const roomGrid = await hideClassesNotVisibleToMembers(await roomGridForDay(day, gridSemesterId));
   const classList =
     view === 'list'
       ? roomGrid.rows
@@ -377,9 +387,11 @@ router.get('/classes', async (req, res) => {
     view,
     activeDays,
     dayLabels: CLASS_DAY_LABELS_FULL,
-    hours: await hoursForDay(day),
+    hours: await hoursForDay(day, gridSemesterId),
     roomGrid,
     classList,
+    semesters,
+    selectedSemesterId,
     hasChildren: children.length > 0,
     children,
     gradeLevels: GRADE_LEVELS,

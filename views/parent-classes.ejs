@@ -33,15 +33,30 @@
     <% } %>
 
     <div class="filter-row no-print">
+      <%
+        // A real request: "Parent portal should have a semester dropdown
+        // picker too" - same All Semesters/one-semester select as Teacher
+        // Portal's own Class Schedule page (views/teacher-classes.ejs).
+        const semesterQuery = selectedSemesterId ? `&semesterId=${selectedSemesterId}` : '';
+      %>
+      <div class="category-filter">
+        <label for="parent-schedule-semester-select">Semester</label>
+        <select id="parent-schedule-semester-select" onchange="window.fullscreenNavigate(this.value)">
+          <option value="/parent/classes?day=<%= day %>&view=<%= view %>" <%= selectedSemesterId === null ? 'selected' : '' %>>All Semesters</option>
+          <% semesters.forEach(function(s) { %>
+            <option value="/parent/classes?day=<%= day %>&view=<%= view %>&semesterId=<%= s.id %>" <%= selectedSemesterId === s.id ? 'selected' : '' %>><%= s.title %></option>
+          <% }); %>
+        </select>
+      </div>
       <%# A real request: "add icons at the top for grid view vs list
           view of classes like co-op class portal." %>
       <div class="class-schedule-view-toggle" role="group" aria-label="Grid or list view">
-        <a class="icon-btn<%= view === 'grid' ? ' icon-btn-active' : '' %>" href="/parent/classes?day=<%= day %>&view=grid" aria-pressed="<%= view === 'grid' %>" aria-label="Grid view" title="Grid view"><svg class="icon"><use href="#icon-grid"/></svg></a>
-        <a class="icon-btn<%= view === 'list' ? ' icon-btn-active' : '' %>" href="/parent/classes?day=<%= day %>&view=list" aria-pressed="<%= view === 'list' %>" aria-label="List view" title="List view"><svg class="icon"><use href="#icon-clipboard-list"/></svg></a>
+        <a class="icon-btn<%= view === 'grid' ? ' icon-btn-active' : '' %>" href="/parent/classes?day=<%= day %>&view=grid<%= semesterQuery %>" aria-pressed="<%= view === 'grid' %>" aria-label="Grid view" title="Grid view"><svg class="icon"><use href="#icon-grid"/></svg></a>
+        <a class="icon-btn<%= view === 'list' ? ' icon-btn-active' : '' %>" href="/parent/classes?day=<%= day %>&view=list<%= semesterQuery %>" aria-pressed="<%= view === 'list' %>" aria-label="List view" title="List view"><svg class="icon"><use href="#icon-clipboard-list"/></svg></a>
       </div>
       <div class="day-toggle schedule-day-toggle">
         <% activeDays.forEach(function (d) { %>
-          <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/parent/classes?day=<%= d %>&view=<%= view %>"><%= dayLabels[d] %></a>
+          <a class="day-toggle-option<%= day === d ? ' active' : '' %>" href="/parent/classes?day=<%= d %>&view=<%= view %><%= semesterQuery %>"><%= dayLabels[d] %></a>
         <% }); %>
       </div>
       <%# A real request: "Parents can filter classes by grade level and

@@ -11,7 +11,7 @@ const path = require('path');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
-const { allClassesList, listSemesters, roomGridForDay, listActiveClassDays } = require('../utils/classSchedule');
+const { allClassesList, listSemesters, roomGridForDay, hoursForDay, listActiveClassDays, hideClassesNotVisibleToMembers } = require('../utils/classSchedule');
 const { CLASS_DAY_ORDER, CLASS_DAY_LABELS_FULL } = require('../utils/classDays');
 const {
   assignmentsForClass,
@@ -132,14 +132,28 @@ router.get('/', async (req, res) => {
 // so there's nothing portal-specific to add.
 //
 // A further real request: "the class schedule page should show the
-// entire classes schedule grid for the semester" - Calendar view's grid
-// was originally just this one teacher's own classes; it now reuses the
+// entire classes schedule grid for the semester" - Grid view's grid was
+// originally just this one teacher's own classes; it now reuses the
 // exact same roomGridForDay the Co-op Admin/Parent Portal grids already
-// render (every class, every room, not filtered to this teacher), stacked
-// one day at a time the same way List view already stacks days, so a
+// render (every class, every room, not filtered to this teacher), so a
 // teacher can see the whole co-op's schedule for context. List view
 // stays this teacher's own classes only (unchanged) - the "My Classes"
 // sidebar section already covers "what do I personally teach".
+//
+// A later real request: "Teacher portal isn't showing the class schedule
+// at all" (List view defaulted this page, and a teacher with nothing
+// staffed yet this semester saw nothing but "not staffed on any classes
+// yet", with the actual schedule grid hidden a click away behind the
+// Calendar icon) plus "teacher portal, classes, should have the same
+// class schedule grid page as the parent portal" - Grid view is now the
+// default (matching parent-classes.ejs) and picks ONE day at a time via
+// the same day-toggle tabs as Parent Portal's own Class Registration
+// page (routes/parent-portal.js's own GET /classes), instead of stacking
+// every active day on one page. "Members can view whatever schedule
+// grids are unlocked for members to see" - Grid view now also runs
+// through hideClassesNotVisibleToMembers, the same browse-time
+// visible_to_members gate Parent Portal's grid already respects (a
+// teacher is a member-facing portal too, not an admin view).
 //
 // roomGridForDay/hoursForDay treat a semesterId of null as "untagged
 // classes only" (unlike allClassesList's own null, used by List view
@@ -150,6 +164,7 @@ router.get('/classes', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const semesters = await listSemesters();
   const selectedSemesterId = req.query.semesterId ? parseInt(req.query.semesterId, 10) : null;
+  const gridSemesterId = selectedSemesterId === null ? undefined : selectedSemesterId;
   const classes = await classesForTeacher(member, selectedSemesterId);
   const sorted = [...classes].sort(
     (a, b) => (CLASS_DAY_ORDER[a.day] - CLASS_DAY_ORDER[b.day]) || a.hour_position - b.hour_position
@@ -160,17 +175,22 @@ router.get('/classes', async (req, res) => {
     if (!group) { group = { day: cls.day, dayLabel: cls.dayLabel, classes: [] }; byDay.push(group); }
     group.classes.push(cls);
   }
-  const view = req.query.view === 'calendar' ? 'calendar' : 'list';
-  let weekDays = null;
-  if (view === 'calendar') {
-    const gridSemesterId = selectedSemesterId === null ? undefined : selectedSemesterId;
-    const activeDays = await listActiveClassDays();
-    const dayGrids = await Promise.all(activeDays.map((day) => roomGridForDay(day, gridSemesterId)));
-    weekDays = activeDays
-      .map((day, i) => ({ day, dayLabel: CLASS_DAY_LABELS_FULL[day], roomGrid: dayGrids[i] }))
-      .filter((d) => d.roomGrid.rows.some((row) => row.cells.some((cell) => cell.classes.length > 0)));
-  }
-  res.render('teacher-classes', { title: 'Class Schedule', byDay, weekDays, view, semesters, selectedSemesterId });
+  const view = req.query.view === 'list' ? 'list' : 'grid';
+  const activeDays = await listActiveClassDays();
+  const day = activeDays.includes(req.query.day) ? req.query.day : (activeDays[0] || 'monday');
+  const roomGrid = view === 'grid' ? await hideClassesNotVisibleToMembers(await roomGridForDay(day, gridSemesterId)) : null;
+  res.render('teacher-classes', {
+    title: 'Class Schedule',
+    byDay,
+    view,
+    day,
+    activeDays,
+    dayLabels: CLASS_DAY_LABELS_FULL,
+    hours: view === 'grid' ? await hoursForDay(day, gridSemesterId) : [],
+    roomGrid,
+    semesters,
+    selectedSemesterId,
+  });
 });
 
 router.get('/classes/:id', async (req, res) => {

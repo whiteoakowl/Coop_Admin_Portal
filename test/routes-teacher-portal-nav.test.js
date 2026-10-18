@@ -78,17 +78,23 @@ test('Teacher Portal nav: "Classes" is renamed "Class Schedule", with no subpage
   assert.match(page.text, /<a href="\/teacher\/classes">[\s\S]*?Class Schedule<\/a>/);
 });
 
-test('Teacher Portal Class Schedule tab: shows a day-by-day table of the classes this teacher teaches, no subpages', async () => {
+test('Teacher Portal Class Schedule tab: List view shows a day-by-day table of the classes this teacher teaches, no subpages', async () => {
   const classId = await makeClass('Schedule Tab Class');
   const cookie = await loginTeacher([classId]);
-  const page = await request(app).get('/teacher/classes').set('Cookie', cookie);
+  const page = await request(app).get('/teacher/classes?view=list').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /<h1>Class Schedule<\/h1>/);
   assert.match(page.text, /Schedule Tab Class/);
   assert.doesNotMatch(page.text, /View Roster/, 'the old per-class card grid should be gone');
 });
 
-test('Teacher Portal Class Schedule tab: has a Semester dropdown, a Print button, and List/Calendar view icons', async () => {
+// A real bug report: "Teacher portal isn't showing the class schedule at
+// all" - List view defaulted this page, and a teacher with nothing
+// staffed yet this semester saw nothing but "not staffed on any classes
+// yet", with the actual co-op-wide schedule grid hidden a click away
+// behind the Grid icon. Grid view is now the default, same as Parent
+// Portal's own Class Registration page.
+test('Teacher Portal Class Schedule tab: defaults to Grid view, has a Semester dropdown, a Print button, and Grid/List view icons', async () => {
   const fall = (await db.prepare("INSERT INTO semesters (title) VALUES ('Fall Nav Test') RETURNING id").get()).id;
   const spring = (await db.prepare("INSERT INTO semesters (title) VALUES ('Spring Nav Test') RETURNING id").get()).id;
   const fallClass = await makeClass('Fall Semester Class', { semesterId: fall });
@@ -99,27 +105,27 @@ test('Teacher Portal Class Schedule tab: has a Semester dropdown, a Print button
   assert.equal(allPage.status, 200);
   assert.match(allPage.text, /Semester/);
   assert.match(allPage.text, /Fall Semester Class/);
-  assert.match(allPage.text, /Spring Semester Class/);
   assert.match(allPage.text, /Print/);
+  assert.match(allPage.text, /aria-label="Grid view"/);
   assert.match(allPage.text, /aria-label="List view"/);
-  assert.match(allPage.text, /aria-label="Calendar view"/);
+  assert.match(allPage.text, /class-schedule-room-grid/, 'the page should default to Grid view, not List');
 
-  // The sidebar's own "My Classes" section (populated independently of
-  // this page's semester filter) always lists both classes, so scope this
+  // List view (this teacher's own classes, grouped by day) - the
+  // sidebar's own "My Classes" section (populated independently of this
+  // page's semester filter) always lists both classes, so scope this
   // check to the schedule table's own day headings rather than the whole
   // page: Fall's class meets Monday, Spring's meets Wednesday.
-  const fallOnly = await request(app).get(`/teacher/classes?semesterId=${fall}`).set('Cookie', cookie);
+  const fallOnly = await request(app).get(`/teacher/classes?view=list&semesterId=${fall}`).set('Cookie', cookie);
   assert.match(fallOnly.text, /<h2>Monday<\/h2>/);
   assert.doesNotMatch(fallOnly.text, /<h2>Wednesday<\/h2>/, 'picking one semester should hide classes from another');
 
-  const calendarView = await request(app).get('/teacher/classes?view=calendar').set('Cookie', cookie);
-  assert.equal(calendarView.status, 200);
-  assert.match(calendarView.text, /class-schedule-room-grid/);
-  assert.match(calendarView.text, /Fall Semester Class/);
-  assert.match(calendarView.text, /Spring Semester Class/);
+  const gridView = await request(app).get('/teacher/classes?view=grid').set('Cookie', cookie);
+  assert.equal(gridView.status, 200);
+  assert.match(gridView.text, /class-schedule-room-grid/);
+  assert.match(gridView.text, /Fall Semester Class/);
 });
 
-test('Teacher Portal Class Schedule tab: Calendar view shows the entire co-op schedule grid for the semester, not just this teacher\'s own classes', async () => {
+test('Teacher Portal Class Schedule tab: Grid view shows the entire co-op schedule grid for one day, not just this teacher\'s own classes - same page as Parent Portal\'s own Class Registration grid', async () => {
   const fall = (await db.prepare("INSERT INTO semesters (title) VALUES ('Fall Grid Test') RETURNING id").get()).id;
   const spring = (await db.prepare("INSERT INTO semesters (title) VALUES ('Spring Grid Test') RETURNING id").get()).id;
   const myClass = await makeClass('My Own Grid Class', { day: 'monday', hourPosition: 1, semesterId: fall });
@@ -127,16 +133,33 @@ test('Teacher Portal Class Schedule tab: Calendar view shows the entire co-op sc
   const springOnlyClass = await makeClass('Spring Only Grid Class', { day: 'monday', hourPosition: 3, semesterId: spring });
   const cookie = await loginTeacher([myClass]);
 
-  const allSemesters = await request(app).get('/teacher/classes?view=calendar').set('Cookie', cookie);
+  const allSemesters = await request(app).get('/teacher/classes?view=grid&day=monday').set('Cookie', cookie);
   assert.equal(allSemesters.status, 200);
   assert.match(allSemesters.text, /My Own Grid Class/);
   assert.match(allSemesters.text, /Someone Elses Grid Class/, 'the grid should show every class in the co-op, not just this teacher\'s own');
   assert.match(allSemesters.text, /Spring Only Grid Class/, '"All Semesters" should include every semester\'s classes');
 
-  const fallOnly = await request(app).get(`/teacher/classes?view=calendar&semesterId=${fall}`).set('Cookie', cookie);
+  const fallOnly = await request(app).get(`/teacher/classes?view=grid&day=monday&semesterId=${fall}`).set('Cookie', cookie);
   assert.equal(fallOnly.status, 200);
   assert.match(fallOnly.text, /Someone Elses Grid Class/);
   assert.doesNotMatch(fallOnly.text, /Spring Only Grid Class/, 'the semester dropdown should scope the whole-co-op grid too');
+});
+
+// "Members can view whatever schedule grids are unlocked for members to
+// see" - Teacher Portal is a member-facing portal too, so its Grid view
+// now runs through the exact same visible_to_members browse-time gate
+// (hideClassesNotVisibleToMembers) Parent Portal's own grid already did.
+test('Teacher Portal Class Schedule tab: Grid view hides classes under a grid locked away from members, same as Parent Portal\'s grid', async () => {
+  const semesterId = (await db.prepare("INSERT INTO semesters (title) VALUES ('Locked Grid Semester') RETURNING id").get()).id;
+  await db
+    .prepare('INSERT INTO class_schedules (title, day_of_week, semester_id, visible_to_members, visible_to_public) VALUES (?, ?, ?, 0, 0)')
+    .run('Locked Tuesday', 'tuesday', semesterId);
+  const lockedClass = await makeClass('Member-Locked Class', { day: 'tuesday', hourPosition: 1, semesterId });
+  const cookie = await loginTeacher([lockedClass]);
+
+  const page = await request(app).get(`/teacher/classes?view=grid&day=tuesday&semesterId=${semesterId}`).set('Cookie', cookie);
+  assert.equal(page.status, 200);
+  assert.doesNotMatch(page.text, /Member-Locked Class/, 'a class under a grid not visible to members should not appear, even to the teacher staffed on it');
 });
 
 test('Teacher Portal nav: a "My Classes" section lists one entry per class this teacher actually teaches', async () => {
