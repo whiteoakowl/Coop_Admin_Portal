@@ -193,6 +193,17 @@ function formatDateNumeric(iso) {
   return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullYear()}`;
 }
 
+// A real request: "Fiscal year dates should be 9/20/2026 format" - same
+// M/D/YYYY shape as formatDateNumeric above, just without its zero-
+// padding (9/20/2026, not 09/20/2026). Kept separate rather than adding a
+// pad option to formatDateNumeric itself, since every existing caller of
+// that one deliberately wants the zero-padded, <input type="date">-
+// matching look (see its own comment).
+function formatDateShort(iso) {
+  const d = parseISO(iso);
+  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+}
+
 // epochMs comes straight from a Postgres bigint column (attendance.
 // check_in_time, checkouts.check_out_time) - the pg driver returns a
 // bigint as a STRING, not a number, to avoid silent precision loss on
@@ -458,6 +469,7 @@ module.exports = {
   formatDateLong,
   formatShortDateLabel,
   formatDateNumeric,
+  formatDateShort,
   formatTime,
   formatTimeOfDay,
   formatTimestamp,

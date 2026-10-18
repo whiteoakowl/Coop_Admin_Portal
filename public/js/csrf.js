@@ -25,7 +25,21 @@
   document.addEventListener('submit', (e) => {
     const form = e.target;
     if (!(form instanceof HTMLFormElement)) return;
-    if (form.method.toLowerCase() !== 'post') return;
+    // A real bug report (found while building a new form with its own
+    // Payment Method <select name="method">): a named form control
+    // shadows the form element's own same-named IDL property (the
+    // classic "DOM clobbering" gotcha) - form.method/form.enctype
+    // silently stopped being the strings "post"/"" the moment a field
+    // named "method" (or, in principle, "enctype") existed anywhere in
+    // that form, throwing form.method.toLowerCase() is not a function
+    // out of this very listener and aborting it before the _csrf field
+    // ever got appended - every submission 403'd with "Session Expired"
+    // instead. getAttribute() always reads the raw HTML attribute, never
+    // a same-named control, so it can't be shadowed this way - the fix
+    // here, not renaming every current and future field that happens to
+    // collide with a form IDL property name (method/enctype/action/
+    // target/name/elements/length...).
+    if ((form.getAttribute('method') || 'get').toLowerCase() !== 'post') return;
 
     // Multipart forms (file uploads) hit the server before their body is
     // parsed - multer runs per-route, after the global csrfProtection
@@ -33,7 +47,7 @@
     // req.body yet when it's checked (see csrfProtection.js). The query
     // string IS available immediately, so multipart forms get the token
     // appended to the action URL instead of a hidden field.
-    if ((form.enctype || '').toLowerCase() === 'multipart/form-data') {
+    if ((form.getAttribute('enctype') || '').toLowerCase() === 'multipart/form-data') {
       if (!/[?&]_csrf=/.test(form.action)) {
         form.action += (form.action.includes('?') ? '&' : '?') + '_csrf=' + encodeURIComponent(token);
       }

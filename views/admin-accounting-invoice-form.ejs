@@ -16,18 +16,34 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1><%= isEdit ? `Edit Invoice #${charge.id}` : 'New Invoice' %></h1>
-    <p><a href="/main-admin/accounting/invoices">&larr; All Invoices</a></p>
+    <p><a href="/main-admin/accounting">&larr; Accounts</a></p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <form method="POST" action="<%= actionUrl %>" class="manage-section accounting-invoice-form" data-split-invoice-form>
-      <% if (!isEdit) { %><input type="hidden" name="memberId" value="<%= member.id %>" /><% } %>
-
       <div class="member-form-grid">
-        <label>Family
-          <input type="text" value="<%= familyLabel %>" readonly disabled />
-        </label>
+        <%# A real request: "Invoice, payment and adjustment button
+            should be a page to create an invoice... and select member" -
+            member selection now lives on this same page (a real
+            <select>, not a readonly field filled in by a separate
+            "which member?" dialog beforehand). Editing an existing
+            invoice still shows the member as plain text - which family
+            a charge belongs to isn't something Edit changes. %>
+        <% if (isEdit) { %>
+          <label>Family
+            <input type="text" value="<%= familyLabel %>" readonly disabled />
+          </label>
+        <% } else { %>
+          <label>Member
+            <select name="memberId" required>
+              <option value="">Select a member&hellip;</option>
+              <% allMembers.forEach(function(m) { %>
+                <option value="<%= m.id %>" <%= member && member.id === m.id ? 'selected' : '' %>><%= m.name %></option>
+              <% }); %>
+            </select>
+          </label>
+        <% } %>
         <label>Category
           <select name="categoryId">
             <option value="">No category</option>

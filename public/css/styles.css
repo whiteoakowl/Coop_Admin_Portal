@@ -13270,7 +13270,18 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
   .accounting-accounts-table-fit th:nth-child(3),
   .accounting-accounts-table-fit td:nth-child(3),
   .accounting-accounts-table-fit th:nth-child(4),
-  .accounting-accounts-table-fit td:nth-child(4) { width: 4.2rem; }
+  .accounting-accounts-table-fit td:nth-child(4) { width: 4.6rem; }
+  /* A real bug report (recurring): "rows are off. They should be
+     straight lines." .badge-pill hardcodes its own font-size/padding,
+     so the table's own font shrink above never reached the Balance/Past
+     Due badges - at their fixed-width columns' original size, "Past
+     Due" overflowed its own td's right edge (overflow: visible is the
+     table default), spilling past .roster-scroll's own right boundary
+     and reading as a crooked, not-quite-closed row border on whichever
+     rows happened to be Past Due. Shrinking the badge itself (not just
+     widening its column, which would have eaten into the Member name
+     column instead) keeps it comfortably inside its own cell. */
+  .accounting-accounts-table-fit .badge-pill { font-size: 0.66rem; padding: 0.15rem 0.4rem; white-space: nowrap; }
 }
 
 /* A real request: "Accounts page, on desktop all orange buttons should

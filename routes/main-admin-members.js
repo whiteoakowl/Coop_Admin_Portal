@@ -31,7 +31,10 @@ const { requirePortalAuth, requirePortal, requirePortalPermission } = require('.
 const { formatDateLabel, formatDateNumeric, formatTime, ageFromBirthday, isChildAge, isValidISODate } = require('../utils/dates');
 const { GRADE_LEVELS, CLASS_DAY_LABELS_FULL, listActiveClassDays } = require('../utils/classSchedule');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE, memberFamilyGroupKey } = require('../utils/pagination');
-const { spreadsheetFileFilter } = require('../utils/uploads');
+const { spreadsheetFileFilter, documentFileFilter, DOCUMENT_MIME_BY_EXT } = require('../utils/uploads');
+const { createStorageClient, uploadFile, deleteFile, generateKey } = require('../utils/storage');
+const path = require('path');
+const fs = require('fs');
 const { uploadMemberPhoto, savePhotoFile, deletePhotoFile } = require('../utils/memberPhoto');
 const { allSetupTeams } = require('../utils/setup');
 const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions } = require('../utils/adminPositions');
@@ -67,6 +70,22 @@ router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermissi
 
 const MEMBER_TYPES = ['student', 'parent', 'admin'];
 const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
+
+// A real request: "add an option to upload the policy handbook as a
+// document, pdf, etc." - same local-disk-fallback-or-Supabase-Storage
+// convention as routes/admin-documents.js's own uploads, just one
+// singleton file instead of a library (utils/membershipHandbook.js's own
+// getHandbookFile/setHandbookFile).
+const HANDBOOK_FILE_BUCKET = 'documents';
+const HANDBOOK_FILE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'documents');
+if (!createStorageClient() && !fs.existsSync(HANDBOOK_FILE_DIR)) {
+  try {
+    fs.mkdirSync(HANDBOOK_FILE_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${HANDBOOK_FILE_DIR}:`, err.message);
+  }
+}
+const handbookFileUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 }, fileFilter: documentFileFilter });
 
 async function attendanceHistoryForMember(memberId) {
   return db
@@ -161,6 +180,7 @@ router.get('/', async (req, res) => {
       settingsTab,
       templates: await membershipApprovals.getLetterTemplates(),
       handbookHtml: await membershipHandbook.getHandbookHtml(),
+      handbookFile: await membershipHandbook.getHandbookFile(),
       paymentInfo: await membershipHandbook.getPaymentInfo(),
       parentFormFields: await membershipFormFields.listFields('parent'),
       childFormFields: await membershipFormFields.listFields('child'),
@@ -388,6 +408,56 @@ router.post('/settings/handbook', async (req, res) => {
   res.redirect('/main-admin/members?tab=settings&settingsTab=handbook&notice=' + encodeURIComponent('Policy Handbook saved.'));
 });
 
+// A real request: "add an option to upload the policy handbook as a
+// document, pdf, etc." - an optional file alongside the rich-text
+// handbook above (see utils/membershipHandbook.js's own comment on why
+// this doesn't touch the existing scroll-to-read enforcement). Uploading
+// a new file replaces whatever was there; deleteFile is a no-op if
+// nothing was ever uploaded.
+router.post('/settings/handbook/file', handbookFileUpload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.redirect('/main-admin/members?tab=settings&settingsTab=handbook&error=' + encodeURIComponent('Choose a PDF or Word file to upload.'));
+  }
+  const existing = await membershipHandbook.getHandbookFile();
+  const client = createStorageClient();
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  const mimeType = DOCUMENT_MIME_BY_EXT[ext] || req.file.mimetype;
+  let key;
+  try {
+    if (client) {
+      key = await uploadFile(client, HANDBOOK_FILE_BUCKET, req.file.buffer, req.file.originalname, mimeType);
+    } else {
+      key = generateKey(req.file.originalname);
+      fs.writeFileSync(path.join(HANDBOOK_FILE_DIR, key), req.file.buffer);
+    }
+  } catch (err) {
+    return res.redirect('/main-admin/members?tab=settings&settingsTab=handbook&error=' + encodeURIComponent(`Upload failed: ${err.message}`));
+  }
+  if (existing) {
+    if (client) await deleteFile(client, HANDBOOK_FILE_BUCKET, existing.key).catch(() => {});
+    else {
+      const oldPath = path.join(HANDBOOK_FILE_DIR, existing.key);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+  }
+  await membershipHandbook.setHandbookFile({ key, originalName: req.file.originalname, mimeType });
+  res.redirect('/main-admin/members?tab=settings&settingsTab=handbook&notice=' + encodeURIComponent('Policy Handbook file uploaded.'));
+});
+
+router.post('/settings/handbook/file/delete', async (req, res) => {
+  const existing = await membershipHandbook.getHandbookFile();
+  if (existing) {
+    const client = createStorageClient();
+    if (client) await deleteFile(client, HANDBOOK_FILE_BUCKET, existing.key).catch(() => {});
+    else {
+      const oldPath = path.join(HANDBOOK_FILE_DIR, existing.key);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+    await membershipHandbook.setHandbookFile(null);
+  }
+  res.redirect('/main-admin/members?tab=settings&settingsTab=handbook&notice=' + encodeURIComponent('Policy Handbook file removed.'));
+});
+
 // A real request: "place at the bottom of the application for payment."
 // Informational only, matching this app's existing payment convention
 // (see utils/membershipHandbook.js's own comment) - no online charge is
@@ -437,6 +507,19 @@ router.post('/settings/grade-levels', async (req, res) => {
     gradeLevelList.map((gradeLevel, i) => ({ gradeLevel, age: ageList[i], cutoffDate: cutoffDateList[i] }))
   );
   res.redirect('/main-admin/members?tab=settings&settingsTab=grade-levels&notice=' + encodeURIComponent('Grade Level Settings saved.'));
+});
+
+// A real request: "Save grade level settings button and apply to all
+// members button should be on the same row" - computes every active
+// student's grade from the saved age/cutoffDate rules and writes it to
+// their own grade_level field (see gradeLevelSettings.js's own
+// applyGradeLevelRulesToAllMembers for exactly how a match is decided).
+router.post('/settings/grade-levels/apply', async (req, res) => {
+  const updated = await gradeLevelSettings.applyGradeLevelRulesToAllMembers();
+  res.redirect(
+    '/main-admin/members?tab=settings&settingsTab=grade-levels&notice=' +
+      encodeURIComponent(updated === 0 ? 'No members needed a grade level update.' : `Updated grade level for ${updated} member${updated === 1 ? '' : 's'}.`)
+  );
 });
 
 // --- Edit mode bulk actions (checkboxes + Actions dropdown on the

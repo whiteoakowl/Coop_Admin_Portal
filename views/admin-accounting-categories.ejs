@@ -78,8 +78,8 @@
           <tbody>
             <% fiscalYears.forEach(function(fy) { %>
               <tr>
-                <td><%= fy.start_date %></td>
-                <td><%= fy.end_date %></td>
+                <td><%= fy.startDateLabel %></td>
+                <td><%= fy.endDateLabel %></td>
                 <td class="roster-btn-row accounting-row-icons">
                   <button type="button" class="icon-btn" onclick="document.getElementById('edit-fiscal-year-dialog-<%= fy.id %>').showModal()" aria-label="Edit fiscal year" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
                   <form method="POST" action="/main-admin/accounting/fiscal-years/<%= fy.id %>/delete" class="inline-block-form" data-confirm="Delete this fiscal year?">

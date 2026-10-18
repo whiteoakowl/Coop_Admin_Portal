@@ -17,6 +17,7 @@
 const { appSetting, setAppSetting } = require('./classSchedule');
 
 const HANDBOOK_HTML_KEY = 'membership_handbook_html';
+const HANDBOOK_FILE_KEY = 'membership_handbook_file';
 const PAYMENT_INSTRUCTIONS_KEY = 'membership_payment_instructions';
 const FEE_CENTS_KEY = 'membership_fee_cents';
 
@@ -26,6 +27,32 @@ async function getHandbookHtml() {
 
 async function setHandbookHtml(html) {
   await setAppSetting(HANDBOOK_HTML_KEY, html || '');
+}
+
+// A real request: "add an option to upload the policy handbook as a
+// document, pdf, etc." - an optional uploaded file ALONGSIDE the rich-
+// text handbook above, not a replacement for it: the existing "can't
+// check the box until you've scrolled through the entire handbook"
+// enforcement (views/portal-register.ejs's own #handbook-scroll-box,
+// routes/portal-auth.js's own handbookRead check) is tied specifically
+// to that HTML content, which this doesn't touch - the uploaded file is
+// just a downloadable reference shown next to it. One file at a time
+// (uploading a new one replaces whatever was there, same "singleton
+// setting" shape as the HTML/payment fields above), so a small JSON blob
+// under the same generic key/value table is enough - no dedicated table
+// needed for exactly one row.
+async function getHandbookFile() {
+  const raw = await appSetting(HANDBOOK_FILE_KEY, null);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+async function setHandbookFile(file) {
+  await setAppSetting(HANDBOOK_FILE_KEY, file ? JSON.stringify(file) : '');
 }
 
 async function getPaymentInfo() {
@@ -39,4 +66,4 @@ async function setPaymentInfo(feeCents, instructions) {
   await setAppSetting(PAYMENT_INSTRUCTIONS_KEY, instructions || '');
 }
 
-module.exports = { getHandbookHtml, setHandbookHtml, getPaymentInfo, setPaymentInfo };
+module.exports = { getHandbookHtml, setHandbookHtml, getHandbookFile, setHandbookFile, getPaymentInfo, setPaymentInfo };

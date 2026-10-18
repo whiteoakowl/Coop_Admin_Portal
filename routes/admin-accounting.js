@@ -34,7 +34,7 @@ const events = require('../utils/events');
 const emailComposer = require('../utils/emailComposer');
 const { appSetting, setAppSetting } = require('../utils/appSettings');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
-const { formatTimestamp } = require('../utils/dates');
+const { formatTimestamp, formatDateShort } = require('../utils/dates');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_finances'));
 
@@ -103,7 +103,6 @@ router.get('/', async (req, res) => {
     title: 'Accounts',
     members: await accountRows(q),
     q: req.query.q || '',
-    allMembers: await billableMembers(),
     notice: req.query.notice || null,
     error: req.query.error || null,
     formatCents: payments.formatCents,
@@ -174,10 +173,16 @@ router.post('/email-all-invoices', async (req, res) => {
 // Events Finance tab's own dropdown still reads from). ---
 
 router.get('/categories', async (req, res) => {
+  // A real request: "Fiscal year dates should be 9/20/2026 format."
+  const fiscalYears = (await events.listFiscalYears()).map((fy) => ({
+    ...fy,
+    startDateLabel: formatDateShort(fy.start_date),
+    endDateLabel: formatDateShort(fy.end_date),
+  }));
   res.render('admin-accounting-categories', {
     title: 'Category/Fiscal Year',
     accountingCategories: await events.listAccountingCategories(),
-    fiscalYears: await events.listFiscalYears(),
+    fiscalYears,
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
@@ -264,20 +269,23 @@ async function emailFamilyAboutInvoice(memberId, description, amountCents, sentB
 }
 
 // "Creating an invoice should look exactly like the screenshot" - a real
-// full page now (Family/Category/Date/Due Date/Auto-Park/Description/
-// Admin Notes/Amount/+Split Invoice/Email Family), reached by picking a
-// member first (same "which member?" pattern +Payment/+Adjustment on the
-// Accounts page already use) rather than the old small "New Invoice"
-// dialog (member+description+amount only).
+// full page (Family/Category/Date/Due Date/Auto-Park/Description/Admin
+// Notes/Amount/+Split Invoice/Email Family). A real request: "Invoice,
+// payment and adjustment button should be a page to create an invoice,
+// payment or adjustment and select member" - member selection now lives
+// ON this same page (a real <select>, not a readonly Family field filled
+// in by a separate "which member?" dialog beforehand) - memberId is
+// still honored as an optional preselect for a direct link, but is no
+// longer required to load the page at all.
 router.get('/invoices/new', async (req, res) => {
-  const memberId = Number(req.query.memberId);
+  const memberId = Number(req.query.memberId) || null;
   const member = memberId ? await db.prepare('SELECT id, name FROM members WHERE id = ?').get(memberId) : null;
-  if (!member) return res.redirect('/main-admin/accounting/invoices?error=' + encodeURIComponent('Pick a member first.'));
   res.render('admin-accounting-invoice-form', {
     title: 'New Invoice',
     charge: null,
     member,
-    familyLabel: familyLabel(member.name),
+    familyLabel: member ? familyLabel(member.name) : null,
+    allMembers: await billableMembers(),
     categories: await events.listAccountingCategories(),
     notice: req.query.notice || null,
     error: req.query.error || null,
@@ -326,7 +334,6 @@ router.get('/invoices', async (req, res) => {
     invoices,
     status,
     memberId,
-    allMembers: await billableMembers(),
     notice: req.query.notice || null,
     error: req.query.error || null,
     formatCents: payments.formatCents,
@@ -337,7 +344,10 @@ router.post('/invoices', async (req, res) => {
   const memberId = Number(req.body.memberId);
   const description = (req.body.description || '').trim();
   const amountCents = toCents(req.body.amount);
-  if (!memberId || !description || amountCents <= 0) {
+  if (!memberId) {
+    return res.redirect('/main-admin/accounting/invoices/new?error=' + encodeURIComponent('Pick a member.'));
+  }
+  if (!description || amountCents <= 0) {
     return res.redirect(`/main-admin/accounting/invoices/new?memberId=${memberId}&error=` + encodeURIComponent('Description and a positive amount are required.'));
   }
   const details = {
@@ -357,7 +367,11 @@ router.post('/invoices', async (req, res) => {
     const totalCents = lineItems.reduce((sum, i) => sum + i.amountCents, 0);
     await emailFamilyAboutInvoice(memberId, description, totalCents, req.portalAccount.id);
   }
-  res.redirect('/main-admin/accounting/invoices?notice=' + encodeURIComponent(lineItems.length > 1 ? `${lineItems.length} invoices added.` : 'Invoice added.'));
+  // A real request: "After you click save it goes back to main admin
+  // portal account page" - the Accounts list (not the Invoices subpage,
+  // which is where this used to land, and not the member's own Account
+  // page either).
+  res.redirect('/main-admin/accounting?notice=' + encodeURIComponent(lineItems.length > 1 ? `${lineItems.length} invoices added.` : 'Invoice added.'));
 });
 
 router.post('/invoices/:id/update', async (req, res) => {
@@ -413,6 +427,65 @@ router.get('/payments', async (req, res) => {
     error: req.query.error || null,
     formatCents: payments.formatCents,
   });
+});
+
+// A real request: "Invoice, payment and adjustment button should be a
+// page to create an invoice, payment or adjustment and select member. It
+// should not go to the members account page." A payment/refund is always
+// recorded against one of that member's own existing (not paid/
+// cancelled) charges - there's no free-standing payment with nothing to
+// apply it to - so this page's own member picker (same on-page <select>,
+// reload-on-change pattern as the Account page's own Account Year
+// filter) is step one, and once a member is picked, a second <select> of
+// their own open charges appears. `direction` just sets which half of
+// the shared Payment/Refund form this link opens on - +Adjustment is the
+// exact same page/route as +Payment, same as the per-charge Record
+// Payment dialog (views/admin-accounting-member.ejs) already unifies
+// both under one Direction field.
+router.get('/payments/new', async (req, res) => {
+  const memberId = Number(req.query.memberId) || null;
+  const member = memberId ? await db.prepare('SELECT id, name FROM members WHERE id = ?').get(memberId) : null;
+  const openCharges = member ? (await payments.chargesForMember(member.id)).filter((c) => c.status !== 'paid' && c.status !== 'cancelled') : [];
+  const direction = req.query.direction === 'refund' ? 'refund' : 'payment';
+  res.render('admin-accounting-payment-form', {
+    title: direction === 'refund' ? 'New Adjustment' : 'New Payment',
+    direction,
+    member,
+    allMembers: await billableMembers(),
+    openCharges,
+    methods: await paymentMethods(),
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+    formatCents: payments.formatCents,
+  });
+});
+
+router.post('/payments', async (req, res) => {
+  const memberId = Number(req.body.memberId) || null;
+  if (!memberId) return res.redirect('/main-admin/accounting/payments/new?error=' + encodeURIComponent('Pick a member.'));
+  const chargeId = Number(req.body.chargeId) || null;
+  const charge = chargeId ? await payments.getCharge(chargeId) : null;
+  if (!charge || charge.member_id !== memberId) {
+    return res.redirect(`/main-admin/accounting/payments/new?memberId=${memberId}&error=` + encodeURIComponent('Pick which open charge to apply this to.'));
+  }
+  const isRefund = req.body.direction === 'refund';
+  const amountCents = toCents(req.body.amount) * (isRefund ? -1 : 1);
+  if (amountCents === 0) {
+    return res.redirect(`/main-admin/accounting/payments/new?memberId=${memberId}&error=` + encodeURIComponent('Enter a nonzero amount.'));
+  }
+  // Same method-label-folds-into-the-note convention as the per-charge
+  // Record Payment dialog's own POST /charges/:id/payments.
+  const methodLabel = (req.body.method || '').trim();
+  const note = [methodLabel, (req.body.note || '').trim()].filter(Boolean).join(' - ');
+  await payments.recordPayment(charge.id, amountCents, 'manual', req.portalAccount.id, note, isRefund ? req.body.adjustmentType : null);
+  await auditLog.record(req.portalAccount.id, isRefund ? 'refund_recorded' : 'payment_recorded', 'payment_charge', charge.id, `${payments.formatCents(Math.abs(amountCents))}${note ? ' - ' + note : ''}`);
+  // A real request: "After you click save it goes back to main admin
+  // portal account page" - the Accounts list, not the member's own
+  // Account page (the per-charge Record Payment dialog there still
+  // redirects back to itself - see POST /charges/:id/payments below,
+  // unchanged - since staying on the page you started from still makes
+  // sense from that entry point).
+  res.redirect('/main-admin/accounting?notice=' + encodeURIComponent(isRefund ? 'Refund recorded.' : 'Payment recorded.'));
 });
 
 // A real request: "add a trash button" (Payments), also reused by

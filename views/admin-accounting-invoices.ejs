@@ -10,13 +10,12 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Invoices</h1>
-    <p class="hint">One invoice per charge on record - the same charges each member's own Account page shows, listed here across everyone.</p>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <div class="roster-btn-row accounting-list-toolbar no-print">
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('goto-invoice-dialog').showModal()">+ Invoice</button>
+      <a class="roster-action-btn" href="/main-admin/accounting/invoices/new">+ Invoice</a>
     </div>
 
     <form method="GET" action="/main-admin/accounting/invoices" class="roster-btn-row no-print" style="margin-bottom: 1rem;">
@@ -74,23 +73,6 @@
         </table>
       </div>
     <% } %>
-
-    <dialog id="goto-invoice-dialog" class="member-picker-dialog">
-      <form method="GET" onsubmit="event.preventDefault(); var id = this.memberId.value; if (id) window.location = '/main-admin/accounting/invoices/new?memberId=' + id;">
-        <h3>Which Member?</h3>
-        <p class="hint">Opens a new invoice for that member's own account.</p>
-        <label>Member
-          <select name="memberId" required>
-            <option value="">Select a member&hellip;</option>
-            <% allMembers.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
-          </select>
-        </label>
-        <div class="notes-dialog-actions">
-          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <button type="submit" class="primary-btn">Continue</button>
-        </div>
-      </form>
-    </dialog>
   </main>
 </body>
 </html>

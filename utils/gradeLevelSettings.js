@@ -8,8 +8,10 @@
 // reference list an admin fills in and reads, not wired into the Grade
 // Level dropdown on the member form itself (still its own manual
 // per-member choice, unrelated to this table).
+const db = require('../db');
 const { appSetting, setAppSetting } = require('./appSettings');
 const { GRADE_LEVELS } = require('./classSchedule');
+const { ageAsOfDate } = require('./dates');
 
 const SETTINGS_KEY = 'grade_level_age_rules';
 
@@ -53,4 +55,32 @@ async function saveGradeLevelRules(rows) {
   await setAppSetting(SETTINGS_KEY, JSON.stringify(toSave));
 }
 
-module.exports = { listGradeLevelRules, saveGradeLevelRules };
+// A real request: "Save grade level settings button and apply to all
+// members button should be on the same row" - "Apply to All Members"
+// didn't exist yet (this whole reference list was never wired into any
+// member's own grade_level field - see this file's own header comment);
+// this is that missing action. For every active student with a real
+// birthday on file, finds the configured rule whose own age/cutoffDate
+// pair matches that student's age AS OF that rule's cutoffDate (the
+// exact "if student is (age), by (date), then they will be in (grade
+// level)" sentence the rows themselves spell out) and sets grade_level
+// to it - a student who matches no rule (no birthday, or no rule's own
+// age lines up) is left untouched rather than cleared, since "no match"
+// isn't the same as "no grade." Returns how many members were actually
+// changed, for the page's own confirmation notice.
+async function applyGradeLevelRulesToAllMembers() {
+  const rules = (await listGradeLevelRules()).filter((r) => r.age != null && r.cutoffDate);
+  if (rules.length === 0) return 0;
+  const students = await db.prepare("SELECT id, birthday, grade_level FROM members WHERE active = 1 AND member_type = 'student' AND birthday IS NOT NULL").all();
+  let updated = 0;
+  for (const student of students) {
+    const match = rules.find((r) => ageAsOfDate(student.birthday, r.cutoffDate) === r.age);
+    if (match && match.gradeLevel !== student.grade_level) {
+      await db.prepare('UPDATE members SET grade_level = ? WHERE id = ?').run(match.gradeLevel, student.id);
+      updated++;
+    }
+  }
+  return updated;
+}
+
+module.exports = { listGradeLevelRules, saveGradeLevelRules, applyGradeLevelRulesToAllMembers };

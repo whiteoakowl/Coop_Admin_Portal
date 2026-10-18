@@ -14,6 +14,9 @@ const { isValidISODate, formatDateNumeric } = require('../utils/dates');
 const { portalStatusForMembers, sectionIdsForMembers } = require('../utils/portalPermissions');
 const membershipHandbook = require('../utils/membershipHandbook');
 const membershipFormFields = require('../utils/membershipFormFields');
+const path = require('path');
+const fs = require('fs');
+const { createStorageClient, downloadFile } = require('../utils/storage');
 
 const portalLoginLimiter = createFailureRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 8 });
 
@@ -66,6 +69,33 @@ router.post('/logout', (req, res) => {
   res.redirect('/');
 });
 
+// A real request: "add an option to upload the policy handbook as a
+// document, pdf, etc." - genuinely public (no login), same reasoning as
+// routes/documents.js's own public /documents/:token/file: a prospective
+// family reading the handbook on /register isn't signed in yet.
+const HANDBOOK_FILE_BUCKET = 'documents';
+const HANDBOOK_FILE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'documents');
+router.get('/handbook-file', async (req, res) => {
+  const file = await membershipHandbook.getHandbookFile();
+  if (!file) return res.status(404).send('Not found');
+  const client = createStorageClient();
+  let buffer;
+  if (client) {
+    try {
+      buffer = await downloadFile(client, HANDBOOK_FILE_BUCKET, file.key);
+    } catch {
+      return res.status(404).send('Not found');
+    }
+  } else {
+    const filePath = path.join(HANDBOOK_FILE_DIR, file.key);
+    if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
+    buffer = fs.readFileSync(filePath);
+  }
+  res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
+  res.setHeader('Content-Disposition', `inline; filename="${file.originalName.replace(/"/g, '')}"`);
+  res.send(buffer);
+});
+
 router.get('/register', async (req, res) => {
   if (req.portalAccount) return res.redirect('/portal');
   res.render('portal-register', {
@@ -75,6 +105,7 @@ router.get('/register', async (req, res) => {
     children: [],
     gradeOptions: GRADE_OPTIONS,
     handbookHtml: await membershipHandbook.getHandbookHtml(),
+    handbookFile: await membershipHandbook.getHandbookFile(),
     paymentInfo: await membershipHandbook.getPaymentInfo(),
     parentFields: await membershipFormFields.listFields('parent'),
     childFields: await membershipFormFields.listFields('child'),
@@ -103,6 +134,7 @@ async function renderRegisterError(res, error, formValues, children) {
     children,
     gradeOptions: GRADE_OPTIONS,
     handbookHtml: await membershipHandbook.getHandbookHtml(),
+    handbookFile: await membershipHandbook.getHandbookFile(),
     paymentInfo: await membershipHandbook.getPaymentInfo(),
     parentFields: await membershipFormFields.listFields('parent'),
     childFields: await membershipFormFields.listFields('child'),

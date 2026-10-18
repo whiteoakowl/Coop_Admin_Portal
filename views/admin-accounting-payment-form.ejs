@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1><%= title %></h1>
+    <p><a href="/main-admin/accounting">&larr; Accounts</a></p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <%# A real request: "Invoice, payment and adjustment button should be
+        a page to create an invoice, payment or adjustment and select
+        member" - step one, a plain member <select> that reloads the page
+        on change (same pattern as the Account page's own Account Year
+        filter) so step two (which open charge to apply this to) can read
+        off that member's own real charges. %>
+    <form method="GET" action="/main-admin/accounting/payments/new" class="member-form-grid">
+      <input type="hidden" name="direction" value="<%= direction %>" />
+      <label class="member-form-full">Member
+        <select name="memberId" onchange="this.form.requestSubmit()" required>
+          <option value="">Select a member&hellip;</option>
+          <% allMembers.forEach(function(m) { %>
+            <option value="<%= m.id %>" <%= member && member.id === m.id ? 'selected' : '' %>><%= m.name %></option>
+          <% }); %>
+        </select>
+      </label>
+    </form>
+
+    <% if (member && openCharges.length === 0) { %>
+      <p class="roster-empty"><%= member.name %> has no open invoices to apply a <%= direction === 'refund' ? 'refund/adjustment' : 'payment' %> to.</p>
+    <% } else if (member) { %>
+      <form method="POST" action="/main-admin/accounting/payments" class="manage-section member-form-grid" data-toggle-form>
+        <input type="hidden" name="memberId" value="<%= member.id %>" />
+
+        <label class="member-form-full">Invoice
+          <select name="chargeId" required>
+            <option value="">Select an invoice&hellip;</option>
+            <% openCharges.forEach(function(c) { %>
+              <option value="<%= c.id %>">#<%= c.id %> &mdash; <%= c.description %> (<%= formatCents(c.amount_cents - c.amountPaid) %> remaining)</option>
+            <% }); %>
+          </select>
+        </label>
+
+        <label>Direction
+          <select name="direction" data-toggle-select>
+            <option value="payment" <%= direction === 'payment' ? 'selected' : '' %>>Payment received</option>
+            <option value="refund" <%= direction === 'refund' ? 'selected' : '' %>>Refund issued</option>
+          </select>
+        </label>
+
+        <%# A real request: "accounting adjustment categories refund,
+            exemption, credit, discount" - only meaningful once Direction
+            above is "Refund issued"; data-toggle-select/data-toggle-field
+            (public/js/lesson-content-form.js's own generic field-
+            visibility toggle) hides this field entirely for a plain
+            payment, same as the per-charge Record Payment dialog. %>
+        <label data-toggle-field="refund" style="<%= direction === 'refund' ? '' : 'display: none;' %>">Adjustment Type
+          <select name="adjustmentType">
+            <option value="refund">Refund</option>
+            <option value="exemption">Exemption</option>
+            <option value="credit">Credit</option>
+            <option value="discount">Discount</option>
+          </select>
+        </label>
+
+        <label>Amount ($)
+          <input type="number" name="amount" min="0.01" step="0.01" required />
+        </label>
+        <label>Method
+          <select name="method">
+            <% methods.forEach(function(meth) { %><option value="<%= meth %>"><%= meth %></option><% }); %>
+          </select>
+        </label>
+        <label class="member-form-full">Note
+          <input type="text" name="note" placeholder="e.g. Check #123, Venmo @handle" />
+        </label>
+
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn"><%= direction === 'refund' ? 'Record Refund/Adjustment' : 'Record Payment' %></button>
+        </div>
+      </form>
+    <% } %>
+  </main>
+  <script src="/js/lesson-content-form.js"></script>
+</body>
+</html>

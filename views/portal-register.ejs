@@ -65,6 +65,13 @@
           client-side nicety. %>
       <div class="form-section">
         <h2>Policy Handbook</h2>
+        <%# A real request: "add an option to upload the policy handbook
+            as a document, pdf, etc." - a plain download link, separate
+            from (and not required for) the scroll-to-read checkbox
+            below, which still only ever tracks the HTML content above. %>
+        <% if (handbookFile) { %>
+          <p class="hint"><a href="/handbook-file" target="_blank">Download a copy of the Policy Handbook (<%= handbookFile.originalName %>)</a></p>
+        <% } %>
         <div id="handbook-scroll-box" class="handbook-scroll-box">
           <% if (handbookHtml && handbookHtml.trim()) { %>
             <%- handbookHtml %>

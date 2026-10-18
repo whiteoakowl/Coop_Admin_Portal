@@ -114,10 +114,11 @@ test('New/Edit Invoice form: Family read-only, Category/Due Date/Admin Notes/Aut
 
   const newInvoicePage = await request(app).get(`/main-admin/accounting/invoices/new?memberId=${memberId}`).set('Cookie', admin.cookie);
   assert.equal(newInvoicePage.status, 200);
-  // "Family (read-only, 'Kalna, Kara')" - Last, First, not this app's
-  // usual stored "First Last".
-  assert.match(newInvoicePage.text, /value="Kalna, Kara"/);
-  assert.match(newInvoicePage.text, /readonly/);
+  // A real request: "Invoice, payment and adjustment button should be a
+  // page to create an invoice... and select member" - member selection
+  // is a real <select> now, not a readonly "Family" field (preselected
+  // here since this GET carries ?memberId=).
+  assert.match(newInvoicePage.text, new RegExp(`<option value="${memberId}" selected>Kara Kalna</option>`));
 
   const createRes = await request(app)
     .post('/main-admin/accounting/invoices')
@@ -137,7 +138,9 @@ test('New/Edit Invoice form: Family read-only, Category/Due Date/Admin Notes/Aut
       emailFamily: 'yes',
       _csrf: extractCsrf(newInvoicePage.text),
     });
-  assert.match(createRes.headers.location, /\/main-admin\/accounting\/invoices\?notice=/);
+  // A real request: "After you click save it goes back to main admin
+  // portal account page" - the Accounts list, not the Invoices subpage.
+  assert.match(createRes.headers.location, /^\/main-admin\/accounting\?notice=/);
 
   const charges = await db.prepare('SELECT * FROM payment_charges WHERE member_id = ? ORDER BY id').all(memberId);
   assert.equal(charges.length, 2, 'the primary Description/Amount and the one +Split Invoice line item should each be their own charge');

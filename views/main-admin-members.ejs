@@ -517,7 +517,7 @@
             choice). %>
         <div class="manage-section">
           <h2>Grade Level Settings</h2>
-          <form method="POST" action="/main-admin/members/settings/grade-levels" class="stack-form">
+          <form method="POST" action="/main-admin/members/settings/grade-levels" class="stack-form" id="grade-level-settings-form">
             <div class="roster-scroll">
               <table class="roster-table condensed-table grade-level-settings-table">
                 <thead><tr><th>If student is&hellip;</th><th>&hellip;by this date&hellip;</th><th>&hellip;then they will be in</th></tr></thead>
@@ -535,8 +535,24 @@
                 </tbody>
               </table>
             </div>
-            <button type="submit" class="primary-btn">Save Grade Level Settings</button>
           </form>
+          <%# A real request: "Save grade level settings button and apply
+              to all members button should be on the same row. Shrink to
+              fit." Two separate <form>s (HTML forbids nesting one inside
+              another) sharing one flex row reads as "the same row" - same
+              roster-btn-row-fit-text/data-fixed-columns shrink-to-fit
+              convention the Accounts page's own side-by-side button pair
+              already uses. Apply is its own real action (see routes/
+              main-admin-members.js's own POST .../grade-levels/apply) -
+              bulk-overwrites every active student's own grade_level, so
+              it gets the same data-confirm guard every other bulk/
+              destructive action in this app already has. %>
+          <div class="roster-btn-row roster-btn-row-fit-text" data-fixed-columns="2">
+            <button type="submit" form="grade-level-settings-form" class="roster-action-btn roster-action-btn-fit">Save Grade Level Settings</button>
+            <form method="POST" action="/main-admin/members/settings/grade-levels/apply" class="inline-block-form" data-confirm="Apply these rules to every active student now? This overwrites each matching student's own Grade Level.">
+              <button type="submit" class="roster-action-btn roster-action-btn-fit">Apply to All Members</button>
+            </form>
+          </div>
         </div>
       <% } else if (settingsTab === 'fee-payment') { %>
         <%# A real request: "place at the bottom of the application for
@@ -628,6 +644,32 @@
             <div class="forum-editable" data-forum-editable contenteditable="true"><%- handbookHtml %></div>
             <input type="hidden" name="handbookHtml" data-forum-body-input />
             <button type="submit" class="primary-btn">Save Policy Handbook</button>
+          </form>
+        </div>
+
+        <%# A real request: "add an option to upload the policy handbook
+            as a document, pdf, etc." - an optional file alongside the
+            rich-text handbook above (see utils/membershipHandbook.js's
+            own comment on why this doesn't touch the existing scroll-to-
+            read enforcement) - shown to families as a plain download
+            link on the public application (views/portal-register.ejs). %>
+        <div class="manage-section">
+          <h2>Policy Handbook File <span class="hint">(optional PDF/Word download)</span></h2>
+          <% if (handbookFile) { %>
+            <p class="hint">
+              Currently posted: <a href="/handbook-file" target="_blank"><%= handbookFile.originalName %></a>
+            </p>
+            <form method="POST" action="/main-admin/members/settings/handbook/file/delete" class="inline-block-form" data-confirm="Remove the uploaded Policy Handbook file? The rich-text handbook above is unaffected.">
+              <button type="submit" class="roster-action-btn roster-action-btn-danger">Remove File</button>
+            </form>
+          <% } else { %>
+            <p class="hint">No file uploaded yet.</p>
+          <% } %>
+          <form method="POST" action="/main-admin/members/settings/handbook/file" enctype="multipart/form-data" class="stack-form stack-form-narrow">
+            <label>Upload <%= handbookFile ? 'a Replacement' : 'a' %> File
+              <input type="file" name="file" accept=".pdf,.doc,.docx" required />
+            </label>
+            <button type="submit" class="primary-btn">Upload</button>
           </form>
         </div>
       <% } %>

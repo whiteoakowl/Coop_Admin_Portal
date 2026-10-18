@@ -28,17 +28,18 @@
         of buttons. %>
     <div class="accounting-accounts-controls">
       <div class="accounting-orange-buttons-group">
-        <%# +Invoice creates a charge for any member directly from here
-            (same POST /invoices the Invoices subpage's own dialog uses);
-            +Payment/+Adjustment both just jump to that member's own
-            Account page below, where Record Payment (direction: payment
-            or refund) already works per-charge - one shared "which
-            member?" dialog for both rather than two, since they lead to
-            the exact same place. %>
+        <%# A real request: "Invoice, payment and adjustment button
+            should be a page to create an invoice, payment or adjustment
+            and select member. It should not go to the members account
+            page." Each is now a plain link straight to its own page
+            (member selection happens there, not in a dialog first) -
+            admin-accounting-invoice-form.ejs for +Invoice, the shared
+            admin-accounting-payment-form.ejs (just a different starting
+            Direction) for +Payment/+Adjustment. %>
         <div class="roster-btn-row accounting-list-toolbar no-print">
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('goto-invoice-dialog').showModal()">+ Invoice</button>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('goto-member-dialog').showModal()">+ Payment</button>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('goto-member-dialog').showModal()">+ Adjustment</button>
+          <a class="roster-action-btn" href="/main-admin/accounting/invoices/new">+ Invoice</a>
+          <a class="roster-action-btn" href="/main-admin/accounting/payments/new">+ Payment</a>
+          <a class="roster-action-btn" href="/main-admin/accounting/payments/new?direction=refund">+ Adjustment</a>
         </div>
 
         <%# A real request: "past due check box should be a button that says
@@ -107,40 +108,6 @@
         </table>
       </div>
     <% } %>
-
-    <dialog id="goto-invoice-dialog" class="member-picker-dialog">
-      <form method="GET" onsubmit="event.preventDefault(); var id = this.memberId.value; if (id) window.location = '/main-admin/accounting/invoices/new?memberId=' + id;">
-        <h3>Which Member?</h3>
-        <p class="hint">Opens a new invoice for that member's own account.</p>
-        <label>Member
-          <select name="memberId" required>
-            <option value="">Select a member&hellip;</option>
-            <% allMembers.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
-          </select>
-        </label>
-        <div class="notes-dialog-actions">
-          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <button type="submit" class="primary-btn">Continue</button>
-        </div>
-      </form>
-    </dialog>
-
-    <dialog id="goto-member-dialog" class="member-picker-dialog">
-      <form method="GET" onsubmit="event.preventDefault(); var id = this.memberId.value; if (id) window.location = '/main-admin/accounting/members/' + id;">
-        <h3>Which Member?</h3>
-        <p class="hint">Opens that member's own Account page, where Record Payment covers both a payment received and a refund/adjustment.</p>
-        <label>Member
-          <select name="memberId" required>
-            <option value="">Select a member&hellip;</option>
-            <% allMembers.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
-          </select>
-        </label>
-        <div class="notes-dialog-actions">
-          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <button type="submit" class="primary-btn">Continue</button>
-        </div>
-      </form>
-    </dialog>
   </main>
 </body>
 </html>
