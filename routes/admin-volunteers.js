@@ -232,6 +232,13 @@ router.get('/volunteers-absence-diagnostic', async (req, res) => {
     if (!cls) {
       lines.push(`No class named "${className}" found on ${day}.`);
     } else {
+      lines.push(`Class "${className}" (id=${cls.id}) cls.roster_id = ${cls.roster_id}`);
+      const classRoster = cls.roster_id ? await db.prepare('SELECT * FROM rosters WHERE id = ?').get(cls.roster_id) : null;
+      lines.push(`  that roster: ${JSON.stringify(classRoster)}`);
+      const classRosterMembers = cls.roster_id ? await db.prepare('SELECT member_id, source FROM roster_members WHERE roster_id = ?').all(cls.roster_id) : [];
+      lines.push(`  roster_members currently on it: ${JSON.stringify(classRosterMembers)}`);
+      lines.push('');
+
       const staff = await db.prepare("SELECT member_id, role FROM class_staff WHERE class_id = ?").all(cls.id);
       lines.push(`Class "${className}" (id=${cls.id}) staff: ${JSON.stringify(staff)}`);
       for (const s of staff) {
@@ -239,6 +246,11 @@ router.get('/volunteers-absence-diagnostic', async (req, res) => {
           .prepare('SELECT session_date, status, source, roster_id, recorded_at FROM attendance WHERE member_id = ? ORDER BY session_date')
           .all(s.member_id);
         lines.push(`  member ${s.member_id} (${s.role}) - every attendance row on file: ${JSON.stringify(rows)}`);
+        const rosterIds = [...new Set(rows.map((r) => r.roster_id))];
+        for (const rid of rosterIds) {
+          const r = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(rid);
+          lines.push(`    roster_id ${rid} is: ${JSON.stringify(r)}`);
+        }
       }
     }
   } else {
