@@ -54,7 +54,6 @@ const {
   assignmentsForStudentInClass,
   diplomaForStudent,
   issueDiploma,
-  transcriptForStudent,
   lessonsForStudentView,
   isLessonLockedForStudent,
   nextContentItemAfter,
@@ -65,7 +64,15 @@ const {
   saveLessonAttachment,
   contentItemsForAssignment,
   markLessonItemComplete,
+  TRANSCRIPT_GRADE_LETTERS,
+  transcriptBuilderForStudent,
+  createTranscriptEntry,
+  getTranscriptEntry,
+  updateTranscriptEntry,
+  deleteTranscriptEntry,
+  coopClassNamesForStudent,
 } = require('../utils/academics');
+const { classesForStudent: familySchoolClassesForStudent } = require('../utils/familySchool');
 const notifications = require('../utils/notifications');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('../utils/sections');
 const { registerForClass, unregisterFromClass, joinClassAsStaff, leaveClassAsStaff } = require('../utils/classRegistration');
@@ -1175,21 +1182,100 @@ router.get('/documents', async (req, res) => {
   res.render('parent-documents', { title: 'Documents', documents });
 });
 
-// Academics - a real request: "sub pages should be transcripts, diplomas,
-// name tags." Transcripts (this bare route - see the Classes/Class
-// Registration precedent above of the bare route being the first
-// subpage) is purely read-only, same as everywhere else a parent views
-// (rather than acts on) their children's records; grades/assignments
-// aren't part of this request and are already viewable per-class in
-// Classroom Dashboard's own Lessons tab, so they're left out here.
+// Academics - a real request: "sub pages should be transcripts,
+// diplomas, name tags." Originally purely read-only (current
+// enrollments + student_academic_history, grades/assignments left out
+// since those are already viewable per-class in Classroom Dashboard's
+// own Lessons tab). A later real request turned Transcripts into a full
+// editable builder: "On transcripts you can create and print a
+// transcript for each student. You can add classes from co-op classes
+// or family management classes or manually add an entirely new class.
+// Then calculate the GPA per school year and for the entire 4 years.
+// Print full page view of transcript." See utils/academics.js's own
+// parent_transcript_entries migration comment for the schema behind
+// this - transcriptForStudent/student_academic_history above are still
+// used elsewhere (generateTranscriptsForEndedClasses's own backfill),
+// just no longer this page's own data source.
 router.get('/academics', async (req, res) => {
   const children = await childrenForAccount(req.portalAccount);
   const transcripts = [];
   for (const child of children) {
-    const { current, history } = await transcriptForStudent(child.id);
-    transcripts.push({ child, current, history });
+    transcripts.push({
+      child,
+      builder: await transcriptBuilderForStudent(child.id),
+      // "Add classes from co-op classes or family management classes
+      // or manually add" - precomputed per child here (each list is
+      // small - a family's own classes) rather than a second fetch()
+      // round trip from the Add Entry dialog.
+      coopClasses: await coopClassNamesForStudent(child.id),
+      familyClasses: (await familySchoolClassesForStudent(child.id)).map((c) => c.class_name),
+    });
   }
-  res.render('parent-academics', { title: 'Academics', transcripts });
+  res.render('parent-academics', {
+    title: 'Transcripts',
+    transcripts,
+    gradeLetters: TRANSCRIPT_GRADE_LETTERS,
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+async function requireOwnChild(req, studentId) {
+  const children = await childrenForAccount(req.portalAccount);
+  return children.some((c) => c.id === studentId);
+}
+
+router.post('/academics/transcripts', async (req, res) => {
+  const studentId = parseInt(req.body.studentId, 10);
+  if (!(await requireOwnChild(req, studentId))) return res.status(404).send('Not found');
+  const schoolYear = (req.body.schoolYear || '').trim();
+  const className = (req.body.className || '').trim();
+  if (!schoolYear || !className) {
+    return res.redirect('/parent/academics?error=' + encodeURIComponent('A school year and class name are required.'));
+  }
+  const creditHours = parseFloat(req.body.creditHours);
+  const gradeLetter = TRANSCRIPT_GRADE_LETTERS.includes(req.body.gradeLetter) ? req.body.gradeLetter : null;
+  await createTranscriptEntry({
+    studentId,
+    schoolYear,
+    className,
+    creditHours: Number.isFinite(creditHours) && creditHours > 0 ? creditHours : 1,
+    gradeLetter,
+    createdByAccountId: req.portalAccount.id,
+  });
+  res.redirect('/parent/academics?notice=' + encodeURIComponent('Class added to transcript.'));
+});
+
+router.post('/academics/transcripts/:id/edit', async (req, res) => {
+  const entry = await getTranscriptEntry(parseInt(req.params.id, 10));
+  if (!entry || !(await requireOwnChild(req, entry.student_id))) return res.status(404).send('Not found');
+  const schoolYear = (req.body.schoolYear || '').trim();
+  const className = (req.body.className || '').trim();
+  if (!schoolYear || !className) {
+    return res.redirect('/parent/academics?error=' + encodeURIComponent('A school year and class name are required.'));
+  }
+  const creditHours = parseFloat(req.body.creditHours);
+  const gradeLetter = TRANSCRIPT_GRADE_LETTERS.includes(req.body.gradeLetter) ? req.body.gradeLetter : null;
+  await updateTranscriptEntry(entry.id, { schoolYear, className, creditHours: Number.isFinite(creditHours) && creditHours > 0 ? creditHours : 1, gradeLetter });
+  res.redirect('/parent/academics?notice=' + encodeURIComponent('Transcript entry updated.'));
+});
+
+router.post('/academics/transcripts/:id/delete', async (req, res) => {
+  const entry = await getTranscriptEntry(parseInt(req.params.id, 10));
+  if (!entry || !(await requireOwnChild(req, entry.student_id))) return res.status(404).send('Not found');
+  await deleteTranscriptEntry(entry.id);
+  res.redirect('/parent/academics?notice=' + encodeURIComponent('Entry removed.'));
+});
+
+// "Print full page view of transcript" - a dedicated full-page print
+// route, same no-nav/no-chrome/window.print() shape the Diploma print
+// page below already uses.
+router.get('/academics/transcripts/:studentId/print', async (req, res) => {
+  const studentId = parseInt(req.params.studentId, 10);
+  if (!(await requireOwnChild(req, studentId))) return res.status(404).send('Not found');
+  const children = await childrenForAccount(req.portalAccount);
+  const child = children.find((c) => c.id === studentId);
+  res.render('parent-academics-transcript-print', { title: 'Transcript', member: child, builder: await transcriptBuilderForStudent(studentId) });
 });
 
 // Diplomas - a real request: "Diplomas allows parents to design and print

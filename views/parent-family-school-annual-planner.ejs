@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
+    <div class="roster-toolbar no-print">
+      <h1>Annual Planner</h1>
+      <% if (familyStudents.length > 0) { %>
+        <div class="roster-btn-row">
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-curriculum-dialog').showModal()">+ Add Curriculum</button>
+        </div>
+      <% } %>
+    </div>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <%# A real request: "Family management should also have a subpage
+        called annual planner where it is organized by student and you
+        add curriculum under each student. Pop up asks for curriculum
+        name, brand, level and price." %>
+    <% if (familyStudents.length === 0) { %>
+      <p class="roster-empty">No students in your family yet.</p>
+    <% } else { %>
+      <% familyStudents.forEach(function(s) { %>
+        <% var items = curriculumByStudent[s.id]; %>
+        <div class="manage-section">
+          <div class="grid-box-header">
+            <h2><%= s.name %></h2>
+          </div>
+          <% if (items.length === 0) { %>
+            <p class="roster-empty">No curriculum added yet.</p>
+          <% } else { %>
+            <div class="roster-scroll">
+              <table class="roster-table members-table condensed-table table-stack-mobile">
+                <thead><tr><th>Curriculum</th><th>Brand</th><th>Level</th><th>Price</th><th></th></tr></thead>
+                <tbody>
+                  <% items.forEach(function(item) { %>
+                    <tr>
+                      <td data-label="Curriculum" class="table-stack-heading"><%= item.name %></td>
+                      <td data-label="Brand"><%= item.brand || '' %></td>
+                      <td data-label="Level"><%= item.level || '' %></td>
+                      <td data-label="Price"><%= item.price != null ? '$' + Number(item.price).toFixed(2) : '' %></td>
+                      <td class="roster-btn-row accounting-row-icons">
+                        <form method="POST" action="/parent/family-school/annual-planner/<%= item.id %>/delete" data-confirm="Remove &quot;<%= item.name %>&quot; from <%= s.name %>&apos;s curriculum?">
+                          <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                        </form>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+      <% }); %>
+    <% } %>
+  </main>
+
+  <% if (familyStudents.length > 0) { %>
+    <dialog id="add-curriculum-dialog" class="class-form-dialog">
+      <form method="POST" action="/parent/family-school/annual-planner">
+        <div class="class-form-dialog-header">
+          <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
+          <h3>Add Curriculum</h3>
+        </div>
+        <label>Student
+          <select name="studentId" required>
+            <% familyStudents.forEach(function(s) { %>
+              <option value="<%= s.id %>"><%= s.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label>Curriculum Name
+          <input type="text" name="name" required />
+        </label>
+        <label>Brand
+          <input type="text" name="brand" />
+        </label>
+        <label>Level
+          <input type="text" name="level" />
+        </label>
+        <label>Price
+          <input type="number" name="price" min="0" step="0.01" />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add Curriculum</button>
+        </div>
+      </form>
+    </dialog>
+  <% } %>
+</body>
+</html>

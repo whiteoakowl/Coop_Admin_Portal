@@ -248,6 +248,99 @@ async function generateTranscriptsForEndedClasses() {
   }
 }
 
+// --- Transcript builder (a real request: "On transcripts you can
+// create and print a transcript for each student. You can add classes
+// from co-op classes or family management classes or manually add an
+// entirely new class. Then calculate the GPA per school year and for
+// the entire 4 years.") Replaces the old read-only current/history
+// summary above for the Academics > Transcripts page - see the
+// parent_transcript_entries migration's own header comment for why
+// every entry snapshots its own class_name rather than a live FK.
+// Standard US unweighted 4.0 scale with +/- - this app's own choice
+// (not literally specified in the request), used because it's the
+// scale a transcript reader actually expects, unlike Family School
+// Management's own simpler A/B/C/D/F-only grade (computed from a raw
+// percent, a different subsystem with a different job).
+const TRANSCRIPT_GRADE_POINTS = {
+  'A+': 4.0, A: 4.0, 'A-': 3.7,
+  'B+': 3.3, B: 3.0, 'B-': 2.7,
+  'C+': 2.3, C: 2.0, 'C-': 1.7,
+  'D+': 1.3, D: 1.0, 'D-': 0.7,
+  F: 0.0,
+};
+const TRANSCRIPT_GRADE_LETTERS = Object.keys(TRANSCRIPT_GRADE_POINTS);
+
+function gpaOf(entries) {
+  const graded = entries.filter((e) => e.grade_letter && TRANSCRIPT_GRADE_POINTS[e.grade_letter] != null);
+  const totalCredits = graded.reduce((sum, e) => sum + Number(e.credit_hours), 0);
+  const gpa = totalCredits > 0 ? graded.reduce((sum, e) => sum + Number(e.credit_hours) * TRANSCRIPT_GRADE_POINTS[e.grade_letter], 0) / totalCredits : null;
+  return { gpa, totalCredits };
+}
+
+// One group per distinct school_year (in the order entries were first
+// added, not re-sorted alphabetically - a parent's own "Year 1"/"Year
+// 2" labels, or real calendar years, both already read correctly typed
+// in order), each with its own GPA, plus the cumulative GPA across
+// every entry regardless of year ("for the entire 4 years" - not
+// hardcoded to exactly 4; however many school years this student
+// actually has entries for).
+async function transcriptBuilderForStudent(studentId) {
+  const rows = await db.prepare('SELECT * FROM parent_transcript_entries WHERE student_id = ? ORDER BY id').all(studentId);
+  const bySchoolYear = new Map();
+  for (const r of rows) {
+    if (!bySchoolYear.has(r.school_year)) bySchoolYear.set(r.school_year, []);
+    bySchoolYear.get(r.school_year).push(r);
+  }
+  const schoolYears = Array.from(bySchoolYear.entries()).map(([schoolYear, entries]) => ({ schoolYear, entries, ...gpaOf(entries) }));
+  const { gpa: cumulativeGpa, totalCredits: cumulativeCredits } = gpaOf(rows);
+  return { schoolYears, cumulativeGpa, cumulativeCredits };
+}
+
+async function createTranscriptEntry({ studentId, schoolYear, className, creditHours, gradeLetter, createdByAccountId }) {
+  const info = await db
+    .prepare(
+      `INSERT INTO parent_transcript_entries (student_id, school_year, class_name, credit_hours, grade_letter, created_by_account_id)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .run(studentId, schoolYear, className, creditHours, gradeLetter || null, createdByAccountId);
+  return info.lastInsertRowid;
+}
+
+async function getTranscriptEntry(id) {
+  return db.prepare('SELECT * FROM parent_transcript_entries WHERE id = ?').get(id);
+}
+
+async function updateTranscriptEntry(id, { schoolYear, className, creditHours, gradeLetter }) {
+  await db
+    .prepare('UPDATE parent_transcript_entries SET school_year = ?, class_name = ?, credit_hours = ?, grade_letter = ?, updated_at = now_text() WHERE id = ?')
+    .run(schoolYear, className, creditHours, gradeLetter || null, id);
+}
+
+async function deleteTranscriptEntry(id) {
+  await db.prepare('DELETE FROM parent_transcript_entries WHERE id = ?').run(id);
+}
+
+// Plain class-name lists for the Add Entry dialog's own "quick-fill
+// from Co-op Classes" dropdown - "add classes from co-op classes... or
+// manually add" - current enrollments plus past (student_academic_
+// history) ones, since a transcript reasonably draws on a student's
+// whole co-op record, not just what they're in right now. No
+// grades/credits here (co-op classes don't track either) - the parent
+// still fills those in by hand regardless of which class they picked.
+async function coopClassNamesForStudent(studentId) {
+  const rows = await db
+    .prepare(
+      `SELECT class_name FROM (
+         SELECT DISTINCT c.class_name FROM class_enrollments ce JOIN classes c ON c.id = ce.class_id WHERE ce.student_id = ?
+         UNION
+         SELECT DISTINCT h.class_name FROM student_academic_history h WHERE h.student_id = ?
+       ) combined
+       ORDER BY class_name COLLATE "C"`
+    )
+    .all(studentId, studentId);
+  return rows.map((r) => r.class_name);
+}
+
 // --- Lesson content items (video/text/file/quiz/assignment_upload) ---
 // A real request: "Classes, lessons. Button to add lessons. Could be link
 // to video, text description, file link, quiz with scoring... drop down
@@ -783,6 +876,13 @@ module.exports = {
   allTranscriptEntries,
   addTranscriptEntry,
   generateTranscriptsForEndedClasses,
+  TRANSCRIPT_GRADE_LETTERS,
+  transcriptBuilderForStudent,
+  createTranscriptEntry,
+  getTranscriptEntry,
+  updateTranscriptEntry,
+  deleteTranscriptEntry,
+  coopClassNamesForStudent,
   getContentItem,
   contentItemsForAssignment,
   createContentItem,

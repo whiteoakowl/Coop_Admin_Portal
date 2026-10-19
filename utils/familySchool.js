@@ -535,38 +535,34 @@ async function deleteJournalEntry(id) {
   await db.prepare('DELETE FROM family_school_journal_entries WHERE id = ?').run(id);
 }
 
-// --- Planner: Annual Plan (the Planner subpage's own dated list - a
-// real request: "parent can create an annual plan for each student.
-// With dates, title, description etc.") ---
+// --- Annual Planner (its own subpage - a real request: "Family
+// management should also have a subpage called annual planner where
+// it is organized by student and you add curriculum under each
+// student. Pop up asks for curriculum name, brand, level and price.") ---
 
-async function annualPlanForStudent(studentId) {
-  const rows = await db
-    .prepare('SELECT * FROM family_school_annual_plan_entries WHERE student_id = ? ORDER BY start_date, id')
-    .all(studentId);
-  return rows.map((r) => ({
-    ...r,
-    startDateLabel: formatDateLabel(r.start_date),
-    endDateLabel: r.end_date ? formatDateLabel(r.end_date) : null,
-  }));
+async function curriculumForStudent(studentId) {
+  return db.prepare('SELECT * FROM family_school_curriculum_items WHERE student_id = ? ORDER BY name COLLATE "C"').all(studentId);
 }
 
-async function createAnnualPlanEntry({ studentId, startDate, endDate, title, description, createdByAccountId }) {
+async function createCurriculumItem({ studentId, name, brand, level, price, createdByAccountId }) {
   const info = await db
-    .prepare('INSERT INTO family_school_annual_plan_entries (student_id, start_date, end_date, title, description, created_by_account_id) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(studentId, startDate, endDate || null, title, description || null, createdByAccountId);
+    .prepare('INSERT INTO family_school_curriculum_items (student_id, name, brand, level, price, created_by_account_id) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(studentId, name, brand || null, level || null, price != null && price !== '' ? price : null, createdByAccountId);
   return info.lastInsertRowid;
 }
 
-async function getAnnualPlanEntry(id) {
-  return db.prepare('SELECT * FROM family_school_annual_plan_entries WHERE id = ?').get(id);
+async function getCurriculumItem(id) {
+  return db.prepare('SELECT * FROM family_school_curriculum_items WHERE id = ?').get(id);
 }
 
-async function deleteAnnualPlanEntry(id) {
-  await db.prepare('DELETE FROM family_school_annual_plan_entries WHERE id = ?').run(id);
+async function deleteCurriculumItem(id) {
+  await db.prepare('DELETE FROM family_school_curriculum_items WHERE id = ?').run(id);
 }
 
-// --- Planner: Weekly Plan Grid (the Planner subpage's own per-week
-// spreadsheet - a real request, with a real decision behind its shape:
+// --- Schedule Planner (its own subpage - a real request: "The other
+// new planner page under family school management should be called
+// schedule planner." Its own per-week spreadsheet grid, with a real
+// decision behind its shape:
 // "View weekly plan grid for each student. Be able to add rows and
 // columns to create plan grid for the week per student," confirmed to
 // mean one independently-editable grid per student PER CALENDAR WEEK,
@@ -711,10 +707,10 @@ module.exports = {
   createJournalEntry,
   updateJournalEntry,
   deleteJournalEntry,
-  annualPlanForStudent,
-  createAnnualPlanEntry,
-  getAnnualPlanEntry,
-  deleteAnnualPlanEntry,
+  curriculumForStudent,
+  createCurriculumItem,
+  getCurriculumItem,
+  deleteCurriculumItem,
   mondayOf,
   getWeeklyPlanById,
   getWeeklyPlanColumn,

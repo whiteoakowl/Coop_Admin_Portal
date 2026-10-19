@@ -5108,40 +5108,49 @@ create table if not exists family_school_journal_entries (
   updated_at text not null default now_text()
 );
 create index if not exists idx_family_school_journal_entries_student on family_school_journal_entries(student_id, entry_date);
--- Family School Management - Planner subpage. A real request: "Family
--- school management. Add a planner subpage. Here parent can create an
--- annual plan for each student. With dates, title, description etc.
--- View weekly plan grid for each student. Be able to add rows and
--- columns to create plan grid for the week per student." Two
--- independent pieces under one Planner page (views/parent-family-
--- school-planner.ejs): a plain dated list (Annual Plan) and a fully
--- custom per-week spreadsheet grid (Weekly Plan) - same "nothing to do
--- with co-op classes" standalone scope as the rest of family_school_*
+-- Family School Management - Annual Planner and Schedule Planner
+-- subpages. Originally one combined "Planner" page with an Annual Plan
+-- tab (a plain dated list) and a Weekly Plan tab (a per-week grid) - a
+-- later real request split these into their own named subpages and
+-- redefined Annual Plan's own shape entirely: "Family management
+-- should also have a subpage called annual planner where it is
+-- organized by student and you add curriculum under each student. Pop
+-- up asks for curriculum name, brand, level and price," and "The other
+-- new planner page under family school management should be called
+-- schedule planner." family_school_curriculum_items replaces the old
+-- (never-shipped, dated-entry) family_school_annual_plan_entries below;
+-- the Schedule Planner's own weekly-grid tables are otherwise unchanged
+-- from the original Planner design - same "nothing to do with co-op
+-- classes" standalone scope as the rest of family_school_*
 -- (20261123010000_family_school_management.sql's own header comment).
 
--- "Create an annual plan for each student. With dates, title,
--- description etc." - a plain dated list, one row per entry. end_date
--- is nullable (a single-day entry just leaves it null) rather than
--- forcing every entry to be a range.
-create table if not exists family_school_annual_plan_entries (
+-- Annual Planner - "organized by student and you add curriculum under
+-- each student. Pop up asks for curriculum name, brand, level and
+-- price." One row per curriculum item; price is numeric (not integer
+-- cents) to match how every other free-entry dollar amount in this app
+-- already stores (e.g. family_school_content_items.points_possible's
+-- own numeric sibling fields elsewhere), not a currency subsystem of
+-- its own.
+create table if not exists family_school_curriculum_items (
   id integer generated always as identity primary key,
   student_id integer not null references members(id) on delete cascade,
-  start_date text not null,
-  end_date text,
-  title text not null,
-  description text,
+  name text not null,
+  brand text,
+  level text,
+  price numeric,
   created_by_account_id integer references member_accounts(id) on delete set null,
   created_at text not null default now_text(),
   updated_at text not null default now_text()
 );
-create index if not exists idx_family_school_annual_plan_entries_student on family_school_annual_plan_entries(student_id, start_date);
+create index if not exists idx_family_school_curriculum_items_student on family_school_curriculum_items(student_id);
 
--- "View weekly plan grid for each student" - a real decision (asked and
--- confirmed): scoped to one specific calendar week per student, with
--- Prev/Next navigation, the same shape family_school_attendance already
--- uses for "one calendar unit per student, stepped through over time" -
--- not one single reusable template. week_start_date is always that
--- week's own Monday (ISO date) - the grid's own navigation key.
+-- Schedule Planner - "View weekly plan grid for each student" - a real
+-- decision (asked and confirmed): scoped to one specific calendar week
+-- per student, with Prev/Next navigation, the same shape family_school_
+-- attendance already uses for "one calendar unit per student, stepped
+-- through over time" - not one single reusable template. week_start_date
+-- is always that week's own Monday (ISO date) - the grid's own
+-- navigation key.
 create table if not exists family_school_weekly_plans (
   id integer generated always as identity primary key,
   student_id integer not null references members(id) on delete cascade,

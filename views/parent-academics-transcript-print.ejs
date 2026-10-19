@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="no-print"><a href="/parent/academics">&larr; Transcripts</a></p>
+    <button type="button" class="roster-action-btn print-action-btn no-print" onclick="window.print()">Print</button>
+
+    <section class="portal-dashboard-card portal-dashboard-card-wide">
+      <h1>Official Transcript</h1>
+      <h2><%= member.name %></h2>
+
+      <% if (builder.schoolYears.length === 0) { %>
+        <p class="hint">No classes on this transcript yet.</p>
+      <% } else { %>
+        <% builder.schoolYears.forEach(function(yr) { %>
+          <h3><%= yr.schoolYear %></h3>
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Class</th><th>Credits</th><th>Grade</th></tr></thead>
+            <tbody>
+              <% yr.entries.forEach(function(e) { %>
+                <tr>
+                  <td><%= e.class_name %></td>
+                  <td><%= e.credit_hours %></td>
+                  <td><%= e.grade_letter || '—' %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+          <p><%= yr.schoolYear %> GPA: <%= yr.gpa != null ? yr.gpa.toFixed(2) : 'N/A' %><% if (yr.gpa != null) { %> (<%= yr.totalCredits %> credits)<% } %></p>
+        <% }); %>
+        <p><strong>Cumulative GPA: <%= builder.cumulativeGpa != null ? builder.cumulativeGpa.toFixed(2) : 'N/A' %></strong><% if (builder.cumulativeGpa != null) { %> (<%= builder.cumulativeCredits %> total credits)<% } %></p>
+      <% } %>
+    </section>
+  </main>
+</body>
+</html>

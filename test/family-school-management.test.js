@@ -296,7 +296,7 @@ test('Attendance: clicking a date cycles present (green) -> absent (red) -> unma
   assert.equal(hijackAttempt.status, 404);
 });
 
-test('Teacher Journal: add an entry by date and student, it shows in the log below, and entries are scoped to one family', async () => {
+test('Daily Learning Log (Teacher Journal): add an entry by date and student, it shows in the log below, and entries are scoped to one family', async () => {
   const familyId = await createFamily('Journal Family');
   const parent = await createPortalMember({ name: 'Journal Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const student = await createPortalMember({ name: 'Journal Student', familyId, memberType: 'student', roleKey: 'student' });
