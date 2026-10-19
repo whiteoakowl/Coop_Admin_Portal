@@ -37,6 +37,7 @@ const {
   backfillSetupCleanupTaskWraps,
   backfillSetupCleanupBadgeLayout,
   backfillSetupCleanupTaskNumber,
+  backfillSetupCleanupBarcodeIdNumber,
   backfillSetupCleanupBadgeFields,
   backfillScheduleCardAllergy,
   backfillScheduleCardAutoFit,
@@ -120,6 +121,7 @@ db.ready = schemaReady
   .then(() => backfillSetupCleanupTaskWraps(db))
   .then(() => backfillSetupCleanupBadgeLayout(db))
   .then(() => backfillSetupCleanupTaskNumber(db))
+  .then(() => backfillSetupCleanupBarcodeIdNumber(db))
   .then(() => backfillScheduleCardAllergy(db))
   .then(() => backfillScheduleCardAutoFit(db))
   .then(() => backfillScheduleCardColors(db))

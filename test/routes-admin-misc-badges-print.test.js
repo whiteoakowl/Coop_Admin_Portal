@@ -130,3 +130,28 @@ test('printing real Setup/Cleanup badges stamps each one with its own task\'s 1-
   assert.equal(taskNumberEls.length, 3, 'each printed card should carry its own task-number element');
   assert.deepEqual(taskNumberEls.map((m) => m[1].trim()).sort(), ['1', '2', '3']);
 });
+
+// A real request: "Setup/cleanup cards should also have their barcode ID
+// number on the card" - the same raw code the barcode element already
+// encodes, also printed as plain text (utils/nameTagBadge.js's own
+// DEFAULT_LAYOUTS.setupCleanup 'barcode-id' element, bound to the
+// barcodeValue field utils/miscBadgeData.js's miscBadgeRowData already
+// supplies).
+test('printing a real Setup/Cleanup badge also prints its barcode value as plain text', async () => {
+  const { cookie, csrfToken } = await loginAsAdmin();
+  const sectionId = await createSection('monday', 'Snack Team', null);
+  const itemId = await addItem(sectionId, 'Set out the snack table');
+  const badge = await db.prepare('SELECT * FROM misc_badges WHERE task_item_id = ?').get(itemId);
+  assert.ok(badge.barcode, 'the real task should have gotten a real barcode');
+
+  const res = await request(app)
+    .post('/admin/design/badges/setupCleanup/print')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ badgeIds: String(badge.id), _csrf: csrfToken });
+
+  assert.equal(res.status, 200);
+  const idElMatch = /data-id="barcode-id" data-type="text"[\s\S]*?<span class="badge-el-text-inner"[^>]*>([^<]*)<\/span>/.exec(res.text);
+  assert.ok(idElMatch, 'the barcode-id text element should be present');
+  assert.equal(idElMatch[1].trim(), badge.barcode);
+});

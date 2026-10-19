@@ -32,6 +32,10 @@
                 fixed-box sizing. See barcode-print-shrink-name.js. %>
             <svg class="barcode-cell-svg" data-barcode-value="<%= m.barcode %>"></svg>
             <div class="barcode-cell-name"><%= m.name %></div>
+            <%# A real request: "printing barcodes only, should have the
+                member ID number on there as well" - same ID: <number>
+                line the Avery barcode-labels sheet already shows. %>
+            <div class="barcode-cell-id">ID: <%= m.member_code || m.barcode %></div>
           </div>
         <% }); %>
       </div>

@@ -77,6 +77,13 @@ const FIELDS_BY_TYPE = {
     { field: 'title', label: 'Team Name' },
     { field: 'leaderLabel', label: 'Leader' },
     { field: 'description', label: 'Task' },
+    // A real request: "Setup/cleanup cards should also have their
+    // barcode ID number on the card" - the same raw code the barcode
+    // element below it already encodes (misc_badges.barcode), printed as
+    // plain text too so it's still readable if a scanner can't read the
+    // bars. Offered here (not just baked into DEFAULT_LAYOUTS) so an
+    // admin can reposition or restyle it like any other field.
+    { field: 'barcodeValue', label: 'Badge ID Number' },
   ],
   custom: [
     { field: 'badgeNumber', label: 'Badge Number' },
@@ -250,8 +257,13 @@ const DEFAULT_LAYOUTS = {
       // barcodeValue is this task's own code (misc_badges.barcode, set by
       // utils/taskList.js's upsertTaskBadge) - lets a parent scan the
       // physical badge at checkout to confirm which task they completed
-      // (see routes/checkout.js's new step 2).
-      { id: 'barcode', type: 'barcode', x: 68, y: 156, width: 200, height: 55 },
+      // (see routes/checkout.js's new step 2). Shrunk from its old 55px
+      // height to make room for the plain-text ID number below it (a
+      // real request: "Setup/cleanup cards should also have their
+      // barcode ID number on the card" - still readable if a scanner
+      // can't read the bars).
+      { id: 'barcode', type: 'barcode', x: 68, y: 156, width: 200, height: 44 },
+      { id: 'barcode-id', type: 'text', field: 'barcodeValue', x: 8, y: 201, width: 320, height: 13, fontSize: 10, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
     ],
   },
   custom: {

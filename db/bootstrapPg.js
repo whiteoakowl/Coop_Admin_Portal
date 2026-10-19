@@ -546,6 +546,43 @@ async function backfillSetupCleanupTaskNumber(db) {
 }
 
 // Genuine one-time backfill for an already-deployed database's EXISTING
+// misc_badge_templates 'setupCleanup' row - a real request: "Setup/
+// cleanup cards should also have their barcode ID number on the card."
+// Same additive shape as backfillSetupCleanupTaskNumber above (detects
+// by field, not type), plus one extra step: the barcode element's old
+// 55px-tall default left no room below it for a new text line within
+// the card's fixed 216px height, so this also shrinks it to the new
+// 44px default - but only when it still exactly matches the OLD
+// default position/size (meaning it was never hand-repositioned); a
+// barcode an admin has customized is left exactly where they put it, so
+// the new ID line may need a manual nudge there via the Design editor.
+async function backfillSetupCleanupBarcodeIdNumber(db) {
+  const row = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+  if (!row) return;
+  let layout;
+  try {
+    layout = normalizeLayout(JSON.parse(row.layout_json));
+  } catch (err) {
+    return;
+  }
+  if (!layout || !Array.isArray(layout.elements)) return;
+  if (layout.elements.some((el) => el.field === 'barcodeValue')) return;
+
+  const idDefault = DEFAULT_LAYOUTS.setupCleanup.elements.find((el) => el.field === 'barcodeValue');
+  if (!idDefault) return;
+
+  const OLD_BARCODE_SHAPE = { x: 68, y: 156, width: 200, height: 55 };
+  const elements = layout.elements.map((el) => {
+    if (el.type !== 'barcode') return el;
+    const matchesOldDefault = ['x', 'y', 'width', 'height'].every((k) => el[k] === OLD_BARCODE_SHAPE[k]);
+    return matchesOldDefault ? { ...el, height: 44 } : el;
+  });
+  elements.push({ ...idDefault });
+
+  await db.prepare("UPDATE misc_badge_templates SET layout_json = ? WHERE badge_type = 'setupCleanup'").run(JSON.stringify({ ...layout, elements }));
+}
+
+// Genuine one-time backfill for an already-deployed database's EXISTING
 // misc_badges rows for setupCleanup tasks - the redesign above didn't
 // just change the template's layout, it SWAPPED what the underlying
 // title/description columns mean for these rows (title: task text ->
@@ -890,6 +927,7 @@ module.exports = {
   backfillSetupCleanupTaskWraps,
   backfillSetupCleanupBadgeLayout,
   backfillSetupCleanupTaskNumber,
+  backfillSetupCleanupBarcodeIdNumber,
   backfillSetupCleanupBadgeFields,
   backfillScheduleCardAllergy,
   backfillScheduleCardAutoFit,

@@ -429,6 +429,11 @@ router.post('/print-plain-parent', async (req, res) => {
   });
 });
 
+// Barcode-only sheet: the scan code, name, and member ID number, no name
+// tag design - for a cheap, fast-to-print stack of scan cards. A real
+// request: "printing barcodes only, should have the member ID number on
+// there as well" - member_code is the same value the barcode-labels
+// sheet below already prints as plain text next to its own barcode.
 router.post('/print-barcodes', async (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
@@ -436,7 +441,9 @@ router.post('/print-barcodes', async (req, res) => {
   }
 
   const placeholders = memberIds.map(() => '?').join(',');
-  const members = (await db.prepare(`SELECT id, name, barcode FROM members WHERE id IN (${placeholders})`).all(...memberIds)).sort(byLastName);
+  const members = (
+    await db.prepare(`SELECT id, name, barcode, member_code FROM members WHERE id IN (${placeholders})`).all(...memberIds)
+  ).sort(byLastName);
 
   res.render('main-admin-name-tag-barcode-print', {
     title: 'Print Barcodes',

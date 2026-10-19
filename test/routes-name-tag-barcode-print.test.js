@@ -89,3 +89,24 @@ test('barcode-only print sheet loads the shrink-to-fit script, not the generic a
     assert.match(res.text, /<div class="barcode-cell-name">Jordan Fitzgerald-Montgomery<\/div>/);
   });
 });
+
+// A real request: "printing barcodes only, should have the member ID
+// number on there as well."
+test('barcode-only print sheet shows each member\'s own ID number', async () => {
+  const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
+  const cookie = loginRes.headers['set-cookie'];
+  const page = await request(app).get('/admin/name-tag?tab=print').set('Cookie', cookie);
+  const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
+
+  const { lastInsertRowid: memberId } = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type) VALUES ('Casey ID Member', '000111', '000111', 'student')")
+    .run();
+
+  const res = await request(app)
+    .post('/admin/name-tag/print-barcodes')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ memberIds: memberId, _csrf: csrfToken });
+  assert.equal(res.status, 200);
+  assert.match(res.text, /<div class="barcode-cell-id">ID: 000111<\/div>/);
+});

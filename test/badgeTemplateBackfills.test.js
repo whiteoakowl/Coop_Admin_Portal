@@ -21,6 +21,7 @@ const {
   backfillMiscBadgeBarcode,
   backfillSetupCleanupTaskWraps,
   backfillSetupCleanupBadgeLayout,
+  backfillSetupCleanupBarcodeIdNumber,
   backfillSetupCleanupBadgeFields,
   backfillScheduleCardAllergy,
   backfillScheduleCardAutoFit,
@@ -75,6 +76,78 @@ test('backfillMiscBadgeBarcode never touches the \'custom\' badge type, which ha
   assert.equal(after.layout_json, before.layout_json);
   const layout = JSON.parse(after.layout_json);
   assert.ok(!layout.elements.some((el) => el.type === 'barcode'), 'custom badges should still have no barcode element');
+});
+
+// A real request: "Setup/cleanup cards should also have their barcode ID
+// number on the card." backfillSetupCleanupBarcodeIdNumber adds a plain-
+// text element bound to barcodeValue, and - only when the barcode
+// element is still exactly where the OLD (pre-change) default put it -
+// shrinks it to make room, the same two-step shape backfillMiscBadgeBarcode
+// above already established for this exact template.
+test('backfillSetupCleanupBarcodeIdNumber adds the ID text element and shrinks an untouched default-position barcode', async () => {
+  const db = await createTestDb();
+  const preIdNumber = {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [
+      { id: 'day', type: 'text', field: 'day', x: 8, y: 6, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      { id: 'task-number', type: 'text', field: 'taskNumber', x: 288, y: 6, width: 40, height: 16, fontSize: 12, color: '#1c2530', bold: true, align: 'right', valign: 'middle' },
+      { id: 'team', type: 'text', field: 'title', x: 8, y: 24, width: 320, height: 32, fontSize: 17, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
+      { id: 'leader', type: 'text', field: 'leaderLabel', x: 8, y: 58, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: false, align: 'center', valign: 'middle', autoFitText: true },
+      { id: 'task', type: 'text', field: 'description', x: 8, y: 76, width: 320, height: 78, fontSize: 14, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
+      { id: 'barcode', type: 'barcode', x: 68, y: 156, width: 200, height: 55 },
+    ],
+  };
+  await db.prepare("UPDATE misc_badge_templates SET layout_json = ? WHERE badge_type = 'setupCleanup'").run(JSON.stringify(preIdNumber));
+
+  await backfillSetupCleanupBarcodeIdNumber(db);
+
+  const row = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+  const layout = JSON.parse(row.layout_json);
+  assert.deepEqual(layout.elements.slice(0, 5), preIdNumber.elements.slice(0, 5), 'every non-barcode element must survive untouched, in order');
+  assert.equal(layout.elements.length, 7, 'exactly one element (the ID number text) should have been added');
+
+  const barcodeEl = layout.elements[5];
+  assert.equal(barcodeEl.type, 'barcode');
+  assert.equal(barcodeEl.height, 44, 'the untouched-default-position barcode should have been shrunk to make room');
+  assert.equal(barcodeEl.x, 68);
+  assert.equal(barcodeEl.y, 156);
+  assert.equal(barcodeEl.width, 200);
+
+  const idEl = layout.elements[6];
+  assert.equal(idEl.field, 'barcodeValue');
+  const currentDefault = DEFAULT_LAYOUTS.setupCleanup.elements.find((el) => el.field === 'barcodeValue');
+  assert.deepEqual(idEl, currentDefault, 'the added element should match the current default ID text element exactly');
+});
+
+test('backfillSetupCleanupBarcodeIdNumber leaves a hand-repositioned barcode element exactly where it was', async () => {
+  const db = await createTestDb();
+  const customBarcodePosition = {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [
+      { id: 'day', type: 'text', field: 'day', x: 8, y: 6, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      { id: 'barcode', type: 'barcode', x: 40, y: 140, width: 250, height: 60 },
+    ],
+  };
+  await db.prepare("UPDATE misc_badge_templates SET layout_json = ? WHERE badge_type = 'setupCleanup'").run(JSON.stringify(customBarcodePosition));
+
+  await backfillSetupCleanupBarcodeIdNumber(db);
+
+  const row = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+  const layout = JSON.parse(row.layout_json);
+  assert.deepEqual(layout.elements[1], customBarcodePosition.elements[1], 'a hand-repositioned barcode must be left exactly as the admin set it');
+  assert.ok(layout.elements.some((el) => el.field === 'barcodeValue'), 'the ID text element should still have been added');
+});
+
+test('backfillSetupCleanupBarcodeIdNumber is a no-op for a layout that already has the ID text element', async () => {
+  const db = await createTestDb();
+  const before = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+
+  await backfillSetupCleanupBarcodeIdNumber(db);
+
+  const after = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+  assert.equal(after.layout_json, before.layout_json, 'a fresh install seeded with the current (ID-number-included) default should be untouched');
 });
 
 test('backfillMiscBadgeBarcode still fixes a setupCleanup template stored in the old bare-elements-array shape (no wrapping object)', async () => {
