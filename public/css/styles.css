@@ -3496,6 +3496,25 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      same idea as .table-stack-heading, just without the heading look. */
   .table-stack-mobile td.table-stack-full { display: block; text-align: left; }
   .table-stack-mobile td.table-stack-full::before { content: none; }
+  /* A real bug report: "edit and delete buttons should be on the same
+     row next to each other" (the Registration Schedule tab's own windows
+     table, views/admin-schedule.ejs - Edit is a plain button, Delete is
+     its own small <form>, both inside one shared td.actions-cell
+     td.table-stack-full). .table-stack-full's own display: block just
+     above (specificity 0,2,1) was beating .actions-cell's own
+     display: flex (0,1,0) on a cell that's both - stacking Edit above
+     Delete on a phone instead of keeping them side by side like every
+     other .actions-cell already renders everywhere else. This selector's
+     extra class brings it back ahead (0,3,1). */
+  .table-stack-mobile td.table-stack-full.actions-cell { display: flex; }
+  /* .roster-action-btn's own flex: 1 0 auto (styles.css, tuned for a
+     narrow desktop table column) grows to fill 100% of this now-full-
+     card-width cell once display: flex is restored just above - with 2
+     buttons that pushes the 2nd one (Delete's own <form>) off the right
+     edge of the card instead of sitting next to Edit. Same fix as every
+     other .actions-cell already needs once its own td goes full-card-
+     width on a phone: stop growing past its own natural width. */
+  .table-stack-mobile td.table-stack-full.actions-cell .roster-action-btn { flex: 0 1 auto; }
   /* This class takes over the "no overflow" job itself, so the shared
      .roster-scroll wrapper around it shouldn't still reserve a
      horizontal scrollbar/track. */
@@ -4782,7 +4801,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    .roster-action-btn's own min-width: 5.5rem, sized for a toolbar row of
    several buttons side by side, forcing a short one-word label like
    "Edit" noticeably wider than its own text needs. */
-.roster-action-btn-fit { min-width: 0; padding: 0.5rem 0.75rem; }
+/* flex: 0 1 auto added for a later bug report (Registration Schedule's
+   own Edit button, views/admin-schedule.ejs): unlike the Committees/
+   Events/Accounting cases above (each already sitting in a context that
+   separately zeroes flex-grow back to 0), this one's parent is a plain
+   .actions-cell (flex: 1 0 auto still active from .roster-action-btn's
+   own base rule), so min-width: 0 alone just let it shrink below 5.5rem
+   while flex-grow: 1 still stretched it to fill the row's remaining
+   space evenly with Delete beside it - the exact "fit to text" ask this
+   class exists for. Folding the override in here instead of relying on
+   each caller's own context to have already zeroed it makes the class
+   self-sufficient wherever it's used next. */
+.roster-action-btn-fit { min-width: 0; padding: 0.5rem 0.75rem; flex: 0 1 auto; }
 
 /* Events' own Add/Edit Category/Add/Edit Location toolbar - a real
    request: "events, desktop, add/edit category and add/edit location
@@ -6144,6 +6174,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    compact instead of stretching to fill the dialog. */
 .volunteer-sections-row { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; width: 100%; }
 .volunteer-sections-row input { width: 10ch; text-align: center; }
+/* A real follow-up request: "edit schedule grid should... have adequate
+   space between buttons... text boxes and features" - each room row
+   (views/partials/class-schedule-grid.ejs's own [data-grid-editor-room-
+   row], reusing .volunteer-sections-row as its wrapping list) had no
+   layout rule of its own at all, so its name input and Remove button sat
+   with zero gap between them, the button's edge touching the input's
+   border. */
+[data-grid-editor-room-row] { display: inline-flex; align-items: center; gap: 0.5rem; }
+[data-grid-editor-room-row] input { width: 14ch; }
 
 /* The Edit Schedule Grids dialog (views/partials/class-schedule-grid.ejs):
    one card per hour, each with its own Label/Start Time/End Time - the
@@ -7469,6 +7508,29 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   box-shadow: 0 8px 30px rgba(0,0,0,0.15);
 }
 .class-form-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+/* A real bug report: "You can't click save changes in bulk class edit"
+   on a phone - this dialog's own long list of fields (Title, Room,
+   Semester, Start/End Time, Start/End Date, Open/Close, Description)
+   pushes Save Changes/Cancel below the phone's visible viewport, worse
+   once the on-screen keyboard is also covering part of the screen while
+   typing into one of those fields - nothing on screen hints the dialog
+   itself still scrolls to reach them. Pinning this footer to the bottom
+   of .class-form-dialog's own scroll area (position: sticky, not the
+   page) keeps Save/Cancel in view the moment the admin scrolls the
+   dialog at all, instead of requiring them to scroll past every field
+   first. The negative margins/matching padding below cancel out this
+   dialog's own 1.75rem/2rem padding so the sticky bar spans the dialog's
+   full width and sits flush with its real bottom edge, with no gap below
+   it; bottom: -1.75rem anchors it exactly there rather than 1.75rem shy
+   of it. */
+.bulk-edit-dialog-actions {
+  position: sticky;
+  bottom: -1.75rem;
+  margin: 1.5rem -2rem -1.75rem;
+  padding: 0.9rem 2rem 1.75rem;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
 /* A real bug report: "Record in person sale. X to close windows overlaps
    title and it shouldn't." .class-form-dialog-close (below) is
    absolutely positioned over the header's own top-right corner, outside
@@ -7863,14 +7925,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   font-size: 0.85rem;
 }
 /* A real request: "Make sure row titles shrink to fit in box" - the room
-   name (each row's own "title") gets the exact same shrink-to-one-line,
-   fall-back-to-2-lines-at-a-word-break treatment as a class card's own
-   title (see .class-card-header h3's own comment and public/js/
-   class-card-title-fit.js, which targets both). .class-schedule-room-
-   col-inner lays the optional drag handle and the name side by side so
-   the name's own min-width: 0 can actually shrink below its natural
-   width inside the flex row, instead of the handle's fixed icon width
-   being squeezed first. */
+   name (each row's own "title") gets the exact same shrink/wrap/last-
+   resort-break treatment as a class card's own title (see .class-card-
+   header h3's own comment and public/js/shrink-title-to-fit.js, which
+   targets both). .class-schedule-room-col-inner lays the optional drag
+   handle and the name side by side so the name's own min-width: 0 can
+   actually shrink below its natural width inside the flex row, instead
+   of the handle's fixed icon width being squeezed first. */
 .class-schedule-room-col-inner { display: flex; align-items: flex-start; gap: 0.3rem; min-width: 0; }
 .class-schedule-room-name { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; overflow-wrap: normal; }
 .class-schedule-cell { background: #fff; overflow: hidden; }
@@ -7976,21 +8037,26 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 /* A real request: "make sure title shrink to fit in in class colored box/
    card," later sharpened to "shrink text to fit class title words on the
    same row, don't split words" - a title stays on ONE line whenever it
-   reasonably can: public/js/class-card-title-fit.js shrinks this h3's own
+   reasonably can: public/js/shrink-title-to-fit.js shrinks this h3's own
    font-size down (never up) until its natural, unwrapped width fits the
    card. white-space: nowrap here is just the STARTING point the script
    measures from, not a hard rule - on the narrowest mobile cards (styles
    below), even a realistic title can run out of card width before it
    runs out of readable font size, and a follow-up on this same request
    confirmed wrapping to a 2nd line beats clipping the end of the title in
-   that case. overflow-wrap stays 'normal' (the browser default, stated
-   here so nobody adds overflow-wrap: break-word back) in both the
-   single-line and the 2-line-wrap-fallback case the script applies -
-   wrapping only ever happens BETWEEN words, never splits one in half.
-   overflow: hidden is a belt-and-suspenders CSS-only backstop for the
-   no-JS case (same containment .class-schedule-cell's own overflow:
-   hidden already relies on) - a title with JS disabled just clips at the
-   card edge instead of spilling into the next column. */
+   that case. overflow-wrap stays 'normal' here (never break-word in the
+   CSS) - wrapping only ever happens BETWEEN words by default. A later,
+   more direct bug report ("the titles are trailing off the class card.
+   Shrink to fit.") traced to a single WORD still being wider than a
+   ~35-60px mobile card column even at the floor font size - the script's
+   own phase 3 (see its file-level comment) is the one place that's
+   allowed to switch THIS element to overflow-wrap: anywhere, and only
+   ever as its own last resort once shrinking/wrapping alone genuinely
+   couldn't make the title fit. overflow: hidden is a belt-and-suspenders
+   CSS-only backstop for the no-JS case (same containment .class-
+   schedule-cell's own overflow: hidden already relies on) - a title with
+   JS disabled just clips at the card edge instead of spilling into the
+   next column. */
 .class-card-header h3 {
   margin: 0;
   font-size: 0.92rem;
@@ -8218,8 +8284,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     flex-wrap: wrap;
     justify-content: center;
   }
+  /* .btn-secondary/.primary-btn added for a later bug report (the
+     Instructor Profile edit dialog's own Cancel/Save row): same stacked-
+     one-per-row symptom as the Floater Assignments Edit Dates/Add-Edit
+     Position row that taught roster-btn-row-grid.js to count
+     .btn-secondary (styles.css's own mobile grid rules above), but here
+     the ask was for text-width sizing, not an equal-width grid, so the
+     fix is this class picking them up instead. */
   .roster-btn-row-fit-text.roster-btn-row > .roster-action-btn,
-  .roster-btn-row-fit-text.roster-btn-row > form > .roster-action-btn {
+  .roster-btn-row-fit-text.roster-btn-row > form > .roster-action-btn,
+  .roster-btn-row-fit-text.roster-btn-row > .btn-secondary,
+  .roster-btn-row-fit-text.roster-btn-row > .primary-btn {
     width: auto;
     flex: 0 1 auto;
     white-space: nowrap;
@@ -11061,18 +11136,14 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
    line, and a title" so this is new, but reuses the same tokens/border/
    radius/shadow every other card family here already uses. */
 .event-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.25rem; margin-top: 1.5rem; }
-
-/* A real request: "Parent portal events, list view... Add the title
-   upcoming events" plus a Past Events section - the heading itself
-   (margin-top: 0 since .event-card-grid above already adds its own
-   1.5rem of space below whichever heading precedes it), a divider line
-   with real room on both sides so it doesn't crowd the Upcoming cards
-   above it, and the Past Events heading gets its own extra top margin on
-   top of that for "spacing between past events title and the list of
-   events" - .event-card-grid's own margin-top handles the gap below it. */
-.event-list-section-heading { margin: 0; }
-.event-list-section-divider { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0 0; }
-.event-list-section-heading-past { margin-top: 1.5rem; }
+/* A real request: "In list view past events should be moved to the
+   bottom under past events" - a plain section heading separates the
+   newest-passed-first past-events grid below from the upcoming one
+   above; a slight opacity dip on the past cards themselves is the same
+   "still fully visible/clickable, just visually secondary" treatment
+   already used elsewhere in this app for past-tense items. */
+.events-past-heading { margin: 2rem 0 0; }
+.event-card-grid-past .event-card { opacity: 0.75; }
 .event-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); overflow: hidden; text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: transform 0.15s ease; }
 .event-card:hover { transform: translateY(-2px); }
 /* A real request: "when they click on an event it shows a popup" - the
@@ -11553,7 +11624,7 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
    only view that uses any of the following. */
 .parent-home-cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.5rem; margin: 1.5rem 0; }
 
-.parent-home-card-v2 { border-radius: 16px; box-shadow: var(--shadow-md); overflow: hidden; display: flex; flex-direction: column; border: 1px solid transparent; }
+.parent-home-card-v2 { border-radius: 16px; box-shadow: var(--shadow-md); overflow: hidden; display: flex; flex-direction: column; border: 1px solid transparent; background: var(--surface); }
 /* A real request: "Shrink the title bars of all of the cards by height" -
    shorter vertical padding, a smaller icon badge, and a slightly smaller
    title to match. */
@@ -11567,31 +11638,74 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
 .parent-home-card-v2-viewall svg { width: 15px; height: 15px; }
 .parent-home-card-v2-body { padding: 0 1.5rem 1.5rem; display: flex; flex-direction: column; gap: 0.6rem; flex: 1; }
 
-/* A real request: "The blue on the cards on the parent portal homepage
-   should be the same blue as the background of the app" - var(--bg),
-   the html/body background color sitewide, instead of its own separate
-   blue. A later real bug report ("The screenshot is showing the parent
-   portal with several colors. That isn't correct" - every card used to
-   get its own distinct color, green/amber/purple/slate/rose) made every
-   card on this page use this one blue variant - "the parent portal
-   homepage should still have blue cards" (not multi-color like the
-   Co-op Admin homepage). Those other color variants are gone; nothing
-   on this page uses them any more. */
-.parent-home-card-v2-blue { background: #eef5fe; border-color: #cfe3fb; }
-.parent-home-card-v2-blue .parent-home-card-v2-icon { background: var(--bg); }
-.parent-home-card-v2-blue .parent-home-card-v2-viewall { color: var(--bg); }
+/* A real request: "The colored cards should all be the same blue that
+   is found in the rest of the website. The pastel soft blue" - each
+   card used to get its own color (green/blue/amber/purple/indigo/slate/
+   rose) to visually tell the sections apart; now every one of them
+   uses this app's own established soft-blue tokens (--brand-soft/
+   --brand/--brand-dark, already the background/border/text this same
+   site uses for its info banners, kiosk home, etc. - see their own
+   :root comments) instead of a one-off color per card. The selectors
+   themselves are untouched (still one rule per card) so the markup in
+   views/parent-home.ejs needs no change at all.
+
+   A follow-up request: "Only the title bar on the cards should be
+   blue, not the whole card" - the tinted --brand-soft background used
+   to cover the whole card (head AND body); it's scoped to just
+   .parent-home-card-v2-head now, with the card's own base rule above
+   giving the body its plain --surface background back. The border
+   stays blue all the way around (still one visual "this card belongs
+   to this family" accent), just the fill inside it isn't. */
+.parent-home-card-v2-green,
+.parent-home-card-v2-blue,
+.parent-home-card-v2-amber,
+.parent-home-card-v2-purple,
+.parent-home-card-v2-indigo,
+.parent-home-card-v2-slate,
+.parent-home-card-v2-rose { border-color: var(--brand); }
+.parent-home-card-v2-green .parent-home-card-v2-head,
+.parent-home-card-v2-blue .parent-home-card-v2-head,
+.parent-home-card-v2-amber .parent-home-card-v2-head,
+.parent-home-card-v2-purple .parent-home-card-v2-head,
+.parent-home-card-v2-indigo .parent-home-card-v2-head,
+.parent-home-card-v2-slate .parent-home-card-v2-head,
+.parent-home-card-v2-rose .parent-home-card-v2-head { background: var(--brand-soft); }
+.parent-home-card-v2-green .parent-home-card-v2-icon,
+.parent-home-card-v2-blue .parent-home-card-v2-icon,
+.parent-home-card-v2-amber .parent-home-card-v2-icon,
+.parent-home-card-v2-purple .parent-home-card-v2-icon,
+.parent-home-card-v2-indigo .parent-home-card-v2-icon,
+.parent-home-card-v2-slate .parent-home-card-v2-icon,
+.parent-home-card-v2-rose .parent-home-card-v2-icon { background: var(--brand-dark); }
+.parent-home-card-v2-green .parent-home-card-v2-viewall,
+.parent-home-card-v2-blue .parent-home-card-v2-viewall,
+.parent-home-card-v2-amber .parent-home-card-v2-viewall,
+.parent-home-card-v2-purple .parent-home-card-v2-viewall,
+.parent-home-card-v2-indigo .parent-home-card-v2-viewall,
+.parent-home-card-v2-slate .parent-home-card-v2-viewall,
+.parent-home-card-v2-rose .parent-home-card-v2-viewall { color: var(--brand-dark); }
 
 /* Dedicated CTA buttons for these cards (not .roster-action-btn - that
    class's own background/color/border triplet is already a fixed,
    sitewide look, not meant to flex into the mockup's "solid green" /
-   "outline amber" / "outline purple" per-card button looks). */
+   "outline amber" / "outline purple" per-card button looks). A real
+   request: "The buttons on the cards should be blue as well" - every
+   variant now uses the same --brand/--brand-dark tokens the cards
+   themselves were already unified to, instead of each keeping its own
+   one-off color; the class names stay (still one per button in
+   views/parent-home.ejs) in case a future card wants its own color
+   back. */
 .parent-home-cta {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
   border-radius: 8px; padding: 0.6rem 1rem; font-size: 0.9rem; font-weight: 700;
   font-family: inherit; cursor: pointer; text-decoration: none; margin-top: 0.2rem;
 }
 .parent-home-cta svg { width: 16px; height: 16px; }
-.parent-home-cta-outline-blue { background: transparent; border: 1.5px solid var(--bg); color: var(--bg); }
+.parent-home-cta-outline-amber,
+.parent-home-cta-outline-purple,
+.parent-home-cta-outline-blue,
+.parent-home-cta-outline-indigo,
+.parent-home-cta-outline-rose { background: transparent; border: 1.5px solid var(--brand); color: var(--brand-dark); }
 
 /* Upcoming Events: a colored date-badge (month abbreviation stacked over
    the day number) instead of a plain text date line. */
@@ -13512,24 +13626,30 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .grade-level-bar-label { margin-top: 0.4rem; font-size: 0.75rem; text-align: center; white-space: nowrap; overflow: hidden; overflow-wrap: normal; max-width: 100%; }
 
 /* Each grade level is its own grid column (not a <table> column - see
-   the view's own comment on why). --grade-level-cols (set inline on the
-   .grade-level-report-fit-inner ancestor, inherited down to here) is
-   however many grade levels actually have a student in them. Shrinking
-   to keep every one of those columns on screen at once (the actual
-   "shrink to fit all grade levels" request) is table-layout: fixed's
-   exact same job for a CSS grid: equal 1fr columns split whatever width
-   is available rather than each one sizing to its own longest name, the
-   same principle the Classes grid's own Room/Hour columns already use
-   (views/partials/class-schedule-grid.ejs). The @media (max-width: 480px)
-   override below switches to --grade-level-cols-mobile instead (half as
-   many columns, wrapping the same columns onto a 2nd row) - see that
-   custom property's own comment in the view. */
-.grade-level-report-grid { display: grid; grid-template-columns: repeat(var(--grade-level-cols), minmax(0, 1fr)); gap: 0.6rem; align-items: start; }
+   the view's own comment on why). --grade-level-names-cols (set inline
+   on the .grade-level-report-fit-inner ancestor, inherited down to here -
+   its own comment in the view explains why it's a separate custom
+   property from the bar chart's --grade-level-cols rather than the same
+   one) spreads however many grade levels actually have a student in them
+   across (at most) 4 rows instead of cramming them all into one, giving
+   each column more width for a real request: "Names by grade level
+   should be broke into 4 rows to allow more space for name." Equal 1fr
+   columns split whatever width is available rather than each one sizing
+   to its own longest name, the same principle the Classes grid's own
+   Room/Hour columns already use (views/partials/class-schedule-grid.ejs).
+   The @media (max-width: 480px) override below switches to
+   --grade-level-names-cols-mobile instead (half as many columns again,
+   doubling to 8 rows) - see that custom property's own comment in the
+   view. */
+.grade-level-report-grid { display: grid; grid-template-columns: repeat(var(--grade-level-names-cols), minmax(0, 1fr)); gap: 0.6rem; align-items: start; }
 .grade-level-report-col { border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.4rem; min-width: 0; }
 /* white-space/overflow-wrap here match .class-card-header h3's own exact
    reasoning (styles.css) - public/js/shrink-title-to-fit.js shrinks this
    down to fit on one line first, falling back to a word-boundary-only
-   2-line wrap (never a mid-word break) only once it genuinely has to. */
+   2-line wrap, and only as its own last resort (phase 3 - see that
+   file's own comment) a mid-word break, once a single word genuinely
+   can't fit any other way (e.g. "Kindergarten" in an 18-column mobile
+   grid). */
 .grade-level-report-col-title {
   font-weight: 700;
   white-space: nowrap;
@@ -13540,10 +13660,15 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
   padding-bottom: 0.3rem;
   margin-bottom: 0.3rem;
 }
-/* overflow-wrap: normal (never break-word), same "don't split words"
-   reasoning as .class-card-header h3's own comment above - a name wraps
-   between words (most names have at least one space to wrap at) rather
-   than ever splitting one in half. */
+/* A real follow-up request: "Shrink font for name and age" - each name
+   (already including its own age in parens, see the view) is run
+   through public/js/shrink-title-to-fit.js same as the column title
+   above it, shrinking down to fit its own column on one line before
+   ever wrapping. overflow-wrap: normal (never break-word) is that
+   script's own CSS starting point, same "don't split words" reasoning as
+   .class-card-header h3's own comment above - a name wraps between
+   words (most names have at least one space to wrap at) rather than
+   ever splitting one in half. */
 .grade-level-report-name { margin: 0 0 0.25rem; font-size: 0.85rem; overflow-wrap: normal; }
 .grade-level-report-name:last-child { margin-bottom: 0; }
 
@@ -13570,11 +13695,11 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
   .grade-level-bar-col { flex: 0 1 calc(100% / var(--grade-level-cols-mobile) - 0.3rem); height: 130px; }
   .grade-level-bar-count { font-size: 0.68rem; }
   .grade-level-bar-label { font-size: 0.58rem; }
-  /* Half the one-row column count, wrapping onto a 2nd row instead of
-     squeezing every grade level into a single row that's too narrow to
-     read on a phone - see --grade-level-cols-mobile's own comment in the
+  /* Half the --grade-level-names-cols column count again (8 rows total),
+     same reasoning as the bar chart's own --grade-level-cols-mobile just
+     above - see --grade-level-names-cols-mobile's own comment in the
      view. */
-  .grade-level-report-grid { grid-template-columns: repeat(var(--grade-level-cols-mobile), minmax(0, 1fr)); gap: 0.25rem; }
+  .grade-level-report-grid { grid-template-columns: repeat(var(--grade-level-names-cols-mobile), minmax(0, 1fr)); gap: 0.25rem; }
   .grade-level-report-col { padding: 0.3rem 0.2rem; border-radius: 6px; }
   .grade-level-report-col-title { font-size: 0.68rem; padding-bottom: 0.2rem; margin-bottom: 0.2rem; }
   .grade-level-report-name { font-size: 0.68rem; }
@@ -13585,18 +13710,23 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    profile-edit.ejs) - a real request: "Add a tab called Teachers/
    Assistants after the classes tab... If a teacher teaches multiple
    classes they will all be listed under the members name with a
-   dropdown arrow and minimize feature." <details>/<summary> is used
-   as-is for that arrow/collapse behavior (see the view's own comment on
-   why) - no marker-hiding override here, unlike .filter-details
-   elsewhere in this file, since the native disclosure triangle IS the
-   requested affordance this time. */
+   dropdown arrow and minimize feature." A real follow-up request then
+   extended that same <details>/<summary> treatment to EVERY member
+   regardless of class count ("even if the member is only teaching or
+   assisting 1 class it should still show as a drop down minimize
+   system so that you see just a list of member names") - so there's no
+   longer a separate single-class inline link style here, just one
+   .teacher-class-list used for every member's own (collapsed-by-
+   default) class list. <details>/<summary> is used as-is for the
+   arrow/collapse behavior (see the view's own comment on why) - no
+   marker-hiding override here, unlike .filter-details elsewhere in this
+   file, since the native disclosure triangle IS the requested
+   affordance this time. */
 .teacher-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .teacher-list-item { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.8rem; }
 .teacher-list-item summary { cursor: pointer; font-weight: 600; }
 .teacher-class-count { font-weight: 400; color: var(--muted); font-size: 0.85rem; }
-.teacher-list-name { font-weight: 600; margin-right: 0.5rem; }
 .teacher-class-list { list-style: none; margin: 0.5rem 0 0; padding: 0 0 0 1.25rem; display: flex; flex-direction: column; gap: 0.4rem; }
-.teacher-single-class,
 .teacher-class-list a {
   display: flex;
   flex-wrap: wrap;
@@ -13607,7 +13737,6 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
   border-radius: 6px;
   padding: 0.2rem 0.4rem;
 }
-.teacher-single-class:hover,
 .teacher-class-list a:hover { background: var(--brand-soft); text-decoration: underline; }
 .teacher-class-name { font-weight: 600; }
 .teacher-class-role { font-size: 0.8rem; color: var(--muted); }

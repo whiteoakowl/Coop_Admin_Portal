@@ -102,8 +102,22 @@
           instead of 1 is a straightforward fix for exactly that. Set here
           (not recomputed per-breakpoint in CSS) since it depends on
           nonEmptyColumns.length, which only the server knows. %>
+      <%
+        // A real follow-up request: "Names by grade level should be
+        // broke into 4 rows to allow more space for name" - the Names by
+        // Grade Level grid (unlike the bar chart just above it, which
+        // keeps its own --grade-level-cols/-mobile exactly as before)
+        // gets its own dedicated column counts, computed to land every
+        // non-empty grade level into (at most) 4 rows on screen/tablet
+        // and 8 on a phone (the same halving relationship --grade-level-
+        // cols-mobile already uses) instead of cramming them all into
+        // one single row of very narrow columns.
+        var GRADE_LEVEL_NAMES_ROWS = 4;
+        var gradeLevelNamesCols = Math.max(1, Math.ceil(nonEmptyColumns.length / GRADE_LEVEL_NAMES_ROWS));
+        var gradeLevelNamesColsMobile = Math.max(1, Math.ceil(nonEmptyColumns.length / (GRADE_LEVEL_NAMES_ROWS * 2)));
+      %>
       <div class="grade-level-report-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="9.4in">
-        <div class="grade-level-report-fit-inner" style="--grade-level-cols: <%= nonEmptyColumns.length %>; --grade-level-cols-mobile: <%= Math.ceil(nonEmptyColumns.length / 2) %>;">
+        <div class="grade-level-report-fit-inner" style="--grade-level-cols: <%= nonEmptyColumns.length %>; --grade-level-cols-mobile: <%= Math.ceil(nonEmptyColumns.length / 2) %>; --grade-level-names-cols: <%= gradeLevelNamesCols %>; --grade-level-names-cols-mobile: <%= gradeLevelNamesColsMobile %>;">
           <%# Bar graph - a real request: "a bar bargraph members on
               every grade level." Bars only for grade levels that
               actually have at least one student, same "don't show an

@@ -509,17 +509,19 @@ router.post('/settings/grade-levels', async (req, res) => {
   res.redirect('/main-admin/members?tab=settings&settingsTab=grade-levels&notice=' + encodeURIComponent('Grade Level Settings saved.'));
 });
 
-// A real request: "Save grade level settings button and apply to all
-// members button should be on the same row" - computes every active
-// student's grade from the saved age/cutoffDate rules and writes it to
-// their own grade_level field (see gradeLevelSettings.js's own
-// applyGradeLevelRulesToAllMembers for exactly how a match is decided).
+// A real follow-up request: "Grade level settings under members should
+// set the grade level for all members according to their birthday" -
+// applies the saved rules above to every student with a birthday on
+// file (utils/gradeLevelSettings.js's own applyGradeLevelRulesToMembers),
+// reporting back how many were actually changed vs. how many matched a
+// rule but were already correct.
 router.post('/settings/grade-levels/apply', async (req, res) => {
-  const updated = await gradeLevelSettings.applyGradeLevelRulesToAllMembers();
-  res.redirect(
-    '/main-admin/members?tab=settings&settingsTab=grade-levels&notice=' +
-      encodeURIComponent(updated === 0 ? 'No members needed a grade level update.' : `Updated grade level for ${updated} member${updated === 1 ? '' : 's'}.`)
-  );
+  const { totalStudents, matched, changed } = await gradeLevelSettings.applyGradeLevelRulesToMembers();
+  const notice =
+    matched === 0
+      ? `No student's age matched a configured rule (checked ${totalStudents} student(s) with a birthday on file).`
+      : `Updated ${changed} of ${matched} matching student(s)' grade level${changed === 1 ? '' : 's'} (${totalStudents} student(s) with a birthday on file checked in all).`;
+  res.redirect('/main-admin/members?tab=settings&settingsTab=grade-levels&notice=' + encodeURIComponent(notice));
 });
 
 // --- Edit mode bulk actions (checkboxes + Actions dropdown on the

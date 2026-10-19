@@ -4,6 +4,7 @@ const requireAdmin = require('../middleware/requireAdmin');
 const { requireClassDay } = require('../utils/classDays');
 const { isValidISODate } = require('../utils/dates');
 const { HOUR_POSITIONS } = require('../utils/classSchedule');
+const { comboSemesterId, qsSemester } = require('../utils/scheduleComboLinks');
 const {
   getPermanentJob,
   createPermanentJob,
@@ -39,25 +40,36 @@ function subUrl(day, params) {
 
 router.post('/volunteers/:day/substitutes/permanent-jobs/new', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  // permanent_jobs itself has no semester concept (day-scoped only, same
-  // for every semester) - this is purely so the redirect lands back on
-  // whichever semester+day combo the admin was actually viewing (routes/
-  // admin-volunteers.js's own combo picker) instead of resetting to the
-  // default. The form's own action URL carries it as a query param (see
-  // views/admin-volunteers.ejs), readable here regardless of this being a
-  // POST since query-string parsing doesn't depend on method.
-  const semesterId = req.query.semesterId;
+  // A real bug report: "floaters being needed for spring semester are
+  // still showing on fall semester... floater assignments... EVERYTHING
+  // are separated by semester." permanent_jobs now carries its own
+  // semester_id (see the migration's own comment) - comboSemesterId reads
+  // the exact semester+day combo the admin was actually viewing (routes/
+  // admin-volunteers.js's own combo picker), carried here as a query
+  // param (see views/admin-volunteers.ejs), readable regardless of this
+  // being a POST since query-string parsing doesn't depend on method.
+  // Also what the redirect echoes back (via qsSemester) so the next page
+  // load lands back on the same combo instead of resetting to the
+  // default.
+  const semesterId = comboSemesterId(req);
   const title = (req.body.title || '').trim();
   const room = (req.body.room || '').trim();
   const hourPositions = [].concat(req.body.hourPositions || [])
     .map((v) => parseInt(v, 10))
     .filter((p) => HOUR_POSITIONS.includes(p));
   if (!title || hourPositions.length === 0) {
-    return res.redirect(subUrl(day, { date: req.body.date, error: 'Job title and at least one hour are required.', semesterId }));
+    return res.redirect(subUrl(day, { date: req.body.date, error: 'Job title and at least one hour are required.', semesterId: qsSemester(semesterId) }));
   }
-  for (const hourPosition of hourPositions) await createPermanentJob({ day, hourPosition, title, room });
+  // New Position's several hour-rows all share one freshly-minted group_key
+  // (see createPermanentJob's own comment) so they stay one editable
+  // group, distinct from any other position - same name or not.
+  let groupKey = null;
+  for (const hourPosition of hourPositions) {
+    const id = await createPermanentJob({ day, hourPosition, title, room, semesterId: semesterId ?? null, groupKey });
+    if (groupKey == null) groupKey = id;
+  }
   const hourNote = hourPositions.length > 1 ? `Hours ${hourPositions.join(', ')}` : `Hour ${hourPositions[0]}`;
-  res.redirect(subUrl(day, { date: req.body.date, notice: `"${title}" added (${hourNote}).`, semesterId }));
+  res.redirect(subUrl(day, { date: req.body.date, notice: `"${title}" added (${hourNote}).`, semesterId: qsSemester(semesterId) }));
 });
 
 // The Add/Edit Position dialog's one Save button - unlike /new above (one
@@ -71,7 +83,7 @@ router.post('/volunteers/:day/substitutes/permanent-jobs/new', requireAdmin, req
 // keyId-is-null-means-new contract.
 router.post('/volunteers/:day/substitutes/permanent-jobs/save-groups', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const semesterId = req.query.semesterId;
+  const semesterId = comboSemesterId(req);
   const groups = req.body.groups && typeof req.body.groups === 'object' ? req.body.groups : {};
   for (const [key, group] of Object.entries(groups)) {
     const title = ((group && group.title) || '').trim();
@@ -81,9 +93,9 @@ router.post('/volunteers/:day/substitutes/permanent-jobs/save-groups', requireAd
       .filter((p) => HOUR_POSITIONS.includes(p));
     const keyId = key === 'new' ? null : parseInt(key, 10);
     if (keyId !== null && Number.isNaN(keyId)) continue;
-    await savePositionGroup(day, keyId, title, room, hours);
+    await savePositionGroup(day, keyId, title, room, hours, semesterId ?? null);
   }
-  res.redirect(subUrl(day, { date: req.body.date, notice: 'Positions saved.', semesterId }));
+  res.redirect(subUrl(day, { date: req.body.date, notice: 'Positions saved.', semesterId: qsSemester(semesterId) }));
 });
 
 // A real bug report: "next to each position in that pop up there should
@@ -98,10 +110,10 @@ router.post('/volunteers/:day/substitutes/permanent-jobs/save-groups', requireAd
 // leaving the admin back at the closed manage page.
 router.post('/volunteers/:day/substitutes/permanent-jobs/group/:keyId/delete', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const semesterId = req.query.semesterId;
+  const semesterId = comboSemesterId(req);
   const keyId = parseInt(req.params.keyId, 10);
   const title = await deletePositionGroup(day, keyId);
-  res.redirect(subUrl(day, { date: req.body.date, dialog: 'job', notice: title ? `Deleted "${title}".` : 'Position not found.', semesterId }));
+  res.redirect(subUrl(day, { date: req.body.date, dialog: 'job', notice: title ? `Deleted "${title}".` : 'Position not found.', semesterId: qsSemester(semesterId) }));
 });
 
 // Add/Edit Temporary Position dialog's own Save button - same all-groups-
@@ -114,10 +126,10 @@ router.post('/volunteers/:day/substitutes/permanent-jobs/group/:keyId/delete', r
 // creating a recurring job by accident.
 router.post('/volunteers/:day/substitutes/temporary-jobs/save-groups', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const semesterId = req.query.semesterId;
+  const semesterId = comboSemesterId(req);
   const date = req.body.date;
   if (!isValidISODate(date)) {
-    return res.redirect(subUrl(day, { date, error: 'Choose a session date before adding a temporary position.', semesterId }));
+    return res.redirect(subUrl(day, { date, error: 'Choose a session date before adding a temporary position.', semesterId: qsSemester(semesterId) }));
   }
   const groups = req.body.groups && typeof req.body.groups === 'object' ? req.body.groups : {};
   for (const [key, group] of Object.entries(groups)) {
@@ -128,18 +140,18 @@ router.post('/volunteers/:day/substitutes/temporary-jobs/save-groups', requireAd
       .filter((p) => HOUR_POSITIONS.includes(p));
     const keyId = key === 'new' ? null : parseInt(key, 10);
     if (keyId !== null && Number.isNaN(keyId)) continue;
-    await saveTemporaryPositionGroup(day, date, keyId, title, room, hours);
+    await saveTemporaryPositionGroup(day, date, keyId, title, room, hours, semesterId ?? null);
   }
-  res.redirect(subUrl(day, { date, notice: 'Temporary positions saved.', semesterId }));
+  res.redirect(subUrl(day, { date, notice: 'Temporary positions saved.', semesterId: qsSemester(semesterId) }));
 });
 
 router.post('/volunteers/:day/substitutes/temporary-jobs/group/:keyId/delete', requireAdmin, requireClassDay, async (req, res) => {
   const day = req.params.day;
-  const semesterId = req.query.semesterId;
+  const semesterId = comboSemesterId(req);
   const date = req.body.date;
   const keyId = parseInt(req.params.keyId, 10);
   const title = isValidISODate(date) ? await deleteTemporaryPositionGroup(day, date, keyId) : null;
-  res.redirect(subUrl(day, { date, dialog: 'temp-job', notice: title ? `Deleted "${title}".` : 'Position not found.', semesterId }));
+  res.redirect(subUrl(day, { date, dialog: 'temp-job', notice: title ? `Deleted "${title}".` : 'Position not found.', semesterId: qsSemester(semesterId) }));
 });
 
 router.post('/volunteers/:day/substitutes/permanent-jobs/:id/edit', requireAdmin, requireClassDay, async (req, res) => {

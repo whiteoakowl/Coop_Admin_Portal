@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page grade-level-report-print-page">
+  <%- include('partials/admin-nav') %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Grade Level Report</p>
+      </div>
+    </div>
+
+    <p class="subtitle no-print"><a href="/admin/members">&larr; Members</a></p>
+
+    <%
+      var hasActiveFilter = !!(selectedSectionId || selectedSignup || selectedFamilyId);
+    %>
+    <div class="roster-toolbar no-print">
+      <h1>Grade Level Report</h1>
+      <div class="roster-btn-row">
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('grade-level-report-filter-dialog').showModal()">
+          <svg class="icon"><use href="#icon-filter"/></svg>
+          Filter<% if (filterLabelParts.length > 0) { %>: <%= filterLabelParts.join(', ') %><% } %>
+        </button>
+        <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
+      </div>
+    </div>
+
+    <dialog id="grade-level-report-filter-dialog" class="member-picker-dialog">
+      <form method="GET" action="/admin/members/grade-level-report">
+        <h3>Filter Grade Level Report</h3>
+        <div class="category-filter">
+          <label for="grade-level-report-section-select">Section</label>
+          <select id="grade-level-report-section-select" name="sectionId">
+            <option value="">All Sections</option>
+            <% sections.forEach(function(s) { %>
+              <option value="<%= s.id %>" <%= selectedSectionId === s.id ? 'selected' : '' %>><%= s.name %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="category-filter">
+          <label for="grade-level-report-signup-select">Schedule Grid Signup</label>
+          <select id="grade-level-report-signup-select" name="signup">
+            <option value="">All Students</option>
+            <option value="signedUp" <%= selectedSignup === 'signedUp' ? 'selected' : '' %>>Signed Up for a Class</option>
+            <option value="notSignedUp" <%= selectedSignup === 'notSignedUp' ? 'selected' : '' %>>Not Signed Up for a Class</option>
+          </select>
+        </div>
+        <div class="category-filter">
+          <label for="grade-level-report-family-select">Family</label>
+          <select id="grade-level-report-family-select" name="familyId">
+            <option value="">All Families</option>
+            <% families.forEach(function(f) { %>
+              <option value="<%= f.id %>" <%= selectedFamilyId === f.id ? 'selected' : '' %>><%= f.name %> Family</option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="notes-dialog-actions">
+          <% if (hasActiveFilter) { %><a class="btn-secondary" href="/admin/members/grade-level-report">Clear Filter</a><% } %>
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Apply Filter</button>
+        </div>
+      </form>
+    </dialog>
+
+    <%
+      var nonEmptyColumns = columns.filter(function (c) { return c.students.length > 0; });
+    %>
+    <% if (nonEmptyColumns.length === 0) { %>
+      <p class="roster-empty"><%= hasActiveFilter ? 'No active students match this filter.' : 'No active students have a grade level on file yet.' %></p>
+    <% } else { %>
+      <%
+        var GRADE_LEVEL_NAMES_ROWS = 4;
+        var gradeLevelNamesCols = Math.max(1, Math.ceil(nonEmptyColumns.length / GRADE_LEVEL_NAMES_ROWS));
+        var gradeLevelNamesColsMobile = Math.max(1, Math.ceil(nonEmptyColumns.length / (GRADE_LEVEL_NAMES_ROWS * 2)));
+      %>
+      <div class="grade-level-report-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="9.4in">
+        <div class="grade-level-report-fit-inner" style="--grade-level-cols: <%= nonEmptyColumns.length %>; --grade-level-cols-mobile: <%= Math.ceil(nonEmptyColumns.length / 2) %>; --grade-level-names-cols: <%= gradeLevelNamesCols %>; --grade-level-names-cols-mobile: <%= gradeLevelNamesColsMobile %>;">
+          <h2>Students per Grade Level</h2>
+          <div class="grade-level-bar-chart">
+            <% nonEmptyColumns.forEach(function(col) { %>
+              <div class="grade-level-bar-col">
+                <span class="grade-level-bar-count"><%= col.students.length %></span>
+                <div class="grade-level-bar-track">
+                  <div class="grade-level-bar" style="height: <%= Math.round((col.students.length / maxCount) * 100) %>%;"></div>
+                </div>
+                <span class="grade-level-bar-label" title="<%= col.gradeLevel %>"><%= col.gradeLevel %></span>
+              </div>
+            <% }); %>
+          </div>
+
+          <h2>Names by Grade Level</h2>
+          <div class="grade-level-report-grid">
+            <% nonEmptyColumns.forEach(function(col) { %>
+              <div class="grade-level-report-col">
+                <div class="grade-level-report-col-title" title="<%= col.gradeLevel %>"><%= col.gradeLevel %></div>
+                <% col.students.forEach(function(s) { %>
+                  <p class="grade-level-report-name"><%= s.name %><%= s.age != null ? ` (${s.age})` : '' %></p>
+                <% }); %>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+    <% } %>
+  </main>
+
+  <script src="/js/shrink-title-to-fit.js"></script>
+  <script src="/js/print-shrink-to-fit.js"></script>
+</body>
+</html>

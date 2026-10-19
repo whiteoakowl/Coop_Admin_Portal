@@ -1,6 +1,7 @@
 const db = require('../db');
 const { HOUR_POSITIONS, hoursForDay, gridForDay, missingMemberIdsForDate, floaterPositionsCoveredByClass } = require('./classSchedule');
 const { getListByDay, sectionsForList, membersForSection, RANK_ORDER } = require('./volunteers');
+const { getActiveKioskSemesterId } = require('./kioskSettings');
 const { hasInfantChild } = require('./members');
 const { todayISO, nowEasternMinutes, formatTimestamp } = require('./dates');
 const { parseClockMinutes } = require('./schedule');
@@ -75,8 +76,27 @@ async function isAutoLateForClass(memberId, date, hourStartTime) {
 // returned. A Temporary Position (see temporaryJobsForDayDate below)
 // deliberately never shows up here, so it can't leak into the recurring
 // Add/Edit Position dialog's own group list.
-async function permanentJobsForDay(day) {
-  return db.prepare('SELECT * FROM permanent_jobs WHERE day = ? AND session_date IS NULL ORDER BY hour_position, LOWER(title)').all(day);
+//
+// A real bug report: "Floaters being needed for spring semester are
+// still showing on fall semester... floater assignments... EVERYTHING
+// are separated by semester." permanent_jobs now carries its own
+// semester_id - semesterId defaults to whatever Settings > Kiosk has
+// active (same convention utils/volunteers.js's own getListByDay already
+// established) when the caller doesn't pass one explicitly, but every
+// admin-facing route that has a real "which semester's Floater
+// Assignments am I looking at" selection now passes it through instead
+// of leaving it to that default. null means the semester-less "No
+// Semester" bucket specifically, same as elsewhere in this app - a job
+// never tagged with a semester still shows up under every real one
+// (OR semester_id IS NULL below), matching how an untagged class works.
+async function permanentJobsForDay(day, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+  if (sid === null) {
+    return db.prepare('SELECT * FROM permanent_jobs WHERE day = ? AND session_date IS NULL AND semester_id IS NULL ORDER BY hour_position, LOWER(title)').all(day);
+  }
+  return db
+    .prepare('SELECT * FROM permanent_jobs WHERE day = ? AND session_date IS NULL AND (semester_id = ? OR semester_id IS NULL) ORDER BY hour_position, LOWER(title)')
+    .all(day, sid);
 }
 
 // A real request: "add a button on floater assignment page ... called
@@ -84,9 +104,16 @@ async function permanentJobsForDay(day) {
 // Same permanent_jobs row shape (and the exact same substitute_assignments
 // assign/unassign machinery permanentJobsForDay's own rows already use -
 // see the migration's own comment), just scoped to one specific date
-// instead of recurring every session.
-async function temporaryJobsForDayDate(day, date) {
-  return db.prepare('SELECT * FROM permanent_jobs WHERE day = ? AND session_date = ? ORDER BY hour_position, LOWER(title)').all(day, date);
+// instead of recurring every session. Same semesterId convention as
+// permanentJobsForDay above.
+async function temporaryJobsForDayDate(day, date, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+  if (sid === null) {
+    return db.prepare('SELECT * FROM permanent_jobs WHERE day = ? AND session_date = ? AND semester_id IS NULL ORDER BY hour_position, LOWER(title)').all(day, date);
+  }
+  return db
+    .prepare('SELECT * FROM permanent_jobs WHERE day = ? AND session_date = ? AND (semester_id = ? OR semester_id IS NULL) ORDER BY hour_position, LOWER(title)')
+    .all(day, date, sid);
 }
 
 async function getPermanentJob(id) {
@@ -97,18 +124,26 @@ async function floaterIdsForJob(jobId) {
   return (await db.prepare('SELECT member_id FROM permanent_job_floaters WHERE job_id = ?').all(jobId)).map((r) => r.member_id);
 }
 
+// groupKey ties every row of one multi-hour "position" together (see
+// groupedPermanentJobsForDay's own comment) - omit it (the very first row
+// of a brand new position) and this job becomes its own group's anchor,
+// its own id doubling as that group's key.
 async function createPermanentJob(fields) {
   const info = await db
-    .prepare('INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES (?, ?, ?, ?)')
-    .run(fields.day, fields.hourPosition, fields.title, fields.room || null);
-  return info.lastInsertRowid;
+    .prepare('INSERT INTO permanent_jobs (day, hour_position, title, room, semester_id, group_key) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(fields.day, fields.hourPosition, fields.title, fields.room || null, fields.semesterId ?? null, fields.groupKey ?? null);
+  const id = info.lastInsertRowid;
+  if (fields.groupKey == null) await db.prepare('UPDATE permanent_jobs SET group_key = ? WHERE id = ?').run(id, id);
+  return id;
 }
 
 async function createTemporaryJob(fields) {
   const info = await db
-    .prepare('INSERT INTO permanent_jobs (day, hour_position, title, room, session_date) VALUES (?, ?, ?, ?, ?)')
-    .run(fields.day, fields.hourPosition, fields.title, fields.room || null, fields.date);
-  return info.lastInsertRowid;
+    .prepare('INSERT INTO permanent_jobs (day, hour_position, title, room, session_date, semester_id, group_key) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(fields.day, fields.hourPosition, fields.title, fields.room || null, fields.date, fields.semesterId ?? null, fields.groupKey ?? null);
+  const id = info.lastInsertRowid;
+  if (fields.groupKey == null) await db.prepare('UPDATE permanent_jobs SET group_key = ? WHERE id = ?').run(id, id);
+  return id;
 }
 
 async function updatePermanentJob(id, fields) {
@@ -126,21 +161,27 @@ async function deletePermanentJob(id) {
 }
 
 // Groups permanentJobsForDay's per-hour rows into one entry per distinct
-// title - the shape the Add/Edit Position dialog edits (see
+// position - the shape the Add/Edit Position dialog edits (see
 // createPermanentJob's own comment: one "position" spanning several hours
-// really is several rows, one per hour, all sharing the same title/room,
+// really is several rows, one per hour, all sharing the same group_key,
 // so an admin editing "Front Desk" needs to see and change all of them at
 // once, not one row at a time). keyId is just the first row's own id
-// encountered for that title - stable enough to use as this group's own
+// encountered for that group - stable enough to use as this group's own
 // form-field key; savePositionGroup below looks its siblings back up by
-// day+title at save time, not by this id specifically, so it doesn't need
-// to be any particular row.
-async function groupedPermanentJobsForDay(day) {
-  const jobs = await permanentJobsForDay(day);
+// group_key at save time (not this id specifically, and NOT by title - a
+// real bug report: "if there are more than one class with the same name
+// it should still be separate in the system... each numbered setup/
+// cleanup tasks should have its own id even if there are more than one
+// with the same name" - two separate positions that happen to share a
+// title (easy to do once the same title can exist in two different
+// semesters) used to get silently merged together here), so it doesn't
+// need to be any particular row.
+async function groupedPermanentJobsForDay(day, semesterId) {
+  const jobs = await permanentJobsForDay(day, semesterId);
   const groups = new Map();
   for (const job of jobs) {
-    if (!groups.has(job.title)) groups.set(job.title, { keyId: job.id, title: job.title, room: job.room || '', hours: [] });
-    groups.get(job.title).hours.push(job.hour_position);
+    if (!groups.has(job.group_key)) groups.set(job.group_key, { keyId: job.id, title: job.title, room: job.room || '', hours: [] });
+    groups.get(job.group_key).hours.push(job.hour_position);
   }
   return [...groups.values()].sort((a, b) => a.title.localeCompare(b.title));
 }
@@ -148,25 +189,32 @@ async function groupedPermanentJobsForDay(day) {
 // Applies one edited (or brand new) position group from the Add/Edit
 // Position dialog. keyId null means "this is the blank Add New Position
 // row at the bottom of the dialog", not an edit of an existing group -
-// only creates rows there, and only if a title was actually given.
-// Otherwise, title/room apply to every hour still checked; any hour that
-// was previously part of this group but is no longer checked gets its own
-// row deleted (this is also how a position is removed entirely - uncheck
-// every hour, or clear its title, which forces every hour off the same
-// way); any newly-checked hour gets a new row. Existing rows for hours
-// that stay checked are updated in place rather than deleted+recreated,
-// so their own floater list (permanent_job_floaters, set separately via
-// setJobFloaters) isn't wiped out just because the title or room changed.
-async function savePositionGroup(day, keyId, title, room, hours) {
+// only creates rows there, and only if a title was actually given, all
+// sharing one freshly-minted group_key (see createPermanentJob's own
+// comment). Otherwise, title/room apply to every hour still checked; any
+// hour that was previously part of this group but is no longer checked
+// gets its own row deleted (this is also how a position is removed
+// entirely - uncheck every hour, or clear its title, which forces every
+// hour off the same way); any newly-checked hour gets a new row, carrying
+// the SAME group_key and semester_id as the rest of the group rather than
+// a fresh one of its own. Existing rows for hours that stay checked are
+// updated in place rather than deleted+recreated, so their own floater
+// list (permanent_job_floaters, set separately via setJobFloaters) isn't
+// wiped out just because the title or room changed.
+async function savePositionGroup(day, keyId, title, room, hours, semesterId) {
   if (keyId == null) {
     if (!title || hours.length === 0) return;
-    for (const hourPosition of hours) await createPermanentJob({ day, hourPosition, title, room });
+    let groupKey = null;
+    for (const hourPosition of hours) {
+      const id = await createPermanentJob({ day, hourPosition, title, room, semesterId: semesterId ?? null, groupKey });
+      if (groupKey == null) groupKey = id;
+    }
     return;
   }
   const anchor = await getPermanentJob(keyId);
   if (!anchor) return;
   const desiredHours = title ? hours : [];
-  const siblings = await db.prepare('SELECT * FROM permanent_jobs WHERE day = ? AND title = ?').all(day, anchor.title);
+  const siblings = await db.prepare('SELECT * FROM permanent_jobs WHERE group_key = ?').all(anchor.group_key);
   const existingHours = new Set(siblings.map((r) => r.hour_position));
   for (const row of siblings) {
     if (desiredHours.includes(row.hour_position)) {
@@ -176,7 +224,7 @@ async function savePositionGroup(day, keyId, title, room, hours) {
     }
   }
   for (const hourPosition of desiredHours) {
-    if (!existingHours.has(hourPosition)) await createPermanentJob({ day, hourPosition, title, room });
+    if (!existingHours.has(hourPosition)) await createPermanentJob({ day, hourPosition, title, room, semesterId: anchor.semester_id, groupKey: anchor.group_key });
   }
 }
 
@@ -186,42 +234,45 @@ async function savePositionGroup(day, keyId, title, room, hours) {
 // possible implicitly via savePositionGroup (uncheck every hour, then
 // Save). keyId is a group's own anchor job id (see groupedPermanentJobsForDay);
 // a group can be several permanent_jobs rows (one per hour it runs), all
-// sharing day+title, so every sibling row - not just the anchor - has to
+// sharing group_key, so every sibling row - not just the anchor - has to
 // go. Returns the deleted group's title (for the notice message), or null
 // if keyId didn't resolve to a real job (already deleted/stale form).
 async function deletePositionGroup(day, keyId) {
   const anchor = await getPermanentJob(keyId);
   if (!anchor) return null;
-  const siblings = await db.prepare('SELECT id FROM permanent_jobs WHERE day = ? AND title = ?').all(day, anchor.title);
+  const siblings = await db.prepare('SELECT id FROM permanent_jobs WHERE group_key = ?').all(anchor.group_key);
   for (const row of siblings) await deletePermanentJob(row.id);
   return anchor.title;
 }
 
 // Temporary Position's own version of groupedPermanentJobsForDay/
-// savePositionGroup/deletePositionGroup above - identical shape, just
-// grouped (and its siblings looked back up) by day+date+title instead of
-// day+title, so a temporary position never gets confused with a
-// recurring one that happens to share the same title on the same day.
-async function groupedTemporaryJobsForDayDate(day, date) {
-  const jobs = await temporaryJobsForDayDate(day, date);
+// savePositionGroup/deletePositionGroup above - identical shape (and
+// same group_key-not-title matching, for the same "same name should stay
+// separate" reason), just scoped to one date instead of recurring.
+async function groupedTemporaryJobsForDayDate(day, date, semesterId) {
+  const jobs = await temporaryJobsForDayDate(day, date, semesterId);
   const groups = new Map();
   for (const job of jobs) {
-    if (!groups.has(job.title)) groups.set(job.title, { keyId: job.id, title: job.title, room: job.room || '', hours: [] });
-    groups.get(job.title).hours.push(job.hour_position);
+    if (!groups.has(job.group_key)) groups.set(job.group_key, { keyId: job.id, title: job.title, room: job.room || '', hours: [] });
+    groups.get(job.group_key).hours.push(job.hour_position);
   }
   return [...groups.values()].sort((a, b) => a.title.localeCompare(b.title));
 }
 
-async function saveTemporaryPositionGroup(day, date, keyId, title, room, hours) {
+async function saveTemporaryPositionGroup(day, date, keyId, title, room, hours, semesterId) {
   if (keyId == null) {
     if (!title || hours.length === 0) return;
-    for (const hourPosition of hours) await createTemporaryJob({ day, date, hourPosition, title, room });
+    let groupKey = null;
+    for (const hourPosition of hours) {
+      const id = await createTemporaryJob({ day, date, hourPosition, title, room, semesterId: semesterId ?? null, groupKey });
+      if (groupKey == null) groupKey = id;
+    }
     return;
   }
   const anchor = await getPermanentJob(keyId);
   if (!anchor) return;
   const desiredHours = title ? hours : [];
-  const siblings = await db.prepare('SELECT * FROM permanent_jobs WHERE day = ? AND session_date = ? AND title = ?').all(day, date, anchor.title);
+  const siblings = await db.prepare('SELECT * FROM permanent_jobs WHERE group_key = ?').all(anchor.group_key);
   const existingHours = new Set(siblings.map((r) => r.hour_position));
   for (const row of siblings) {
     if (desiredHours.includes(row.hour_position)) {
@@ -231,14 +282,14 @@ async function saveTemporaryPositionGroup(day, date, keyId, title, room, hours) 
     }
   }
   for (const hourPosition of desiredHours) {
-    if (!existingHours.has(hourPosition)) await createTemporaryJob({ day, date, hourPosition, title, room });
+    if (!existingHours.has(hourPosition)) await createTemporaryJob({ day, date, hourPosition, title, room, semesterId: anchor.semester_id, groupKey: anchor.group_key });
   }
 }
 
 async function deleteTemporaryPositionGroup(day, date, keyId) {
   const anchor = await getPermanentJob(keyId);
   if (!anchor) return null;
-  const siblings = await db.prepare('SELECT id FROM permanent_jobs WHERE day = ? AND session_date = ? AND title = ?').all(day, date, anchor.title);
+  const siblings = await db.prepare('SELECT id FROM permanent_jobs WHERE group_key = ?').all(anchor.group_key);
   for (const row of siblings) await deletePermanentJob(row.id);
   return anchor.title;
 }
@@ -380,8 +431,8 @@ async function classStaffByHour(grid) {
 // member's rank for THIS specific hour (membersForSection), not a
 // single member-wide rank, since Floater Teams now lets rank vary hour
 // to hour.
-async function floaterMembersForHour(day, hourPosition) {
-  const list = await getListByDay(day);
+async function floaterMembersForHour(day, hourPosition, semesterId) {
+  const list = await getListByDay(day, semesterId);
   if (!list) return [];
   const section = (await sectionsForList(list.id)).find((s) => s.position === hourPosition);
   if (!section) return [];
@@ -562,13 +613,13 @@ async function assignedHourCountsForDate(date) {
 // explicitly chooses someone from availableFloaters below and the route
 // calls setAssignment - always straight to 'approved', never a
 // system-guessed 'pending' in between.
-async function substituteBoard(day, date) {
+async function substituteBoard(day, date, semesterId) {
   const missingById = date ? await missingMemberIdsForDate(date) : new Map();
-  const grid = await gridForDay(day);
+  const grid = await gridForDay(day, semesterId);
   const classStaffByHourPosition = await classStaffByHour(grid);
   const classVacancySlotsByHourPosition = await classVacancySlotsByHour(grid);
-  const jobs = await permanentJobsForDay(day);
-  const tempJobs = date ? await temporaryJobsForDayDate(day, date) : [];
+  const jobs = await permanentJobsForDay(day, semesterId);
+  const tempJobs = date ? await temporaryJobsForDayDate(day, date, semesterId) : [];
   const jobsByHour = {};
   [...jobs, ...tempJobs].forEach((j) => {
     if (!jobsByHour[j.hour_position]) jobsByHour[j.hour_position] = [];
@@ -578,7 +629,7 @@ async function substituteBoard(day, date) {
   const result = [];
   for (const hourGroup of grid) {
     const hourPosition = hourGroup.position;
-    const floaterPool = (await floaterMembersForHour(day, hourPosition)).filter((m) => !missingById.has(m.id));
+    const floaterPool = (await floaterMembersForHour(day, hourPosition, semesterId)).filter((m) => !missingById.has(m.id));
     const usedThisHour = new Set();
     const slots = [];
 
@@ -675,8 +726,8 @@ async function substituteBoard(day, date) {
 // assigning someone here is exactly the same action as approving a
 // substitute - there's only one "who's covering this slot" system,
 // whether it's being planned weeks ahead or filled last-minute.
-async function jobAssignmentGrid(day, dates) {
-  const jobs = await permanentJobsForDay(day);
+async function jobAssignmentGrid(day, dates, semesterId) {
+  const jobs = await permanentJobsForDay(day, semesterId);
   const byHour = {};
   jobs.forEach((j) => {
     if (!byHour[j.hour_position]) byHour[j.hour_position] = [];

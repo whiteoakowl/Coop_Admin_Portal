@@ -17,6 +17,7 @@ const openFor = {
   student_register_self: existing ? existing.open_for_student_register_self : false,
 };
 const checkedSectionIds = existing ? existing.sectionIds : [];
+const checkedScheduleIds = existing ? existing.scheduleIds : [];
 %>
 <form method="POST" action="<%= action %>" class="member-form-grid">
   <label class="member-form-full">Label
@@ -31,21 +32,37 @@ const checkedSectionIds = existing ? existing.sectionIds : [];
       <label class="checkbox-option"><input type="checkbox" name="actionTypes" value="student_register_self" <%= openFor.student_register_self ? 'checked' : '' %> /> Students can register for classes</label>
     </div>
   </div>
-  <label>Schedule Grid
-    <select name="classScheduleId">
-      <option value="">Every schedule grid</option>
-      <% classSchedules.forEach(function(cs) { %>
-        <option value="<%= cs.id %>" <%= existing && existing.class_schedule_id === cs.id ? 'selected' : '' %>><%= cs.title %><% var sem = semesters.find(function(s) { return s.id === cs.semester_id; }); %><% if (sem) { %> (<%= sem.title %>)<% } %></option>
-      <% }); %>
-    </select>
-  </label>
+  <%# A real request: "schedule grid should be a dropdown menu with check
+      boxes to select multiple. Section should be a dropdown menu with
+      checkboxes to choose multiple" - Schedule Grid used to be a plain
+      single-choice <select> (now classScheduleIds, a real join table -
+      see utils/registrationWindows.js) and Section was already a
+      multi-checkbox group but always rendered open rather than collapsed
+      into a dropdown trigger. Both now use the same closed-by-default
+      checkbox-dropdown-with-chips widget the rest of the app already
+      uses for this exact shape (views/partials/multi-select-checkbox.ejs -
+      Chat Section/Grade/Age, Resource Links' Show On, Communication's
+      Send To, ...). %>
   <div class="member-form-full">
-    <span class="checkbox-group-label">Section <span class="hint">(none selected means open to everyone)</span></span>
-    <div class="checkbox-group checkbox-group-boxed">
-      <% sections.forEach(function(s) { %>
-        <label class="checkbox-option"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= checkedSectionIds.includes(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
-      <% }); %>
-    </div>
+    <span class="checkbox-group-label">Schedule Grid</span>
+    <%- include('multi-select-checkbox', {
+      name: 'classScheduleIds',
+      options: classSchedules.map(function(cs) {
+        var sem = semesters.find(function(s) { return s.id === cs.semester_id; });
+        return { value: cs.id, label: cs.title + (sem ? ` (${sem.title})` : '') };
+      }),
+      selected: checkedScheduleIds.map(String),
+      placeholder: 'Every schedule grid',
+    }) %>
+  </div>
+  <div class="member-form-full">
+    <span class="checkbox-group-label">Section</span>
+    <%- include('multi-select-checkbox', {
+      name: 'sectionIds',
+      options: sections.map(function(s) { return { value: s.id, label: s.name }; }),
+      selected: checkedSectionIds.map(String),
+      placeholder: 'All sections (open to everyone)',
+    }) %>
   </div>
   <label>Opens At
     <input type="datetime-local" name="opensAt" value="<%= existing ? existing.opensInput : '' %>" required />

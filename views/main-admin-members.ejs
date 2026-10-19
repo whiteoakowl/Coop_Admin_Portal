@@ -544,13 +544,17 @@
               convention the Accounts page's own side-by-side button pair
               already uses. Apply is its own real action (see routes/
               main-admin-members.js's own POST .../grade-levels/apply) -
-              bulk-overwrites every active student's own grade_level, so
-              it gets the same data-confirm guard every other bulk/
-              destructive action in this app already has. %>
+              data-confirm-safe since this only ever SETS a grade level it's
+              confident about (a student matching no rule is left untouched
+              - see the util's own comment), never blanks one out - not the
+              same risk class as a delete. %>
           <div class="roster-btn-row roster-btn-row-fit-text" data-fixed-columns="2">
             <button type="submit" form="grade-level-settings-form" class="roster-action-btn roster-action-btn-fit">Save Grade Level Settings</button>
-            <form method="POST" action="/main-admin/members/settings/grade-levels/apply" class="inline-block-form" data-confirm="Apply these rules to every active student now? This overwrites each matching student's own Grade Level.">
-              <button type="submit" class="roster-action-btn roster-action-btn-fit">Apply to All Members</button>
+            <form method="POST" action="/main-admin/members/settings/grade-levels/apply" class="inline-block-form" data-confirm="Set every matching student's grade level from their birthday, using the rules above? This overwrites their current Grade Level on the member form." data-confirm-yes-label="Apply" data-confirm-icon="icon-refresh" data-confirm-safe="1">
+              <button type="submit" class="roster-action-btn roster-action-btn-fit">
+                <svg class="icon"><use href="#icon-refresh"/></svg>
+                Apply to All Members
+              </button>
             </form>
           </div>
         </div>

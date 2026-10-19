@@ -151,13 +151,7 @@ async function isRegistrationWindowOpen(event) {
   return true;
 }
 
-// A real request: "Parent portal events, list view... add the title
-// upcoming events" (with a Past Events section below it) - pastOnly is
-// upcomingOnly's own mirror image, same "starts_at vs now_text()" test
-// just flipped, ordered most-recent-past-first (DESC) instead of
-// soonest-first since that's the order a "Past Events" list reads
-// naturally in.
-async function listEvents({ status, visibility, upcomingOnly, pastOnly, approvalStatus, categoryId } = {}) {
+async function listEvents({ status, visibility, upcomingOnly, approvalStatus, categoryId } = {}) {
   const clauses = [];
   const params = [];
   if (status) {
@@ -178,7 +172,6 @@ async function listEvents({ status, visibility, upcomingOnly, pastOnly, approval
     params.push(categoryId);
   }
   if (upcomingOnly) clauses.push("starts_at >= now_text()");
-  if (pastOnly) clauses.push("starts_at < now_text()");
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   return db
     .prepare(
@@ -186,7 +179,7 @@ async function listEvents({ status, visibility, upcomingOnly, pastOnly, approval
        FROM events e
        LEFT JOIN event_categories ec ON ec.id = e.category_id
        LEFT JOIN event_locations el ON el.id = e.location_id
-       ${where} ORDER BY starts_at${pastOnly ? ' DESC' : ''}`
+       ${where} ORDER BY starts_at`
     )
     .all(...params);
 }

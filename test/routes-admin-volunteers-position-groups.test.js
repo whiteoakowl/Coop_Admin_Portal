@@ -48,11 +48,25 @@ test('the manage page button reads "+ Add/Edit Permanent Positions"', async () =
   assert.match(res.text, /\+ Add\/Edit Permanent Positions/);
 });
 
+// Every seeded position below sets its own group_key explicitly (the id
+// its own first row got, shared by every other row in that same
+// position) - utils/substitutes.js's own createPermanentJob always does
+// this for a real save, but these tests seed permanent_jobs directly, so
+// they have to set it by hand to look like real data (a real bug report:
+// "if there are more than one class with the same name it should still
+// be separate in the system... each numbered setup/cleanup tasks should
+// have its own id even if there are more than one with the same name" -
+// groupedPermanentJobsForDay/savePositionGroup/deletePositionGroup now
+// match a position's own several hour-rows by this group_key, not by
+// title text, so two different positions that happen to share a title
+// never get silently merged).
 test('the dialog lists every existing position, stacked, with its own hours checked', async () => {
   const { cookie } = await loginAsAdmin();
-  await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 1, 'Front Desk', '101')").run();
-  await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 2, 'Front Desk', '101')").run();
-  await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 3, 'Library Desk', '')").run();
+  const frontDesk1 = (await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 1, 'Front Desk', '101') RETURNING id").get()).id;
+  await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room, group_key) VALUES ('monday', 2, 'Front Desk', '101', ?)").run(frontDesk1);
+  await db.prepare('UPDATE permanent_jobs SET group_key = ? WHERE id = ?').run(frontDesk1, frontDesk1);
+  const libraryDesk = (await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 3, 'Library Desk', '') RETURNING id").get()).id;
+  await db.prepare('UPDATE permanent_jobs SET group_key = ? WHERE id = ?').run(libraryDesk, libraryDesk);
 
   const res = await request(app).get('/admin/volunteers/monday/manage').set('Cookie', cookie);
   assert.equal(res.status, 200);
@@ -71,9 +85,11 @@ test('the dialog lists every existing position, stacked, with its own hours chec
 
 test('saving the dialog can edit an existing position\'s title/room, add a brand-new one, and remove another by unchecking every hour', async () => {
   const { cookie, csrfToken } = await loginAsAdmin();
-  const frontDesk1 = (await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('wednesday', 1, 'Old Name', '9')").run()).lastInsertRowid;
-  await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('wednesday', 2, 'Old Name', '9')").run();
-  const goingAway = (await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('wednesday', 1, 'Going Away', '')").run()).lastInsertRowid;
+  const frontDesk1 = (await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('wednesday', 1, 'Old Name', '9') RETURNING id").get()).id;
+  await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room, group_key) VALUES ('wednesday', 2, 'Old Name', '9', ?)").run(frontDesk1);
+  await db.prepare('UPDATE permanent_jobs SET group_key = ? WHERE id = ?').run(frontDesk1, frontDesk1);
+  const goingAway = (await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('wednesday', 1, 'Going Away', '') RETURNING id").get()).id;
+  await db.prepare('UPDATE permanent_jobs SET group_key = ? WHERE id = ?').run(goingAway, goingAway);
 
   const member = await db.prepare("INSERT INTO members (name, barcode, member_type, family_id, active) VALUES ('Floater One', 'floater-one', 'parent', NULL, 1)").run();
   await db.prepare('INSERT INTO permanent_job_floaters (job_id, member_id) VALUES (?, ?)').run(frontDesk1, member.lastInsertRowid);
@@ -119,7 +135,8 @@ test('saving the dialog can edit an existing position\'s title/room, add a brand
 // editing."
 test('each existing position in the dialog has its own trash-icon delete button', async () => {
   const { cookie } = await loginAsAdmin();
-  const jobId = (await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 1, 'Copy Room', '2')").run()).lastInsertRowid;
+  const jobId = (await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 1, 'Copy Room', '2') RETURNING id").get()).id;
+  await db.prepare('UPDATE permanent_jobs SET group_key = ? WHERE id = ?').run(jobId, jobId);
 
   const res = await request(app).get('/admin/volunteers/monday/manage').set('Cookie', cookie);
   const dialogHtml = /<dialog id="add-job-dialog"[\s\S]*?<\/dialog>/.exec(res.text)[0];
@@ -134,9 +151,11 @@ test('each existing position in the dialog has its own trash-icon delete button'
 
 test('clicking a position\'s trash icon deletes every hour row for that position, keeps the dialog open, and leaves other positions alone', async () => {
   const { cookie, csrfToken } = await loginAsAdmin();
-  const goneHour1 = (await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 1, 'Kitchen Duty', '')").run()).lastInsertRowid;
-  await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 2, 'Kitchen Duty', '')").run();
-  const staysId = (await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 1, 'Front Desk', '')").run()).lastInsertRowid;
+  const goneHour1 = (await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 1, 'Kitchen Duty', '') RETURNING id").get()).id;
+  await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room, group_key) VALUES ('monday', 2, 'Kitchen Duty', '', ?)").run(goneHour1);
+  await db.prepare('UPDATE permanent_jobs SET group_key = ? WHERE id = ?').run(goneHour1, goneHour1);
+  const staysId = (await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 1, 'Front Desk', '') RETURNING id").get()).id;
+  await db.prepare('UPDATE permanent_jobs SET group_key = ? WHERE id = ?').run(staysId, staysId);
   const floater = await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Kitchen Floater', 'kitchen-floater-1', 'parent')").run();
   await db
     .prepare(`INSERT INTO substitute_assignments (session_date, slot_type, slot_id, member_id, is_override, status) VALUES ('2026-09-14', 'job', ?, ?, 0, 'approved')`)

@@ -354,6 +354,65 @@ router.post('/members/families/new', async (req, res) => {
 // member (GET/POST /members/:id/edit below) is unaffected.
 const PROFILE_TABS = ['profile', 'schedule', 'attendance'];
 
+// The same Grade Level Report the Main Admin Portal's own Members page
+// already has (routes/main-admin-members.js) - a real request to add it
+// here on the Co-op Admin side too. Registered ahead of GET /:id below
+// so "grade-level-report" is never swallowed as a member id.
+router.get('/members/grade-level-report', async (req, res) => {
+  const sectionId = req.query.sectionId ? parseInt(req.query.sectionId, 10) : null;
+  const signup = ['signedUp', 'notSignedUp'].includes(req.query.signup) ? req.query.signup : '';
+  const familyId = req.query.familyId ? parseInt(req.query.familyId, 10) : null;
+
+  let students = (await membersWithDetails('student'))
+    .filter((m) => Number(m.active) === 1)
+    .map((m) => ({ id: m.id, name: m.name, age: ageFromBirthday(m.birthday), gradeLevel: m.grade_level, familyId: m.family_id }));
+
+  if (familyId) students = students.filter((s) => s.familyId === familyId);
+
+  if (sectionId) {
+    const sectionIdsByMember = await sectionIdsForMembers(students.map((s) => s.id));
+    students = students.filter((s) => (sectionIdsByMember[s.id] || new Set()).has(sectionId));
+  }
+
+  if (signup) {
+    const enrolledRows = await db.prepare('SELECT DISTINCT student_id AS "studentId" FROM class_enrollments').all();
+    const enrolledIds = new Set(enrolledRows.map((r) => r.studentId));
+    students = students.filter((s) => (signup === 'signedUp' ? enrolledIds.has(s.id) : !enrolledIds.has(s.id)));
+  }
+
+  students = students.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+  const columns = GRADE_LEVELS.map((gradeLevel) => ({
+    gradeLevel,
+    students: students.filter((s) => s.gradeLevel === gradeLevel),
+  }));
+  const ungraded = students.filter((s) => !GRADE_LEVELS.includes(s.gradeLevel));
+  if (ungraded.length > 0) columns.push({ gradeLevel: 'Ungraded', students: ungraded });
+
+  const filterLabelParts = [];
+  if (sectionId) {
+    const section = await db.prepare('SELECT name FROM sections WHERE id = ?').get(sectionId);
+    if (section) filterLabelParts.push(section.name);
+  }
+  if (signup) filterLabelParts.push(signup === 'signedUp' ? 'Signed Up' : 'Not Signed Up');
+  if (familyId) {
+    const family = await db.prepare('SELECT name FROM families WHERE id = ?').get(familyId);
+    if (family) filterLabelParts.push(`${family.name} Family`);
+  }
+
+  res.render('admin-members-grade-level-report', {
+    title: 'Grade Level Report',
+    columns,
+    maxCount: Math.max(1, ...columns.map((c) => c.students.length)),
+    sections: await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all(),
+    families: await db.prepare('SELECT * FROM families ORDER BY LOWER(name)').all(),
+    selectedSectionId: sectionId,
+    selectedSignup: signup,
+    selectedFamilyId: familyId,
+    filterLabelParts,
+  });
+});
+
 // Clicking a member's name anywhere lands here - a read-only profile with
 // Profile / Class Schedule / Attendance tabs. Class Schedule reflects
 // class enrollment/staffing automatically (see syncMemberSchedulesForDay

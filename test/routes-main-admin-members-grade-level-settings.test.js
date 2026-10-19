@@ -26,6 +26,7 @@ process.env.MAIN_ADMIN_PASSWORD = 'changeme123';
 
 const request = require('supertest');
 const app = require('../server');
+const db = require('../db');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -94,4 +95,87 @@ test('POST /main-admin/members/settings/grade-levels saves every row and redirec
   const kRow = reloaded.text.split('name="gradeLevel" value="Kindergarten"')[1].split('</tr>')[0];
   assert.match(kRow, /value="5"/);
   assert.match(kRow, /value="2026-09-01"/);
+});
+
+test('Grade Level Settings tab offers an "Apply to All Members" action', async () => {
+  const { cookie } = await loginAsMainAdmin();
+  const page = await request(app).get('/main-admin/members?tab=settings&settingsTab=grade-levels').set('Cookie', cookie);
+  assert.match(page.text, /<form method="POST" action="\/main-admin\/members\/settings\/grade-levels\/apply"/);
+  assert.match(page.text, />\s*Apply to All Members\s*</);
+});
+
+// A real follow-up request: "Grade level settings under members should
+// set the grade level for all members according to their birthday"
+// (routes/main-admin-members.js's own POST /settings/grade-levels/apply,
+// utils/gradeLevelSettings.js's own applyGradeLevelRulesToMembers).
+test('POST /settings/grade-levels/apply sets each matching student\'s grade level from their birthday, leaves non-matches and non-students alone', async (t) => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+
+  // Kindergarten: age 5 by 2026-09-01. 1st: age 6 by 2026-09-01.
+  const page = await request(app).get('/main-admin/members?tab=settings').set('Cookie', cookie);
+  const gradeLevels = [...page.text.matchAll(/name="gradeLevel" value="([^"]*)"/g)].map((m) => m[1]);
+  const age = gradeLevels.map((g) => (g === 'Kindergarten' ? '5' : g === '1st' ? '6' : ''));
+  const cutoffDate = gradeLevels.map((g) => (g === 'Kindergarten' || g === '1st' ? '2026-09-01' : ''));
+  await request(app).post('/main-admin/members/settings/grade-levels').set('Cookie', cookie).type('form').send({ gradeLevel: gradeLevels, age, cutoffDate, _csrf: csrfToken });
+
+  let seedCounter = 0;
+  async function createStudent({ name, birthday, gradeLevel }) {
+    seedCounter += 1;
+    const code = `gradeapply${seedCounter}`;
+    await db
+      .prepare("INSERT INTO members (name, barcode, member_code, member_type, birthday, grade_level, active) VALUES (?, ?, ?, 'student', ?, ?, 1)")
+      .run(name, code, code, birthday || null, gradeLevel || null);
+    return (await db.prepare('SELECT id FROM members WHERE barcode = ?').get(code)).id;
+  }
+  async function createParent(name) {
+    seedCounter += 1;
+    const code = `gradeapplyparent${seedCounter}`;
+    await db.prepare("INSERT INTO members (name, barcode, member_code, member_type, active) VALUES (?, ?, ?, 'parent', 1)").run(name, code, code);
+  }
+
+  // Turns 5 on 2026-09-01 exactly - matches the Kindergarten rule.
+  const kidId = await createStudent({ name: 'Grade Apply Kinder', birthday: '2021-09-01' });
+  // Turns 6 on 2026-09-01 - matches 1st, but already has a DIFFERENT
+  // grade level set by hand - should be overwritten to 1st.
+  const firstId = await createStudent({ name: 'Grade Apply First', birthday: '2020-09-01', gradeLevel: '2nd' });
+  // Already correctly Kindergarten - matched but not actually changed.
+  const alreadyCorrectId = await createStudent({ name: 'Grade Apply Already Right', birthday: '2021-08-15', gradeLevel: 'Kindergarten' });
+  // Age 10 by the cutoff date - no EXACT rule covers that age (only
+  // Kindergarten=5 and 1st=6 are configured), but 1st is the closer of
+  // the two (|10-6| < |10-5|), so this student should land on 1st
+  // instead of staying Ungraded.
+  const noExactMatchId = await createStudent({ name: 'Grade Apply No Exact Match', birthday: '2016-01-01', gradeLevel: '5th' });
+  // No birthday on file at all - never considered, even though rules exist.
+  const noBirthdayId = await createStudent({ name: 'Grade Apply No Birthday', birthday: null, gradeLevel: '3rd' });
+  await createParent('Grade Apply Parent');
+
+  const res = await request(app).post('/main-admin/members/settings/grade-levels/apply').set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /settingsTab=grade-levels/);
+  assert.match(decodeURIComponent(res.headers.location), /Updated 3 of 4 matching student\(s\)/);
+
+  await t.test('a student matching Kindergarten gets it set', async () => {
+    const row = await db.prepare('SELECT grade_level FROM members WHERE id = ?').get(kidId);
+    assert.equal(row.grade_level, 'Kindergarten');
+  });
+
+  await t.test('a student matching 1st gets their old hand-set grade level overwritten', async () => {
+    const row = await db.prepare('SELECT grade_level FROM members WHERE id = ?').get(firstId);
+    assert.equal(row.grade_level, '1st');
+  });
+
+  await t.test('a student already matching their rule stays the same (counted as matched, not changed)', async () => {
+    const row = await db.prepare('SELECT grade_level FROM members WHERE id = ?').get(alreadyCorrectId);
+    assert.equal(row.grade_level, 'Kindergarten');
+  });
+
+  await t.test('a student whose age matches no exact rule lands on the closest configured one instead of staying Ungraded', async () => {
+    const row = await db.prepare('SELECT grade_level FROM members WHERE id = ?').get(noExactMatchId);
+    assert.equal(row.grade_level, '1st');
+  });
+
+  await t.test('a student with no birthday on file is never touched', async () => {
+    const row = await db.prepare('SELECT grade_level FROM members WHERE id = ?').get(noBirthdayId);
+    assert.equal(row.grade_level, '3rd');
+  });
 });

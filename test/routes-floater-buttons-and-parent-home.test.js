@@ -59,6 +59,39 @@ test('Parent Portal homepage buttons are scoped to fit-to-text sizing (not stret
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'public', 'css', 'styles.css'), 'utf8'), /\.parent-home-main \.roster-action-btn \{ align-self: flex-start; flex-grow: 0; \}/);
 });
 
+// A real request: "Parent portal homepage. The colored cards should all
+// be the same blue that is found in the rest of the website. The pastel
+// soft blue" - every card (green/blue/amber/purple/indigo/slate/rose)
+// now shares this app's own established soft-blue tokens instead of its
+// own one-off color. A follow-up request: "Only the title bar on the
+// cards should be blue, not the whole card" - the tint is scoped to
+// just .parent-home-card-v2-head now, with the card's own base rule
+// giving the body back its plain --surface background; a separate
+// follow-up ("the buttons on the cards should be blue as well") moved
+// every .parent-home-cta-outline-* button onto the same tokens too.
+test('Parent Portal homepage: every dashboard card title bar (not the whole card) uses the site-wide soft-blue tokens, and every card CTA button does too', async () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'css', 'styles.css'), 'utf8');
+  assert.match(css, /\.parent-home-card-v2 \{[^}]*background: var\(--surface\);[^}]*\}/, 'the base card rule should give the whole card (body included) a plain surface background');
+  // The comma-separated selector list names every variant once for the border, and again (scoped to .parent-home-card-v2-head) for the tinted background.
+  assert.match(css, /\.parent-home-card-v2-green,\s*\n\s*\.parent-home-card-v2-blue,\s*\n\s*\.parent-home-card-v2-amber,\s*\n\s*\.parent-home-card-v2-purple,\s*\n\s*\.parent-home-card-v2-indigo,\s*\n\s*\.parent-home-card-v2-slate,\s*\n\s*\.parent-home-card-v2-rose \{ border-color: var\(--brand\); \}/);
+  assert.match(
+    css,
+    /\.parent-home-card-v2-green \.parent-home-card-v2-head,\s*\n\s*\.parent-home-card-v2-blue \.parent-home-card-v2-head,\s*\n\s*\.parent-home-card-v2-amber \.parent-home-card-v2-head,\s*\n\s*\.parent-home-card-v2-purple \.parent-home-card-v2-head,\s*\n\s*\.parent-home-card-v2-indigo \.parent-home-card-v2-head,\s*\n\s*\.parent-home-card-v2-slate \.parent-home-card-v2-head,\s*\n\s*\.parent-home-card-v2-rose \.parent-home-card-v2-head \{ background: var\(--brand-soft\); \}/
+  );
+  assert.match(css, /\.parent-home-card-v2-rose \.parent-home-card-v2-icon \{ background: var\(--brand-dark\); \}/);
+  assert.match(css, /\.parent-home-card-v2-rose \.parent-home-card-v2-viewall \{ color: var\(--brand-dark\); \}/);
+  // Every CTA button variant shares the same blue tokens now too.
+  assert.match(
+    css,
+    /\.parent-home-cta-outline-amber,\s*\n\s*\.parent-home-cta-outline-purple,\s*\n\s*\.parent-home-cta-outline-blue,\s*\n\s*\.parent-home-cta-outline-indigo,\s*\n\s*\.parent-home-cta-outline-rose \{ background: transparent; border: 1\.5px solid var\(--brand\); color: var\(--brand-dark\); \}/
+  );
+  // None of the old one-off hex colors should remain on these selectors.
+  assert.doesNotMatch(css, /\.parent-home-card-v2-green \{ background: #effaf3/);
+  assert.doesNotMatch(css, /\.parent-home-card-v2-purple \{ background: #f6f0fc/);
+  assert.doesNotMatch(css, /\.parent-home-cta-outline-amber \{ background: transparent; border: 1\.5px solid #c7912a/);
+  assert.doesNotMatch(css, /\.parent-home-cta-outline-purple \{ background: transparent; border: 1\.5px solid #8148c2/);
+});
+
 async function loginAsPortalParent() {
   const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('Registration Count Family') RETURNING id").get()).id;
   const parentId = (

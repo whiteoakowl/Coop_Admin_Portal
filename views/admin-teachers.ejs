@@ -31,57 +31,42 @@
     <% if (members.length === 0) { %>
       <p class="roster-empty">No teachers or assistants are staffed on a class<%= selectedSemesterId ? ' for this semester' : '' %> yet.</p>
     <% } else { %>
-      <%# A real request: "If a teacher teaches multiple classes they will
-          all be listed under the members name with a dropdown arrow and
-          minimize feature" - <details>/<summary> is this app's own
-          established collapsible idiom (e.g. the Filter popup's own
-          filter-details), so a teacher with more than one class gets a
-          real collapse/expand arrow for free; a single-class teacher
-          just shows that one class inline since there's nothing to
-          collapse. "Organized alphabetical by last name" - members is
-          already byLastName-sorted server-side (routes/admin-teachers.js). %>
+      <%# A real follow-up request: "even if the member is only teaching or
+          assisting 1 class it should still show as a drop down minimize
+          system so that you see just a list of member names" - every
+          member now gets the same <details>/<summary> collapsible
+          treatment regardless of class count, so the collapsed page
+          reads as a clean list of names only; a single-class member's
+          <details> just happens to hold one <li> once expanded.
+          "Organized alphabetical by last name" - members is already
+          byLastName-sorted server-side (routes/admin-teachers.js). %>
       <ul class="teacher-list">
         <% members.forEach(function(m) { %>
           <li class="teacher-list-item">
-            <% if (m.classes.length > 1) { %>
-              <details>
-                <summary><%= m.name %> <span class="teacher-class-count">(<%= m.classes.length %> classes)</span></summary>
-                <ul class="teacher-class-list">
-                  <% m.classes.forEach(function(c) { %>
-                    <%# A real request: "You can click on the class and it
-                        will go to the class" - a full admin goes straight
-                        to the class's own tabbed manage page (same click
-                        target the Classes grid's own cards already use,
-                        public/js/class-schedule-view.js), but that page
-                        is requireFullAdmin-gated; a non-full Co-op Admin
-                        (who can still see this list at all - see admin-
-                        nav.ejs's own comment) instead lands on that
-                        class's own day grid, the closest a read-only
-                        viewer can actually open. %>
-                    <li>
-                      <a href="<%= isFullAdmin ? `/admin/class-schedule/classes/${c.id}/manage` : `/admin/schedule?tab=${c.day}${selectedSemesterId ? '&semesterId=' + selectedSemesterId : ''}` %>">
-                        <span class="teacher-class-name"><%= c.className %></span>
-                        <span class="teacher-class-role"><%= c.role === 'teacher' ? 'Teacher' : 'Assistant' %></span>
-                        <span class="teacher-class-meta"><%= c.dayLabel %><%= c.timeLabel ? ' · ' + c.timeLabel : '' %><%= c.room ? ' · ' + c.room : '' %></span>
-                      </a>
-                    </li>
-                  <% }); %>
-                </ul>
-              </details>
-            <% } else { %>
-              <%
-                var onlyClass = m.classes[0];
-                var onlyClassHref = isFullAdmin
-                  ? `/admin/class-schedule/classes/${onlyClass.id}/manage`
-                  : `/admin/schedule?tab=${onlyClass.day}${selectedSemesterId ? '&semesterId=' + selectedSemesterId : ''}`;
-              %>
-              <span class="teacher-list-name"><%= m.name %></span>
-              <a class="teacher-single-class" href="<%= onlyClassHref %>">
-                <span class="teacher-class-name"><%= onlyClass.className %></span>
-                <span class="teacher-class-role"><%= onlyClass.role === 'teacher' ? 'Teacher' : 'Assistant' %></span>
-                <span class="teacher-class-meta"><%= onlyClass.dayLabel %><%= onlyClass.timeLabel ? ' · ' + onlyClass.timeLabel : '' %><%= onlyClass.room ? ' · ' + onlyClass.room : '' %></span>
-              </a>
-            <% } %>
+            <details>
+              <summary><%= m.name %> <span class="teacher-class-count"><%= m.classes.length %> class<%= m.classes.length === 1 ? '' : 'es' %></span></summary>
+              <ul class="teacher-class-list">
+                <% m.classes.forEach(function(c) { %>
+                  <%# A real request: "You can click on the class and it
+                      will go to the class" - a full admin goes straight
+                      to the class's own tabbed manage page (same click
+                      target the Classes grid's own cards already use,
+                      public/js/class-schedule-view.js), but that page
+                      is requireFullAdmin-gated; a non-full Co-op Admin
+                      (who can still see this list at all - see admin-
+                      nav.ejs's own comment) instead lands on that
+                      class's own day grid, the closest a read-only
+                      viewer can actually open. %>
+                  <li>
+                    <a href="<%= isFullAdmin ? `/admin/class-schedule/classes/${c.id}/manage` : `/admin/schedule?tab=${c.day}${selectedSemesterId ? '&semesterId=' + selectedSemesterId : ''}` %>">
+                      <span class="teacher-class-name"><%= c.className %></span>
+                      <span class="teacher-class-role"><%= c.role === 'teacher' ? 'Teacher' : 'Assistant' %></span>
+                      <span class="teacher-class-meta"><%= c.dayLabel %><%= c.timeLabel ? ' · ' + c.timeLabel : '' %><%= c.room ? ' · ' + c.room : '' %></span>
+                    </a>
+                  </li>
+                <% }); %>
+              </ul>
+            </details>
           </li>
         <% }); %>
       </ul>

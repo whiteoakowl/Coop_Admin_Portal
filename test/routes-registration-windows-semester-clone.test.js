@@ -70,7 +70,7 @@ test('creating a new semester clones its predecessor\'s Registration Windows exa
     label: 'Fall Early Bird',
     opensAt: '2026-08-01 00:00:00',
     closesAt: '2026-08-15 00:00:00',
-    classScheduleId: fallMonday,
+    classScheduleIds: [fallMonday],
     sectionIds: [sectionId],
     actionTypes: ['parent_register_student', 'student_register_self'],
   });
@@ -79,7 +79,7 @@ test('creating a new semester clones its predecessor\'s Registration Windows exa
   const springMonday = await classScheduleIdFor('monday', spring.id);
 
   const windows = await listWindows();
-  const cloned = windows.find((w) => w.label === 'Fall Early Bird' && w.class_schedule_id === springMonday);
+  const cloned = windows.find((w) => w.label === 'Fall Early Bird' && w.scheduleIds.includes(springMonday));
   assert.ok(cloned, 'the window should be cloned onto the new semester\'s own Monday grid');
 
   // Dates are copied EXACTLY, per the admin's own choice - not reset for the new semester.
@@ -92,7 +92,7 @@ test('creating a new semester clones its predecessor\'s Registration Windows exa
   assert.deepEqual(cloned.sectionIds, [sectionId]);
 
   // The original Fall window is untouched, still pointing at Fall's own grid.
-  const original = windows.find((w) => w.label === 'Fall Early Bird' && w.class_schedule_id === fallMonday);
+  const original = windows.find((w) => w.label === 'Fall Early Bird' && w.scheduleIds.includes(fallMonday));
   assert.ok(original, 'the original window should still exist, unmodified');
 });
 
@@ -102,7 +102,7 @@ test('a window with no Schedule Grid at all (applies to every grid already) is n
 
   const fall = await createSemesterWithDays(admin, 'Universal Fall 2026', ['monday']);
   void fall;
-  await createWindow({ label: 'Always Open', opensAt: '2026-01-01 00:00:00', closesAt: null, classScheduleId: null, sectionIds: [], actionTypes: [] });
+  await createWindow({ label: 'Always Open', opensAt: '2026-01-01 00:00:00', closesAt: null, classScheduleIds: [], sectionIds: [], actionTypes: [] });
 
   await createSemesterWithDays(admin, 'Universal Spring 2027', ['monday']);
 
@@ -117,7 +117,7 @@ test('a window scoped to a day the new semester does not meet is skipped, not cl
 
   const fall = await createSemesterWithDays(admin, 'Friday Fall 2026', ['friday']);
   const fallFriday = await classScheduleIdFor('friday', fall.id);
-  await createWindow({ label: 'Friday Only Window', opensAt: '2026-01-01 00:00:00', closesAt: null, classScheduleId: fallFriday, sectionIds: [], actionTypes: [] });
+  await createWindow({ label: 'Friday Only Window', opensAt: '2026-01-01 00:00:00', closesAt: null, classScheduleIds: [fallFriday], sectionIds: [], actionTypes: [] });
 
   // The next semester only meets Monday - no Friday grid to remap onto.
   await createSemesterWithDays(admin, 'Monday Only Spring 2027', ['monday']);
