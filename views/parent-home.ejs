@@ -37,24 +37,61 @@
         <% } %>
       </section>
 
-      <section class="parent-home-card-v2 parent-home-card-v2-slate">
-        <div class="parent-home-card-v2-head">
-          <span class="parent-home-card-v2-icon"><svg><use href="#icon-link"/></svg></span>
-          <div class="parent-home-card-v2-titles">
-            <h2>Quick Links</h2>
+      <%# A real request: "Add training card with assigned trainings below
+          forms card" - Forms and Training stacked together in this one
+          narrow grid column (a plain wrapper div, not a 3rd .home-top-grid
+          column - that grid only defines two, so a 3rd direct child would
+          wrap onto its own new row instead of stacking under Forms). %>
+      <div class="home-top-grid-side">
+        <%# A real request: "Change the quicklinks title to forms. Change
+            the icon to one that looks like a form and pencil." %>
+        <section class="parent-home-card-v2 parent-home-card-v2-blue">
+          <div class="parent-home-card-v2-head">
+            <span class="parent-home-card-v2-icon"><svg><use href="#icon-file-pen"/></svg></span>
+            <div class="parent-home-card-v2-titles">
+              <h2>Forms</h2>
+            </div>
           </div>
-        </div>
-        <div class="parent-home-card-v2-body">
-          <ul class="portal-dashboard-list">
-            <li><a href="/name-tag">Name Tag Form</a></li>
-            <li><a href="/absence">Absence/Late Form</a></li>
-            <%# A real request: "Join a Committee should just be a link
-                under quick links" - no longer its own card (see git
-                history for the previous dedicated Committees card). %>
-            <li><a href="/committees">Join a Committee</a></li>
-          </ul>
-        </div>
-      </section>
+          <div class="parent-home-card-v2-body">
+            <ul class="portal-dashboard-list">
+              <li><a href="/name-tag">Name Tag Form</a></li>
+              <li><a href="/absence">Absence/Late Form</a></li>
+              <%# A real request: "Join a Committee should just be a link
+                  under quick links" - no longer its own card (see git
+                  history for the previous dedicated Committees card). %>
+              <li><a href="/committees">Join a Committee</a></li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="parent-home-card-v2 parent-home-card-v2-blue">
+          <div class="parent-home-card-v2-head">
+            <span class="parent-home-card-v2-icon"><svg><use href="#icon-graduation-cap"/></svg></span>
+            <div class="parent-home-card-v2-titles">
+              <h2>Training</h2>
+            </div>
+            <a class="parent-home-card-v2-viewall" href="/parent/training">View All <svg><use href="#icon-chevron-right"/></svg></a>
+          </div>
+          <div class="parent-home-card-v2-body">
+            <% if (trainingAssignments.length === 0) { %>
+              <p class="roster-empty">No training assigned right now.</p>
+            <% } else { %>
+              <ul class="portal-dashboard-list">
+                <% trainingAssignments.forEach(function(a) { %>
+                  <li>
+                    <a class="parent-home-row" href="/training/<%= a.id %>/play">
+                      <span class="parent-home-row-info">
+                        <span class="parent-home-row-title"><%= a.title %></span>
+                      </span>
+                      <%- include('partials/training-status-badge', { status: a.status }) %>
+                    </a>
+                  </li>
+                <% }); %>
+              </ul>
+            <% } %>
+          </div>
+        </section>
+      </div>
     </div>
 
     <%# A real request: "Change the parent portal dashboard to have cards
@@ -105,7 +142,7 @@
         </div>
       </section>
 
-      <section class="parent-home-card-v2 parent-home-card-v2-green">
+      <section class="parent-home-card-v2 parent-home-card-v2-blue">
         <div class="parent-home-card-v2-head">
           <span class="parent-home-card-v2-icon"><svg><use href="#icon-book"/></svg></span>
           <div class="parent-home-card-v2-titles">
@@ -137,7 +174,7 @@
         </div>
       </section>
 
-      <section class="parent-home-card-v2 parent-home-card-v2-amber">
+      <section class="parent-home-card-v2 parent-home-card-v2-blue">
         <div class="parent-home-card-v2-head">
           <span class="parent-home-card-v2-icon"><svg><use href="#icon-megaphone"/></svg></span>
           <div class="parent-home-card-v2-titles">
@@ -174,11 +211,11 @@
               <% }); %>
             </ul>
           <% } %>
-          <a class="parent-home-cta parent-home-cta-outline-amber" href="/classifieds/mine"><svg><use href="#icon-plus"/></svg> Post a Classified</a>
+          <a class="parent-home-cta parent-home-cta-outline-blue" href="/classifieds/mine"><svg><use href="#icon-plus"/></svg> Post a Classified</a>
         </div>
       </section>
 
-      <section class="parent-home-card-v2 parent-home-card-v2-purple">
+      <section class="parent-home-card-v2 parent-home-card-v2-blue">
         <div class="parent-home-card-v2-head">
           <span class="parent-home-card-v2-icon"><svg><use href="#icon-store"/></svg></span>
           <div class="parent-home-card-v2-titles">
@@ -207,31 +244,7 @@
               <% }); %>
             </ul>
           <% } %>
-          <a class="parent-home-cta parent-home-cta-outline-purple" href="/directory/mine"><svg><use href="#icon-plus"/></svg> Add Your Business</a>
-        </div>
-      </section>
-
-      <section class="parent-home-card-v2 parent-home-card-v2-indigo">
-        <div class="parent-home-card-v2-head">
-          <span class="parent-home-card-v2-icon"><svg><use href="#icon-clipboard-list"/></svg></span>
-          <div class="parent-home-card-v2-titles">
-            <h2>Class Registrations</h2>
-          </div>
-        </div>
-        <div class="parent-home-card-v2-body">
-          <%# A real request: "should show how many classes your family is
-              registered for by person in your family" - per-child counts
-              instead of one ambiguous family-wide total. %>
-          <% if (registrationCountsByChild.length === 0) { %>
-            <p class="hint">No students linked to your family yet.</p>
-          <% } else { %>
-            <ul class="portal-dashboard-list">
-              <% registrationCountsByChild.forEach(function(c) { %>
-                <li><%= c.name %>: <span class="badge-pill badge-pill-blue"><%= c.count %> class<%= c.count === 1 ? '' : 'es' %></span></li>
-              <% }); %>
-            </ul>
-          <% } %>
-          <a class="parent-home-cta parent-home-cta-outline-indigo" href="/parent/classes/dashboard"><svg><use href="#icon-chevron-right"/></svg> Classroom Dashboard</a>
+          <a class="parent-home-cta parent-home-cta-outline-blue" href="/directory/mine"><svg><use href="#icon-plus"/></svg> Add Your Business</a>
         </div>
       </section>
     </div>

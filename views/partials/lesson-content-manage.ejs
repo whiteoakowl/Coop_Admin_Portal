@@ -95,7 +95,7 @@
                 <% if (item.type === 'video' && item.description) { %><div class="hint"><%= item.description %></div><% } %>
                 <% if (item.type === 'file' && item.file_url) { %><div class="hint"><a href="<%= item.file_url %>" target="_blank" rel="noopener">File link</a></div><% } %>
                 <% if (item.type === 'file' && item.description) { %><div class="hint"><%= item.description %></div><% } %>
-                <% if (item.type === 'text' && item.body) { %><div class="hint forum-editable-display"><%- item.body %></div><% } %>
+                <% if (item.type === 'text' && item.body) { %><div class="hint plain-text-display"><%= item.body %></div><% } %>
                 <% if (item.type === 'quiz') { %><div class="hint"><%= item.questions.length %> question<%= item.questions.length === 1 ? '' : 's' %></div><% } %>
                 <% if (item.type === 'assignment_upload') { %>
                   <% if (item.body) { %><div class="hint forum-editable-display"><%- item.body %></div><% } %>

@@ -8,7 +8,7 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <p class="subtitle no-print"><a href="/admin/class-schedule/classes/<%= cls.id %>/manage?tab=assignments">&larr; <%= cls.class_name %> Lessons</a></p>
     <h1><%= assignment.title %></h1>
-    <% if (assignment.description) { %><p class="hint"><%= assignment.description %></p><% } %>
+    <% if (assignment.description) { %><p class="hint plain-text-display"><%= assignment.description %></p><% } %>
     <p class="hint">
       <% if (assignment.points_possible != null) { %>Out of <%= assignment.points_possible %> points<% } %>
     </p>

@@ -3,7 +3,10 @@
 //    is registered for... Button should say classroom dashboard and take
 //    the parent to the classroom dashboard list of classes their family
 //    is signed up for." -> button relabeled, now links to
-//    /parent/classes/dashboard instead of /parent/classes.
+//    /parent/classes/dashboard instead of /parent/classes. A later real
+//    request ("Remove class registration card. Add training card with
+//    assigned trainings below forms card") dropped this card entirely -
+//    see the Training card test below instead.
 // 2. "Take off the my family card and replace it with upcoming events
 //    from the event calendar. Button should say view event calendar."
 // 3. "Committees description should say. Signup for a Committee and help
@@ -62,18 +65,40 @@ async function loginAsPortalParent() {
   return { cookie: loginRes.headers['set-cookie'], familyId, parentId, acctId };
 }
 
-test('Parent Portal homepage: Classroom Dashboard button replaces Browse Classes', async () => {
+test('Parent Portal homepage: Class Registrations card is gone', async () => {
   const { cookie } = await loginAsPortalParent();
   const page = await request(app).get('/parent').set('Cookie', cookie);
   assert.equal(page.status, 200);
-  // A real request rebuilt this card's button into a dedicated .parent-
-  // home-cta (see views/parent-home.ejs/public/css/styles.css's own
-  // "Change the parent portal dashboard to have cards exactly like this"
-  // comment) - no longer a plain .roster-action-btn, but still the same
-  // real link to the same real destination.
-  assert.match(page.text, /<a class="parent-home-cta parent-home-cta-outline-indigo" href="\/parent\/classes\/dashboard">/);
-  assert.match(page.text, /Classroom Dashboard/);
-  assert.doesNotMatch(page.text, /Browse Classes/);
+  // A real request: "Remove class registration card" - the whole card
+  // (counts-by-child list + its Classroom Dashboard button) is gone, not
+  // just relabeled. /parent/classes/dashboard itself is untouched - still
+  // reachable from the Classes nav group's own subpages.
+  assert.doesNotMatch(page.text, /<h2>Class Registrations<\/h2>/);
+  assert.doesNotMatch(page.text, /parent-home-cta-outline-indigo/);
+});
+
+// A real request: "Add training card with assigned trainings below forms
+// card" - same trainingModule.myAssignments(member.id) the nav-shelled
+// /parent/training page itself shows, in a new card stacked under Forms.
+test('Parent Portal homepage: Training card shows this parent\'s assigned trainings', async () => {
+  const { cookie, parentId } = await loginAsPortalParent();
+  const trainingId = (await db.prepare("INSERT INTO trainings (title, status) VALUES ('Safety Basics', 'published') RETURNING id").get()).id;
+  await db.prepare("INSERT INTO training_assignments (training_id, member_id, status) VALUES (?, ?, 'not_started')").run(trainingId, parentId);
+
+  const page = await request(app).get('/parent').set('Cookie', cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<h2>Training<\/h2>/);
+  assert.match(page.text, /Safety Basics/);
+  assert.match(page.text, /badge-pill-gray">Not Started</);
+  assert.match(page.text, /<a class="parent-home-card-v2-viewall" href="\/parent\/training">/);
+});
+
+test('Parent Portal homepage: Training card has an empty state when nothing is assigned', async () => {
+  const { cookie } = await loginAsPortalParent();
+  const page = await request(app).get('/parent').set('Cookie', cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<h2>Training<\/h2>/);
+  assert.match(page.text, /No training assigned right now\./);
 });
 
 test('Parent Portal homepage: My Family card is gone, replaced by an Upcoming Events card', async () => {
@@ -92,22 +117,25 @@ test('Parent Portal homepage: My Family card is gone, replaced by an Upcoming Ev
   // forces view=calendar&portal=parent instead of a bare /events, which
   // otherwise falls back to whatever the org-wide default view setting
   // happens to be (see routes/events.js's own comment). A real request
-  // later rebuilt this into the card's own header "View All" link (see
-  // the Classroom Dashboard test above's own comment on the class
-  // rename) rather than a bottom "View Event Calendar" button - same
-  // real destination.
+  // later rebuilt this into the card's own header "View All" link
+  // (same .parent-home-card-v2-viewall pattern every card on this page
+  // uses) rather than a bottom "View Event Calendar" button - same real
+  // destination.
   assert.match(page.text, /<a class="parent-home-card-v2-viewall" href="\/events\?view=calendar&(?:amp;)?portal=parent">/);
 });
 
-test('Parent Portal homepage: Join a Committee is a Quick Links item, not its own card', async () => {
+test('Parent Portal homepage: Join a Committee is a Forms item, not its own card', async () => {
   const { cookie } = await loginAsPortalParent();
   const page = await request(app).get('/parent').set('Cookie', cookie);
   // A real request: "Join a Committee should just be a link under quick
   // links" - the earlier standalone Committees card is gone; it's now a
-  // plain list item alongside the other Quick Links.
-  assert.match(page.text, /<h2>Quick Links<\/h2>/);
+  // plain list item alongside the other Quick Links. A later real
+  // request ("Change the quicklinks title to forms") renamed the card
+  // itself from Quick Links to Forms, same list.
+  assert.match(page.text, /<h2>Forms<\/h2>/);
   assert.match(page.text, /<li><a href="\/committees">Join a Committee<\/a><\/li>/);
   assert.doesNotMatch(page.text, /<h2>Committees<\/h2>/);
+  assert.doesNotMatch(page.text, /<h2>Quick Links<\/h2>/);
 });
 
 test('Parent Portal homepage: Reading Challenge card shows a plain ranked leaderboard', async () => {
@@ -149,10 +177,66 @@ test('Parent Portal homepage: Business Directory and Classifieds cards show acti
   assert.match(page.text, /<h2>Business Directory<\/h2>/);
   assert.match(page.text, /Sunny Bakery/);
   assert.match(page.text, /<a class="parent-home-card-v2-viewall" href="\/directory">/);
-  assert.match(page.text, /<a class="parent-home-cta parent-home-cta-outline-purple" href="\/directory\/mine">/);
+  assert.match(page.text, /<a class="parent-home-cta parent-home-cta-outline-blue" href="\/directory\/mine">/);
 
   assert.match(page.text, /<h2>Classifieds<\/h2>/);
   assert.match(page.text, /Used Piano/);
   assert.match(page.text, /<a class="parent-home-card-v2-viewall" href="\/classifieds">/);
-  assert.match(page.text, /<a class="parent-home-cta parent-home-cta-outline-amber" href="\/classifieds\/mine">/);
+  assert.match(page.text, /<a class="parent-home-cta parent-home-cta-outline-blue" href="\/classifieds\/mine">/);
+});
+
+// A real request: "Events card the calendar date box should be orange."
+// Static CSS-content check (no inline color was ever set here - the
+// default badge color lives purely in the stylesheet), same pattern as
+// admin-mobile-topbar-compositing.test.js's own note on why.
+test('Parent Portal homepage: Upcoming Events date badge is orange', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'css', 'styles.css'), 'utf8');
+  const match = /\.parent-home-date-badge\s*\{([^}]*)\}/.exec(css);
+  assert.ok(match, 'expected the .parent-home-date-badge rule');
+  assert.match(match[1], /background:\s*#e2762c/, 'the date badge should be orange, not the old blue');
+});
+
+// A real request: "The blue on the cards on the parent portal homepage
+// should be the same blue as the background of the app" - var(--bg),
+// not its own separate blue hex.
+test('Parent Portal homepage: the blue card accent matches the app\'s own background color', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'css', 'styles.css'), 'utf8');
+  const match = /\.parent-home-card-v2-blue \.parent-home-card-v2-icon\s*\{([^}]*)\}/.exec(css);
+  assert.ok(match, 'expected the .parent-home-card-v2-blue icon rule');
+  assert.match(match[1], /background:\s*var\(--bg\)/, 'the blue card icon should reuse var(--bg), not its own hex');
+});
+
+// A real bug report: "The screenshot is showing the parent portal with
+// several colors. That isn't correct" - every card (Forms, Training,
+// Upcoming Events, Reading Challenge, Classifieds, Business Directory)
+// used to get its own distinct color (slate/rose/blue/green/amber/
+// purple); "the parent portal homepage should still have blue cards"
+// (singular palette) made every one of them parent-home-card-v2-blue
+// instead - the other color variants are gone from both the markup and
+// the stylesheet.
+test('Parent Portal homepage: every card is the same blue, no other colors', async () => {
+  const { cookie } = await loginAsPortalParent();
+  const page = await request(app).get('/parent').set('Cookie', cookie);
+  assert.equal(page.status, 200);
+  const cardClasses = [...page.text.matchAll(/class="parent-home-card-v2 (parent-home-card-v2-\w+)"/g)].map((m) => m[1]);
+  assert.ok(cardClasses.length >= 6, `expected at least 6 cards, found ${cardClasses.length}`);
+  assert.ok(cardClasses.every((c) => c === 'parent-home-card-v2-blue'), `expected every card to be blue, got: ${cardClasses.join(', ')}`);
+
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'css', 'styles.css'), 'utf8');
+  assert.doesNotMatch(css, /\.parent-home-card-v2-(green|amber|purple|slate|rose)\b/, 'the other card color variants should be gone from the stylesheet, not just unused');
+  assert.doesNotMatch(css, /\.parent-home-cta-outline-(amber|purple|rose)\b/, 'the matching CTA button color variants should be gone too');
+});
+
+// A real request: "Shrink the title bars of all of the cards by height" -
+// shorter vertical padding than the original 1.25rem/1rem top/bottom, on
+// the one shared .parent-home-card-v2-head every card (Forms, Training,
+// Events, Reading Challenge, Classifieds, Business Directory) uses.
+test('Parent Portal homepage: card title bars are shorter than before', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'css', 'styles.css'), 'utf8');
+  const match = /\.parent-home-card-v2-head\s*\{([^}]*)\}/.exec(css);
+  assert.ok(match, 'expected the .parent-home-card-v2-head rule');
+  const paddingMatch = /padding:\s*([\d.]+)rem\s+[\d.]+rem\s+([\d.]+)rem/.exec(match[1]);
+  assert.ok(paddingMatch, 'expected a shorthand top/sides/bottom padding');
+  assert.ok(Number(paddingMatch[1]) < 1.25, 'top padding should be shorter than the original 1.25rem');
+  assert.ok(Number(paddingMatch[2]) < 1, 'bottom padding should be shorter than the original 1rem');
 });

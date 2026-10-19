@@ -4,10 +4,17 @@
 // button it will ask you, do you want to copy the same teachers and
 // class assistants, it will also have a drop down menu to ask which
 // semester/day it will be added to. Duplicate of class will then appear
-// on the other semester/day grid." Covers: the dialog on the Details
-// tab, duplicating onto a different day/semester combo with every
-// Details/Slots/Sections field carried over, the copy-staff checkbox
-// (both on and off), and that enrollment/students are never copied.
+// on the other semester/day grid." A later real request ("it asks keep
+// the same teachers, separately ask to keep the same assistants. Also
+// ask to keep the description. Ask to keep finance settings") split the
+// original single "copy staff" checkbox into 4 independent ones -
+// Teachers, Assistants, Description, Finance Settings (price/charged
+// per/account category) - each off by default, same as the original
+// checkbox's own default. Covers: the dialog on the Details tab,
+// duplicating onto a different day/semester combo with every always-on
+// Details/Slots/Sections field carried over, each of the 4 opt-in
+// checkboxes independently (on and off), and that enrollment/students
+// are never copied.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -51,7 +58,7 @@ async function classScheduleIdForDay(day) {
   return row.id;
 }
 
-test('the Details tab has a Duplicate Class button and dialog with a copy-staff checkbox and a semester/day dropdown', async () => {
+test('the Details tab has a Duplicate Class button and dialog with 4 independent copy checkboxes and a semester/day dropdown', async () => {
   const admin = await loginAsAdmin();
   const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'Pottery' });
 
@@ -60,17 +67,23 @@ test('the Details tab has a Duplicate Class button and dialog with a copy-staff 
   assert.match(page.text, /Duplicate Class/);
   assert.match(page.text, /id="duplicate-class-dialog"/);
   assert.match(page.text, new RegExp(`action="/admin/class-schedule/classes/${classId}/duplicate"`));
-  assert.match(page.text, /name="copyStaff" value="1"/);
+  assert.match(page.text, /name="copyTeachers" value="1"/);
+  assert.match(page.text, /name="copyAssistants" value="1"/);
+  assert.match(page.text, /name="copyDescription" value="1"/);
+  assert.match(page.text, /name="copyFinance" value="1"/);
+  assert.doesNotMatch(page.text, /name="copyStaff"/, 'the old combined checkbox should be gone');
   assert.match(page.text, /<select name="targetComboId" required>/);
   assert.match(page.text, />Monday</);
   assert.match(page.text, />Wednesday</);
 });
 
-test('duplicating a class onto a different day copies every detail/slot/section field but not enrollment, and staff only if asked', async () => {
+test('duplicating a class onto a different day always copies every Details/Slots/Sections field except description, finance settings, staff, and enrollment', async () => {
   const admin = await loginAsAdmin();
 
   const sectionInfo = await db.prepare("INSERT INTO sections (name) VALUES ('Teen Co-op')").run();
   const sectionId = sectionInfo.lastInsertRowid;
+  const categoryInfo = await db.prepare("INSERT INTO event_accounting_categories (name) VALUES ('Class Fees')").run();
+  const categoryId = categoryInfo.lastInsertRowid;
 
   const classId = await createClass({
     day: 'monday',
@@ -93,22 +106,26 @@ test('duplicating a class onto a different day copies every detail/slot/section 
     minCapacity: 3,
     priceCents: 2500,
     pricePer: 'students_and_staff',
+    accountingCategoryId: categoryId,
   });
   await db.prepare('INSERT INTO class_sections (class_id, section_id) VALUES (?, ?)').run(classId, sectionId);
 
   const teacherInfo = await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Dup Teacher', 'dup-teacher', 'parent', 1)").run();
   await addStaff(classId, teacherInfo.lastInsertRowid, 'teacher');
+  const assistantInfo = await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Dup Assistant', 'dup-assistant', 'parent', 1)").run();
+  await addStaff(classId, assistantInfo.lastInsertRowid, 'assistant');
 
   const studentInfo = await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Dup Student', 'dup-student', 'student', 1)").run();
   await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId, studentInfo.lastInsertRowid);
 
   const wednesdayScheduleId = await classScheduleIdForDay('wednesday');
 
+  // None of the 4 opt-in checkboxes sent this time.
   const res = await request(app)
     .post(`/admin/class-schedule/classes/${classId}/duplicate`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ targetComboId: String(wednesdayScheduleId), copyStaff: '1', _csrf: admin.csrfToken });
+    .send({ targetComboId: String(wednesdayScheduleId), _csrf: admin.csrfToken });
   assert.equal(res.status, 302);
   assert.match(decodeURIComponent(res.headers.location), /Duplicated as "Chemistry Lab"/);
 
@@ -124,25 +141,79 @@ test('duplicating a class onto a different day copies every detail/slot/section 
   assert.equal(dup.end_date, '2026-12-01');
   assert.equal(dup.capacity, 12);
   assert.equal(dup.registration_open, 1);
-  assert.equal(dup.description, 'Hands-on chemistry.');
   assert.equal(dup.supply_list, 'Goggles, gloves.');
   assert.equal(dup.teacher_slots, 2);
   assert.equal(dup.assistant_slots, 1);
   assert.equal(dup.min_capacity, 3);
-  assert.equal(dup.price_cents, 2500);
-  assert.equal(dup.price_per, 'students_and_staff');
+
+  // Opt-in fields: none of the 4 checkboxes were sent.
+  assert.equal(dup.description, null, 'description should not be copied unless copyDescription is checked');
+  assert.equal(dup.price_cents, null, 'price should not be copied unless copyFinance is checked');
+  assert.equal(dup.price_per, 'students', 'price_per should reset to its default, not carry over, unless copyFinance is checked');
+  assert.equal(dup.accounting_category_id, null, 'account category should not be copied unless copyFinance is checked');
 
   const dupSections = await db.prepare('SELECT section_id FROM class_sections WHERE class_id = ?').all(dup.id);
-  assert.deepEqual(dupSections.map((r) => r.section_id), [sectionId], 'section restriction should carry over');
+  assert.deepEqual(dupSections.map((r) => r.section_id), [sectionId], 'section restriction should always carry over');
 
-  const dupStaff = await getClass(dup.id);
-  assert.equal(dupStaff.staff.length, 1, 'the teacher should have been copied since copyStaff was checked');
-  assert.equal(dupStaff.staff[0].name, 'Dup Teacher');
-
-  assert.equal(dupStaff.students.length, 0, 'enrollment should never be copied onto a duplicate');
+  const dupWithStaff = await getClass(dup.id);
+  assert.equal(dupWithStaff.staff.length, 0, 'no staff should be copied when neither Teachers nor Assistants was checked');
+  assert.equal(dupWithStaff.students.length, 0, 'enrollment should never be copied onto a duplicate');
 });
 
-test('duplicating without checking "copy staff" leaves the new class with no staff', async () => {
+test('Keep the same teachers and Keep the same assistants are independent - checking only one copies only that role', async () => {
+  const admin = await loginAsAdmin();
+  const classId = await createClass({ day: 'monday', hourPosition: 4, className: 'Independent Staff Class' });
+  const teacherInfo = await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Indep Teacher', 'indep-teacher', 'parent', 1)").run();
+  await addStaff(classId, teacherInfo.lastInsertRowid, 'teacher');
+  const assistantInfo = await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Indep Assistant', 'indep-assistant', 'parent', 1)").run();
+  await addStaff(classId, assistantInfo.lastInsertRowid, 'assistant');
+
+  const mondayScheduleId = await classScheduleIdForDay('monday');
+
+  // Only Teachers checked.
+  const res = await request(app)
+    .post(`/admin/class-schedule/classes/${classId}/duplicate`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ targetComboId: String(mondayScheduleId), copyTeachers: '1', _csrf: admin.csrfToken });
+  assert.equal(res.status, 302);
+
+  const dup = await db.prepare("SELECT * FROM classes WHERE class_name = 'Independent Staff Class' AND id != ?").get(classId);
+  const dupStaff = await getClass(dup.id);
+  assert.equal(dupStaff.staff.length, 1, 'only the teacher should have been copied');
+  assert.equal(dupStaff.staff[0].name, 'Indep Teacher');
+  assert.equal(dupStaff.staff[0].role, 'teacher');
+});
+
+test('Keep the same description and Keep the same finance settings each independently copy their own fields when checked', async () => {
+  const admin = await loginAsAdmin();
+  const categoryInfo = await db.prepare("INSERT INTO event_accounting_categories (name) VALUES ('Finance Copy Category') RETURNING id").get();
+  const classId = await createClass({
+    day: 'monday',
+    hourPosition: 5,
+    className: 'Finance Copy Class',
+    description: 'A description worth keeping.',
+    priceCents: 4000,
+    pricePer: 'students_and_staff',
+    accountingCategoryId: categoryInfo.id,
+  });
+
+  const mondayScheduleId = await classScheduleIdForDay('monday');
+  const res = await request(app)
+    .post(`/admin/class-schedule/classes/${classId}/duplicate`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ targetComboId: String(mondayScheduleId), copyDescription: '1', copyFinance: '1', _csrf: admin.csrfToken });
+  assert.equal(res.status, 302);
+
+  const dup = await db.prepare("SELECT * FROM classes WHERE class_name = 'Finance Copy Class' AND id != ?").get(classId);
+  assert.equal(dup.description, 'A description worth keeping.');
+  assert.equal(dup.price_cents, 4000);
+  assert.equal(dup.price_per, 'students_and_staff');
+  assert.equal(dup.accounting_category_id, categoryInfo.id);
+});
+
+test('duplicating without checking any staff box leaves the new class with no staff', async () => {
   const admin = await loginAsAdmin();
   const classId = await createClass({ day: 'monday', hourPosition: 3, className: 'Art Studio' });
   const teacherInfo = await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Solo Art Teacher', 'solo-art-teacher', 'parent', 1)").run();
@@ -158,5 +229,5 @@ test('duplicating without checking "copy staff" leaves the new class with no sta
   const dup = await db.prepare("SELECT * FROM classes WHERE class_name = 'Art Studio' AND id != ?").get(classId);
   assert.ok(dup, 'duplicating onto the SAME day/semester combo should still work (a second class row)');
   const dupWithStaff = await getClass(dup.id);
-  assert.equal(dupWithStaff.staff.length, 0, 'staff should not be copied when the checkbox was left unchecked');
+  assert.equal(dupWithStaff.staff.length, 0, 'staff should not be copied when neither checkbox was checked');
 });

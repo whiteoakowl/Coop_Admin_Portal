@@ -1800,15 +1800,19 @@ body.public-page .roster-empty {
    (views/public-home.ejs, the one other "button at the top of the page"
    this covers) isn't split by viewport the same way, so it's wrapped in
    its own min-width guard here. */
+/* A real request: "On desktop the blue buttons at the top for settings,
+   portals and profile. The blue should also match the background blue
+   of the app" - var(--bg), not var(--brand) (the lighter logo blue). */
 .admin-page-corner-actions .admin-corner-link,
 .admin-page-corner-actions .portal-switcher-details summary {
-  background: var(--brand);
+  background: var(--bg);
   color: var(--ink);
 }
 .admin-page-corner-actions .admin-corner-link:hover,
 .admin-page-corner-actions .portal-switcher-details summary:hover,
 .admin-page-corner-actions .portal-switcher-details[open] summary {
-  background: var(--brand-dark);
+  background: var(--bg);
+  filter: brightness(0.88);
   color: var(--ink);
 }
 @media (min-width: 861px) {
@@ -4561,6 +4565,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .inline-form-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 .inline-form-row label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; font-weight: 600; color: var(--ink); flex: 1; min-width: 180px; }
 .hint { font-weight: 400; }
+/* A real bug report: "Class edit, assignments. When adding a text
+   description assignment. It should appear the way it was typed. The
+   same rows, etc. Keep the same formatting." Both an assignment's own
+   top-level description (views/teacher-roster.ejs's own Add Assignment
+   form) and a lesson content item's own Text Description body (views/
+   partials/lesson-content-manage.ejs's own Add/Edit Content form,
+   type==='text') are plain <textarea> fields, not the rich-text
+   contenteditable editor the OTHER content types (Assignment Upload/
+   Submission) use - their line breaks are real \n characters that a
+   plain <p>/<div> (normal white-space) collapses on display. Scoped to
+   this one class, not `.hint`/`.forum-editable-display` themselves,
+   which are used far too widely elsewhere to risk this change everywhere
+   they appear. */
+.plain-text-display { white-space: pre-wrap; }
 
 /* A seamless text-bar-and-button unit: input/select + button joined into
    one control, no gap, connected corners. Used for quick-add bars
@@ -11536,37 +11554,32 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
 .parent-home-cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.5rem; margin: 1.5rem 0; }
 
 .parent-home-card-v2 { border-radius: 16px; box-shadow: var(--shadow-md); overflow: hidden; display: flex; flex-direction: column; border: 1px solid transparent; }
-.parent-home-card-v2-head { display: flex; align-items: flex-start; gap: 0.85rem; padding: 1.25rem 1.5rem 1rem; }
-.parent-home-card-v2-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; }
-.parent-home-card-v2-icon svg { width: 22px; height: 22px; }
+/* A real request: "Shrink the title bars of all of the cards by height" -
+   shorter vertical padding, a smaller icon badge, and a slightly smaller
+   title to match. */
+.parent-home-card-v2-head { display: flex; align-items: flex-start; gap: 0.7rem; padding: 0.75rem 1.5rem 0.6rem; }
+.parent-home-card-v2-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; }
+.parent-home-card-v2-icon svg { width: 19px; height: 19px; }
 .parent-home-card-v2-titles { flex: 1; min-width: 0; }
-.parent-home-card-v2-titles h2 { margin: 0; font-size: 1.15rem; font-weight: 800; }
+.parent-home-card-v2-titles h2 { margin: 0; font-size: 1.05rem; font-weight: 800; }
 .parent-home-card-v2-titles p { margin: 0.15rem 0 0; font-size: 0.8rem; color: var(--muted); }
 .parent-home-card-v2-viewall { font-size: 0.85rem; font-weight: 700; white-space: nowrap; display: flex; align-items: center; gap: 0.2rem; text-decoration: none; flex-shrink: 0; margin-top: 0.3rem; }
 .parent-home-card-v2-viewall svg { width: 15px; height: 15px; }
 .parent-home-card-v2-body { padding: 0 1.5rem 1.5rem; display: flex; flex-direction: column; gap: 0.6rem; flex: 1; }
 
-.parent-home-card-v2-green { background: #effaf3; border-color: #cdebd6; }
-.parent-home-card-v2-green .parent-home-card-v2-icon { background: #1fa355; }
-.parent-home-card-v2-green .parent-home-card-v2-viewall { color: #1fa355; }
+/* A real request: "The blue on the cards on the parent portal homepage
+   should be the same blue as the background of the app" - var(--bg),
+   the html/body background color sitewide, instead of its own separate
+   blue. A later real bug report ("The screenshot is showing the parent
+   portal with several colors. That isn't correct" - every card used to
+   get its own distinct color, green/amber/purple/slate/rose) made every
+   card on this page use this one blue variant - "the parent portal
+   homepage should still have blue cards" (not multi-color like the
+   Co-op Admin homepage). Those other color variants are gone; nothing
+   on this page uses them any more. */
 .parent-home-card-v2-blue { background: #eef5fe; border-color: #cfe3fb; }
-.parent-home-card-v2-blue .parent-home-card-v2-icon { background: #2f7fe0; }
-.parent-home-card-v2-blue .parent-home-card-v2-viewall { color: #2f7fe0; }
-.parent-home-card-v2-amber { background: #fdf7ec; border-color: #f3e3bf; }
-.parent-home-card-v2-amber .parent-home-card-v2-icon { background: #c7912a; }
-.parent-home-card-v2-amber .parent-home-card-v2-viewall { color: #c7912a; }
-.parent-home-card-v2-purple { background: #f6f0fc; border-color: #e3d2f4; }
-.parent-home-card-v2-purple .parent-home-card-v2-icon { background: #8148c2; }
-.parent-home-card-v2-purple .parent-home-card-v2-viewall { color: #8148c2; }
-.parent-home-card-v2-indigo { background: #eef0fd; border-color: #d4d8f7; }
-.parent-home-card-v2-indigo .parent-home-card-v2-icon { background: #4f55c7; }
-.parent-home-card-v2-indigo .parent-home-card-v2-viewall { color: #4f55c7; }
-.parent-home-card-v2-slate { background: #f3f4f6; border-color: #dfe2e7; }
-.parent-home-card-v2-slate .parent-home-card-v2-icon { background: #55617a; }
-.parent-home-card-v2-slate .parent-home-card-v2-viewall { color: #55617a; }
-.parent-home-card-v2-rose { background: #fdf0f2; border-color: #f6d4da; }
-.parent-home-card-v2-rose .parent-home-card-v2-icon { background: #d0486a; }
-.parent-home-card-v2-rose .parent-home-card-v2-viewall { color: #d0486a; }
+.parent-home-card-v2-blue .parent-home-card-v2-icon { background: var(--bg); }
+.parent-home-card-v2-blue .parent-home-card-v2-viewall { color: var(--bg); }
 
 /* Dedicated CTA buttons for these cards (not .roster-action-btn - that
    class's own background/color/border triplet is already a fixed,
@@ -11578,11 +11591,7 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
   font-family: inherit; cursor: pointer; text-decoration: none; margin-top: 0.2rem;
 }
 .parent-home-cta svg { width: 16px; height: 16px; }
-.parent-home-cta-outline-amber { background: transparent; border: 1.5px solid #c7912a; color: #c7912a; }
-.parent-home-cta-outline-purple { background: transparent; border: 1.5px solid #8148c2; color: #8148c2; }
-.parent-home-cta-outline-blue { background: transparent; border: 1.5px solid #2f7fe0; color: #2f7fe0; }
-.parent-home-cta-outline-indigo { background: transparent; border: 1.5px solid #4f55c7; color: #4f55c7; }
-.parent-home-cta-outline-rose { background: transparent; border: 1.5px solid #d0486a; color: #d0486a; }
+.parent-home-cta-outline-blue { background: transparent; border: 1.5px solid var(--bg); color: var(--bg); }
 
 /* Upcoming Events: a colored date-badge (month abbreviation stacked over
    the day number) instead of a plain text date line. */
@@ -11591,7 +11600,7 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
 .parent-home-row:hover { background: #fff; }
 .parent-home-chevron { flex-shrink: 0; width: 16px; height: 16px; color: var(--muted); }
 
-.parent-home-date-badge { flex-shrink: 0; width: 46px; border-radius: 9px; background: #2f7fe0; color: #fff; text-align: center; padding: 0.3rem 0; line-height: 1.1; }
+.parent-home-date-badge { flex-shrink: 0; width: 46px; border-radius: 9px; background: #e2762c; color: #fff; text-align: center; padding: 0.3rem 0; line-height: 1.1; }
 .parent-home-date-badge-month { display: block; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; opacity: 0.9; }
 .parent-home-date-badge-day { display: block; font-size: 1.05rem; font-weight: 800; }
 .parent-home-row-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
@@ -11631,7 +11640,7 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
 
 @media (max-width: 640px) {
   .parent-home-cards-grid { grid-template-columns: 1fr; }
-  .parent-home-card-v2-head { padding: 1rem 1.1rem 0.8rem; }
+  .parent-home-card-v2-head { padding: 0.65rem 1.1rem 0.55rem; }
   .parent-home-card-v2-body { padding: 0 1.1rem 1.1rem; }
 }
 
@@ -11648,6 +11657,10 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
 @media (max-width: 860px) {
   .home-top-grid { grid-template-columns: 1fr; }
 }
+/* A real request: "Add training card with assigned trainings below
+   forms card" - Forms and Training stacked in this one narrow
+   .home-top-grid column (views/parent-home.ejs). */
+.home-top-grid-side { display: flex; flex-direction: column; gap: 1.25rem; }
 
 /* Word of the Week - a real request: "show a word of the week. system
    generates a new word every sunday. it will actually show 3 words. one

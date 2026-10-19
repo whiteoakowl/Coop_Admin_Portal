@@ -346,6 +346,12 @@ router.post('/assignments/:id/content', uploadLessonAttachment, async (req, res)
   // submit always sent both as a 2-element array - .trim() or
   // sanitizePostBody() on that array threw regardless of which type was
   // actually selected. Each field now has its own unique name.
+  // A real bug report: "Class edit, assignments. When adding a text
+  // description assignment. It should appear the way it was typed." Same
+  // fix as routes/admin-class-schedule.js's own identical route - a
+  // Text Description's body is a plain <textarea>, not the rich-text
+  // editor assignment_upload/assignment_submission use, so sanitizing it
+  // as HTML could silently eat anything typed that looked like a tag.
   await createContentItem({
     assignmentId,
     type,
@@ -353,7 +359,7 @@ router.post('/assignments/:id/content', uploadLessonAttachment, async (req, res)
     videoUrl: type === 'video' ? (req.body.videoUrl || '').trim() : null,
     body:
       type === 'text'
-        ? sanitizePostBody(req.body.body || '')
+        ? (req.body.body || '').trim()
         : type === 'assignment_upload'
         ? sanitizePostBody(req.body.assignmentBody || '')
         : type === 'assignment_submission'
@@ -392,7 +398,7 @@ router.post('/content/:id/edit', uploadLessonAttachment, async (req, res) => {
     videoUrl: type === 'video' ? (req.body.videoUrl || '').trim() : contentItem.video_url,
     body:
       type === 'text'
-        ? sanitizePostBody(req.body.body || '')
+        ? (req.body.body || '').trim()
         : type === 'assignment_upload'
         ? sanitizePostBody(req.body.assignmentBody || '')
         : type === 'assignment_submission'

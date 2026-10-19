@@ -319,10 +319,15 @@ const TEACHER_NAV_LINKS = [
 // page") - a class's own Assignments tab is one click away from every
 // Classroom Dashboard card (routes/student-portal.js's own
 // /classes/dashboard), and the flat all-assignments view is still
-// reachable at its own /student/assignments URL, same "dropped from the
-// nav, not from the route table" precedent Name Tag already set (its
-// own /student/name-tag URL, now this Classes group's own Name Tag Form
-// subpage instead of a standing tab).
+// reachable at its own /student/assignments URL.
+//
+// A still later real request ("Students don't need access to those")
+// dropped Absence/Late Form and Name Tag Form back out of this group -
+// both are a parent-facing concern (reporting a child's absence, printing
+// a child's name tag), not something a student fills out for themself.
+// Their own /absence and /student/name-tag routes are untouched - same
+// "dropped from the nav, not from the route table" precedent this exact
+// group already set once before (Assignments above).
 const STUDENT_NAV_LINKS = [
   { href: '/student', icon: 'home', label: 'Home' },
   { href: '/events?view=calendar&portal=student', icon: 'calendar-check', label: 'Events', subpages: [
@@ -332,8 +337,6 @@ const STUDENT_NAV_LINKS = [
   { href: '/student/classes', icon: 'graduation-cap', label: 'Classes', subpages: [
     { href: '/student/classes', label: 'Class Schedule' },
     { href: '/student/classes/dashboard', label: 'Classroom Dashboard' },
-    { href: '/absence', label: 'Absence/Late Form' },
-    { href: '/student/name-tag', label: 'Name Tag Form' },
   ] },
   { href: '/forums?portal=student', icon: 'users', label: 'Chat' },
   { href: '/student/resources', icon: 'book', label: 'Resources' },

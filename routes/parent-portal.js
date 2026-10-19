@@ -166,12 +166,11 @@ async function staffEligibleFamilyMembers(account) {
 router.get('/', async (req, res) => {
   // Everything in this first batch is independent of everything else in
   // it (none reads a value another produced) - run concurrently instead
-  // of one at a time. Only childIds/countsByStudent (needs `children`)
-  // and visibilityFlags (needs `upcoming` + `family`) have a real
-  // dependency, so those stay in a second batch below.
-  const [children, siteRows, personalRows, family, upcoming, businessDirectoryListingsRaw, classifiedsListingsRaw, readingLeaders, member] =
+  // of one at a time. Only visibilityFlags (needs `upcoming` + `family`)
+  // and trainingAssignments (needs `member`) have a real dependency, so
+  // those stay in a second batch below.
+  const [siteRows, personalRows, family, upcoming, businessDirectoryListingsRaw, classifiedsListingsRaw, readingLeaders, member] =
     await Promise.all([
-      childrenForAccount(req.portalAccount),
       // Two real sources merged into one feed, newest first - a real
       // request: "notifications should be announcements and show up on
       // the parent portal homepage, showing current announcements and
@@ -212,31 +211,10 @@ router.get('/', async (req, res) => {
     .sort((a, b) => (a.sortKey < b.sortKey ? 1 : -1))
     .slice(0, 15);
 
-  const childIds = children.map((c) => c.id);
-  // A real request: "class registrations count should show how many
-  // classes your family is registered for by person in your family" -
-  // per-child counts instead of one family-wide total, so the homepage
-  // reads as "Jane: 2, Sam: 1" rather than an ambiguous "3". A real bug
-  // report: "not showing counts... when I know they are signed up for
-  // classes" - this used to count class_registrations (only a log of the
-  // parent's OWN self-service register/cancel actions - see
-  // utils/classRegistration.js), which stays empty for any student whose
-  // class assignment came from Co-op Admin's own roster tool instead
-  // (utils/classSchedule.js's setEnrollment writes class_enrollments
-  // directly, never touching class_registrations at all). class_enrollments
-  // is the actual "is this student in this class" table used everywhere
-  // else (attendance, rosters, ...), so it's the right source here too.
   const classifiedsSlice = classifiedsListingsRaw.slice(0, 4);
   const classifiedsMemberIds = classifiedsSlice.map((l) => l.member_id);
 
-  const [countsByStudent, visibilityFlags, classifiedsPosterRows] = await Promise.all([
-    childIds.length
-      ? db
-          .prepare(
-            `SELECT student_id, COUNT(*) AS c FROM class_enrollments WHERE student_id IN (${childIds.map(() => '?').join(',')}) GROUP BY student_id`
-          )
-          .all(...childIds)
-      : Promise.resolve([]),
+  const [visibilityFlags, classifiedsPosterRows, trainingAssignments] = await Promise.all([
     Promise.all(upcoming.map((e) => events.eventVisibleToFamily(e.id, family))),
     // classifieds.listListings() never joins a poster name (routes/
     // classifieds.js's own live listing page doesn't show one either) -
@@ -246,9 +224,12 @@ router.get('/', async (req, res) => {
     classifiedsMemberIds.length
       ? db.prepare(`SELECT id, name FROM members WHERE id IN (${classifiedsMemberIds.map(() => '?').join(',')})`).all(...classifiedsMemberIds)
       : Promise.resolve([]),
+    // A real request: "Remove class registration card. Add training card
+    // with assigned trainings below forms card" - same trainingModule.
+    // myAssignments(member.id) the nav-shelled /parent/training page
+    // itself uses (routes/parent-portal.js's own GET /training above).
+    trainingModule.myAssignments(member.id),
   ]);
-  const countByStudentId = new Map(countsByStudent.map((r) => [Number(r.student_id), Number(r.c)]));
-  const registrationCountsByChild = children.map((c) => ({ name: c.name, count: countByStudentId.get(Number(c.id)) || 0 }));
 
   const upcomingEvents = upcoming
     .filter((e, i) => visibilityFlags[i])
@@ -298,13 +279,12 @@ router.get('/', async (req, res) => {
   res.render('parent-home', {
     title: 'Parent Portal',
     member,
-    children,
     announcements,
-    registrationCountsByChild,
     upcomingEvents,
     businessDirectoryListings,
     classifiedsListings,
     readingLeaders,
+    trainingAssignments,
   });
 });
 

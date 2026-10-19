@@ -42,7 +42,7 @@
     <% } %>
     <% if (item.video_url) { %><p><a href="<%= item.video_url %>" target="_blank" rel="noopener"><%= videoEmbedUrl ? 'Watch on YouTube' : 'Watch Video' %></a></p><% } %>
   <% } else if (item.type === 'text') { %>
-    <% if (item.body) { %><div class="forum-editable-display"><%- item.body %></div><% } %>
+    <% if (item.body) { %><div class="plain-text-display"><%= item.body %></div><% } %>
   <% } else if (item.type === 'file') { %>
     <% if (item.description) { %><p><%= item.description %></p><% } %>
     <% if (item.file_url) { %><p><a href="<%= item.file_url %>" target="_blank" rel="noopener">Open File</a></p><% } %>

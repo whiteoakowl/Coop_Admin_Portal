@@ -677,6 +677,18 @@ router.post('/class-schedule/assignments/:id/content', requireFullAdmin, uploadL
   // so a real form submit always sent both as a 2-element array - .trim()
   // or sanitizePostBody() on that array threw regardless of which type
   // was actually selected. Each field now has its own unique name.
+  //
+  // A real bug report: "Class edit, assignments. When adding a text
+  // description assignment. It should appear the way it was typed."
+  // type==='text' is a plain <textarea> (lesson-content-manage.ejs's own
+  // Add Content form), unlike assignment_upload/assignment_submission's
+  // real rich-text contenteditable editor - running it through
+  // sanitizePostBody (an HTML sanitizer) silently ate anything that
+  // looked like an HTML tag the member had typed as plain text (e.g.
+  // "<see note>"). Just trimmed now, same as every other plain-text
+  // field here (title, fileUrl, description); the matching display fix
+  // (views/partials/lesson-content-manage.ejs/lesson-content-detail.ejs)
+  // escapes it on the way back out instead.
   await createContentItem({
     assignmentId,
     type,
@@ -684,7 +696,7 @@ router.post('/class-schedule/assignments/:id/content', requireFullAdmin, uploadL
     videoUrl: type === 'video' ? (req.body.videoUrl || '').trim() : null,
     body:
       type === 'text'
-        ? sanitizePostBody(req.body.body || '')
+        ? (req.body.body || '').trim()
         : type === 'assignment_upload'
         ? sanitizePostBody(req.body.assignmentBody || '')
         : type === 'assignment_submission'
@@ -733,7 +745,7 @@ router.post('/class-schedule/content/:id/edit', requireFullAdmin, uploadLessonAt
     videoUrl: type === 'video' ? (req.body.videoUrl || '').trim() : contentItem.video_url,
     body:
       type === 'text'
-        ? sanitizePostBody(req.body.body || '')
+        ? (req.body.body || '').trim()
         : type === 'assignment_upload'
         ? sanitizePostBody(req.body.assignmentBody || '')
         : type === 'assignment_submission'
@@ -1063,11 +1075,21 @@ router.post('/class-schedule/classes/:id/delete', requireFullAdmin, async (req, 
 // Copies every Class Details/Slots/Sections field onto a brand new class
 // row on the chosen class_schedules combo's own day (and semester) -
 // students/enrollment is deliberately never copied (a duplicate is a
-// fresh offering, not last term's roster); staff (teachers/assistants)
-// only copies over if the admin opts in, same addStaff/skipSync + one
-// syncDayMemberRosters-at-the-end pattern the bulk Import Classes flow
-// already uses for "add several staff at once" without a full resync
-// per row.
+// fresh offering, not last term's roster).
+//
+// A later real request ("it asks keep the same teachers, separately ask
+// to keep the same assistants. Also ask to keep the description. Ask to
+// keep finance settings") split the single "copy staff" checkbox into
+// independent Teachers/Assistants toggles, and added two more for
+// Description and Finance Settings (Price/Charged Per/Account Category -
+// the same 3 fields the Class Details tab's own "Price ($)"/"Charged
+// per"/"Account Category" inputs cover) - every one of these defaults to
+// NOT copied (an unchecked box, same as the original single checkbox
+// always did), everything else on the class still always copies as
+// before. Staff only copies over if at least one of the two role toggles
+// is on, same addStaff/skipSync + one syncDayMemberRosters-at-the-end
+// pattern the bulk Import Classes flow already uses for "add several
+// staff at once" without a full resync per row.
 router.post('/class-schedule/classes/:id/duplicate', requireFullAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const cls = await getClass(id);
@@ -1079,6 +1101,9 @@ router.post('/class-schedule/classes/:id/duplicate', requireFullAdmin, async (re
   if (!target) {
     return res.redirect(back + '?error=' + encodeURIComponent('Choose a semester/day to duplicate into.'));
   }
+
+  const copyDescription = req.body.copyDescription === '1';
+  const copyFinance = req.body.copyFinance === '1';
 
   const existingSectionIds = await classSectionIds(id);
   const newId = await createClass({
@@ -1095,7 +1120,7 @@ router.post('/class-schedule/classes/:id/duplicate', requireFullAdmin, async (re
     endDate: cls.end_date,
     capacity: cls.capacity,
     registrationOpen: !!cls.registration_open,
-    description: cls.description,
+    description: copyDescription ? cls.description : null,
     supplyList: cls.supply_list,
     allowParentRegister: !!cls.allow_parent_register,
     allowTeacherRegister: !!cls.allow_teacher_register,
@@ -1105,8 +1130,9 @@ router.post('/class-schedule/classes/:id/duplicate', requireFullAdmin, async (re
     minCapacity: cls.min_capacity,
     allowCancel: !!cls.allow_cancel,
     autoRefundOnCancel: !!cls.auto_refund_on_cancel,
-    priceCents: cls.price_cents,
-    pricePer: cls.price_per,
+    priceCents: copyFinance ? cls.price_cents : null,
+    pricePer: copyFinance ? cls.price_per : null,
+    accountingCategoryId: copyFinance ? cls.accounting_category_id : null,
     lockByGrade: !!cls.lock_by_grade,
     lockByAge: !!cls.lock_by_age,
     allowParentCompleteLessons: !!cls.allow_parent_complete_lessons,
@@ -1118,8 +1144,11 @@ router.post('/class-schedule/classes/:id/duplicate', requireFullAdmin, async (re
     await db.prepare('INSERT INTO class_sections (class_id, section_id) VALUES (?, ?)').run(newId, sectionId);
   }
 
-  if (req.body.copyStaff === '1' && cls.staff.length) {
-    for (const s of cls.staff) {
+  const copyTeachers = req.body.copyTeachers === '1';
+  const copyAssistants = req.body.copyAssistants === '1';
+  const staffToCopy = cls.staff.filter((s) => (s.role === 'teacher' && copyTeachers) || (s.role === 'assistant' && copyAssistants));
+  if (staffToCopy.length) {
+    for (const s of staffToCopy) {
       await addStaff(newId, s.id, s.role, { skipSync: true });
     }
     await syncDayMemberRosters(target.day);

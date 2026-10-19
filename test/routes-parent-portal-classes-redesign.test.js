@@ -101,15 +101,21 @@ async function createParentWithChild() {
   return { cookie, csrfToken: extractCsrf(homePage.text), childId: childInfo.lastInsertRowid };
 }
 
-test('Parent Portal homepage: "Classroom Dashboard" links to /parent/classes/dashboard', async () => {
+// A real request rebuilt this card's button into a dedicated
+// .parent-home-cta (see views/parent-home.ejs's own "Change the parent
+// portal dashboard to have cards exactly like this" comment). A later
+// real request ("Remove class registration card") removed the whole
+// Class Registrations homepage card this button lived on - Classroom
+// Dashboard is still reachable, just from the Classes nav group's own
+// subpages (the test right below this one) instead of the homepage.
+test('Parent Portal homepage: Class Registrations card (and its Classroom Dashboard button) is gone; the real page is still reachable from the nav', async () => {
   const parent = await createParentWithChild();
   const home = await request(app).get('/parent').set('Cookie', parent.cookie);
-  // A real request rebuilt this card's button into a dedicated
-  // .parent-home-cta (see views/parent-home.ejs's own "Change the parent
-  // portal dashboard to have cards exactly like this" comment) - no
-  // longer a plain .roster-action-btn, but still the same real link.
-  assert.match(home.text, /<a class="parent-home-cta parent-home-cta-outline-indigo" href="\/parent\/classes\/dashboard">/);
-  assert.match(home.text, /Classroom Dashboard/);
+  assert.doesNotMatch(home.text, /parent-home-cta-outline-indigo/);
+  assert.doesNotMatch(home.text, /<h2>Class Registrations<\/h2>/);
+
+  const dashboard = await request(app).get('/parent/classes/dashboard').set('Cookie', parent.cookie);
+  assert.equal(dashboard.status, 200);
 });
 
 // A real request removed the "View/Cancel Classes" subpage entirely

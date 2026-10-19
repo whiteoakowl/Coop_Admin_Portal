@@ -224,7 +224,16 @@
         <dialog id="duplicate-class-dialog" class="member-picker-dialog">
           <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/duplicate">
             <h3>Duplicate Class</h3>
-            <label class="checkbox-option"><input type="checkbox" name="copyStaff" value="1" /> Also copy the same teachers and class assistants</label>
+            <%# A real request: "it asks keep the same teachers, separately
+                ask to keep the same assistants. Also ask to keep the
+                description. Ask to keep finance settings" - split the old
+                single "copy staff" checkbox into 4 independent ones; none
+                are copied unless checked, same as the original checkbox's
+                own default. %>
+            <label class="checkbox-option"><input type="checkbox" name="copyTeachers" value="1" /> Keep the same teachers</label>
+            <label class="checkbox-option"><input type="checkbox" name="copyAssistants" value="1" /> Keep the same assistants</label>
+            <label class="checkbox-option"><input type="checkbox" name="copyDescription" value="1" /> Keep the same description</label>
+            <label class="checkbox-option"><input type="checkbox" name="copyFinance" value="1" /> Keep the same finance settings (price, charged per, account category)</label>
             <label>Add the duplicate to
               <select name="targetComboId" required>
                 <% combos.forEach(function(combo) { %>

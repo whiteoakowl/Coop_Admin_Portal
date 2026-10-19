@@ -720,14 +720,18 @@ async function currentDefaultSemesterId() {
   return row ? row.id : null;
 }
 
+// accountingCategoryId was omitted here until a real request ("Ask to
+// keep finance settings" on Duplicate Class) needed to set it at create
+// time, not just via updateClass's own later edit - every other existing
+// caller still omits it and gets null, same as before.
 async function createClass(fields) {
   const semesterId = fields.semesterId !== undefined ? (fields.semesterId || null) : await currentDefaultSemesterId();
   const info = await db
     .prepare(
       `INSERT INTO classes (day, hour_position, class_name, room, age_group, numeric_ages, color, start_time, end_time, start_date, end_date, capacity, registration_open, description, supply_list,
-         allow_parent_register, allow_teacher_register, allow_student_register, teacher_slots, assistant_slots, min_capacity, allow_cancel, auto_refund_on_cancel, price_cents, price_per, lock_by_grade, lock_by_age,
+         allow_parent_register, allow_teacher_register, allow_student_register, teacher_slots, assistant_slots, min_capacity, allow_cancel, auto_refund_on_cancel, price_cents, price_per, accounting_category_id, lock_by_grade, lock_by_age,
          allow_parent_complete_lessons, allow_parent_chat, semester_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.day,
@@ -769,6 +773,7 @@ async function createClass(fields) {
       fields.autoRefundOnCancel ? 1 : 0,
       fields.priceCents || null,
       fields.pricePer === 'students_and_staff' ? 'students_and_staff' : 'students',
+      fields.accountingCategoryId || null,
       fields.lockByGrade === false ? 0 : 1,
       fields.lockByAge === false ? 0 : 1,
       fields.allowParentCompleteLessons ? 1 : 0,

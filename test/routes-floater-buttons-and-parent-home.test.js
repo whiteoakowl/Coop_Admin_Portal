@@ -9,7 +9,8 @@
 //    the stylesheet, since a real "is it wide" check needs a browser.)
 // 3. "Parent portal homepage class registrations count. Should show how
 //    many classes your family is registered for by person in your
-//    family."
+//    family." A later real request ("Remove class registration card")
+//    removed this card entirely - see the test below instead.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -79,37 +80,14 @@ async function loginAsPortalParent() {
   return { cookie: loginRes.headers['set-cookie'], familyId, parentId, acctId };
 }
 
-test('Parent Portal homepage shows class registration counts broken down per child in the family', async () => {
-  const { cookie, familyId } = await loginAsPortalParent();
-  const child1 = (
-    await db
-      .prepare("INSERT INTO members (name, barcode, member_type, family_id, active) VALUES ('First Child', 'first-child', 'student', ?, 1) RETURNING id")
-      .get(familyId)
-  ).id;
-  const child2 = (
-    await db
-      .prepare("INSERT INTO members (name, barcode, member_type, family_id, active) VALUES ('Second Child', 'second-child', 'student', ?, 1) RETURNING id")
-      .get(familyId)
-  ).id;
-  const classId1 = (await db.prepare("INSERT INTO classes (class_name, day, hour_position) VALUES ('Count Class One', 'monday', 1) RETURNING id").get()).id;
-  const classId2 = (await db.prepare("INSERT INTO classes (class_name, day, hour_position) VALUES ('Count Class Two', 'monday', 2) RETURNING id").get()).id;
-  const classId3 = (await db.prepare("INSERT INTO classes (class_name, day, hour_position) VALUES ('Count Class Three', 'wednesday', 1) RETURNING id").get()).id;
-  // A real bug report: "not showing counts... when I know they are signed
-  // up for classes" - the homepage used to count class_registrations
-  // (only a log of the parent's OWN self-service register/cancel
-  // actions), which stays empty for a student enrolled straight through
-  // Co-op Admin's own roster tool (utils/classSchedule.js's setEnrollment
-  // writes class_enrollments directly, never class_registrations). A
-  // confirmed self-service registration ALSO writes class_enrollments
-  // (see utils/classRegistration.js's registerForClass), so seeding just
-  // that one table here still covers both real paths.
-  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId1, child1);
-  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId2, child1);
-  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId3, child2);
-
+// A real request: "Remove class registration card" - the per-child
+// counts card this test used to cover is gone entirely now, not just
+// changed; Classroom Dashboard is still reachable, just from the Classes
+// nav group's own subpages instead of a homepage button.
+test('Parent Portal homepage: Class Registrations card (with its per-child counts) is gone', async () => {
+  const { cookie } = await loginAsPortalParent();
   const page = await request(app).get('/parent').set('Cookie', cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /First Child: <span class="badge-pill badge-pill-blue">2 classes<\/span>/);
-  assert.match(page.text, /Second Child: <span class="badge-pill badge-pill-blue">1 class<\/span>/);
-  assert.match(page.text, /href="\/parent\/classes\/dashboard">Classroom Dashboard<\/a>/);
+  assert.doesNotMatch(page.text, /<h2>Class Registrations<\/h2>/);
+  assert.doesNotMatch(page.text, /badge-pill-blue">\d+ classe?s?<\/span>/);
 });

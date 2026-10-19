@@ -202,3 +202,15 @@ test('Admin count: distinct active members holding an Admin Position (Settings >
   assert.equal(res.status, 200);
   assert.match(res.text, /<span class="family-student-row-label">Admins<\/span>\s*<span class="family-student-row-value">1<\/span>/);
 });
+
+// A real request: "On desktop the blue buttons at the top for settings,
+// portals and profile. The blue should also match the background blue
+// of the app." Static CSS-content check (no inline color is ever set on
+// these - the color lives purely in the stylesheet), same pattern as
+// admin-mobile-topbar-compositing.test.js's own note on why.
+test('The top-right My Profile/Settings/Switch Portal buttons use the app\'s own background blue, not the lighter logo blue', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'css', 'styles.css'), 'utf8');
+  const match = /\.admin-page-corner-actions \.admin-corner-link,\s*\n\.admin-page-corner-actions \.portal-switcher-details summary \{([^}]*)\}/.exec(css);
+  assert.ok(match, 'expected the .admin-page-corner-actions blue-buttons rule');
+  assert.match(match[1], /background:\s*var\(--bg\)/, 'should reuse var(--bg), not var(--brand)');
+});

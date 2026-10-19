@@ -101,6 +101,54 @@ test('Lessons tab shows a clickable sub-bar (title + due date + check mark) that
   assert.match(detail.text, /Part of: A Lesson/);
 });
 
+// A real bug report: "Class edit, assignments. When adding a text
+// description assignment. It should appear the way it was typed. The
+// same rows, etc. Keep the same formatting." A Text Description content
+// item's body comes from a plain <textarea> (views/partials/lesson-
+// content-manage.ejs's own Add Content form, type==='text'), not the
+// rich-text editor the Assignment Upload/Submission types use - it used
+// to be rendered raw via <%- %> + .forum-editable-display (built for
+// real HTML from that other editor), which both silently collapsed its
+// line breaks AND would have rendered a literal "<" the member typed as
+// real HTML. Both the admin/teacher management list and the student/
+// parent detail page now escape it and preserve whitespace instead.
+test('A Text Description content item\'s line breaks are preserved exactly as typed, and HTML-special characters are escaped, not rendered', async () => {
+  const admin = await loginAsAdmin();
+  n += 1;
+  const className = `Formatting Class ${n}`;
+  await request(app)
+    .post('/admin/class-schedule/classes/new')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ day: 'monday', className, hourPosition: '3', room: 'Room A', color: '#EE9A4D', startTime: '9:00 AM', endTime: '9:45 AM', _csrf: admin.csrfToken });
+  const cls = await db.prepare('SELECT * FROM classes WHERE class_name = ?').get(className);
+  const student = await createStudentAccount('Formatting Student');
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(cls.id, student.studentId);
+
+  const manage = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage`).set('Cookie', admin.cookie);
+  const manageCsrf = extractCsrf(manage.text);
+  await request(app).post(`/admin/class-schedule/classes/${cls.id}/assignments`).set('Cookie', admin.cookie).type('form').send({ title: 'A Lesson', _csrf: manageCsrf });
+  const assignment = await db.prepare('SELECT * FROM class_assignments WHERE class_id = ?').get(cls.id);
+  const typedBody = 'Line one\nLine two\n\nLine four after a blank line <not a real tag>';
+  await request(app)
+    .post(`/admin/class-schedule/assignments/${assignment.id}/content`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ type: 'text', title: 'Formatted Notes', body: typedBody, _csrf: manageCsrf });
+  const contentItem = await db.prepare("SELECT * FROM lesson_content_items WHERE assignment_id = ? AND type = 'text'").get(assignment.id);
+  assert.equal(contentItem.body, typedBody, 'the raw typed text, newlines included, should be stored exactly as typed');
+
+  const manageList = await request(app).get(`/admin/class-schedule/assignments/${assignment.id}`).set('Cookie', admin.cookie);
+  assert.equal(manageList.status, 200);
+  assert.match(manageList.text, /class="hint plain-text-display">Line one\nLine two\n\nLine four after a blank line &lt;not a real tag&gt;/, 'management list: real newlines preserved, HTML escaped');
+
+  const loginRes = await request(app).post('/login').type('form').send({ email: student.email, password: 'testpassword123', next: '/student' });
+  const cookie = loginRes.headers['set-cookie'];
+  const detail = await request(app).get(`/student/content/${contentItem.id}`).set('Cookie', cookie);
+  assert.equal(detail.status, 200);
+  assert.match(detail.text, /class="plain-text-display">Line one\nLine two\n\nLine four after a blank line &lt;not a real tag&gt;/, 'student detail page: real newlines preserved, HTML escaped');
+});
+
 test('GET /student/content/:id 404s for a content item outside this student\'s own classes', async () => {
   const admin = await loginAsAdmin();
   n += 1;

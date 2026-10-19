@@ -78,6 +78,23 @@ test('My Classes shows only this student\'s own enrolled classes', async () => {
   void otherId;
 });
 
+// A real request: "Student portal. Classes, remove the name tag form and
+// absence form sub pages. Students don't need access to those" - both
+// are a parent-facing concern (reporting a child's absence, printing a
+// child's name tag), not something a student fills out for themself.
+// Their own /absence and /student/name-tag routes are untouched - only
+// the Classes group's own subpages dropdown (portal-nav.ejs's own
+// STUDENT_NAV_LINKS) drops them.
+test('Student Portal Classes tab no longer offers Absence/Late Form or Name Tag Form as subpages', async () => {
+  const { cookie } = await createStudent('Nav Subpages Student');
+  const res = await request(app).get('/student').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /Class Schedule/, 'the remaining two subpages should still be there');
+  assert.match(res.text, /Classroom Dashboard/);
+  assert.doesNotMatch(res.text, /Absence\/Late Form/);
+  assert.doesNotMatch(res.text, /Name Tag Form/);
+});
+
 test('a class detail page 404s for a class this student is not enrolled in', async () => {
   const { cookie } = await createStudent('Not Enrolled Student');
   const classId = await createClassWithTeacher('monday', 'Someone Else\'s Class', 'Ms. Teacher');

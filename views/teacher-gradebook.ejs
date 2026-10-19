@@ -9,7 +9,7 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <p class="hint"><a href="/teacher/classes/<%= cls.id %>">&larr; Back to <%= cls.class_name %></a></p>
     <h1><%= assignment.title %></h1>
-    <% if (assignment.description) { %><p class="hint"><%= assignment.description %></p><% } %>
+    <% if (assignment.description) { %><p class="hint plain-text-display"><%= assignment.description %></p><% } %>
     <p class="hint">
       <% if (assignment.points_possible != null) { %>Out of <%= assignment.points_possible %> points<% } %>
     </p>
