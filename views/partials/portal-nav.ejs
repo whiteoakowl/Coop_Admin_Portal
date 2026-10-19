@@ -251,12 +251,19 @@ const PARENT_NAV_LINKS = [
 // Teacher Portal's own primary nav - same anti-drift reasoning as
 // MAIN_ADMIN_NAV_LINKS above, centralizing what used to be an identical
 // navLinks array copy-pasted into all 11 views/teacher-*.ejs files.
-// Chat is deliberately left out here - COMMUNITY_LINKS_TEACHER below
-// already covers it (and Photos) as its own Community section, the same
-// split Parent/Student Portal's own primary nav + Community sections use;
-// the old per-file copy had a second, redundant "Messages" entry pointing
-// at that exact same /forums URL a second time, dropped as pure
-// duplication.
+// Chat/Photos originally lived only in their own separate Community
+// section (COMMUNITY_LINKS_TEACHER below) - the old per-file copy had a
+// second, redundant "Messages" entry pointing at that exact same /forums
+// URL a second time, dropped as pure duplication when that split was
+// first centralized here. A later real request ("there should be a
+// community section with tabs [but] the photo tab and chat tab should be
+// under the main teacher portal section") moved both of them up into
+// this list instead - COMMUNITY_LINKS_TEACHER is now empty (no separate
+// Community section at all), same as Parent/Student Portal's own below.
+// ?portal=teacher on both tags sharedPortalTitle (middleware/
+// portalAuth.js) with which portal a dual-role account actually clicked
+// from, the same disambiguation Events/Photos/Chat already use elsewhere
+// for a parent-and-student account.
 //
 // A real request: "Teacher portal dashboard add section for my classes
 // tab. Each tab after that should be each class that teacher is signed up
@@ -279,6 +286,8 @@ const TEACHER_NAV_LINKS = [
   { href: '/teacher/classes', icon: 'graduation-cap', label: 'Class Schedule' },
   { href: '/training', icon: 'graduation-cap', label: 'Training' },
   { href: '/teacher/assignments', icon: 'clipboard-list', label: 'Assignments' },
+  { href: '/forums?portal=teacher', icon: 'users', label: 'Chat' },
+  { href: '/photos?portal=teacher', icon: 'camera', label: 'Photos' },
   // A real request: "Teachers can edit their instructor profile on the
   // teacher portal if they are given permission to view that portal and
   // if their profile has been enabled" - the link is always offered to
@@ -424,16 +433,19 @@ const COMMUNITY_LINKS = [
 // reachable to a parent only if Main Admin links to them from elsewhere
 // (e.g. an announcement or the newsletter itself), not as a standing tab.
 const COMMUNITY_LINKS_PARENT = [];
-// Teacher gets a further-trimmed version - a real request: "teacher
-// portal, remove the following tabs. newsletter, forms, store,
-// publications, accounting, notifications, member directory, business
-// directory, classifieds, events and reports." ("Reports" is Teacher
-// Portal's own tab, dropped from its own navLinks array in every
-// views/teacher-*.ejs file, not from this shared list.)
-const COMMUNITY_LINKS_TEACHER = [
-  { href: '/forums', icon: 'users', label: 'Chat' },
-  { href: '/photos', icon: 'camera', label: 'Photos' },
-];
+// Teacher gets no separate Community section at all (empty array, same
+// as Parent/Student Portal below) - a real request: "teacher portal,
+// remove the following tabs. newsletter, forms, store, publications,
+// accounting, notifications, member directory, business directory,
+// classifieds, events and reports" ("Reports" is Teacher Portal's own
+// tab, dropped from its own navLinks array in every views/teacher-*.ejs
+// file, not from this shared list) first trimmed this down to just
+// Chat/Photos; a later real request ("there should be a community
+// section with tabs [but] the photo tab and chat tab should be under the
+// main teacher portal section") moved those last two up into
+// TEACHER_NAV_LINKS above, leaving nothing left for a Community section
+// to show.
+const COMMUNITY_LINKS_TEACHER = [];
 // Student Portal gets no separate Community section at all (empty
 // array, same as Main Admin above) - a real request: "dashboard panel
 // tabs. They should be these titles and in this order" gave an exact,

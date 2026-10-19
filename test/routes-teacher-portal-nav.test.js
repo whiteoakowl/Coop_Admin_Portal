@@ -162,6 +162,45 @@ test('Teacher Portal Class Schedule tab: Grid view hides classes under a grid lo
   assert.doesNotMatch(page.text, /Member-Locked Class/, 'a class under a grid not visible to members should not appear, even to the teacher staffed on it');
 });
 
+// A real request: "there should be a community section with tabs [but]
+// the photo tab and chat tab should be under the main teacher portal
+// section." Chat/Photos moved out of their own separate Community
+// section (which had nothing else in it) and into TEACHER_NAV_LINKS
+// itself, same as Parent/Student Portal's own single flat nav.
+test('Teacher Portal nav: Chat and Photos are in the main section, with no separate Community section', async () => {
+  const classId = await makeClass();
+  const cookie = await loginTeacher([classId]);
+  const page = await request(app).get('/teacher').set('Cookie', cookie);
+  assert.equal(page.status, 200);
+
+  const navSection = page.text.slice(page.text.indexOf('id="admin-nav-links"'), page.text.indexOf('</nav>'));
+  assert.match(navSection, /href="\/forums\?portal=teacher"/, 'Chat should be in the main nav section');
+  assert.match(navSection, /href="\/photos\?portal=teacher"/, 'Photos should be in the main nav section');
+
+  assert.doesNotMatch(page.text, /id="community-nav-links"/, 'no separate Community section - nothing else was ever in it');
+  assert.doesNotMatch(page.text, /class="portal-nav-title">Community</, 'no separate Community heading');
+});
+
+// A real bug this surfaced: sharedPortalTitle (middleware/portalAuth.js)
+// never checked for a teacher role before, so a teacher-only account
+// clicking Chat or Photos fell through to a degraded/public shell
+// instead of keeping their own Teacher Portal sidebar - the same "wrong
+// portal" bug already fixed for parent/student dual-role accounts.
+test('Teacher Portal: clicking Chat or Photos keeps the full Teacher Portal nav shell, not a degraded one', async () => {
+  const classId = await makeClass();
+  const cookie = await loginTeacher([classId]);
+
+  const chatPage = await request(app).get('/forums?portal=teacher').set('Cookie', cookie);
+  assert.equal(chatPage.status, 200);
+  assert.match(chatPage.text, /class="portal-nav-title">Teacher Portal</, 'Chat should keep the Teacher Portal nav shell');
+  assert.match(chatPage.text, /href="\/teacher\/attendance"/, 'the full Teacher Portal nav, not a 2-link fallback');
+
+  const photosPage = await request(app).get('/photos?portal=teacher').set('Cookie', cookie);
+  assert.equal(photosPage.status, 200);
+  assert.match(photosPage.text, /class="portal-nav-title">Teacher Portal</, 'Photos should keep the Teacher Portal nav shell');
+  assert.match(photosPage.text, /href="\/teacher\/attendance"/, 'the full Teacher Portal nav, not the plain public site header');
+});
+
 test('Teacher Portal nav: a "My Classes" section lists one entry per class this teacher actually teaches', async () => {
   const classA = await makeClass('Nav My Classes A');
   const classB = await makeClass('Nav My Classes B');

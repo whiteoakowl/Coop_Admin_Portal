@@ -58,11 +58,22 @@ async function loadPortalSession(req, res, next) {
     const roles = res.locals.portalRoles || [];
     const hasParent = roles.some((r) => r.key === 'parent');
     const hasStudent = roles.some((r) => r.key === 'student');
+    // A real request moved Chat/Photos out of Teacher Portal's own
+    // separate Community section and into its main nav (portal-nav.ejs's
+    // own TEACHER_NAV_LINKS) - this function never knew about a teacher
+    // account at all before that, so a teacher-only account clicking
+    // either link fell all the way through to `fallback` here (never
+    // 'Teacher Portal'), landing on a degraded/public shell instead of
+    // their own sidebar - the exact same "wrong portal" bug this function
+    // was built to prevent for parent/student.
+    const hasTeacher = roles.some((r) => r.key === 'teacher');
     const requestedPortal = req.query.portal;
     if (requestedPortal === 'parent' && hasParent) return 'Parent Portal';
     if (requestedPortal === 'student' && hasStudent) return 'Student Portal';
+    if (requestedPortal === 'teacher' && hasTeacher) return 'Teacher Portal';
     if (hasParent) return 'Parent Portal';
     if (hasStudent) return 'Student Portal';
+    if (hasTeacher) return 'Teacher Portal';
     return fallback;
   };
 

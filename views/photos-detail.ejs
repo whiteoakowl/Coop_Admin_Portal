@@ -7,14 +7,15 @@
   // Same fix as directory-list.ejs's own comment.
   const hasParentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'parent');
   const hasStudentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'student');
-  const usesPortalNavShell = hasParentRole || hasStudentRole;
+  const hasTeacherRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'teacher');
+  const usesPortalNavShell = hasParentRole || hasStudentRole || hasTeacherRole;
 %>
 <body>
   <% if (usesPortalNavShell) { %>
     <%
       // Same fix as photos-list.ejs's own comment.
     %>
-    <%- include('partials/portal-nav', { portalTitle: sharedPortalTitle(hasParentRole ? 'Parent Portal' : 'Student Portal') }) %>
+    <%- include('partials/portal-nav', { portalTitle: sharedPortalTitle(hasParentRole ? 'Parent Portal' : hasStudentRole ? 'Student Portal' : 'Teacher Portal') }) %>
   <% } else { %>
   <%- include('partials/icon-sprite') %>
 
