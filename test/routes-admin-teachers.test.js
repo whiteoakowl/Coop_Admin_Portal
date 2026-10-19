@@ -78,7 +78,7 @@ test('Classes tab is immediately followed by Teachers/Assistants in the Co-op Ad
   assert.equal(chevronLabels[classesIndex + 1], 'Teachers/Assistants');
 });
 
-test('Teachers/Assistants list: alphabetical by last name, every member (including a single-class one) gets a collapsible details dropdown', async () => {
+test('Teachers list: alphabetical by last name, every member (including a single-class one) gets a collapsible details dropdown', async () => {
   const { cookie } = await loginAsAdmin();
 
   const zebraId = await createMember('Amy Zebra');
@@ -89,10 +89,11 @@ test('Teachers/Assistants list: alphabetical by last name, every member (includi
   const classA1 = await createClass({ day: 'monday', hourPosition: 1, className: 'Science' });
   const classA2 = await createClass({ day: 'wednesday', hourPosition: 2, className: 'History' });
   await addStaff(classA1, appleId, 'teacher');
-  await addStaff(classA2, appleId, 'assistant');
+  await addStaff(classA2, appleId, 'teacher');
 
   const res = await request(app).get('/admin/teachers').set('Cookie', cookie);
   assert.equal(res.status, 200);
+  assert.match(res.text, />Teachers</, 'the page heading should read Teachers');
 
   // "Organized alphabetical by last name" - Apple before Zebra.
   assert.ok(res.text.indexOf('Bob Apple') < res.text.indexOf('Amy Zebra'), 'Bob Apple (last name Apple) should come before Amy Zebra (last name Zebra)');
@@ -108,14 +109,66 @@ test('Teachers/Assistants list: alphabetical by last name, every member (includi
   assert.match(zebraSection, /Art/);
 
   // Multi-class member: real <details>/<summary> dropdown listing both
-  // classes with their own role label.
+  // classes.
   const appleSection = res.text.slice(res.text.indexOf('Bob Apple') - 150, res.text.indexOf('Bob Apple') + 1200);
   assert.match(appleSection, /<details>/, 'a member staffed on more than one class should get a collapsible dropdown');
   assert.match(appleSection, /2 classes</, 'the summary should show a plural "2 classes" count');
   assert.match(appleSection, /Science/);
   assert.match(appleSection, /History/);
-  assert.match(appleSection, /Teacher/);
-  assert.match(appleSection, /Assistant/);
+});
+
+// A real request: "Teachers/assistants. Separate into two different
+// pages. One for assistants and one for teachers. Count the classes for
+// each member separately based off if they teach or assistant."
+test('Teachers and Assistants are two separate pages, each counting only its own role\'s classes', async () => {
+  const { cookie } = await loginAsAdmin();
+
+  const bothId = await createMember('Dana Bothroles');
+  const teachClassA = await createClass({ day: 'monday', hourPosition: 1, className: 'Teaches Alpha' });
+  const teachClassB = await createClass({ day: 'wednesday', hourPosition: 2, className: 'Teaches Beta' });
+  const assistClass = await createClass({ day: 'monday', hourPosition: 3, className: 'Assists Gamma' });
+  await addStaff(teachClassA, bothId, 'teacher');
+  await addStaff(teachClassB, bothId, 'teacher');
+  await addStaff(assistClass, bothId, 'assistant');
+
+  const teachersRes = await request(app).get('/admin/teachers').set('Cookie', cookie);
+  assert.equal(teachersRes.status, 200);
+  assert.match(teachersRes.text, /Dana Bothroles/);
+  const teachersSection = teachersRes.text.slice(teachersRes.text.indexOf('Dana Bothroles') - 150, teachersRes.text.indexOf('Dana Bothroles') + 1000);
+  assert.match(teachersSection, /2 classes</, 'the Teachers page should only count this member\'s 2 teaching classes, not the assisting one too');
+  assert.match(teachersSection, /Teaches Alpha/);
+  assert.match(teachersSection, /Teaches Beta/);
+  assert.doesNotMatch(teachersSection, /Assists Gamma/, 'the assisting class should not appear on the Teachers page at all');
+
+  const assistantsRes = await request(app).get('/admin/teachers/assistants').set('Cookie', cookie);
+  assert.equal(assistantsRes.status, 200);
+  assert.match(assistantsRes.text, />Assistants</, 'the page heading should read Assistants');
+  assert.match(assistantsRes.text, /Dana Bothroles/);
+  const assistantsSection = assistantsRes.text.slice(assistantsRes.text.indexOf('Dana Bothroles') - 150, assistantsRes.text.indexOf('Dana Bothroles') + 600);
+  assert.match(assistantsSection, /1 class</, 'the Assistants page should only count this member\'s 1 assisting class, not the teaching ones too');
+  assert.match(assistantsSection, /Assists Gamma/);
+  assert.doesNotMatch(assistantsSection, /Teaches Alpha/, 'the teaching classes should not appear on the Assistants page at all');
+  assert.doesNotMatch(assistantsSection, /Teaches Beta/);
+});
+
+test('a member staffed ONLY as a teacher never appears on the Assistants page, and vice versa', async () => {
+  const { cookie } = await loginAsAdmin();
+
+  const teacherOnlyId = await createMember('Teacher Only Person');
+  const teacherOnlyClass = await createClass({ day: 'monday', hourPosition: 1, className: 'Teacher Only Class' });
+  await addStaff(teacherOnlyClass, teacherOnlyId, 'teacher');
+
+  const assistantOnlyId = await createMember('Assistant Only Person');
+  const assistantOnlyClass = await createClass({ day: 'monday', hourPosition: 2, className: 'Assistant Only Class' });
+  await addStaff(assistantOnlyClass, assistantOnlyId, 'assistant');
+
+  const teachersRes = await request(app).get('/admin/teachers').set('Cookie', cookie);
+  assert.match(teachersRes.text, /Teacher Only Person/);
+  assert.doesNotMatch(teachersRes.text, /Assistant Only Person/);
+
+  const assistantsRes = await request(app).get('/admin/teachers/assistants').set('Cookie', cookie);
+  assert.match(assistantsRes.text, /Assistant Only Person/);
+  assert.doesNotMatch(assistantsRes.text, /Teacher Only Person/);
 });
 
 test('Teachers/Assistants: semester dropdown filters the list to only that semester\'s classes', async () => {

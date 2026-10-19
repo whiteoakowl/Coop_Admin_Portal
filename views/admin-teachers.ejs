@@ -7,7 +7,7 @@
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="roster-toolbar no-print">
-      <h1>Teachers/Assistants</h1>
+      <h1><%= title %></h1>
       <div class="roster-btn-row">
         <%# A real request: "organized by schedule grid semester with a
             dropdown filter" - a plain Semester-only select, same shape as
@@ -15,8 +15,11 @@
             partials/class-schedule-grid.ejs) - NOT the shared semester+
             day combo picker (partials/schedule-combo-picker.ejs), since
             this list spans every day at once per teacher rather than
-            showing one day's own grid. %>
-        <form method="GET" action="/admin/teachers" class="category-filter">
+            showing one day's own grid. basePath (routes/admin-teachers.js)
+            points this back at whichever of the two role-scoped pages
+            it's actually on - a later real request split this single
+            page into GET /teachers and GET /teachers/assistants. %>
+        <form method="GET" action="<%= basePath %>" class="category-filter">
           <label for="teachers-semester-select">Semester</label>
           <select id="teachers-semester-select" name="semesterId" onchange="this.form.submit()">
             <option value="" <%= !selectedSemesterId ? 'selected' : '' %>>All Semesters</option>
@@ -29,7 +32,7 @@
     </div>
 
     <% if (members.length === 0) { %>
-      <p class="roster-empty">No teachers or assistants are staffed on a class<%= selectedSemesterId ? ' for this semester' : '' %> yet.</p>
+      <p class="roster-empty">No <%= roleLabel %>s are staffed on a class<%= selectedSemesterId ? ' for this semester' : '' %> yet.</p>
     <% } else { %>
       <%# A real follow-up request: "even if the member is only teaching or
           assisting 1 class it should still show as a drop down minimize
@@ -57,10 +60,14 @@
                       nav.ejs's own comment) instead lands on that
                       class's own day grid, the closest a read-only
                       viewer can actually open. %>
+                  <%# Role is deliberately not shown per-class any more -
+                      this whole page is already scoped to one role (see
+                      routes/admin-teachers.js's own roleLabel), so a
+                      Teacher/Assistant tag on every row would just repeat
+                      the same word back for every class on this page. %>
                   <li>
                     <a href="<%= isFullAdmin ? `/admin/class-schedule/classes/${c.id}/manage` : `/admin/schedule?tab=${c.day}${selectedSemesterId ? '&semesterId=' + selectedSemesterId : ''}` %>">
                       <span class="teacher-class-name"><%= c.className %></span>
-                      <span class="teacher-class-role"><%= c.role === 'teacher' ? 'Teacher' : 'Assistant' %></span>
                       <span class="teacher-class-meta"><%= c.dayLabel %><%= c.timeLabel ? ' · ' + c.timeLabel : '' %><%= c.room ? ' · ' + c.room : '' %></span>
                     </a>
                   </li>

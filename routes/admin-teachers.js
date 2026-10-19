@@ -13,6 +13,15 @@
 // they are given permission to view that portal and if their profile has
 // been enabled." See routes/teacher-portal.js's own GET/POST /teacher/
 // instructor-profile for that self-edit side of the same feature.
+//
+// A later real request: "Teachers/assistants. Separate into two
+// different pages. One for assistants and one for teachers. Count the
+// classes for each member separately based off if they teach or
+// assistant" - GET /teachers and GET /teachers/assistants below now each
+// only ever see ONE role's own class_staff rows, so a member who both
+// teaches some classes and assists on others gets two independent counts
+// (and two independent collapsible entries, one per page) instead of one
+// combined list with a per-class Teacher/Assistant tag.
 const express = require('express');
 const router = express.Router();
 const requireAdmin = require('../middleware/requireAdmin');
@@ -37,21 +46,30 @@ async function resolveSemesterId(req) {
   return getActiveKioskSemesterId();
 }
 
-// Every active teacher/assistant staffed on at least one class in scope,
-// grouped under their own member record - one entry per class they're
-// staffed on, not one entry per class_staff row rendered flat, since the
-// real request was explicit: "they will all be listed under the members
-// name." allClassesList's own semesterId matching is an EXACT match (no
-// semester given means no filter at all - see its own comment) - a
-// dedicated "who's teaching this semester" report reading that literally
-// is simpler and less surprising than the Classes grid's own "selected
-// semester OR untagged" fallback would be here.
-async function teachersAndAssistantsForSemester(semesterId) {
+// Every active member staffed in the given ROLE on at least one class in
+// scope, grouped under their own member record - one entry per class
+// they're staffed on, not one entry per class_staff row rendered flat,
+// since the real request was explicit: "they will all be listed under
+// the members name." allClassesList's own semesterId matching is an
+// EXACT match (no semester given means no filter at all - see its own
+// comment) - a dedicated "who's teaching this semester" report reading
+// that literally is simpler and less surprising than the Classes grid's
+// own "selected semester OR untagged" fallback would be here.
+//
+// role-scoped (not "every teacher/assistant combined") - a real request:
+// "Separate into two different pages. One for assistants and one for
+// teachers. Count the classes for each member separately based off if
+// they teach or assistant." A member staffed as both teacher on some
+// classes and assistant on others now gets two separate entries, one per
+// page this is called from, each with its own independent class count -
+// never one member with a single combined count spanning both roles.
+async function staffForSemesterByRole(semesterId, role) {
   const classes = await allClassesList(null, semesterId);
   const byMember = new Map();
   for (const cls of classes) {
     const staff = await staffForClass(cls.id);
     for (const s of staff) {
+      if (s.role !== role) continue;
       if (!byMember.has(s.id)) byMember.set(s.id, { id: s.id, name: s.name, classes: [] });
       byMember.get(s.id).classes.push({
         id: cls.id,
@@ -61,7 +79,6 @@ async function teachersAndAssistantsForSemester(semesterId) {
         hourPosition: cls.hour_position,
         room: cls.room,
         timeLabel: cls.timeLabel,
-        role: s.role,
       });
     }
   }
@@ -74,9 +91,29 @@ async function teachersAndAssistantsForSemester(semesterId) {
 
 router.get('/teachers', requireAdmin, async (req, res) => {
   const semesterId = await resolveSemesterId(req);
-  const members = await teachersAndAssistantsForSemester(semesterId);
+  const members = await staffForSemesterByRole(semesterId, 'teacher');
   res.render('admin-teachers', {
-    title: 'Teachers/Assistants',
+    title: 'Teachers',
+    roleLabel: 'teacher',
+    basePath: '/admin/teachers',
+    members,
+    semesters: await listSemesters(),
+    selectedSemesterId: semesterId,
+  });
+});
+
+// A real request: "Separate into two different pages. One for assistants
+// and one for teachers" - see staffForSemesterByRole's own comment above.
+// Reuses the exact same admin-teachers.ejs view as GET /teachers (same
+// collapsible-list layout, semester filter, and click-through-to-class
+// behavior), just scoped to the 'assistant' role instead.
+router.get('/teachers/assistants', requireAdmin, async (req, res) => {
+  const semesterId = await resolveSemesterId(req);
+  const members = await staffForSemesterByRole(semesterId, 'assistant');
+  res.render('admin-teachers', {
+    title: 'Assistants',
+    roleLabel: 'assistant',
+    basePath: '/admin/teachers/assistants',
     members,
     semesters: await listSemesters(),
     selectedSemesterId: semesterId,

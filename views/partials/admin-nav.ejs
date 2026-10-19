@@ -75,9 +75,16 @@
       // classes tab" - same adminNavLinks visibility as Classes itself
       // (every Co-op Admin, not just a full Admin), since the Classes
       // grid it's built from is read-only-but-visible to a non-full
-      // admin too (see class-schedule-grid.ejs's own gridReadOnly).
+      // admin too (see class-schedule-grid.ejs's own gridReadOnly). A
+      // later real request: "Separate into two different pages. One for
+      // assistants and one for teachers" split the old single Teachers/
+      // Assistants subpage into these two (routes/admin-teachers.js's own
+      // GET /teachers and GET /teachers/assistants) - the group label
+      // itself stays Teachers/Assistants, still an accurate umbrella name
+      // for the group.
       { href: '/admin/teachers', icon: 'user-check', label: 'Teachers/Assistants', subpages: [
-        { href: '/admin/teachers', label: 'Teachers/Assistants' },
+        { href: '/admin/teachers', label: 'Teachers' },
+        { href: '/admin/teachers/assistants', label: 'Assistants' },
         { href: '/admin/teachers/instructor-profiles', label: 'Instructor Profiles' },
       ] },
       // A real request: "Co-op admin portal add a tab called lesson
