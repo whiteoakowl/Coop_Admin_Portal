@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Lesson Plans</h1>
+    <p class="hint">Reusable lesson templates - create one here, then assign it to a class to add it as a new
+      lesson. A teacher can tweak their own class's copy afterward without changing this original.</p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="roster-toolbar">
+      <div class="roster-btn-row">
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('new-lesson-plan-dialog').showModal()">+ New Lesson Plan</button>
+      </div>
+    </div>
+
+    <% if (lessonPlans.length === 0) { %>
+      <p class="roster-empty">No lesson plans yet &mdash; create one above.</p>
+    <% } %>
+
+    <div class="team-card-grid">
+      <% lessonPlans.forEach(function(p) { %>
+        <div class="team-col">
+          <div class="team-info-card">
+            <span class="team-info-icon"><svg class="icon"><use href="#icon-clipboard-list"/></svg></span>
+            <h3 class="team-info-title"><a href="/admin/lesson-plans/<%= p.id %>"><%= p.title %></a></h3>
+            <% if (p.description) { %><p class="hint"><%= p.description %></p><% } %>
+            <div class="roster-btn-row">
+              <a class="roster-action-btn" href="/admin/lesson-plans/<%= p.id %>">Edit</a>
+              <form method="POST" action="/admin/lesson-plans/<%= p.id %>/delete" onsubmit="return confirm('Delete the lesson plan &quot;<%= p.title %>&quot;? Any class it was already assigned to keeps its own independent copy.');" class="inline-block-form">
+                <button type="submit" class="roster-action-btn">Delete</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+    <dialog id="new-lesson-plan-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/lesson-plans">
+        <h3>New Lesson Plan</h3>
+        <label>Title
+          <input type="text" name="title" placeholder="e.g. Intro to Watercolors" required />
+        </label>
+        <label>Description
+          <textarea name="description" rows="3" placeholder="Short description (optional)"></textarea>
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Create</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

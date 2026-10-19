@@ -46,6 +46,7 @@ test('routers gated by a blanket router.use(requireFullAdmin) reject an unauthen
     ['/admin/members', 'admin-members.js'],
     ['/admin/name-tag', 'admin-name-tag.js'],
     ['/admin/search', 'admin-search.js'],
+    ['/admin/lesson-plans', 'admin-lesson-plans.js'],
   ];
 
   for (const [route, file] of routes) {

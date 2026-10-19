@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle no-print"><a href="/admin/lesson-plans">&larr; Lesson Plans</a></p>
+    <h1><%= plan.title %></h1>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <%# A real request: "Admins can create lessons plans and assign them
+        to a class to be used as an option." A flat class picker (every
+        class app-wide, grouped by day) rather than the Duplicate Class
+        dialog's own two-step semester/day-then-class flow - there's no
+        "which day's grid" starting point here the way there is when
+        duplicating FROM one specific class already on a grid. %>
+    <div class="roster-btn-row no-print">
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('assign-lesson-plan-dialog').showModal()">Assign to Class</button>
+    </div>
+
+    <dialog id="assign-lesson-plan-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/lesson-plans/<%= plan.id %>/assign">
+        <h3>Assign to Class</h3>
+        <p class="hint">Adds a new, independent copy of this lesson plan as a Lesson on the class you pick -
+          editing it afterward (from either side) never changes this original.</p>
+        <label>Class
+          <select name="classId" required>
+            <option value="">Choose a class&hellip;</option>
+            <% var classesByDay = {}; classes.forEach(function(c) { (classesByDay[c.dayLabel] = classesByDay[c.dayLabel] || []).push(c); }); %>
+            <% Object.keys(classesByDay).forEach(function(dayLabel) { %>
+              <optgroup label="<%= dayLabel %>">
+                <% classesByDay[dayLabel].forEach(function(c) { %>
+                  <option value="<%= c.id %>"><%= c.class_name %><% if (c.hourLabel) { %> (<%= c.hourLabel %>)<% } %></option>
+                <% }); %>
+              </optgroup>
+            <% }); %>
+          </select>
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Assign</button>
+        </div>
+      </form>
+    </dialog>
+
+    <%- include('partials/lesson-plan-content-manage', { plan, contentItems }) %>
+  </main>
+</body>
+</html>

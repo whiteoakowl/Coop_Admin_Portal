@@ -80,6 +80,14 @@
         { href: '/admin/teachers', label: 'Teachers/Assistants' },
         { href: '/admin/teachers/instructor-profiles', label: 'Instructor Profiles' },
       ] },
+      // A real request: "Co-op admin portal add a tab called lesson
+      // plans... Admins can create lessons plans and assign them to a
+      // class to be used as an option." A reusable template library,
+      // separate from any one class's own Lessons tab (routes/admin-
+      // lesson-plans.js) - full-admin-only (routes/admin-lesson-plans.js's
+      // own router.use(requireFullAdmin)), same gate Settings above the
+      // Classes group already applies.
+      ...(isFullAdmin ? [{ href: '/admin/lesson-plans', icon: 'clipboard-list', label: 'Lesson Plans' }] : []),
       { href: '/admin/logs', icon: 'clipboard-list', label: 'Logs', subpages: [
         // Same bug/fix as Classes' own identical comment above - GET
         // /admin/logs with no ?tab= renders the Absence/Late tab

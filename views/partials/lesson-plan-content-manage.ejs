@@ -1,0 +1,202 @@
+<%# Lesson Plan content items (video/text/file/quiz/assignment upload/
+    assignment submission) - trimmed copy of views/partials/lesson-
+    content-manage.ejs (the real class Lesson's own version) for a
+    standalone template: no Open/Close Date (nothing to lock yet - no
+    class, no students), no per-item Due Date (only makes sense once a
+    copy is attached to a real class - see the lesson_plans migration's
+    own comment), and no "Review Submissions" link (no submissions can
+    exist against a template). plan/contentItems come from the including
+    page; basePath is always '/admin/lesson-plans'. %>
+<div class="manage-section">
+  <div class="grid-box-header">
+    <h2>Lesson Plan Details</h2>
+  </div>
+  <form method="POST" action="/admin/lesson-plans/<%= plan.id %>/edit" class="member-form-grid">
+    <label class="member-form-full">Title
+      <input type="text" name="title" value="<%= plan.title %>" required />
+    </label>
+    <label class="member-form-full">Description
+      <textarea name="description" rows="2"><%= plan.description || '' %></textarea>
+    </label>
+    <div class="member-form-full">
+      <button type="submit" class="primary-btn">Save Lesson Plan Details</button>
+    </div>
+  </form>
+</div>
+
+<div class="manage-section">
+  <div class="grid-box-header">
+    <h2>Content (<%= contentItems.length %>)</h2>
+    <button type="button" class="roster-action-btn" onclick="document.getElementById('add-content-dialog').showModal()">+ Add Content</button>
+  </div>
+  <% if (contentItems.length === 0) { %>
+    <p class="roster-empty">No content added yet.</p>
+  <% } else { %>
+    <%
+      var CONTENT_TYPE_LABELS = {
+        video: 'Video', text: 'Text', file: 'File', quiz: 'Quiz',
+        assignment_upload: 'Upload', assignment_submission: 'Submission',
+      };
+    %>
+    <div class="roster-scroll">
+      <table class="roster-table members-table condensed-table table-stack-mobile">
+        <thead>
+          <tr><th></th><th>Content</th><th></th></tr>
+        </thead>
+        <tbody data-content-reorder-tbody data-assignment-id="<%= plan.id %>" data-reorder-url="/admin/lesson-plans/<%= plan.id %>/content/reorder">
+          <% contentItems.forEach(function(item) { %>
+            <tr data-content-reorder-row="<%= item.id %>">
+              <td class="roster-drag-col"><span data-content-reorder-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span></td>
+              <td class="roster-name-col table-stack-heading">
+                <button type="button" class="link-btn content-item-title-trigger" onclick="document.getElementById('edit-content-dialog-<%= item.id %>').showModal()"><%= item.title || '(untitled)' %></button>
+                <% if (item.type === 'video' && item.video_url) { %><div class="hint"><a href="<%= item.video_url %>" target="_blank" rel="noopener">Video link</a></div><% } %>
+                <% if (item.type === 'video' && item.description) { %><div class="hint"><%= item.description %></div><% } %>
+                <% if (item.type === 'file' && item.file_url) { %><div class="hint"><a href="<%= item.file_url %>" target="_blank" rel="noopener">File link</a></div><% } %>
+                <% if (item.type === 'file' && item.description) { %><div class="hint"><%= item.description %></div><% } %>
+                <% if (item.type === 'text' && item.body) { %><div class="hint plain-text-display"><%= item.body %></div><% } %>
+                <% if (item.type === 'quiz') { %><div class="hint"><%= item.questions.length %> question<%= item.questions.length === 1 ? '' : 's' %></div><% } %>
+                <% if (item.type === 'assignment_upload') { %>
+                  <% if (item.body) { %><div class="hint forum-editable-display"><%- item.body %></div><% } %>
+                  <% if (item.attachmentUrl) { %><div class="hint"><a href="<%= item.attachmentUrl %>" target="_blank" rel="noopener"><%= item.attachment_name || 'Attachment' %></a></div><% } %>
+                <% } %>
+                <% if (item.type === 'assignment_submission') { %>
+                  <% if (item.body) { %><div class="hint forum-editable-display"><%- item.body %></div><% } %>
+                  <div class="hint"><% if (item.points_possible != null) { %><%= item.points_possible %> points<% } %></div>
+                <% } %>
+              </td>
+              <td data-label="" class="table-stack-full">
+                <div class="roster-btn-row content-item-row-icons">
+                  <span class="content-item-type-label">Type: <%= CONTENT_TYPE_LABELS[item.type] || item.type %></span>
+                  <% if (item.type === 'quiz') { %>
+                    <a class="roster-action-btn content-item-manage-link" href="/admin/lesson-plans/content/<%= item.id %>/questions">Manage Questions</a>
+                  <% } %>
+                  <button type="button" class="icon-btn" onclick="document.getElementById('edit-content-dialog-<%= item.id %>').showModal()" aria-label="Edit <%= item.title || 'content' %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
+                  <form method="POST" action="/admin/lesson-plans/content/<%= item.id %>/delete" onsubmit="return confirm('Remove this content?');" class="inline-block-form">
+                    <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= item.title || 'content' %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <% contentItems.forEach(function(item) { %>
+      <dialog id="edit-content-dialog-<%= item.id %>" class="member-picker-dialog dialog-label-stack">
+        <form method="POST" action="/admin/lesson-plans/content/<%= item.id %>/edit" enctype="multipart/form-data">
+          <h3>Edit Content</h3>
+          <label>Title
+            <input type="text" name="title" value="<%= item.title || '' %>" />
+          </label>
+          <% if (item.type === 'video') { %>
+            <label>Video URL
+              <input type="url" name="videoUrl" value="<%= item.video_url || '' %>" placeholder="https://..." />
+            </label>
+            <label>Description
+              <textarea name="description" rows="2"><%= item.description || '' %></textarea>
+            </label>
+          <% } else if (item.type === 'text') { %>
+            <label>Description
+              <textarea name="body" rows="3"><%= item.body || '' %></textarea>
+            </label>
+          <% } else if (item.type === 'file') { %>
+            <label>File URL
+              <input type="url" name="fileUrl" value="<%= item.file_url || '' %>" placeholder="https://..." />
+            </label>
+            <label>Description
+              <textarea name="fileDescription" rows="2"><%= item.description || '' %></textarea>
+            </label>
+          <% } else if (item.type === 'quiz') { %>
+            <p class="hint">A quiz's own questions are edited from its "Manage Questions" link, not here.</p>
+          <% } else if (item.type === 'assignment_upload') { %>
+            <div data-forum-editor>
+              <label>Assignment Text</label>
+              <%- include('forum-editor-toolbar') %>
+              <div class="forum-editable" data-forum-editable contenteditable="true"><%- item.body || '' %></div>
+              <input type="hidden" name="assignmentBody" data-forum-body-input />
+            </div>
+            <% if (item.attachmentUrl) { %><p class="hint">Current file: <a href="<%= item.attachmentUrl %>" target="_blank" rel="noopener"><%= item.attachment_name || 'Attachment' %></a></p><% } %>
+            <label>Replace File <span class="hint">(optional - leave blank to keep the current one)</span>
+              <input type="file" name="attachment" accept=".doc,.docx,.pdf,.jpg,.jpeg,.png,.gif,.webp" />
+            </label>
+          <% } else if (item.type === 'assignment_submission') { %>
+            <div data-forum-editor>
+              <label>Description</label>
+              <%- include('forum-editor-toolbar') %>
+              <div class="forum-editable" data-forum-editable contenteditable="true"><%- item.body || '' %></div>
+              <input type="hidden" name="submissionBody" data-forum-body-input />
+            </div>
+            <label>Points Possible
+              <input type="number" name="submissionPointsPossible" min="0" value="<%= item.points_possible != null ? item.points_possible : '' %>" />
+            </label>
+          <% } %>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Save Changes</button>
+          </div>
+        </form>
+      </dialog>
+    <% }); %>
+  <% } %>
+
+  <dialog id="add-content-dialog" class="member-picker-dialog dialog-label-stack">
+    <form method="POST" action="/admin/lesson-plans/<%= plan.id %>/content" enctype="multipart/form-data" class="member-form-grid" data-toggle-form>
+      <h3>Add Content</h3>
+      <label class="member-form-full">Type
+        <select name="type" data-toggle-select>
+          <option value="video">Link to Video</option>
+          <option value="text">Text Description</option>
+          <option value="file">Link to File</option>
+          <option value="quiz">Quiz (with scoring)</option>
+          <option value="assignment_upload">Assignment Upload</option>
+          <option value="assignment_submission">Assignment Submission</option>
+        </select>
+      </label>
+      <label class="member-form-full">Title
+        <input type="text" name="title" />
+      </label>
+      <label class="member-form-full" data-toggle-field="video">Video URL
+        <input type="url" name="videoUrl" placeholder="https://..." />
+      </label>
+      <label class="member-form-full" data-toggle-field="video" style="display: none;">Description
+        <textarea name="description" rows="2"></textarea>
+      </label>
+      <label class="member-form-full" data-toggle-field="text" style="display: none;">Description
+        <textarea name="body" rows="3"></textarea>
+      </label>
+      <label class="member-form-full" data-toggle-field="file" style="display: none;">File URL
+        <input type="url" name="fileUrl" placeholder="https://..." />
+      </label>
+      <label class="member-form-full" data-toggle-field="file" style="display: none;">Description
+        <textarea name="fileDescription" rows="2"></textarea>
+      </label>
+      <p class="hint member-form-full" data-toggle-field="quiz" style="display: none;">A blank quiz will be added - add its questions afterward from the "Manage Questions" link.</p>
+      <div class="member-form-full" data-toggle-field="assignment_upload" style="display: none;" data-forum-editor>
+        <label>Assignment Text</label>
+        <%- include('forum-editor-toolbar') %>
+        <div class="forum-editable" data-forum-editable data-word-count-source contenteditable="true"></div>
+        <input type="hidden" name="assignmentBody" data-forum-body-input />
+        <p class="hint"><span data-word-count>0</span> words</p>
+      </div>
+      <label class="member-form-full" data-toggle-field="assignment_upload" style="display: none;">Attach a File <span class="hint">(doc, pdf, or image)</span>
+        <input type="file" name="attachment" accept=".doc,.docx,.pdf,.jpg,.jpeg,.png,.gif,.webp" />
+      </label>
+      <div class="member-form-full" data-toggle-field="assignment_submission" style="display: none;" data-forum-editor>
+        <label>Description</label>
+        <%- include('forum-editor-toolbar') %>
+        <div class="forum-editable" data-forum-editable contenteditable="true"></div>
+        <input type="hidden" name="submissionBody" data-forum-body-input />
+      </div>
+      <label class="member-form-full" data-toggle-field="assignment_submission" style="display: none;">Points Possible
+        <input type="number" name="submissionPointsPossible" min="0" />
+      </label>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+        <button type="submit" class="primary-btn">Add Content</button>
+      </div>
+    </form>
+  </dialog>
+</div>
+<script src="/js/lesson-drag-reorder.js"></script>
+<script src="/js/lesson-content-form.js"></script>
+<script src="/js/assignment-upload-word-count.js"></script>
