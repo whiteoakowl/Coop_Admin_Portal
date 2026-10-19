@@ -21,7 +21,7 @@
 const db = require('../db');
 const fs = require('fs');
 const path = require('path');
-const { todayISO, formatDateLabel } = require('./dates');
+const { todayISO, formatDateLabel, addDays, weekdayOf } = require('./dates');
 const { byLastName } = require('./members');
 const { createStorageClient, uploadFile, deleteFile, generateKey, publicUrl } = require('./storage');
 const { urlForUpload } = require('./uploadBackend');
@@ -535,6 +535,140 @@ async function deleteJournalEntry(id) {
   await db.prepare('DELETE FROM family_school_journal_entries WHERE id = ?').run(id);
 }
 
+// --- Planner: Annual Plan (the Planner subpage's own dated list - a
+// real request: "parent can create an annual plan for each student.
+// With dates, title, description etc.") ---
+
+async function annualPlanForStudent(studentId) {
+  const rows = await db
+    .prepare('SELECT * FROM family_school_annual_plan_entries WHERE student_id = ? ORDER BY start_date, id')
+    .all(studentId);
+  return rows.map((r) => ({
+    ...r,
+    startDateLabel: formatDateLabel(r.start_date),
+    endDateLabel: r.end_date ? formatDateLabel(r.end_date) : null,
+  }));
+}
+
+async function createAnnualPlanEntry({ studentId, startDate, endDate, title, description, createdByAccountId }) {
+  const info = await db
+    .prepare('INSERT INTO family_school_annual_plan_entries (student_id, start_date, end_date, title, description, created_by_account_id) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(studentId, startDate, endDate || null, title, description || null, createdByAccountId);
+  return info.lastInsertRowid;
+}
+
+async function getAnnualPlanEntry(id) {
+  return db.prepare('SELECT * FROM family_school_annual_plan_entries WHERE id = ?').get(id);
+}
+
+async function deleteAnnualPlanEntry(id) {
+  await db.prepare('DELETE FROM family_school_annual_plan_entries WHERE id = ?').run(id);
+}
+
+// --- Planner: Weekly Plan Grid (the Planner subpage's own per-week
+// spreadsheet - a real request, with a real decision behind its shape:
+// "View weekly plan grid for each student. Be able to add rows and
+// columns to create plan grid for the week per student," confirmed to
+// mean one independently-editable grid per student PER CALENDAR WEEK,
+// stepped through with Prev/Next the same way family_school_attendance's
+// own calendar already is - not one single reusable template.) ---
+
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// Always that week's own Monday, regardless of which day of the week
+// `dateIso` itself falls on - the Weekly Plan page's own Prev/Next
+// buttons step a whole week at a time from here, same as
+// family_school_attendance's own month math.
+function mondayOf(dateIso) {
+  const weekday = weekdayOf(dateIso); // 0=Sun..6=Sat (utils/dates.js's own weekdayOf)
+  return addDays(dateIso, weekday === 0 ? -6 : 1 - weekday);
+}
+
+async function getWeeklyPlan(studentId, weekStartDate) {
+  return db.prepare('SELECT * FROM family_school_weekly_plans WHERE student_id = ? AND week_start_date = ?').get(studentId, weekStartDate);
+}
+
+async function getWeeklyPlanById(id) {
+  return db.prepare('SELECT * FROM family_school_weekly_plans WHERE id = ?').get(id);
+}
+
+async function getWeeklyPlanColumn(id) {
+  return db.prepare('SELECT * FROM family_school_weekly_plan_columns WHERE id = ?').get(id);
+}
+
+async function getWeeklyPlanRow(id) {
+  return db.prepare('SELECT * FROM family_school_weekly_plan_rows WHERE id = ?').get(id);
+}
+
+// Lazily creates the plan row the first time this student's grid for
+// this particular week is ever opened, seeded with one column per
+// actual day of that week (Monday through Sunday, labeled by weekday
+// name) as a sensible starting point - rows start empty (a parent's own
+// subjects/periods, not something to guess), and a parent can still add
+// to or delete from the seeded columns same as any other.
+async function getOrCreateWeeklyPlan(studentId, weekStartDate) {
+  const existing = await getWeeklyPlan(studentId, weekStartDate);
+  if (existing) return existing;
+  const info = await db.prepare('INSERT INTO family_school_weekly_plans (student_id, week_start_date) VALUES (?, ?)').run(studentId, weekStartDate);
+  const planId = info.lastInsertRowid;
+  for (let i = 0; i < 7; i++) {
+    const dayIso = addDays(weekStartDate, i);
+    await db.prepare('INSERT INTO family_school_weekly_plan_columns (plan_id, label, position) VALUES (?, ?, ?)').run(planId, WEEKDAY_NAMES[weekdayOf(dayIso)], i);
+  }
+  return { id: planId, student_id: studentId, week_start_date: weekStartDate };
+}
+
+// The whole grid, ready to render: columns in order, each row in order
+// carrying its own cells array already lined up one-to-one with
+// `columns` (a cell with no saved content yet is just '').
+async function weeklyPlanGrid(studentId, weekStartDate) {
+  const plan = await getOrCreateWeeklyPlan(studentId, weekStartDate);
+  const columns = await db.prepare('SELECT * FROM family_school_weekly_plan_columns WHERE plan_id = ? ORDER BY position, id').all(plan.id);
+  const rows = await db.prepare('SELECT * FROM family_school_weekly_plan_rows WHERE plan_id = ? ORDER BY position, id').all(plan.id);
+  const cells =
+    rows.length > 0
+      ? await db.prepare(`SELECT * FROM family_school_weekly_plan_cells WHERE row_id IN (${rows.map(() => '?').join(',')})`).all(...rows.map((r) => r.id))
+      : [];
+  const contentByKey = {};
+  for (const c of cells) contentByKey[`${c.row_id}:${c.column_id}`] = c.content;
+  return {
+    planId: plan.id,
+    columns,
+    rows: rows.map((r) => ({ ...r, cells: columns.map((c) => ({ columnId: c.id, content: contentByKey[`${r.id}:${c.id}`] || '' })) })),
+  };
+}
+
+async function addWeeklyPlanColumn(planId, label) {
+  const { next_position: nextPosition } = await db
+    .prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM family_school_weekly_plan_columns WHERE plan_id = ?')
+    .get(planId);
+  await db.prepare('INSERT INTO family_school_weekly_plan_columns (plan_id, label, position) VALUES (?, ?, ?)').run(planId, label, nextPosition);
+}
+
+async function addWeeklyPlanRow(planId, label) {
+  const { next_position: nextPosition } = await db
+    .prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM family_school_weekly_plan_rows WHERE plan_id = ?')
+    .get(planId);
+  await db.prepare('INSERT INTO family_school_weekly_plan_rows (plan_id, label, position) VALUES (?, ?, ?)').run(planId, label, nextPosition);
+}
+
+async function deleteWeeklyPlanColumn(id) {
+  await db.prepare('DELETE FROM family_school_weekly_plan_columns WHERE id = ?').run(id);
+}
+
+async function deleteWeeklyPlanRow(id) {
+  await db.prepare('DELETE FROM family_school_weekly_plan_rows WHERE id = ?').run(id);
+}
+
+async function setWeeklyPlanCell(rowId, columnId, content) {
+  await db
+    .prepare(
+      `INSERT INTO family_school_weekly_plan_cells (row_id, column_id, content, updated_at) VALUES (?, ?, ?, now_text())
+       ON CONFLICT (row_id, column_id) DO UPDATE SET content = excluded.content, updated_at = now_text()`
+    )
+    .run(rowId, columnId, content || null);
+}
+
 module.exports = {
   CONTENT_ITEM_TYPES,
   attachmentUrl,
@@ -577,4 +711,18 @@ module.exports = {
   createJournalEntry,
   updateJournalEntry,
   deleteJournalEntry,
+  annualPlanForStudent,
+  createAnnualPlanEntry,
+  getAnnualPlanEntry,
+  deleteAnnualPlanEntry,
+  mondayOf,
+  getWeeklyPlanById,
+  getWeeklyPlanColumn,
+  getWeeklyPlanRow,
+  weeklyPlanGrid,
+  addWeeklyPlanColumn,
+  addWeeklyPlanRow,
+  deleteWeeklyPlanColumn,
+  deleteWeeklyPlanRow,
+  setWeeklyPlanCell,
 };

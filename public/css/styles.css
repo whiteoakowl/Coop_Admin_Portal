@@ -13825,6 +13825,15 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .fs-attendance-legend-present { background: var(--green); color: #fff; }
 .fs-attendance-legend-absent { background: var(--red); color: #fff; }
 
+/* Family School Management - Planner's own Weekly Plan Grid (views/
+   parent-family-school-planner.ejs). A real request: "Be able to add
+   rows and columns to create plan grid for the week per student." -
+   each cell is a plain text input sized to fill its own <td> so the
+   grid reads as a real spreadsheet, not a table of separate form
+   controls. */
+.fs-planner-grid-table th, .fs-planner-grid-table td { white-space: nowrap; }
+.fs-planner-cell-input { width: 100%; min-width: 8rem; border: 1px solid var(--border); border-radius: var(--control-radius); padding: 0.3rem 0.4rem; font: inherit; }
+
 /* Family School Management - Teacher Journal log (views/parent-family-
    school-journal.ejs). A real request: "Then a log below showing all
    entries." */

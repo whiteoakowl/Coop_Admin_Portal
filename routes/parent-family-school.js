@@ -55,7 +55,22 @@ const {
   updateJournalEntry,
   deleteJournalEntry,
   getJournalEntry,
+  annualPlanForStudent,
+  createAnnualPlanEntry,
+  getAnnualPlanEntry,
+  deleteAnnualPlanEntry,
+  mondayOf,
+  getWeeklyPlanById,
+  getWeeklyPlanColumn,
+  getWeeklyPlanRow,
+  weeklyPlanGrid,
+  addWeeklyPlanColumn,
+  addWeeklyPlanRow,
+  deleteWeeklyPlanColumn,
+  deleteWeeklyPlanRow,
+  setWeeklyPlanCell,
 } = require('../utils/familySchool');
+const { todayISO, isValidISODate, addDays, formatDateLabel } = require('../utils/dates');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 
 // Journal entries are stored as sanitized HTML (the rich-text editor's
@@ -584,6 +599,128 @@ router.post('/family-school/journal/:id/delete', async (req, res) => {
   if (!entry || !(await requireOwnStudent(req, entry.student_id))) return res.status(404).send('Not found');
   await deleteJournalEntry(entry.id);
   res.redirect(`/parent/family-school/journal?studentId=${entry.student_id}&notice=` + encodeURIComponent('Entry removed.'));
+});
+
+// --- Planner subpage - a real request: "Add a planner subpage. Here
+// parent can create an annual plan for each student. With dates, title,
+// description etc. View weekly plan grid for each student. Be able to
+// add rows and columns to create plan grid for the week per student." ---
+
+router.get('/family-school/planner', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
+  const isOwnStudent = selectedStudentId && familyStudents.some((s) => s.id === selectedStudentId);
+  const view = req.query.view === 'weekly' ? 'weekly' : 'annual';
+
+  const weekStartDate = mondayOf(isValidISODate(req.query.week) ? req.query.week : todayISO());
+  const prevWeek = addDays(weekStartDate, -7);
+  const nextWeek = addDays(weekStartDate, 7);
+
+  res.render('parent-family-school-planner', {
+    title: 'Planner',
+    familyStudents,
+    selectedStudentId: isOwnStudent ? selectedStudentId : null,
+    view,
+    annualPlan: isOwnStudent && view === 'annual' ? await annualPlanForStudent(selectedStudentId) : [],
+    weeklyGrid: isOwnStudent && view === 'weekly' ? await weeklyPlanGrid(selectedStudentId, weekStartDate) : null,
+    weekStartDate,
+    weekStartLabel: formatDateLabel(weekStartDate),
+    prevWeek,
+    nextWeek,
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+router.post('/family-school/planner/annual', async (req, res) => {
+  const studentId = parseInt(req.body.studentId, 10);
+  if (!(await requireOwnStudent(req, studentId))) return res.status(404).send('Not found');
+  const startDate = (req.body.startDate || '').trim();
+  const title = (req.body.title || '').trim();
+  const backUrl = `/parent/family-school/planner?view=annual&studentId=${studentId}`;
+  if (!isValidISODate(startDate)) return res.redirect(`${backUrl}&error=` + encodeURIComponent('A start date is required.'));
+  if (!title) return res.redirect(`${backUrl}&error=` + encodeURIComponent('A title is required.'));
+  const endDate = (req.body.endDate || '').trim();
+  await createAnnualPlanEntry({
+    studentId,
+    startDate,
+    endDate: isValidISODate(endDate) ? endDate : null,
+    title,
+    description: (req.body.description || '').trim(),
+    createdByAccountId: req.portalAccount.id,
+  });
+  res.redirect(`${backUrl}&notice=` + encodeURIComponent('Plan entry added.'));
+});
+
+router.post('/family-school/planner/annual/:id/delete', async (req, res) => {
+  const entry = await getAnnualPlanEntry(parseInt(req.params.id, 10));
+  if (!entry || !(await requireOwnStudent(req, entry.student_id))) return res.status(404).send('Not found');
+  await deleteAnnualPlanEntry(entry.id);
+  res.redirect(`/parent/family-school/planner?view=annual&studentId=${entry.student_id}&notice=` + encodeURIComponent('Plan entry removed.'));
+});
+
+// Shared by every Weekly Plan Grid write route below - a planId outside
+// this account's own family is simply not found, never a raw/unscoped
+// lookup (same "never trust an id from the request alone" rule
+// requireOwnClass/requireOwnLesson already document above).
+async function requireOwnWeeklyPlan(req, planId) {
+  const plan = await getWeeklyPlanById(planId);
+  if (!plan || !(await requireOwnStudent(req, plan.student_id))) return null;
+  return plan;
+}
+
+function plannerWeeklyBackUrl(plan) {
+  return `/parent/family-school/planner?view=weekly&studentId=${plan.student_id}&week=${plan.week_start_date}`;
+}
+
+router.post('/family-school/planner/weekly/:planId/columns', async (req, res) => {
+  const plan = await requireOwnWeeklyPlan(req, parseInt(req.params.planId, 10));
+  if (!plan) return res.status(404).send('Not found');
+  const label = (req.body.label || '').trim();
+  if (!label) return res.redirect(`${plannerWeeklyBackUrl(plan)}&error=` + encodeURIComponent('A column label is required.'));
+  await addWeeklyPlanColumn(plan.id, label);
+  res.redirect(plannerWeeklyBackUrl(plan));
+});
+
+router.post('/family-school/planner/weekly/:planId/rows', async (req, res) => {
+  const plan = await requireOwnWeeklyPlan(req, parseInt(req.params.planId, 10));
+  if (!plan) return res.status(404).send('Not found');
+  const label = (req.body.label || '').trim();
+  if (!label) return res.redirect(`${plannerWeeklyBackUrl(plan)}&error=` + encodeURIComponent('A row label is required.'));
+  await addWeeklyPlanRow(plan.id, label);
+  res.redirect(plannerWeeklyBackUrl(plan));
+});
+
+router.post('/family-school/planner/weekly/columns/:id/delete', async (req, res) => {
+  const column = await getWeeklyPlanColumn(parseInt(req.params.id, 10));
+  const plan = column && (await requireOwnWeeklyPlan(req, column.plan_id));
+  if (!plan) return res.status(404).send('Not found');
+  await deleteWeeklyPlanColumn(column.id);
+  res.redirect(plannerWeeklyBackUrl(plan));
+});
+
+router.post('/family-school/planner/weekly/rows/:id/delete', async (req, res) => {
+  const row = await getWeeklyPlanRow(parseInt(req.params.id, 10));
+  const plan = row && (await requireOwnWeeklyPlan(req, row.plan_id));
+  if (!plan) return res.status(404).send('Not found');
+  await deleteWeeklyPlanRow(row.id);
+  res.redirect(plannerWeeklyBackUrl(plan));
+});
+
+// AJAX endpoint (public/js/family-school-planner.js) - saves one cell's
+// own content on blur, no full page reload, same shape public/js/
+// family-school-attendance.js's own toggle fetch() already uses.
+router.post('/family-school/planner/weekly/cell', async (req, res) => {
+  const rowId = parseInt(req.body.rowId, 10);
+  const columnId = parseInt(req.body.columnId, 10);
+  const row = await getWeeklyPlanRow(rowId);
+  const plan = row && (await requireOwnWeeklyPlan(req, row.plan_id));
+  if (!plan) return res.status(404).json({ ok: false });
+  const column = await getWeeklyPlanColumn(columnId);
+  if (!column || column.plan_id !== row.plan_id) return res.status(404).json({ ok: false });
+  await setWeeklyPlanCell(rowId, columnId, (req.body.content || '').trim());
+  res.json({ ok: true });
 });
 
 module.exports = router;

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
+    <div class="roster-toolbar no-print">
+      <h1>Planner</h1>
+      <% if (familyStudents.length > 0) { %>
+        <form method="GET" action="/parent/family-school/planner" class="category-filter">
+          <label for="planner-student-select">Student</label>
+          <select id="planner-student-select" name="studentId" onchange="this.form.submit()">
+            <% familyStudents.forEach(function(s) { %>
+              <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
+            <% }); %>
+          </select>
+          <input type="hidden" name="view" value="<%= view %>" />
+        </form>
+      <% } %>
+    </div>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <% if (familyStudents.length === 0) { %>
+      <p class="roster-empty">No students in your family yet.</p>
+    <% } else { %>
+      <%# "Add a planner subpage. Here parent can create an annual plan
+          for each student... View weekly plan grid for each student."
+          Two independent views under one Planner page, same tab idiom
+          portal-profile.ejs's own Schedules/Event Signups tabs use. %>
+      <div class="view-tabs no-print">
+        <a class="view-tab<%= view === 'annual' ? ' active' : '' %>" href="?view=annual&studentId=<%= selectedStudentId %>">Annual Plan</a>
+        <a class="view-tab<%= view === 'weekly' ? ' active' : '' %>" href="?view=weekly&studentId=<%= selectedStudentId %>">Weekly Plan</a>
+      </div>
+
+      <% if (view === 'annual') { %>
+        <div class="roster-toolbar no-print">
+          <h2>Annual Plan</h2>
+          <div class="roster-btn-row">
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-plan-entry-dialog').showModal()">+ New Plan Entry</button>
+          </div>
+        </div>
+
+        <% if (annualPlan.length === 0) { %>
+          <p class="roster-empty">No plan entries yet. Add one to get started.</p>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table table-stack-mobile">
+              <thead><tr><th>Dates</th><th>Title</th><th>Description</th><th></th></tr></thead>
+              <tbody>
+                <% annualPlan.forEach(function(e) { %>
+                  <tr>
+                    <td data-label="Dates" class="table-stack-heading"><%= e.startDateLabel %><% if (e.endDateLabel) { %> &ndash; <%= e.endDateLabel %><% } %></td>
+                    <td data-label="Title"><%= e.title %></td>
+                    <td data-label="Description"><%= e.description || '' %></td>
+                    <td class="roster-btn-row accounting-row-icons">
+                      <form method="POST" action="/parent/family-school/planner/annual/<%= e.id %>/delete" data-confirm="Remove this plan entry? This cannot be undone.">
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <dialog id="add-plan-entry-dialog" class="class-form-dialog">
+          <form method="POST" action="/parent/family-school/planner/annual">
+            <input type="hidden" name="studentId" value="<%= selectedStudentId %>" />
+            <div class="class-form-dialog-header">
+              <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-calendar-check"/></svg></span>
+              <h3>New Plan Entry</h3>
+            </div>
+            <label>Start Date
+              <input type="date" name="startDate" required />
+            </label>
+            <label>End Date <span class="hint">(optional)</span>
+              <input type="date" name="endDate" />
+            </label>
+            <label>Title
+              <input type="text" name="title" required />
+            </label>
+            <label>Description
+              <textarea name="description" rows="2"></textarea>
+            </label>
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Add Entry</button>
+            </div>
+          </form>
+        </dialog>
+      <% } else { %>
+        <%# "View weekly plan grid for each student. Be able to add rows
+            and columns to create plan grid for the week per student."
+            Prev/Next Week nav mirrors Family Attendance's own Prev/Next
+            Month row exactly (same roster-btn-row-fit-text fix). %>
+        <div class="roster-btn-row roster-btn-row-fit-text">
+          <a class="btn-secondary" href="?view=weekly&studentId=<%= selectedStudentId %>&week=<%= prevWeek %>">&larr; Prev Week</a>
+          <strong><%= weekStartLabel %></strong>
+          <a class="btn-secondary" href="?view=weekly&studentId=<%= selectedStudentId %>&week=<%= nextWeek %>">Next Week &rarr;</a>
+        </div>
+
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table fs-planner-grid-table" data-fs-planner-grid data-cell-url="/parent/family-school/planner/weekly/cell">
+            <thead>
+              <tr>
+                <th></th>
+                <% weeklyGrid.columns.forEach(function(c) { %>
+                  <th>
+                    <%= c.label %>
+                    <form method="POST" action="/parent/family-school/planner/weekly/columns/<%= c.id %>/delete" data-confirm="Delete the &quot;<%= c.label %>&quot; column? This removes its cell content too." class="inline-block-form">
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete column" title="Delete column"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </th>
+                <% }); %>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (weeklyGrid.rows.length === 0) { %>
+                <tr><td colspan="<%= weeklyGrid.columns.length + 1 %>" class="roster-empty">No rows yet. Add one below (e.g. a subject or period).</td></tr>
+              <% } %>
+              <% weeklyGrid.rows.forEach(function(r) { %>
+                <tr>
+                  <th>
+                    <%= r.label %>
+                    <form method="POST" action="/parent/family-school/planner/weekly/rows/<%= r.id %>/delete" data-confirm="Delete the &quot;<%= r.label %>&quot; row? This removes its cell content too." class="inline-block-form">
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete row" title="Delete row"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </th>
+                  <% r.cells.forEach(function(cell) { %>
+                    <td>
+                      <input type="text" class="fs-planner-cell-input" data-fs-planner-cell data-row-id="<%= r.id %>" data-column-id="<%= cell.columnId %>" data-saved-content="<%= cell.content %>" value="<%= cell.content %>" />
+                    </td>
+                  <% }); %>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="roster-btn-row no-print">
+          <form method="POST" action="/parent/family-school/planner/weekly/<%= weeklyGrid.planId %>/columns" class="category-filter">
+            <input type="text" name="label" placeholder="New column label" required />
+            <button type="submit" class="roster-action-btn">+ Column</button>
+          </form>
+          <form method="POST" action="/parent/family-school/planner/weekly/<%= weeklyGrid.planId %>/rows" class="category-filter">
+            <input type="text" name="label" placeholder="New row label" required />
+            <button type="submit" class="roster-action-btn">+ Row</button>
+          </form>
+        </div>
+      <% } %>
+    <% } %>
+  </main>
+  <script src="/js/family-school-planner.js"></script>
+</body>
+</html>
