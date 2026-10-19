@@ -42,13 +42,15 @@ test.after(() => {
   fs.rmSync(testUploadsDir, { recursive: true, force: true });
 });
 
+let parentCounter = 0;
 async function createParentAndLogin() {
-  const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('Shared Calendar Family')").run()).lastInsertRowid;
+  parentCounter += 1;
+  const familyId = (await db.prepare('INSERT INTO families (name) VALUES (?)').run(`Shared Calendar Family ${parentCounter}`)).lastInsertRowid;
   const code = await generateMemberCode();
   const parentInfo = await db
-    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, is_primary_parent, active) VALUES ('Shared Calendar Parent', ?, ?, 'parent', ?, 1, 1)")
-    .run(code, code, familyId);
-  const email = 'shared-calendar-parent@example.com';
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, is_primary_parent, active) VALUES (?, ?, ?, 'parent', ?, 1, 1)")
+    .run(`Shared Calendar Parent ${parentCounter}`, code, code, familyId);
+  const email = `shared-calendar-parent-${parentCounter}@example.com`;
   await db
     .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text())")
     .run(parentInfo.lastInsertRowid, email, hashPassword('testpassword123'));
@@ -117,4 +119,23 @@ test('a logged-out visitor to /events?view=calendar still gets the plain public 
   assert.equal(res.status, 200);
   assert.match(res.text, /class="site-header"/);
   assert.match(res.text, /id="event-month-select"/);
+});
+
+// A real request: "The dates on the calendar view should only be
+// October dates. If viewing November it should only show November
+// dates. Currently it shows a few of the dates from the previous month
+// and upcoming dates for the next month."
+test('the calendar grid blanks out leading/trailing days from adjacent months instead of showing their date numbers', async () => {
+  const cookie = await createParentAndLogin();
+
+  // October 2026 starts on a Thursday (4 leading September padding
+  // days) and has exactly 31 days of its own, needing exactly 5 grid
+  // rows (utils/events.js's own monthGrid already drops any 6th,
+  // all-next-month row) - so exactly 31 day-number <div>s should ever
+  // render, one per real October date, never one for a leading
+  // September or trailing November padding cell.
+  const page = await request(app).get('/events?view=calendar&month=2026-10').set('Cookie', cookie);
+  assert.equal(page.status, 200);
+  const dayNumberDivs = page.text.match(/<div>\d+<\/div>/g) || [];
+  assert.equal(dayNumberDivs.length, 31, 'exactly one day-number div per real October date, none for adjacent-month padding days');
 });

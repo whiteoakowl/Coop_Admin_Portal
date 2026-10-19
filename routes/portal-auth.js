@@ -477,6 +477,23 @@ async function renderProfile(req, res, error, notice, activeTab) {
     signups = Array.from(monthsByKey.values());
   }
 
+  // A real request: "Below the family section it should show what
+  // sections and portals the member has permissions for" - the exact
+  // same Sections/Portal Roles lookup member-profile-card.ejs's own GET
+  // /portal/family/:memberId already does for a FAMILY member, here for
+  // the signed-in account's own member instead. Only computed for the
+  // 'profile' tab - the Schedules/Signups tabs above never render it.
+  let memberSections = [];
+  let memberPortalRoles = null;
+  if (tab === 'profile') {
+    const allSections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
+    const memberSectionIds = (await sectionIdsForMembers([member.id]))[member.id];
+    const portalStatus = (await portalStatusForMembers([member.id]))[member.id];
+    const allRoles = await db.prepare('SELECT * FROM roles ORDER BY label').all();
+    memberSections = allSections.filter((s) => memberSectionIds.has(s.id));
+    memberPortalRoles = portalStatus.account ? allRoles.filter((r) => portalStatus.roleIds.has(r.id)) : null;
+  }
+
   res.render('portal-profile', {
     title: 'My Profile',
     member,
@@ -489,6 +506,8 @@ async function renderProfile(req, res, error, notice, activeTab) {
     activeTab: tab,
     schedule,
     signups,
+    memberSections,
+    memberPortalRoles,
     gradeOptions: GRADE_OPTIONS,
     dayLabels: CLASS_DAY_LABELS_FULL,
     error,
@@ -512,11 +531,20 @@ router.get('/portal/profile', async (req, res) => {
 // IS the account's complete, real family roster, so a memberId outside
 // it (someone else's family, or a typo) simply isn't found in that list -
 // never a raw, unscoped `SELECT * FROM members WHERE id = ?`.
+// Shared by the read-only card and its own edit page below - a memberId
+// outside this account's own family is simply not found in family's own
+// list, never a raw/unscoped `SELECT * FROM members WHERE id = ?`.
+async function requireOwnFamilyMember(req, memberId) {
+  const family = await familyForAccount(req.portalAccount.id);
+  const member = family.find((m) => m.id === memberId);
+  return member ? { family, member } : null;
+}
+
 router.get('/portal/family/:memberId', async (req, res) => {
   if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile');
-  const family = await familyForAccount(req.portalAccount.id);
-  const member = family.find((m) => m.id === parseInt(req.params.memberId, 10));
-  if (!member) return res.status(404).send('Not found');
+  const found = await requireOwnFamilyMember(req, parseInt(req.params.memberId, 10));
+  if (!found) return res.status(404).send('Not found');
+  const { family, member } = found;
   member.birthdayLabel = member.birthday ? formatDateNumeric(member.birthday) : null;
 
   const familyRow = member.family_id ? await db.prepare('SELECT name FROM families WHERE id = ?').get(member.family_id) : null;
@@ -533,7 +561,58 @@ router.get('/portal/family/:memberId', async (req, res) => {
     famChildren: family.filter((m) => m.member_type === 'student'),
     memberSections: allSections.filter((s) => memberSectionIds.has(s.id)),
     memberPortalRoles: portalStatus.account ? allRoles.filter((r) => portalStatus.roleIds.has(r.id)) : null,
+    // A real request: "When clicking on a child or adult profile there
+    // it should allow parent to edit their profiles as well, not just
+    // view" - member-profile-card.ejs's own editHref local (already
+    // used by the Co-op/Main Admin versions of this same shared card)
+    // just needed a target here too.
+    editHref: `/portal/family/${member.id}/edit`,
   });
+});
+
+router.get('/portal/family/:memberId/edit', async (req, res) => {
+  if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile');
+  const found = await requireOwnFamilyMember(req, parseInt(req.params.memberId, 10));
+  if (!found) return res.status(404).send('Not found');
+  res.render('parent-member-profile-edit', {
+    title: `Edit ${found.member.name}`,
+    member: found.member,
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
+
+// Deliberately narrow - the same "just contact info" field set (name/
+// address/city/state/zip/phone/email/medicalNotes) POST /portal/profile
+// already restricts a member to editing on themselves, now also
+// available for a parent editing another member of their own family.
+// member_type, birthday, grade_level, family_id, and admin positions
+// never appear in this request at all, for the same reason POST
+// /portal/profile's own header comment gives.
+router.post('/portal/family/:memberId/edit', async (req, res) => {
+  if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile');
+  const memberId = parseInt(req.params.memberId, 10);
+  const found = await requireOwnFamilyMember(req, memberId);
+  if (!found) return res.status(404).send('Not found');
+
+  const name = (req.body.name || '').trim();
+  if (!name) return res.redirect(`/portal/family/${memberId}/edit?error=` + encodeURIComponent('Name is required.'));
+
+  await db
+    .prepare('UPDATE members SET name = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?, medical_notes = ? WHERE id = ?')
+    .run(
+      name,
+      (req.body.address || '').trim() || null,
+      (req.body.city || '').trim() || null,
+      (req.body.state || '').trim() || null,
+      (req.body.zip || '').trim() || null,
+      (req.body.phone || '').trim() || null,
+      (req.body.email || '').trim() || null,
+      (req.body.medicalNotes || '').trim() || null,
+      memberId
+    );
+
+  res.redirect(`/portal/family/${memberId}/edit?notice=` + encodeURIComponent('Profile updated.'));
 });
 
 // Deliberately narrow - only the fields the admin-side membership form

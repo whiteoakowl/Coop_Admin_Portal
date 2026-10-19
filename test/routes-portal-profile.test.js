@@ -207,6 +207,27 @@ test('Event Signups tab is grouped by month, then by event, with a dropdown show
   assert.doesNotMatch(otherPage.text, /Fall Festival/);
 });
 
+// A real request: "Below the family section it should show what
+// sections and portals the member has permissions for."
+test('My Profile shows the signed-in member\'s own Sections and Portal Roles below My Family', async () => {
+  const parent = await createParentAccount();
+  const sectionInfo = await db.prepare("INSERT INTO sections (name) VALUES ('Teen Co-op')").run();
+  await db.prepare('INSERT INTO member_sections (member_id, section_id) VALUES (?, ?)').run(parent.memberId, sectionInfo.lastInsertRowid);
+
+  const page = await request(app).get('/portal/profile').set('Cookie', parent.cookie);
+  assert.equal(page.status, 200);
+  const familyIndex = page.text.indexOf('>My Family<');
+  const sectionsIndex = page.text.indexOf('>Sections<');
+  const teenCoopIndex = page.text.indexOf('Teen Co-op');
+  const portalRolesIndex = page.text.indexOf('>Portal Roles<');
+  const parentRoleIndex = page.text.indexOf('<li>Parent</li>');
+  assert.ok(familyIndex !== -1 && sectionsIndex !== -1 && teenCoopIndex !== -1 && portalRolesIndex !== -1 && parentRoleIndex !== -1, 'all four markers must be present');
+  assert.ok(
+    familyIndex < sectionsIndex && sectionsIndex < teenCoopIndex && teenCoopIndex < portalRolesIndex && portalRolesIndex < parentRoleIndex,
+    'Sections/Portal Roles must render below My Family, each with its own data'
+  );
+});
+
 test('signing out and hitting the profile page redirects to login', async () => {
   const res = await request(app).get('/portal/profile');
   assert.equal(res.status, 302);

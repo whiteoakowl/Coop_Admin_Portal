@@ -69,7 +69,9 @@ var otherChildren = famChildren.filter(function(m) { return m.id !== member.id; 
         a page this detailed - same conditional-row treatment, so a
         member who HAS one of these still sees it. %>
     <% if (member.member_code) { %><p class="member-profile-contact-row"><svg class="icon"><use href="#icon-badge"/></svg> Member ID: <%= member.member_code %></p><% } %>
-    <% if (member.member_type === 'student' && member.birthdayLabel) { %><p class="member-profile-contact-row"><svg class="icon"><use href="#icon-calendar-check"/></svg> Born <%= member.birthdayLabel %></p><% } %>
+    <%# A real request: "instead of born and the birthday it should have
+        a cake icon and say birthday." %>
+    <% if (member.member_type === 'student' && member.birthdayLabel) { %><p class="member-profile-contact-row"><svg class="icon"><use href="#icon-cake"/></svg> Birthday <%= member.birthdayLabel %></p><% } %>
     <% if (member.medical_notes) { %><p class="member-profile-contact-row member-profile-medical-row"><svg class="icon"><use href="#icon-medical-bag"/></svg> <%= member.medical_notes %></p><% } %>
   </div>
 </div>

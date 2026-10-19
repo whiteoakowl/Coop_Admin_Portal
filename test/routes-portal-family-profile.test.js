@@ -65,16 +65,62 @@ test('My Profile page lists other family members as clickable names into /portal
   assert.doesNotMatch(page.text, new RegExp(`href="/portal/family/${parent.parentId}"`));
 });
 
-test('clicking a family member\'s name renders the shared Member Profile card, read-only', async () => {
+test('clicking a family member\'s name renders the shared Member Profile card, with an Edit link into its own edit page', async () => {
   const parent = await createParentAccount();
   const page = await request(app).get(`/portal/family/${parent.studentId}`).set('Cookie', parent.cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /Member Profile/);
   assert.match(page.text, new RegExp(`Family Profile Kid ${familyCounter}`));
   assert.match(page.text, /3rd Grade/);
-  // Read-only - no Edit button in the banner, unlike Co-op/Main Admin's
-  // own version of this same shared partial.
-  assert.doesNotMatch(page.text, /roster-action-btn" href="[^"]*\/edit"/);
+  // A later real request: "When clicking on a child or adult profile
+  // there it should allow parent to edit their profiles as well, not
+  // just view" - unlike the old read-only behavior, an Edit link into
+  // /portal/family/:id/edit now appears in the banner, same as Co-op/
+  // Main Admin's own version of this shared partial.
+  assert.match(page.text, new RegExp(`roster-action-btn" href="/portal/family/${parent.studentId}/edit"`));
+});
+
+test('a parent can edit a family member\'s contact info, but never their birthday/grade level/member type', async () => {
+  const parent = await createParentAccount();
+  const editPage = await request(app).get(`/portal/family/${parent.studentId}/edit`).set('Cookie', parent.cookie);
+  assert.equal(editPage.status, 200);
+  assert.match(editPage.text, new RegExp(`value="Family Profile Kid ${familyCounter}"`));
+  assert.match(editPage.text, /disabled/, 'birthday/grade level still render disabled on this form too');
+
+  const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(editPage.text)[1];
+  const res = await request(app)
+    .post(`/portal/family/${parent.studentId}/edit`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ name: 'Family Profile Kid Updated', phone: '555-4321', medicalNotes: 'Peanut allergy', birthday: '2000-01-01', gradeLevel: '9th Grade', memberType: 'admin', _csrf: csrfToken });
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /notice=/);
+
+  const updated = await db.prepare('SELECT name, phone, medical_notes, birthday, grade_level, member_type FROM members WHERE id = ?').get(parent.studentId);
+  assert.equal(updated.name, 'Family Profile Kid Updated');
+  assert.equal(updated.phone, '555-4321');
+  assert.equal(updated.medical_notes, 'Peanut allergy');
+  assert.equal(updated.grade_level, '3rd Grade', 'grade level must never change through this route');
+  assert.equal(updated.member_type, 'student', 'member type can never be spoofed to admin through this route');
+});
+
+test('a parent cannot view or edit another family\'s member by guessing an id', async () => {
+  const parent = await createParentAccount();
+  const otherFamily = await createParentAccount();
+
+  const getRes = await request(app).get(`/portal/family/${otherFamily.studentId}/edit`).set('Cookie', parent.cookie);
+  assert.equal(getRes.status, 404);
+
+  const ownPage = await request(app).get('/portal/profile').set('Cookie', parent.cookie);
+  const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(ownPage.text)[1];
+  const postRes = await request(app)
+    .post(`/portal/family/${otherFamily.studentId}/edit`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ name: 'Hijacked Name', _csrf: csrfToken });
+  assert.equal(postRes.status, 404);
+  const untouched = await db.prepare('SELECT name FROM members WHERE id = ?').get(otherFamily.studentId);
+  assert.notEqual(untouched.name, 'Hijacked Name');
 });
 
 test('a parent cannot view a member outside their own family by guessing an id', async () => {

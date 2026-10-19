@@ -40,7 +40,7 @@
   </div>
 </div>
 
-<% if (calendar.weeks.every(function(w) { return w.every(function(d) { return d.events.length === 0; }); })) { %>
+<% if (calendar.weeks.every(function(w) { return w.every(function(d) { return !d.inMonth || d.events.length === 0; }); })) { %>
   <p class="roster-empty">No published events this month.</p>
 <% } %>
 <div class="roster-scroll">
@@ -49,13 +49,29 @@
     <tbody>
       <% calendar.weeks.forEach(function(week) { %>
         <tr>
+          <%# A real request: "The dates on the calendar view should only
+              be October dates. If viewing November it should only show
+              November dates. Currently it shows a few of the dates from
+              the previous month and upcoming dates for the next month."
+              monthGrid (utils/events.js) still pads the grid with
+              adjacent-month days so every week is a real 7-day row and
+              the weekday columns line up - that part is unchanged - but
+              a leading/trailing cell (day.inMonth === false) now renders
+              as a plain blank cell instead of showing the other month's
+              own date number (and, incidentally, its events - an event
+              on Oct 31 no longer shows twice, once on October's own
+              grid and once padding November's). %>
           <% week.forEach(function(day) { %>
-            <td class="<%= day.inMonth ? '' : 'hint' %>">
-              <div><%= day.day %></div>
-              <% day.events.forEach(function(e) { %>
-                <a href="<%= eventHref(e) %>" class="badge-pill<%= e.status === 'cancelled' ? ' event-title-cancelled' : '' %>" style="<%= e.categoryColor ? `background:${e.categoryColor};color:#fff;` : '' %> display:block; margin-top:2px;"><%= e.title %><% if (e.status === 'cancelled') { %> CANCELED<% } %></a>
-              <% }); %>
-            </td>
+            <% if (!day.inMonth) { %>
+              <td></td>
+            <% } else { %>
+              <td>
+                <div><%= day.day %></div>
+                <% day.events.forEach(function(e) { %>
+                  <a href="<%= eventHref(e) %>" class="badge-pill<%= e.status === 'cancelled' ? ' event-title-cancelled' : '' %>" style="<%= e.categoryColor ? `background:${e.categoryColor};color:#fff;` : '' %> display:block; margin-top:2px;"><%= e.title %><% if (e.status === 'cancelled') { %> CANCELED<% } %></a>
+                <% }); %>
+              </td>
+            <% } %>
           <% }); %>
         </tr>
       <% }); %>

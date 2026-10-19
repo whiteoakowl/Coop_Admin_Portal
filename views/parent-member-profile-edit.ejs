@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: sharedPortalTitle('My Profile'),
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle no-print"><a href="/portal/family/<%= member.id %>">&larr; Back to Member Profile</a></p>
+    <h1>Edit <%= member.name %></h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <%# A real request: "When clicking on a child or adult profile there
+        it should allow parent to edit their profiles as well, not just
+        view." Same narrow "just contact info" field set as POST
+        /portal/profile's own self-edit form - see that route's header
+        comment for why birthday/grade level/member type never appear
+        here either. %>
+    <form method="POST" action="/portal/family/<%= member.id %>/edit" class="member-form-grid">
+      <label class="member-form-full">Name
+        <input type="text" name="name" value="<%= member.name %>" required />
+      </label>
+      <label>Address
+        <input type="text" name="address" value="<%= member.address || '' %>" />
+      </label>
+      <label>City
+        <input type="text" name="city" value="<%= member.city || '' %>" />
+      </label>
+      <label>State
+        <input type="text" name="state" value="<%= member.state || '' %>" />
+      </label>
+      <label>Zip
+        <input type="text" name="zip" value="<%= member.zip || '' %>" />
+      </label>
+      <label>Phone
+        <input type="text" name="phone" value="<%= member.phone || '' %>" />
+      </label>
+      <label>Email
+        <input type="email" name="email" value="<%= member.email || '' %>" />
+      </label>
+
+      <label>Birthday <span class="hint">(contact an admin to change)</span>
+        <input type="text" value="<%= member.birthday || 'Not set' %>" disabled />
+      </label>
+      <label>Grade Level <span class="hint">(contact an admin to change)</span>
+        <input type="text" value="<%= member.grade_level || 'Not set' %>" disabled />
+      </label>
+
+      <label class="member-form-full">Medical/Allergy Notes
+        <textarea name="medicalNotes" rows="3"><%= member.medical_notes || '' %></textarea>
+      </label>
+
+      <div class="member-form-full">
+        <button type="submit" class="primary-btn">Save</button>
+      </div>
+    </form>
+  </main>
+</body>
+</html>
