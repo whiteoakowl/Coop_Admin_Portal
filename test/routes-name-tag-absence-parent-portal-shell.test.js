@@ -8,9 +8,20 @@
 // signed-in parent - losing their bottom tab bar and every other portal
 // link, exactly the bug /events had before its own fix (see views/
 // events-list.ejs). A signed-in parent now gets the real Parent Portal
-// nav shell around this same unchanged form; a signed-out visitor (the
-// real kiosk case) still gets the plain kiosk shell with its own
-// "Return to Home Screen" link.
+// nav shell around this same unchanged form; a signed-out visitor gets
+// the plain kiosk-styled shell either way.
+//
+// A later real request: "Quicklinks have been created for member to
+// quickly view ... absence/late form, name tag form ... When they go to
+// these quick links they should be stand alone pages not connected to
+// the kiosk. Member should not be able to access the kiosk by going to
+// these pages." A signed-out visitor is no longer automatically assumed
+// to be "the actual kiosk case" - the "Return to Home Screen" link back
+// to /kiosk (and the post-submit auto-redirect there) now only shows
+// when reached via the Kiosk home screen's own ?kiosk=1-tagged link
+// (routes/absence.js's/routes/name-tag.js's own isFromKiosk); a bare
+// Quick Link/QR code visit gets the same plain shell with no path back
+// into the kiosk at all.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -83,16 +94,35 @@ test('a signed-in parent visiting /absence gets the Parent Portal nav shell, not
   assert.match(res.text, /action="\/absence\/submit"/);
 });
 
-test('a signed-out kiosk visitor still gets the plain kiosk shell on /name-tag and /absence', async () => {
-  const nameTag = await request(app).get('/name-tag');
+test('a signed-out visitor reaching /name-tag and /absence from the Kiosk home screen (?kiosk=1) gets the plain kiosk shell with a Return to Home Screen link', async () => {
+  const nameTag = await request(app).get('/name-tag?kiosk=1');
   assert.equal(nameTag.status, 200);
   assert.match(nameTag.text, /class="public-page"/);
   assert.match(nameTag.text, /Return to Home Screen/);
   assert.doesNotMatch(nameTag.text, /class="admin-mobile-tabs"/);
 
-  const absence = await request(app).get('/absence');
+  const absence = await request(app).get('/absence?kiosk=1');
   assert.equal(absence.status, 200);
   assert.match(absence.text, /class="public-page"/);
   assert.match(absence.text, /Return to Home Screen/);
   assert.doesNotMatch(absence.text, /class="admin-mobile-tabs"/);
+});
+
+// A real request: "Quicklinks have been created for member to quickly
+// view ... absence/late form, name tag form ... When they go to these
+// quick links they should be stand alone pages not connected to the
+// kiosk. Member should not be able to access the kiosk by going to
+// these pages."
+test('a signed-out visitor reaching /name-tag and /absence directly (no ?kiosk=1) gets the plain shell but no path back to the kiosk', async () => {
+  const nameTag = await request(app).get('/name-tag');
+  assert.equal(nameTag.status, 200);
+  assert.match(nameTag.text, /class="public-page"/);
+  assert.doesNotMatch(nameTag.text, /Return to Home Screen/);
+  assert.doesNotMatch(nameTag.text, /href="\/kiosk"/);
+
+  const absence = await request(app).get('/absence');
+  assert.equal(absence.status, 200);
+  assert.match(absence.text, /class="public-page"/);
+  assert.doesNotMatch(absence.text, /Return to Home Screen/);
+  assert.doesNotMatch(absence.text, /href="\/kiosk"/);
 });

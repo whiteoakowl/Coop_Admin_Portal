@@ -12,9 +12,36 @@ const { publicFloaterCardsForDate } = require('../utils/substitutes');
 // same "pick a day" step Class Check-In's own kiosk flow already uses
 // (kiosk-class-checkin-days.ejs), and lands on that day's chart (below)
 // after.
+//
+// A later real request: "Quicklinks have been created for member to
+// quickly view ... floater assignments ... When they go to these quick
+// links they should be stand alone pages not connected to the kiosk.
+// Member should not be able to access the kiosk by going to these
+// pages." /volunteers and /volunteers/:day are the exact same bare URL
+// the Kiosk home screen's own Floater Assignments card links to (views/
+// kiosk-home.ejs) AND the one a member reaches directly via a Quick
+// Link/QR code/bookmark - with no way to tell those two visitors apart,
+// this used to always show the kiosk "Return to Home Screen" link (and
+// an idle timer that auto-navigates there too), which is exactly how a
+// Quick Link visitor could wander into the real, interactive Kiosk. A
+// fromKiosk flag - true only when kiosk-home.ejs's own links tag the
+// request with ?kiosk=1 - now gates every path back to /kiosk; a bare
+// visit (the Quick Link/QR code case) gets neither.
+function isFromKiosk(req) {
+  return req.query.kiosk === '1';
+}
+
 router.get('/volunteers', async (req, res) => {
   const days = (await listActiveClassDays()).map((d) => ({ value: d, label: DAY_LABELS[d] }));
-  res.render('kiosk-day-picker', { title: 'Floater Assignments', heading: 'Floater Assignments', basePath: '/volunteers', icon: 'icon-users', days });
+  const fromKiosk = isFromKiosk(req);
+  res.render('kiosk-day-picker', {
+    title: 'Floater Assignments',
+    heading: 'Floater Assignments',
+    basePath: '/volunteers',
+    icon: 'icon-users',
+    days,
+    fromKiosk,
+  });
 });
 
 // Public, no-login kiosk-style view: shows the floater assignment chart
@@ -27,6 +54,7 @@ router.get('/volunteers', async (req, res) => {
 router.get('/volunteers/:day', async (req, res) => {
   const day = req.params.day;
   if (!isValidClassDay(day)) return res.status(404).render('404', { title: 'Not Found' });
+  const fromKiosk = isFromKiosk(req);
 
   // getListByDay now creates this day's list (for whatever semester is
   // currently active - utils/kioskSettings.js) on demand if it doesn't
@@ -56,6 +84,7 @@ router.get('/volunteers/:day', async (req, res) => {
     date,
     dateLabel: date ? formatDateLabel(date) : null,
     cards,
+    fromKiosk,
   });
 });
 

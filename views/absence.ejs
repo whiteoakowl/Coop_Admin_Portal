@@ -17,6 +17,16 @@
   // Parent Portal nav shell instead, with this exact same form inside it;
   // a signed-out or non-parent visitor (the actual kiosk case) still gets
   // the plain kiosk header and its own "Return to Home Screen" link.
+  //
+  // A later real request: "Quicklinks have been created for member to
+  // quickly view ... absence/late form ... When they go to these quick
+  // links they should be stand alone pages not connected to the kiosk.
+  // Member should not be able to access the kiosk by going to these
+  // pages." A signed-out visitor is no longer automatically assumed to
+  // be "the actual kiosk case" - fromKiosk (routes/absence.js's own
+  // isFromKiosk) is only true when reached via the Kiosk home screen's
+  // own ?kiosk=1-tagged link, so a bare Quick Link/QR code visit gets
+  // neither the Parent Portal shell NOR any path back to /kiosk.
   const hasParentRole = portalRoles.some((r) => r.key === 'parent');
 %>
 <body<% if (!hasParentRole) { %> class="public-page"<% } %>>
@@ -26,7 +36,7 @@
     <%- include('partials/icon-sprite') %>
   <% } %>
   <main id="main-content" tabindex="-1" class="form-wrap<% if (hasParentRole) { %> admin-main<% } %>">
-    <% if (!hasParentRole) { %>
+    <% if (!hasParentRole && fromKiosk) { %>
       <a href="/kiosk" class="kiosk-home"><svg class="icon"><use href="#icon-home"/></svg> Return to Home Screen</a>
     <% } %>
     <div class="kiosk-header">
@@ -35,14 +45,15 @@
     </div>
 
     <% if (result) { %>
-      <dialog id="result-dialog" class="alert-popup-dialog <%= result.ok ? 'alert-popup-success' : 'alert-popup-error' %>" data-redirect-home="<%= result.ok && result.redirectHome ? '1' : '' %>">
+      <% const willRedirectHome = result.ok && result.redirectHome && fromKiosk; %>
+      <dialog id="result-dialog" class="alert-popup-dialog <%= result.ok ? 'alert-popup-success' : 'alert-popup-error' %>" data-redirect-home="<%= willRedirectHome ? '1' : '' %>">
         <svg class="icon alert-popup-icon"><use href="#<%= result.ok ? 'icon-check-circle' : 'icon-x-circle' %>"/></svg>
         <p class="alert-popup-message"><%= result.message %></p>
-        <button type="button" class="primary-btn alert-popup-ok" autofocus><%= result.ok ? 'Return to Home' : 'OK' %></button>
+        <button type="button" class="primary-btn alert-popup-ok" autofocus><%= willRedirectHome ? 'Return to Home' : 'OK' %></button>
       </dialog>
     <% } %>
 
-    <form method="POST" action="/absence/submit" id="absence-form" class="form-outer-panel" data-preserve-fullscreen>
+    <form method="POST" action="/absence/submit<%= fromKiosk ? '?kiosk=1' : '' %>" id="absence-form" class="form-outer-panel" data-preserve-fullscreen>
       <div class="form-section">
         <h2>Absence or Late</h2>
         <div class="stack-form">

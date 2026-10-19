@@ -12,6 +12,20 @@ const { unassignMemberForDate } = require('../utils/substitutes');
 // public, no-login endpoint with repeated attendance-record writes.
 const submitLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 10 });
 
+// A real request: "Quicklinks have been created for member to quickly
+// view ... absence/late form ... When they go to these quick links they
+// should be stand alone pages not connected to the kiosk. Member should
+// not be able to access the kiosk by going to these pages." /absence is
+// the exact same bare URL the Kiosk home screen's own Absence/Late Form
+// button links to AND the one a member reaches directly via a Quick
+// Link/QR code/bookmark - fromKiosk (true only when reached via
+// ?kiosk=1, the tag kiosk-home.ejs's own links now carry) gates the
+// "Return to Home Screen" link below (see the view's own hasParentRole
+// comment) and the post-submit auto-redirect-to-/kiosk (result.redirectHome).
+function isFromKiosk(req) {
+  return req.query.kiosk === '1';
+}
+
 router.get('/absence', async (req, res) => {
   res.render('absence', {
     title: 'Absence/Late Form',
@@ -19,10 +33,12 @@ router.get('/absence', async (req, res) => {
     childrenByParent: await familyGroupsByMember(),
     result: null,
     formValues: { type: 'absence', parentId: '', studentIds: [], sessionDate: '', reasonCategory: '', reason: '' },
+    fromKiosk: isFromKiosk(req),
   });
 });
 
 router.post('/absence/submit', async (req, res) => {
+  const fromKiosk = isFromKiosk(req);
   if (submitLimiter.isLimited(req.ip)) {
     return res.render('absence', {
       title: 'Absence/Late Form',
@@ -30,6 +46,7 @@ router.post('/absence/submit', async (req, res) => {
       childrenByParent: await familyGroupsByMember(),
       formValues: { type: 'absence', parentId: '', studentIds: [], sessionDate: '', reasonCategory: '', reason: '' },
       result: { ok: false, message: 'Too many submissions from this device. Please wait a few minutes and try again.' },
+      fromKiosk,
     });
   }
   submitLimiter.recordAttempt(req.ip);
@@ -53,7 +70,7 @@ router.post('/absence/submit', async (req, res) => {
   };
 
   function fail(message) {
-    return res.render('absence', { title: 'Absence/Late Form', parents, childrenByParent, formValues, result: { ok: false, message } });
+    return res.render('absence', { title: 'Absence/Late Form', parents, childrenByParent, formValues, result: { ok: false, message }, fromKiosk });
   }
 
   const parent = parentId ? parents.find((p) => p.id === parentId) : null;
@@ -147,7 +164,12 @@ router.post('/absence/submit', async (req, res) => {
     parents,
     childrenByParent,
     formValues: { type: 'absence', parentId: '', studentIds: [], sessionDate: '', reasonCategory: '', reason: '' },
+    // redirectHome only actually fires the auto-navigate-to-/kiosk
+    // behavior when fromKiosk is also true (views/absence.ejs's own
+    // data-redirect-home) - a standalone Quick Link submission just
+    // leaves the success message showing instead.
     result: { ok: true, message, redirectHome: true },
+    fromKiosk,
   });
 });
 

@@ -11,6 +11,18 @@ const REQUEST_TYPES = ['lost_tag', 'schedule_change', 'new_tag'];
 // still a real cap on this public, no-login endpoint.
 const submitLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 10 });
 
+// A real request: "Quicklinks have been created for member to quickly
+// view ... name tag form ... When they go to these quick links they
+// should be stand alone pages not connected to the kiosk. Member should
+// not be able to access the kiosk by going to these pages." Same
+// reasoning as routes/absence.js's own isFromKiosk - /name-tag is the
+// exact same bare URL the Kiosk home screen's own Name Tag Form button
+// links to AND the one a member reaches directly via a Quick Link/QR
+// code/bookmark.
+function isFromKiosk(req) {
+  return req.query.kiosk === '1';
+}
+
 router.get('/name-tag', async (req, res) => {
   const members = await activeMemberOptions();
   res.render('name-tag', {
@@ -21,10 +33,12 @@ router.get('/name-tag', async (req, res) => {
     activeDays: await listActiveClassDays(),
     dayLabels: CLASS_DAY_LABELS_FULL,
     formValues: { memberId: '', memberIds: [], requestType: '', day: '', description: '' },
+    fromKiosk: isFromKiosk(req),
   });
 });
 
 router.post('/name-tag/submit', async (req, res) => {
+  const fromKiosk = isFromKiosk(req);
   const activeDays = await listActiveClassDays();
   if (submitLimiter.isLimited(req.ip)) {
     const members = await activeMemberOptions();
@@ -36,6 +50,7 @@ router.post('/name-tag/submit', async (req, res) => {
       dayLabels: CLASS_DAY_LABELS_FULL,
       formValues: { memberId: '', memberIds: [], requestType: '', day: '', description: '' },
       result: { ok: false, message: 'Too many submissions from this device. Please wait a few minutes and try again.' },
+      fromKiosk,
     });
   }
   submitLimiter.recordAttempt(req.ip);
@@ -57,7 +72,7 @@ router.post('/name-tag/submit', async (req, res) => {
   };
 
   function fail(message) {
-    return res.render('name-tag', { title: 'Name Tag Form', members, familyByMember, activeDays, dayLabels: CLASS_DAY_LABELS_FULL, formValues, result: { ok: false, message } });
+    return res.render('name-tag', { title: 'Name Tag Form', members, familyByMember, activeDays, dayLabels: CLASS_DAY_LABELS_FULL, formValues, result: { ok: false, message }, fromKiosk });
   }
 
   const requester = requesterId ? members.find((m) => m.id === requesterId) : null;
@@ -85,7 +100,12 @@ router.post('/name-tag/submit', async (req, res) => {
     activeDays,
     dayLabels: CLASS_DAY_LABELS_FULL,
     formValues: { memberId: '', memberIds: [], requestType: '', day: '', description: '' },
+    // redirectHome only actually fires the auto-navigate-to-/kiosk
+    // behavior when fromKiosk is also true (views/name-tag.ejs's own
+    // data-redirect-home) - a standalone Quick Link submission just
+    // leaves the success message showing instead.
     result: { ok: true, message: `Request submitted for ${names}.`, redirectHome: true },
+    fromKiosk,
   });
 });
 

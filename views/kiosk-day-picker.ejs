@@ -6,9 +6,19 @@
 <body class="public-page">
   <%- include('partials/icon-sprite') %>
   <main id="main-content" tabindex="-1" class="form-wrap">
-    <div class="kiosk-inline-header">
-      <a href="/kiosk" class="kiosk-home kiosk-home-inline">&larr; Home</a>
-    </div>
+    <%# A real request: "Quicklinks have been created for member to
+        quickly view setup/cleanup team, floater assignments ... When
+        they go to these quick links they should be stand alone pages
+        not connected to the kiosk." fromKiosk (routes/setup.js's/
+        routes/volunteers.js's own isFromKiosk) is only true when this
+        page was reached from the Kiosk home screen's own link
+        (?kiosk=1) - a direct Quick Link/QR code visit gets no path back
+        to /kiosk at all. %>
+    <% if (fromKiosk) { %>
+      <div class="kiosk-inline-header">
+        <a href="/kiosk" class="kiosk-home kiosk-home-inline">&larr; Home</a>
+      </div>
+    <% } %>
     <h1><%= heading %></h1>
     <p class="subtitle">Choose a day to view.</p>
 
@@ -19,7 +29,7 @@
         listActiveClassDays), same catalog the Classes grid's own tabs use. %>
     <div class="landing-grid landing-grid-two">
       <% days.forEach(function(d) { %>
-        <a class="landing-card landing-card-purple" href="<%= basePath %>/<%= d.value %>">
+        <a class="landing-card landing-card-purple" href="<%= basePath %>/<%= d.value %><%= fromKiosk ? '?kiosk=1' : '' %>">
           <span class="landing-icon"><svg class="icon"><use href="#<%= icon %>"/></svg></span>
           <span class="landing-label"><%= d.label %></span>
         </a>

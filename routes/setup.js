@@ -10,9 +10,31 @@ const { teamsForDay, membersForTeam, datesForDay } = require('../utils/setup');
 // Wednesday pair - a real request: "Full 7 day expansion..."), same "pick
 // a day" step Class Check-In's own kiosk flow already uses, and lands on
 // that day's team list (below) after.
+//
+// A later real request: "Quicklinks have been created for member to
+// quickly view setup/cleanup team ... When they go to these quick links
+// they should be stand alone pages not connected to the kiosk. Member
+// should not be able to access the kiosk by going to these pages." See
+// routes/volunteers.js's own identical isFromKiosk comment - same bare
+// URL serves both the Kiosk home screen's own link AND a direct Quick
+// Link/QR code visit, with no way to tell them apart before this. A
+// fromKiosk flag - true only when kiosk-home.ejs's own links tag the
+// request with ?kiosk=1 - now gates every path back to /kiosk.
+function isFromKiosk(req) {
+  return req.query.kiosk === '1';
+}
+
 router.get('/setup', async (req, res) => {
   const days = (await listActiveClassDays()).map((d) => ({ value: d, label: DAY_LABELS[d] }));
-  res.render('kiosk-day-picker', { title: 'Setup/Cleanup Teams', heading: 'Setup/Cleanup Teams', basePath: '/setup', icon: 'icon-broom', days });
+  const fromKiosk = isFromKiosk(req);
+  res.render('kiosk-day-picker', {
+    title: 'Setup/Cleanup Teams',
+    heading: 'Setup/Cleanup Teams',
+    basePath: '/setup',
+    icon: 'icon-broom',
+    days,
+    fromKiosk,
+  });
 });
 
 // Public, no-login kiosk-style view: a real request - "setup/cleanup team
@@ -26,6 +48,7 @@ router.get('/setup', async (req, res) => {
 router.get('/setup/:day', async (req, res) => {
   const day = req.params.day;
   if (!isValidClassDay(day)) return res.status(404).render('404', { title: 'Not Found' });
+  const fromKiosk = isFromKiosk(req);
 
   const teams = await Promise.all((await teamsForDay(day)).map(async (t) => ({ ...t, members: await membersForTeam(t.id) })));
   // A real request: "should show the next upcoming date like floater
@@ -40,6 +63,7 @@ router.get('/setup/:day', async (req, res) => {
     dayLabel: DAY_LABELS[day],
     dateLabel: date ? formatDateLabel(date) : null,
     teams,
+    fromKiosk,
   });
 });
 

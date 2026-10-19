@@ -42,11 +42,19 @@ test('kiosk home: mobile grid/action bar and desktop/tablet top menu/columns bot
   const res = await request(app).get('/kiosk');
   assert.equal(res.status, 200);
 
+  // A real request: "Quicklinks have been created for member to quickly
+  // view setup/cleanup team, floater assignments, absence/late form,
+  // name tag form. When they go to these quick links they should be
+  // stand alone pages not connected to the kiosk." These 4 links now
+  // carry ?kiosk=1 (routes/setup.js's/routes/volunteers.js's/routes/
+  // absence.js's/routes/name-tag.js's own isFromKiosk) - that's what
+  // tells those routes this really is the physical kiosk, as opposed to
+  // a bare Quick Link visit.
   await t.test('the mobile-only bottom bar has all 5 top-menu links (Name Tag Form, Absence/Late Form, Find a Parent, Class Check In & Out, Admin) as icon-on-top/label-below tab items', () => {
     const groupMatch = /<footer class="landing-action-bar">([\s\S]*?)<\/footer>/.exec(res.text);
     assert.ok(groupMatch, 'expected a <footer class="landing-action-bar"> group');
-    assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/name-tag">/);
-    assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/absence">/);
+    assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/name-tag\?kiosk=1">/);
+    assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/absence\?kiosk=1">/);
     assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/kiosk\/find-parent">/);
     assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/kiosk\/class-checkin">/);
     assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/admin">/);
@@ -55,8 +63,8 @@ test('kiosk home: mobile grid/action bar and desktop/tablet top menu/columns bot
   await t.test('the desktop/tablet-only top menu bar has all 5 secondary links', () => {
     const groupMatch = /<nav class="landing-top-menu landing-desktop-only">([\s\S]*?)<\/nav>/.exec(res.text);
     assert.ok(groupMatch, 'expected a .landing-top-menu group');
-    assert.match(groupMatch[1], /<a class="landing-top-menu-link" href="\/name-tag">/);
-    assert.match(groupMatch[1], /<a class="landing-top-menu-link" href="\/absence">/);
+    assert.match(groupMatch[1], /<a class="landing-top-menu-link" href="\/name-tag\?kiosk=1">/);
+    assert.match(groupMatch[1], /<a class="landing-top-menu-link" href="\/absence\?kiosk=1">/);
     assert.match(groupMatch[1], /<a class="landing-top-menu-link" href="\/kiosk\/find-parent">/);
     assert.match(groupMatch[1], /<a class="landing-top-menu-link" href="\/kiosk\/class-checkin">/);
     assert.match(groupMatch[1], /<a class="landing-top-menu-link" href="\/admin">/);
@@ -68,8 +76,8 @@ test('kiosk home: mobile grid/action bar and desktop/tablet top menu/columns bot
     const [leftColumn, rightColumn] = groupMatch[1].split('<div class="landing-column">').slice(1);
     assert.match(leftColumn, /<a class="landing-card landing-card-green landing-card-wide" href="\/kiosk\/checkin">/);
     assert.match(leftColumn, /<a class="landing-card landing-card-green landing-card-wide" href="\/kiosk\/checkout">/);
-    assert.match(rightColumn, /<a class="landing-card landing-card-purple landing-card-wide" href="\/volunteers">/);
-    assert.match(rightColumn, /<a class="landing-card landing-card-purple landing-card-wide" href="\/setup">/);
+    assert.match(rightColumn, /<a class="landing-card landing-card-purple landing-card-wide" href="\/volunteers\?kiosk=1">/);
+    assert.match(rightColumn, /<a class="landing-card landing-card-purple landing-card-wide" href="\/setup\?kiosk=1">/);
   });
 
   await t.test('the mobile-only grid has exactly 4 cards, in order Check In, Check Out (green), Floater Assignments, Setup/Cleanup Teams (purple) - Name Tag Form/Absence/Late Form live in the bottom bar instead', () => {
@@ -79,8 +87,8 @@ test('kiosk home: mobile grid/action bar and desktop/tablet top menu/columns bot
     assert.deepEqual(labels, ['Check In', 'Check Out', 'Floater Assignments', 'Setup/Cleanup Teams']);
     assert.match(groupMatch[1], /<a class="landing-card landing-card-green" href="\/kiosk\/checkin">/);
     assert.match(groupMatch[1], /<a class="landing-card landing-card-green" href="\/kiosk\/checkout">/);
-    assert.match(groupMatch[1], /<a class="landing-card landing-card-purple" href="\/volunteers">/);
-    assert.match(groupMatch[1], /<a class="landing-card landing-card-purple" href="\/setup">/);
+    assert.match(groupMatch[1], /<a class="landing-card landing-card-purple" href="\/volunteers\?kiosk=1">/);
+    assert.match(groupMatch[1], /<a class="landing-card landing-card-purple" href="\/setup\?kiosk=1">/);
   });
 
   // A real request: "remove full screen button on all kiosk pages now

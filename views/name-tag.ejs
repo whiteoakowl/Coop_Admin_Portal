@@ -17,6 +17,16 @@
   // Portal nav shell instead, with this exact same form inside it; a
   // signed-out or non-parent visitor (the actual kiosk case) still gets
   // the plain kiosk header and its own "Return to Home Screen" link.
+  //
+  // A later real request: "Quicklinks have been created for member to
+  // quickly view ... name tag form ... When they go to these quick
+  // links they should be stand alone pages not connected to the kiosk.
+  // Member should not be able to access the kiosk by going to these
+  // pages." A signed-out visitor is no longer automatically assumed to
+  // be "the actual kiosk case" - fromKiosk (routes/name-tag.js's own
+  // isFromKiosk) is only true when reached via the Kiosk home screen's
+  // own ?kiosk=1-tagged link, so a bare Quick Link/QR code visit gets
+  // neither the Parent Portal shell NOR any path back to /kiosk.
   const hasParentRole = portalRoles.some((r) => r.key === 'parent');
 %>
 <body<% if (!hasParentRole) { %> class="public-page"<% } %>>
@@ -26,7 +36,7 @@
     <%- include('partials/icon-sprite') %>
   <% } %>
   <main id="main-content" tabindex="-1" class="form-wrap<% if (hasParentRole) { %> admin-main<% } %>">
-    <% if (!hasParentRole) { %>
+    <% if (!hasParentRole && fromKiosk) { %>
       <a href="/kiosk" class="kiosk-home"><svg class="icon"><use href="#icon-home"/></svg> Return to Home Screen</a>
     <% } %>
     <div class="kiosk-header">
@@ -38,7 +48,7 @@
       <div class="alert <%= result.ok ? 'alert-success' : 'alert-error' %>"><%= result.message %></div>
     <% } %>
 
-    <form method="POST" action="/name-tag/submit" id="name-tag-form" class="form-outer-panel" data-redirect-home="<%= result && result.redirectHome ? '1' : '' %>" data-preserve-fullscreen>
+    <form method="POST" action="/name-tag/submit<%= fromKiosk ? '?kiosk=1' : '' %>" id="name-tag-form" class="form-outer-panel" data-redirect-home="<%= result && result.redirectHome && fromKiosk ? '1' : '' %>" data-preserve-fullscreen>
       <%
         // activeMemberOptions (routes/name-tag.js) offers every active
         // member - parent, admin, or student - not just parents, so each

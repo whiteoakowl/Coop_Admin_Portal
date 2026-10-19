@@ -17,9 +17,22 @@
        Parent, Class Check In & Out, Admin) as the phone's own bottom menu.
        Lives outside .landing-wrap so it isn't constrained to that
        element's own centered max-width. -->
+  <%# A real request: "Quicklinks have been created for member to quickly
+      view setup/cleanup team, floater assignments, absence/late form,
+      name tag form. When they go to these quick links they should be
+      stand alone pages not connected to the kiosk. Member should not be
+      able to access the kiosk by going to these pages." /name-tag,
+      /absence, /setup, and /volunteers are shared by this kiosk screen
+      AND the admin-curated Quick Links (views/admin-settings.ejs,
+      views/main-admin-quick-links.ejs, both still bare URLs - no
+      ?kiosk=1 there, deliberately) - every ?kiosk=1 below is what tells
+      those 4 routes "this really is the physical kiosk" (see e.g.
+      routes/absence.js's own isFromKiosk), so only THESE links still
+      show a "Return to Home Screen" path back into the kiosk; a Quick
+      Link visit gets none. %>
   <nav class="landing-top-menu landing-desktop-only">
-    <a class="landing-top-menu-link" href="/name-tag"><svg class="icon"><use href="#icon-badge"/></svg> Name Tag Form</a>
-    <a class="landing-top-menu-link" href="/absence"><svg class="icon"><use href="#icon-clipboard-list"/></svg> Absence/Late Form</a>
+    <a class="landing-top-menu-link" href="/name-tag?kiosk=1"><svg class="icon"><use href="#icon-badge"/></svg> Name Tag Form</a>
+    <a class="landing-top-menu-link" href="/absence?kiosk=1"><svg class="icon"><use href="#icon-clipboard-list"/></svg> Absence/Late Form</a>
     <a class="landing-top-menu-link" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg> Find a Parent</a>
     <a class="landing-top-menu-link" href="/kiosk/class-checkin"><svg class="icon"><use href="#icon-graduation-cap"/></svg> Class Check In &amp; Out</a>
     <a class="landing-top-menu-link" href="/admin"><svg class="icon"><use href="#icon-lock"/></svg> Admin</a>
@@ -76,8 +89,8 @@
       see that partial's own comment. %>
   <%- include('partials/fullscreen-exit-pin-dialog', { verifyPinUrl: '/kiosk/fullscreen/verify-pin' }) %>
   <footer class="landing-action-bar">
-    <a class="landing-action-bar-btn" href="/name-tag"><svg class="icon"><use href="#icon-badge"/></svg><span>Name Tag Form</span></a>
-    <a class="landing-action-bar-btn" href="/absence"><svg class="icon"><use href="#icon-clipboard-list"/></svg><span>Absence/Late Form</span></a>
+    <a class="landing-action-bar-btn" href="/name-tag?kiosk=1"><svg class="icon"><use href="#icon-badge"/></svg><span>Name Tag Form</span></a>
+    <a class="landing-action-bar-btn" href="/absence?kiosk=1"><svg class="icon"><use href="#icon-clipboard-list"/></svg><span>Absence/Late Form</span></a>
     <a class="landing-action-bar-btn" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg><span>Find a Parent</span></a>
     <a class="landing-action-bar-btn" href="/kiosk/class-checkin"><svg class="icon"><use href="#icon-graduation-cap"/></svg><span>Class Check In &amp; Out</span></a>
     <a class="landing-action-bar-btn" href="/admin"><svg class="icon"><use href="#icon-lock"/></svg><span>Admin</span></a>
@@ -100,11 +113,11 @@
         </a>
       </div>
       <div class="landing-column">
-        <a class="landing-card landing-card-purple landing-card-wide" href="/volunteers">
+        <a class="landing-card landing-card-purple landing-card-wide" href="/volunteers?kiosk=1">
           <span class="landing-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
           <span class="landing-label">Floater Assignments</span>
         </a>
-        <a class="landing-card landing-card-purple landing-card-wide" href="/setup">
+        <a class="landing-card landing-card-purple landing-card-wide" href="/setup?kiosk=1">
           <span class="landing-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
           <span class="landing-label">Setup/Cleanup Teams</span>
         </a>
@@ -124,11 +137,11 @@
           <span class="landing-icon"><svg class="icon"><use href="#icon-log-out"/></svg></span>
           <span class="landing-label">Check Out</span>
         </a>
-        <a class="landing-card landing-card-purple" href="/volunteers">
+        <a class="landing-card landing-card-purple" href="/volunteers?kiosk=1">
           <span class="landing-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
           <span class="landing-label">Floater Assignments</span>
         </a>
-        <a class="landing-card landing-card-purple" href="/setup">
+        <a class="landing-card landing-card-purple" href="/setup?kiosk=1">
           <span class="landing-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
           <span class="landing-label">Setup/Cleanup Teams</span>
         </a>
