@@ -18,11 +18,13 @@ const multer = require('multer');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
+const { avatarColorFor } = require('../utils/members');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const { lessonAttachmentFileFilter } = require('../utils/uploads');
 const {
   CONTENT_ITEM_TYPES,
   classesForFamily,
+  overviewForFamily,
   getClass,
   createClass,
   updateClass,
@@ -45,6 +47,7 @@ const {
   gradeAssignmentSubmission,
   gradesForStudent,
   attendanceForStudent,
+  allAttendanceForStudent,
   toggleAttendance,
   monthGridDays,
   journalEntriesForStudent,
@@ -53,6 +56,14 @@ const {
   deleteJournalEntry,
   getJournalEntry,
 } = require('../utils/familySchool');
+const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+
+// Journal entries are stored as sanitized HTML (the rich-text editor's
+// own output) - plain text for a CSV cell, same inline strip-tags idiom
+// utils/events.js/utils/globalSearch.js already use elsewhere.
+function plainText(html) {
+  return (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
 
 router.use(requirePortalAuth, requirePortal('parent'));
 
@@ -90,10 +101,71 @@ async function requireOwnLesson(req, lessonId) {
   return { lesson, cls };
 }
 
+// A real request: "First subpage should be family school management.
+// This page shows a card per kid. Each card shows the students name,
+// grade level, list of family classes and their overall grade next to
+// each class. Also over gpa based on current individual class grades...
+// Each card also has the students profile picture from their profile.
+// Each card also has a total count of attendance days from family
+// management attendance per student. 1/180." The bare /family-school
+// landing page is this overview dashboard now - overviewForFamily
+// (utils/familySchool.js) does the per-student grade/GPA/attendance
+// aggregation; the actual class list moved to its own /classes subpage
+// below.
 router.get('/family-school', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
-  res.render('parent-family-school-classes', {
+  const students = await overviewForFamily(familyId);
+  // The Filter popover's own student checkbox list - a real request:
+  // "Make sure they are similar size, same height, fit to text" (for
+  // the Export/Print/Download/Filter row) meant this page needed a
+  // Filter control too, even though it has no existing per-student
+  // selector the way Attendance/Grades/Journal do. Narrows which cards
+  // render; an empty/missing selection means "show everyone" rather
+  // than "show no one".
+  const filterStudentIds = [].concat(req.query.studentId || []).map((v) => parseInt(v, 10));
+  res.render('parent-family-school-overview', {
     title: 'Family School Management',
+    students: filterStudentIds.length ? students.filter((s) => filterStudentIds.includes(s.id)) : students,
+    allStudents: students,
+    filterStudentIds,
+    avatarColorFor,
+  });
+});
+
+// Export/Print/Download/Filter buttons - a real request: "Add the
+// following buttons to each page. Export, print, download, filter."
+// Export is the summary one row per student (what the Overview cards
+// themselves show); Download is the detailed one row per student per
+// class breakdown - the same "current view vs. everything" split these
+// buttons use on every Family School Management page below.
+router.get('/family-school/export.csv', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const students = await overviewForFamily(familyId);
+  const lines = [
+    toCsvRow(['Student', 'Grade Level', 'GPA', 'Attendance']),
+    ...students.map((s) => toCsvRow([s.name, s.grade_level || '', s.gpa != null ? s.gpa.toFixed(2) : '', `${s.presentDays}/${s.attendanceTargetDays}`])),
+  ];
+  sendCsv(res, 'family-school-management.csv', lines);
+});
+
+router.get('/family-school/download.csv', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const students = await overviewForFamily(familyId);
+  const lines = [toCsvRow(['Student', 'Class', 'Grade %', 'Grade Letter'])];
+  for (const s of students) {
+    if (s.classes.length === 0) {
+      lines.push(toCsvRow([s.name, '', '', '']));
+      continue;
+    }
+    for (const c of s.classes) lines.push(toCsvRow([s.name, c.class_name, c.gradePercent != null ? c.gradePercent.toFixed(1) : '', c.gradeLetter || '']));
+  }
+  sendCsv(res, 'family-school-management-detail.csv', lines);
+});
+
+router.get('/family-school/classes', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  res.render('parent-family-school-classes', {
+    title: 'Family Classes',
     classes: await classesForFamily(familyId),
     notice: req.query.notice || null,
     error: req.query.error || null,
@@ -103,7 +175,7 @@ router.get('/family-school', async (req, res) => {
 router.post('/family-school/classes', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const className = (req.body.className || '').trim();
-  if (!className) return res.redirect('/parent/family-school?error=' + encodeURIComponent('A class name is required.'));
+  if (!className) return res.redirect('/parent/family-school/classes?error=' + encodeURIComponent('A class name is required.'));
   const id = await createClass({ familyId, className, description: (req.body.description || '').trim(), createdByAccountId: req.portalAccount.id });
   res.redirect(`/parent/family-school/classes/${id}?notice=` + encodeURIComponent('Class created.'));
 });
@@ -112,7 +184,7 @@ router.post('/family-school/classes/:id/delete', async (req, res) => {
   const cls = await requireOwnClass(req);
   if (!cls) return res.status(404).send('Not found');
   await deleteClass(cls.id);
-  res.redirect('/parent/family-school?notice=' + encodeURIComponent(`Deleted "${cls.class_name}".`));
+  res.redirect('/parent/family-school/classes?notice=' + encodeURIComponent(`Deleted "${cls.class_name}".`));
 });
 
 router.get('/family-school/classes/:id', async (req, res) => {
@@ -329,13 +401,43 @@ router.get('/family-school/grades', async (req, res) => {
   const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
   const isOwnStudent = selectedStudentId && familyStudents.some((s) => s.id === selectedStudentId);
   res.render('parent-family-school-grades', {
-    title: 'Family School - Grades',
+    title: 'Family Grades',
     familyStudents,
     selectedStudentId: isOwnStudent ? selectedStudentId : null,
     grades: isOwnStudent ? await gradesForStudent(selectedStudentId) : [],
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
+});
+
+router.get('/family-school/grades/export.csv', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
+  const student = familyStudents.find((s) => s.id === selectedStudentId);
+  const grades = student ? await gradesForStudent(student.id) : [];
+  const lines = [
+    toCsvRow(['Student', 'Class', 'Lesson', 'Assignment', 'Due', 'Submitted', 'Points Earned', 'Points Possible', 'Grade Letter']),
+    ...grades.map((g) =>
+      toCsvRow([student.name, g.class_name, g.lesson_title, g.item_title || '', g.dueDateLabel || '', g.submission_id ? 'Yes' : 'No', g.points_earned != null ? g.points_earned : '', g.points_possible != null ? g.points_possible : '', g.grade_letter || ''])
+    ),
+  ];
+  sendCsv(res, 'family-grades.csv', lines);
+});
+
+router.get('/family-school/grades/download.csv', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const lines = [toCsvRow(['Student', 'Class', 'Lesson', 'Assignment', 'Due', 'Submitted', 'Points Earned', 'Points Possible', 'Grade Letter'])];
+  for (const student of familyStudents) {
+    const grades = await gradesForStudent(student.id);
+    for (const g of grades) {
+      lines.push(
+        toCsvRow([student.name, g.class_name, g.lesson_title, g.item_title || '', g.dueDateLabel || '', g.submission_id ? 'Yes' : 'No', g.points_earned != null ? g.points_earned : '', g.points_possible != null ? g.points_possible : '', g.grade_letter || ''])
+      );
+    }
+  }
+  sendCsv(res, 'family-grades-all.csv', lines);
 });
 
 router.post('/family-school/grades/:contentItemId/:studentId', async (req, res) => {
@@ -374,7 +476,7 @@ router.get('/family-school/attendance', async (req, res) => {
   const year = req.query.year ? parseInt(req.query.year, 10) : now.getUTCFullYear();
   const month = req.query.month ? parseInt(req.query.month, 10) : now.getUTCMonth() + 1;
   res.render('parent-family-school-attendance', {
-    title: 'Family School - Attendance',
+    title: 'Family Attendance',
     familyStudents,
     selectedStudentId: isOwnStudent ? selectedStudentId : null,
     year,
@@ -398,6 +500,27 @@ router.post('/family-school/attendance/:studentId/toggle', async (req, res) => {
   res.json({ ok: true, status });
 });
 
+router.get('/family-school/attendance/export.csv', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
+  const student = familyStudents.find((s) => s.id === selectedStudentId);
+  const rows = student ? await allAttendanceForStudent(student.id) : [];
+  const lines = [toCsvRow(['Student', 'Date', 'Status']), ...rows.map((r) => toCsvRow([student.name, r.attendance_date, r.status]))];
+  sendCsv(res, 'family-attendance.csv', lines);
+});
+
+router.get('/family-school/attendance/download.csv', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const lines = [toCsvRow(['Student', 'Date', 'Status'])];
+  for (const student of familyStudents) {
+    const rows = await allAttendanceForStudent(student.id);
+    for (const r of rows) lines.push(toCsvRow([student.name, r.attendance_date, r.status]));
+  }
+  sendCsv(res, 'family-attendance-all.csv', lines);
+});
+
 // --- Teacher Journal subpage - a real request: "Subpage for teacher
 // journal. Add journal/notes entry by date and by student in the
 // family. Full edit description typing box. Then a log below showing
@@ -416,6 +539,27 @@ router.get('/family-school/journal', async (req, res) => {
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
+});
+
+router.get('/family-school/journal/export.csv', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
+  const student = familyStudents.find((s) => s.id === selectedStudentId);
+  const entries = student ? await journalEntriesForStudent(student.id) : [];
+  const lines = [toCsvRow(['Student', 'Date', 'Notes']), ...entries.map((e) => toCsvRow([student.name, e.entry_date, plainText(e.body)]))];
+  sendCsv(res, 'teacher-journal.csv', lines);
+});
+
+router.get('/family-school/journal/download.csv', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const lines = [toCsvRow(['Student', 'Date', 'Notes'])];
+  for (const student of familyStudents) {
+    const entries = await journalEntriesForStudent(student.id);
+    for (const e of entries) lines.push(toCsvRow([student.name, e.entry_date, plainText(e.body)]));
+  }
+  sendCsv(res, 'teacher-journal-all.csv', lines);
 });
 
 async function requireOwnStudent(req, studentId) {

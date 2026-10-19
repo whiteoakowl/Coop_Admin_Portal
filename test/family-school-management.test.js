@@ -180,7 +180,7 @@ test('a class/lesson/content item belonging to one family 404s for another famil
   const familyB = await createFamily('Isolation Family B');
   const parentB = await createPortalMember({ name: 'Isolation Parent B', familyId: familyB, memberType: 'parent', roleKey: 'parent' });
 
-  const listPage = await request(app).get('/parent/family-school').set('Cookie', parentB.cookie);
+  const listPage = await request(app).get('/parent/family-school/classes').set('Cookie', parentB.cookie);
   assert.doesNotMatch(listPage.text, /Family A Only Class/);
 
   const manageRes = await request(app).get(`/parent/family-school/classes/${classId}`).set('Cookie', parentB.cookie);
@@ -363,4 +363,142 @@ test('Family School classes never touch the co-op classes/class_staff/class_assi
   assert.equal(afterClasses, beforeClasses, 'creating a Family School class must not create a co-op class');
   assert.equal(afterStaff, beforeStaff, 'must not create any co-op class_staff row');
   assert.equal(afterAssignments, beforeAssignments, 'must not create any co-op class_assignments row');
+});
+
+// A real request: "First subpage should be family school management.
+// This page shows a card per kid. Each card shows the students name,
+// grade level, list of family classes and their overall grade next to
+// each class. Also over gpa based on current individual class grades...
+// Each card also has the students profile picture from their profile.
+// Each card also has a total count of attendance days from family
+// management attendance per student. 1/180."
+test('Overview: the bare /parent/family-school page shows a card per student with grade level, per-class grades, GPA, and attendance count', async () => {
+  const familyId = await createFamily('Overview Family');
+  const parent = await createPortalMember({ name: 'Overview Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const gradedStudent = await createPortalMember({ name: 'Overview Graded Student', familyId, memberType: 'student', roleKey: 'student' });
+  const ungradedStudent = await createPortalMember({ name: 'Overview Ungraded Student', familyId, memberType: 'student', roleKey: 'student' });
+  await db.prepare('UPDATE members SET grade_level = ? WHERE id = ?').run('5th Grade', gradedStudent.memberId);
+
+  const { createClass, assignClassToStudents, createLesson, createContentItem, submitAssignment, toggleAttendance } = require('../utils/familySchool');
+  const classId = await createClass({ familyId, className: 'Overview Class', description: null, createdByAccountId: null });
+  await assignClassToStudents(classId, [gradedStudent.memberId]);
+  const lessonId = await createLesson({ classId, title: 'Lesson', description: null, createdByAccountId: null });
+  const itemId = await createContentItem({ lessonId, type: 'assignment_submission', title: 'Quiz', pointsPossible: 20 });
+  await submitAssignment({ contentItemId: itemId, studentId: gradedStudent.memberId, fileUrl: 'key', fileName: 'quiz.pdf' });
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school');
+  await request(app)
+    .post(`/parent/family-school/grades/${itemId}/${gradedStudent.memberId}`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ pointsEarned: '18', gradeLetter: '', feedback: '', _csrf: csrf });
+
+  await toggleAttendance(gradedStudent.memberId, '2026-03-01');
+  await toggleAttendance(gradedStudent.memberId, '2026-03-02');
+  await toggleAttendance(gradedStudent.memberId, '2026-03-03');
+
+  const overview = await request(app).get('/parent/family-school').set('Cookie', parent.cookie);
+  assert.equal(overview.status, 200);
+  assert.match(overview.text, /Family School Management/);
+
+  assert.match(overview.text, /Overview Graded Student/);
+  assert.match(overview.text, /5th Grade/);
+  assert.match(overview.text, /Overview Class/);
+  assert.match(overview.text, />A</, '18/20 = 90% rounds to an A letter grade next to the class');
+  assert.match(overview.text, /4\.00/, 'a single graded class at an A (4.0 GPA points) averages to 4.00');
+  assert.match(overview.text, /3\/180/, 'present-day count over the 180-day target');
+
+  assert.match(overview.text, /Overview Ungraded Student/);
+  assert.match(overview.text, /0\/180/, 'a student with no attendance rows yet shows 0\\/180');
+  assert.match(overview.text, /No grade level set/);
+
+  const otherFamilyId = await createFamily('Overview Other Family');
+  const otherParent = await createPortalMember({ name: 'Overview Other Parent', familyId: otherFamilyId, memberType: 'parent', roleKey: 'parent' });
+  const otherOverview = await request(app).get('/parent/family-school').set('Cookie', otherParent.cookie);
+  assert.doesNotMatch(otherOverview.text, /Overview Graded Student/);
+  assert.doesNotMatch(otherOverview.text, /Overview Class/);
+});
+
+// A real request: "Add the following buttons to each page. Export,
+// print, download, filter." Export/Download are CSV downloads (Print is
+// just window.print(), nothing server-side to test); Filter is the
+// Overview page's own student checkbox set (Attendance/Grades/Journal
+// already had a student selector, just moved into the new Filter
+// popover - covered implicitly by their own existing tests above still
+// passing with the restructured toolbar).
+test('Overview: Export/Download CSV buttons and the Filter checkbox set', async () => {
+  const familyId = await createFamily('CSV Family');
+  const parent = await createPortalMember({ name: 'CSV Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const studentA = await createPortalMember({ name: 'CSV Student A', familyId, memberType: 'student', roleKey: 'student' });
+  const studentB = await createPortalMember({ name: 'CSV Student B', familyId, memberType: 'student', roleKey: 'student' });
+
+  const { createClass, assignClassToStudents } = require('../utils/familySchool');
+  const classId = await createClass({ familyId, className: 'CSV Class', description: null, createdByAccountId: null });
+  await assignClassToStudents(classId, [studentA.memberId]);
+
+  const summaryCsv = await request(app).get('/parent/family-school/export.csv').set('Cookie', parent.cookie);
+  assert.equal(summaryCsv.status, 200);
+  assert.match(summaryCsv.headers['content-type'], /text\/csv/);
+  assert.match(summaryCsv.text, /CSV Student A/);
+  assert.match(summaryCsv.text, /CSV Student B/);
+
+  const detailCsv = await request(app).get('/parent/family-school/download.csv').set('Cookie', parent.cookie);
+  assert.equal(detailCsv.status, 200);
+  assert.match(detailCsv.text, /CSV Class/);
+
+  // The Filter checkbox set narrows the Overview page's own cards (not
+  // the CSV downloads, which always cover the whole family). Student B
+  // still appears once, as an unchecked option inside the Filter
+  // popover itself - only its own card (the fs-overview-name heading)
+  // must be gone.
+  const filtered = await request(app).get(`/parent/family-school?studentId=${studentA.memberId}`).set('Cookie', parent.cookie);
+  assert.match(filtered.text, /CSV Student A/);
+  assert.doesNotMatch(filtered.text, /class="fs-overview-name">CSV Student B</);
+});
+
+test('Grades/Attendance/Journal: Export (one student) and Download (whole family) CSV buttons', async () => {
+  const familyId = await createFamily('Export Family');
+  const parent = await createPortalMember({ name: 'Export Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const studentA = await createPortalMember({ name: 'Export Student A', familyId, memberType: 'student', roleKey: 'student' });
+  const studentB = await createPortalMember({ name: 'Export Student B', familyId, memberType: 'student', roleKey: 'student' });
+
+  const { createClass, assignClassToStudents, createLesson, createContentItem, submitAssignment, gradeAssignmentSubmission, toggleAttendance, createJournalEntry } = require('../utils/familySchool');
+  const classId = await createClass({ familyId, className: 'Export Class', description: null, createdByAccountId: null });
+  await assignClassToStudents(classId, [studentA.memberId, studentB.memberId]);
+  const lessonId = await createLesson({ classId, title: 'Export Lesson', description: null, createdByAccountId: null });
+  const itemId = await createContentItem({ lessonId, type: 'assignment_submission', title: 'Export Assignment', pointsPossible: 10 });
+  await submitAssignment({ contentItemId: itemId, studentId: studentA.memberId, fileUrl: 'k', fileName: 'f.pdf' });
+  await gradeAssignmentSubmission({ contentItemId: itemId, studentId: studentA.memberId, pointsEarned: 9, gradeLetter: 'A-', feedback: '' });
+  await submitAssignment({ contentItemId: itemId, studentId: studentB.memberId, fileUrl: 'k', fileName: 'f.pdf' });
+  await gradeAssignmentSubmission({ contentItemId: itemId, studentId: studentB.memberId, pointsEarned: 5, gradeLetter: 'F', feedback: '' });
+  await toggleAttendance(studentA.memberId, '2026-04-01');
+  await toggleAttendance(studentB.memberId, '2026-04-02');
+  await createJournalEntry({ studentId: studentA.memberId, entryDate: '2026-04-01', body: '<p>Student A did great</p>', createdByAccountId: parent.accountId });
+  await createJournalEntry({ studentId: studentB.memberId, entryDate: '2026-04-02', body: '<p>Student B did ok</p>', createdByAccountId: parent.accountId });
+
+  const gradesExport = await request(app).get(`/parent/family-school/grades/export.csv?studentId=${studentA.memberId}`).set('Cookie', parent.cookie);
+  assert.match(gradesExport.text, /Export Student A/);
+  assert.doesNotMatch(gradesExport.text, /Export Student B/);
+  const gradesDownload = await request(app).get('/parent/family-school/grades/download.csv').set('Cookie', parent.cookie);
+  assert.match(gradesDownload.text, /Export Student A/);
+  assert.match(gradesDownload.text, /Export Student B/);
+
+  const attendanceExport = await request(app).get(`/parent/family-school/attendance/export.csv?studentId=${studentA.memberId}`).set('Cookie', parent.cookie);
+  assert.match(attendanceExport.text, /2026-04-01/);
+  assert.doesNotMatch(attendanceExport.text, /2026-04-02/);
+  const attendanceDownload = await request(app).get('/parent/family-school/attendance/download.csv').set('Cookie', parent.cookie);
+  assert.match(attendanceDownload.text, /2026-04-01/);
+  assert.match(attendanceDownload.text, /2026-04-02/);
+
+  const journalExport = await request(app).get(`/parent/family-school/journal/export.csv?studentId=${studentA.memberId}`).set('Cookie', parent.cookie);
+  assert.match(journalExport.text, /Student A did great/);
+  assert.doesNotMatch(journalExport.text, /Student B did ok/);
+  const journalDownload = await request(app).get('/parent/family-school/journal/download.csv').set('Cookie', parent.cookie);
+  assert.match(journalDownload.text, /Student A did great/);
+  assert.match(journalDownload.text, /Student B did ok/);
+
+  // Scoped to this family only.
+  const otherFamilyId = await createFamily('Export Other Family');
+  const otherParent = await createPortalMember({ name: 'Export Other Parent', familyId: otherFamilyId, memberType: 'parent', roleKey: 'parent' });
+  const otherGradesDownload = await request(app).get('/parent/family-school/grades/download.csv').set('Cookie', otherParent.cookie);
+  assert.doesNotMatch(otherGradesDownload.text, /Export Student/);
 });

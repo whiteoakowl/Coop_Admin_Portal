@@ -9,18 +9,33 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
     <div class="roster-toolbar no-print">
-      <h1>Grades</h1>
-      <% if (familyStudents.length > 0) { %>
-        <form method="GET" action="/parent/family-school/grades" class="category-filter">
-          <label for="grades-student-select">Student</label>
-          <select id="grades-student-select" name="studentId" onchange="this.form.submit()">
-            <% familyStudents.forEach(function(s) { %>
-              <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
-            <% }); %>
-          </select>
-        </form>
-      <% } %>
+      <h1>Family Grades</h1>
     </div>
+
+    <%# "Add the following buttons to each page. Export, print, download,
+        filter. Make sure they are the similar size, same height, fit to
+        text." Same restructure as Family Attendance's own toolbar - see
+        that view's comment. Export is this one selected student's
+        grades; Download is every family student's - see routes/parent-
+        family-school.js's own /grades/export.csv and /grades/download.csv. %>
+    <% if (familyStudents.length > 0) { %>
+      <div class="roster-btn-row roster-btn-row-fit-text no-print">
+        <a class="roster-action-btn file-action-btn" href="/parent/family-school/grades/export.csv?studentId=<%= selectedStudentId %>">Export</a>
+        <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+        <a class="roster-action-btn file-action-btn" href="/parent/family-school/grades/download.csv">Download</a>
+        <details class="filter-details">
+          <summary class="roster-action-btn">Filter</summary>
+          <form method="GET" action="/parent/family-school/grades" class="filter-panel">
+            <label for="grades-student-select">Student</label>
+            <select id="grades-student-select" name="studentId" onchange="this.form.submit()">
+              <% familyStudents.forEach(function(s) { %>
+                <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
+              <% }); %>
+            </select>
+          </form>
+        </details>
+      </div>
+    <% } %>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>

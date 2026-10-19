@@ -13758,6 +13758,46 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .instructor-profile-form input[type="text"],
 .instructor-profile-form textarea { font-weight: 400; }
 
+/* Family School Management - Overview dashboard (views/parent-family-
+   school-overview.ejs), the Parent Portal's new first subpage at the
+   bare /parent/family-school URL. A real request: "This page shows a
+   card per kid. Each card shows the students name, grade level, list of
+   family classes and their overall grade next to each class. Also over
+   gpa based on current individual class grades... profile picture...
+   total count of attendance days... 1/180." .fs-overview-avatar reuses
+   .member-avatar (Members list's own photo-or-initials circle) at a
+   larger size since it's the card's own header, not a table row. */
+.fs-overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+.fs-overview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem;
+}
+.fs-overview-card-header { display: flex; align-items: center; gap: 0.75rem; }
+.fs-overview-avatar { width: 56px; height: 56px; font-size: 1.3rem; }
+.fs-overview-name { margin: 0; }
+.fs-overview-stats { display: flex; gap: 0.75rem; }
+.fs-overview-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.65rem;
+  text-align: center;
+}
+.fs-overview-stat-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.02em; }
+.fs-overview-stat-value { font-size: 1.15rem; font-weight: 700; }
+.fs-overview-classes-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.fs-overview-classes-list li { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.fs-overview-classes-list li a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* Family School Management - Attendance calendar (views/parent-family-
    school-attendance.ejs). A real request: "View a calendar and mark days
    student is present for school by clicking on the date and it

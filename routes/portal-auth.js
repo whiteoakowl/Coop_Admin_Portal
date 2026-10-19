@@ -10,6 +10,7 @@ const { generateMemberCode } = require('../utils/members');
 const { createFailureRateLimiter } = require('../utils/loginRateLimit');
 const { GRADE_OPTIONS } = require('../utils/membership');
 const { CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
+const { CLASS_DAYS } = require('../utils/classDays');
 const { isValidISODate, formatDateNumeric } = require('../utils/dates');
 const { portalStatusForMembers, sectionIdsForMembers } = require('../utils/portalPermissions');
 const membershipHandbook = require('../utils/membershipHandbook');
@@ -362,6 +363,7 @@ router.get('/portal/settings', (req, res) => {
 // Co-op Admin login (routes/admin.js) isn't tied to any one member, so
 // it keeps its own separate /admin/settings instead.
 const PROFILE_TABS = ['profile', 'schedules', 'signups'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 async function renderProfile(req, res, error, notice, activeTab) {
   const member = await memberForAccount(req.portalAccount.id);
@@ -374,29 +376,105 @@ async function renderProfile(req, res, error, notice, activeTab) {
   let signups = [];
   const tab = PROFILE_TABS.includes(activeTab) ? activeTab : 'profile';
 
+  // A real request: "It will also have a tab for schedules, event
+  // signups" followed by "Schedules tab should be organized by family
+  // member and then by day under each family member" - the flat row set
+  // below is unchanged (still every class_enrollments/class_staff row
+  // across the whole family), just grouped into member -> day -> classes
+  // here instead of rendered as one flat table. CLASS_DAYS (utils/
+  // classDays.js) gives the sun-sat iteration order; family (already
+  // fetched above, self first then otherFamilyMembers order) gives a
+  // stable per-member section order instead of an alphabetical resort.
   if (tab === 'schedules') {
-    schedule = await db
+    const rows = await db
       .prepare(
-        `SELECT c.day, c.hour_position, c.class_name, c.room, c.start_time, c.end_time, m.name AS "memberName", 'Student' AS "role"
+        `SELECT c.day, c.hour_position, c.class_name, c.room, c.start_time, c.end_time, m.id AS "memberId", m.name AS "memberName", 'Student' AS "role"
          FROM class_enrollments ce JOIN classes c ON c.id = ce.class_id JOIN members m ON m.id = ce.student_id
          WHERE ce.student_id IN (${placeholders})
          UNION ALL
-         SELECT c.day, c.hour_position, c.class_name, c.room, c.start_time, c.end_time, m.name AS "memberName",
+         SELECT c.day, c.hour_position, c.class_name, c.room, c.start_time, c.end_time, m.id AS "memberId", m.name AS "memberName",
            CASE cs.role WHEN 'teacher' THEN 'Teacher' ELSE 'Assistant' END AS "role"
          FROM class_staff cs JOIN classes c ON c.id = cs.class_id JOIN members m ON m.id = cs.member_id
          WHERE cs.member_id IN (${placeholders})
          ORDER BY day, hour_position`
       )
       .all(...familyIds, ...familyIds);
+    const byMemberId = new Map();
+    for (const r of rows) {
+      if (!byMemberId.has(r.memberId)) byMemberId.set(r.memberId, new Map());
+      const byDay = byMemberId.get(r.memberId);
+      if (!byDay.has(r.day)) byDay.set(r.day, []);
+      byDay.get(r.day).push(r);
+    }
+    schedule = family.map((m) => {
+      const byDay = byMemberId.get(m.id);
+      return {
+        memberName: m.name,
+        days: byDay ? CLASS_DAYS.filter((d) => byDay.has(d)).map((d) => ({ day: d, classes: byDay.get(d) })) : [],
+      };
+    });
   } else if (tab === 'signups') {
-    signups = await db
+    // A later real request: "Event signup tab should be organized by
+    // month and then by event with drop down from the event to show who
+    // signed up and what you may have signed up for like food,
+    // volunteer etc." Three independent per-family queries (event
+    // registrations themselves, sign_up_list_claims, and
+    // volunteer_signup_list_signups - see utils/committeesAndSignupLists.js's
+    // own header comment for the schema these two sign-up-list tables
+    // share) merged into one event -> {registrations, items, shifts} map,
+    // since a family could show up on any of the three independently
+    // (e.g. claimed a food item for an event nobody in the family ever
+    // formally "registered" for).
+    const registrationRows = await db
       .prepare(
         `SELECT e.id, e.title, e.starts_at, er.status, m.name AS "memberName"
          FROM event_registrations er JOIN events e ON e.id = er.event_id JOIN members m ON m.id = er.member_id
-         WHERE er.member_id IN (${placeholders}) AND er.status != 'cancelled'
-         ORDER BY e.starts_at DESC`
+         WHERE er.member_id IN (${placeholders}) AND er.status != 'cancelled'`
       )
       .all(...familyIds);
+    const itemRows = await db
+      .prepare(
+        `SELECT sl.event_id AS "eventId", e.title, e.starts_at, sli.item_name AS "itemName", c.quantity_claimed AS "quantityClaimed", m.name AS "memberName"
+         FROM sign_up_list_claims c
+         JOIN sign_up_list_items sli ON sli.id = c.item_id
+         JOIN sign_up_lists sl ON sl.id = sli.list_id
+         JOIN events e ON e.id = sl.event_id
+         JOIN members m ON m.id = c.member_id
+         WHERE c.member_id IN (${placeholders}) AND sl.event_id IS NOT NULL`
+      )
+      .all(...familyIds);
+    const shiftRows = await db
+      .prepare(
+        `SELECT vl.event_id AS "eventId", e.title, e.starts_at, vs.job_name AS "jobName", vs.shift_date AS "shiftDate", vs.start_time AS "startTime", vs.end_time AS "endTime", m.name AS "memberName"
+         FROM volunteer_signup_list_signups s
+         JOIN volunteer_signup_list_shifts vs ON vs.id = s.shift_id
+         JOIN volunteer_signup_lists vl ON vl.id = vs.list_id
+         JOIN events e ON e.id = vl.event_id
+         JOIN members m ON m.id = s.member_id
+         WHERE s.member_id IN (${placeholders}) AND vl.event_id IS NOT NULL`
+      )
+      .all(...familyIds);
+
+    const eventsById = new Map();
+    function eventEntry(id, title, startsAt) {
+      if (!eventsById.has(id)) eventsById.set(id, { id, title, starts_at: startsAt, registrations: [], items: [], shifts: [] });
+      return eventsById.get(id);
+    }
+    for (const r of registrationRows) eventEntry(r.id, r.title, r.starts_at).registrations.push({ memberName: r.memberName, status: r.status });
+    for (const r of itemRows) eventEntry(r.eventId, r.title, r.starts_at).items.push({ itemName: r.itemName, memberName: r.memberName, quantityClaimed: r.quantityClaimed });
+    for (const r of shiftRows) eventEntry(r.eventId, r.title, r.starts_at).shifts.push({ jobName: r.jobName, shiftDate: r.shiftDate, startTime: r.startTime, endTime: r.endTime, memberName: r.memberName });
+
+    const events = Array.from(eventsById.values()).sort((a, b) => (a.starts_at || '').localeCompare(b.starts_at || ''));
+    const monthsByKey = new Map();
+    for (const ev of events) {
+      const monthKey = (ev.starts_at || '').slice(0, 7);
+      if (!monthsByKey.has(monthKey)) {
+        const [y, mo] = monthKey.split('-');
+        monthsByKey.set(monthKey, { monthLabel: `${MONTH_NAMES[parseInt(mo, 10) - 1]} ${y}`, events: [] });
+      }
+      monthsByKey.get(monthKey).events.push(ev);
+    }
+    signups = Array.from(monthsByKey.values());
   }
 
   res.render('portal-profile', {

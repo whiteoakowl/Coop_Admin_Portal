@@ -24,6 +24,17 @@ const path = require('path');
 const { todayISO, formatDateLabel } = require('./dates');
 const { byLastName } = require('./members');
 const { createStorageClient, uploadFile, deleteFile, generateKey, publicUrl } = require('./storage');
+const { urlForUpload } = require('./uploadBackend');
+
+// Same bucket/local-dir convention routes/admin-members.js/routes/member-
+// directory.js already established for member photos - read-only reuse
+// here (resolving a URL for an already-stored members.photo_path), not a
+// second upload path of its own.
+const MEMBER_PHOTOS_BUCKET = 'member-photos';
+const memberPhotosStorageClient = createStorageClient();
+function memberPhotoUrl(photoPath) {
+  return urlForUpload({ client: memberPhotosStorageClient, bucket: MEMBER_PHOTOS_BUCKET, webDir: '/uploads/members', key: photoPath });
+}
 
 const CONTENT_ITEM_TYPES = ['video', 'text', 'file', 'assignment_upload', 'assignment_submission'];
 
@@ -344,6 +355,86 @@ async function gradesForStudent(studentId) {
   }));
 }
 
+// A standard 90/80/70/60 cutoff and 4.0 letter-to-GPA-point scale - the
+// same convention most US schools (and this app's own grade_letter free-
+// text field elsewhere) already assume, used here only to turn a class's
+// own raw points_earned/points_possible into something summarizable
+// (a letter per class, a GPA across classes) for the Overview page below.
+function percentToLetterGrade(percent) {
+  if (percent == null) return null;
+  if (percent >= 90) return 'A';
+  if (percent >= 80) return 'B';
+  if (percent >= 70) return 'C';
+  if (percent >= 60) return 'D';
+  return 'F';
+}
+const LETTER_GRADE_GPA_POINTS = { A: 4, B: 3, C: 2, D: 1, F: 0 };
+
+// The Parent Portal's own Family School Management landing page (a real
+// request: "This page shows a card per kid. Each card shows the
+// students name, grade level, list of family classes and their overall
+// grade next to each class. Also over gpa based on current individual
+// class grades... Each card also has the students profile picture from
+// their profile. Each card also has a total count of attendance days
+// from family management attendance per student. 1/180.") - one row per
+// student in the family, each with:
+//   - every class assigned to them, with an aggregate grade (summed
+//     points_earned/points_possible across every graded
+//     assignment_submission content item in that class - no separate
+//     grades table, same "read live off the content items" approach
+//     gradesForStudent above already takes) turned into a letter grade;
+//     a class with nothing graded yet shows no grade rather than an F.
+//   - an overall GPA: the plain average of each GRADED class's own GPA
+//     points (a class with no grade yet doesn't drag the average down -
+//     "nothing graded" isn't the same as "failing").
+//   - a running count of 'present' attendance days against
+//     ATTENDANCE_TARGET_DAYS (180 - the number of instructional days
+//     most US states require of a homeschooler's year), e.g. "1/180".
+const ATTENDANCE_TARGET_DAYS = 180;
+
+async function overviewForFamily(familyId) {
+  const students = await db
+    .prepare("SELECT * FROM members WHERE family_id = ? AND member_type = 'student' AND active = 1 ORDER BY name COLLATE \"C\"")
+    .all(familyId);
+  return Promise.all(
+    students.map(async (student) => {
+      const classes = await classesForStudent(student.id);
+      const classesWithGrades = await Promise.all(
+        classes.map(async (cls) => {
+          const totals = await db
+            .prepare(
+              `SELECT COALESCE(SUM(s.points_earned), 0) AS earned, COALESCE(SUM(ci.points_possible), 0) AS possible
+               FROM family_school_lessons l
+               JOIN family_school_content_items ci ON ci.lesson_id = l.id AND ci.type = 'assignment_submission'
+               JOIN family_school_assignment_submissions s ON s.content_item_id = ci.id AND s.student_id = ? AND s.status = 'graded'
+               WHERE l.class_id = ?`
+            )
+            .get(student.id, cls.id);
+          const possible = Number(totals.possible);
+          const percent = possible > 0 ? (Number(totals.earned) / possible) * 100 : null;
+          return { ...cls, gradePercent: percent, gradeLetter: percentToLetterGrade(percent) };
+        })
+      );
+      const gradedClasses = classesWithGrades.filter((c) => c.gradeLetter);
+      const gpa =
+        gradedClasses.length > 0
+          ? gradedClasses.reduce((sum, c) => sum + LETTER_GRADE_GPA_POINTS[c.gradeLetter], 0) / gradedClasses.length
+          : null;
+      const presentDays = Number(
+        (await db.prepare("SELECT COUNT(*) AS n FROM family_school_attendance WHERE student_id = ? AND status = 'present'").get(student.id)).n
+      );
+      return {
+        ...student,
+        photoUrl: memberPhotoUrl(student.photo_path),
+        classes: classesWithGrades,
+        gpa,
+        presentDays,
+        attendanceTargetDays: ATTENDANCE_TARGET_DAYS,
+      };
+    })
+  );
+}
+
 // --- Attendance (the Attendance subpage - a real request: "View a
 // calendar and mark days student is present for school by clicking on
 // the date and it highlights gren. If you click again it becomes red
@@ -360,6 +451,14 @@ async function attendanceForStudent(studentId, year, month) {
   const byDate = {};
   for (const r of rows) byDate[r.attendance_date] = r.status;
   return byDate;
+}
+
+// Every attendance row ever marked for this student, oldest first - the
+// Export/Download CSV buttons' own data (unlike attendanceForStudent
+// above, which is deliberately scoped to one calendar month for the
+// Attendance page's own grid).
+async function allAttendanceForStudent(studentId) {
+  return db.prepare('SELECT attendance_date, status FROM family_school_attendance WHERE student_id = ? ORDER BY attendance_date').all(studentId);
 }
 
 // A plain weeks-of-the-month grid for the Attendance calendar - Sunday-
@@ -468,8 +567,10 @@ module.exports = {
   lessonsForStudentView,
   nextContentItemAfter,
   gradesForStudent,
+  overviewForFamily,
   monthGridDays,
   attendanceForStudent,
+  allAttendanceForStudent,
   toggleAttendance,
   journalEntriesForStudent,
   getJournalEntry,

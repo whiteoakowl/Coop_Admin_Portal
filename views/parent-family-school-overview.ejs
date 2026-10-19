@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="roster-toolbar no-print">
+      <h1>Family School Management</h1>
+      <div class="roster-btn-row roster-btn-row-fit-text">
+        <a class="btn-secondary" href="/parent/family-school/classes">Family Classes</a>
+        <a class="btn-secondary" href="/parent/family-school/grades">Family Grades</a>
+        <a class="btn-secondary" href="/parent/family-school/attendance">Family Attendance</a>
+      </div>
+    </div>
+
+    <%# "Add the following buttons to each page. Export, print, download,
+        filter. Make sure they are the similar size, same height, fit to
+        text." Export is the summary CSV (one row per student, same
+        numbers the cards below show); Download is the fuller one row
+        per student per class detail - see routes/parent-family-
+        school.js's own /export.csv and /download.csv comment. Filter is
+        the same <details>/<summary> popover idiom admin-rosters.ejs's
+        own Filter button already uses, here a plain checkbox-per-student
+        set (this page has no single-student selector the way Attendance/
+        Grades/Journal do, since it normally shows every student at once). %>
+    <div class="roster-btn-row roster-btn-row-fit-text no-print">
+      <a class="roster-action-btn file-action-btn" href="/parent/family-school/export.csv">Export</a>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+      <a class="roster-action-btn file-action-btn" href="/parent/family-school/download.csv">Download</a>
+      <% if (allStudents.length > 0) { %>
+        <details class="filter-details">
+          <summary class="roster-action-btn">Filter</summary>
+          <form method="GET" action="/parent/family-school" class="filter-panel">
+            <% allStudents.forEach(function(s) { %>
+              <label class="checkbox-option">
+                <input type="checkbox" name="studentId" value="<%= s.id %>" <%= filterStudentIds.includes(s.id) ? 'checked' : '' %> />
+                <%= s.name %>
+              </label>
+            <% }); %>
+            <button type="submit" class="primary-btn">Apply</button>
+          </form>
+        </details>
+      <% } %>
+    </div>
+
+    <%
+      // A grade letter -> badge-pill color, same soft-tint convention the
+      // rest of the app already uses for status (green=good, red=needs
+      // work) rather than inventing a new color scheme just for letters.
+      function gradeBadgeClass(letter) {
+        if (letter === 'A' || letter === 'B') return 'badge-pill-green';
+        if (letter === 'C') return 'badge-pill-gold';
+        if (letter === 'D' || letter === 'F') return 'badge-pill-red';
+        return 'badge-pill-gray';
+      }
+    %>
+
+    <% if (students.length === 0) { %>
+      <p class="roster-empty">No students in your family yet.</p>
+    <% } else { %>
+      <div class="fs-overview-grid">
+        <% students.forEach(function(s) { %>
+          <div class="fs-overview-card">
+            <div class="fs-overview-card-header">
+              <span class="member-avatar fs-overview-avatar member-avatar-<%= avatarColorFor(s.id) %>">
+                <% if (s.photoUrl) { %>
+                  <img src="<%= s.photoUrl %>" alt="" />
+                <% } else { %>
+                  <%= s.name.charAt(0).toUpperCase() %>
+                <% } %>
+              </span>
+              <div>
+                <h3 class="fs-overview-name"><%= s.name %></h3>
+                <p class="hint"><%= s.grade_level || 'No grade level set' %></p>
+              </div>
+            </div>
+
+            <div class="fs-overview-stats">
+              <div class="fs-overview-stat">
+                <span class="fs-overview-stat-label">GPA</span>
+                <span class="fs-overview-stat-value"><%= s.gpa != null ? s.gpa.toFixed(2) : '—' %></span>
+              </div>
+              <div class="fs-overview-stat">
+                <span class="fs-overview-stat-label">Attendance</span>
+                <span class="fs-overview-stat-value"><%= s.presentDays %>/<%= s.attendanceTargetDays %></span>
+              </div>
+            </div>
+
+            <div class="fs-overview-classes">
+              <% if (s.classes.length === 0) { %>
+                <p class="roster-empty">Not assigned to any family classes yet.</p>
+              <% } else { %>
+                <ul class="fs-overview-classes-list">
+                  <% s.classes.forEach(function(c) { %>
+                    <li>
+                      <a href="/parent/family-school/classes/<%= c.id %>"><%= c.class_name %></a>
+                      <span class="badge-pill <%= gradeBadgeClass(c.gradeLetter) %>"><%= c.gradeLetter || 'No grade yet' %></span>
+                    </li>
+                  <% }); %>
+                </ul>
+              <% } %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

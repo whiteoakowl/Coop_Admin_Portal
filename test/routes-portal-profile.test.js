@@ -140,6 +140,73 @@ test('Event Signups tab lists the family\'s event registrations', async () => {
   assert.match(page.text, /badge-pill-green">Confirmed</);
 });
 
+// A later real request: "Schedules tab should be organized by family
+// member and then by day under each family member."
+test('Schedules tab is grouped by family member, then by day under each member', async () => {
+  const parent = await createParentAccount();
+  const mondayClass = await db
+    .prepare("INSERT INTO classes (day, hour_position, class_name, room, start_time, end_time) VALUES ('monday', 1, 'Monday Art', 'Room 5', '9:00 AM', '10:00 AM')")
+    .run();
+  const wednesdayClass = await db
+    .prepare("INSERT INTO classes (day, hour_position, class_name, room, start_time, end_time) VALUES ('wednesday', 1, 'Wednesday Science', 'Room 6', '11:00 AM', '12:00 PM')")
+    .run();
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(mondayClass.lastInsertRowid, parent.studentId);
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(wednesdayClass.lastInsertRowid, parent.studentId);
+
+  const page = await request(app).get('/portal/profile?tab=schedules').set('Cookie', parent.cookie);
+  assert.equal(page.status, 200);
+  const kidIndex = page.text.indexOf('Profile Test Kid');
+  const mondayIndex = page.text.indexOf('>Monday<');
+  const mondayArtIndex = page.text.indexOf('Monday Art');
+  const wednesdayIndex = page.text.indexOf('>Wednesday<');
+  const wednesdayScienceIndex = page.text.indexOf('Wednesday Science');
+  assert.ok(kidIndex !== -1 && mondayIndex !== -1 && mondayArtIndex !== -1 && wednesdayIndex !== -1 && wednesdayScienceIndex !== -1, 'the member heading and both day headings must be present');
+  assert.ok(kidIndex < mondayIndex && mondayIndex < mondayArtIndex && mondayArtIndex < wednesdayIndex && wednesdayIndex < wednesdayScienceIndex, 'the member section must come before Monday, Monday before its class, Monday before Wednesday, and Wednesday before its own class');
+
+  // The parent themselves has no enrollments/staff rows - their own
+  // section still renders, just with the "no classes" fallback instead
+  // of being silently dropped from the page.
+  assert.match(page.text, /No classes scheduled\./);
+});
+
+// A later real request: "Event signup tab should be organized by month
+// and then by event with drop down from the event to show who signed up
+// and what you may have signed up for like food, volunteer etc."
+test('Event Signups tab is grouped by month, then by event, with a dropdown showing registrations, food-item claims, and volunteer shift signups', async () => {
+  const parent = await createParentAccount();
+  const eventInfo = await db
+    .prepare("INSERT INTO events (title, starts_at, status) VALUES ('Fall Festival', '2026-10-15 10:00:00', 'published')")
+    .run();
+  const eventId = eventInfo.lastInsertRowid;
+  await db.prepare("INSERT INTO event_registrations (event_id, member_id, status) VALUES (?, ?, 'confirmed')").run(eventId, parent.memberId);
+
+  const signUpListInfo = await db.prepare('INSERT INTO sign_up_lists (title, event_id) VALUES (?, ?)').run('Potluck', eventId);
+  const itemInfo = await db.prepare('INSERT INTO sign_up_list_items (list_id, item_name, quantity_needed) VALUES (?, ?, ?)').run(signUpListInfo.lastInsertRowid, 'Cupcakes', 12);
+  await db.prepare('INSERT INTO sign_up_list_claims (item_id, member_id, quantity_claimed) VALUES (?, ?, ?)').run(itemInfo.lastInsertRowid, parent.memberId, 2);
+
+  const volunteerListInfo = await db.prepare('INSERT INTO volunteer_signup_lists (title, event_id) VALUES (?, ?)').run('Setup Crew', eventId);
+  const shiftInfo = await db
+    .prepare("INSERT INTO volunteer_signup_list_shifts (list_id, job_name, shift_date, start_time, end_time) VALUES (?, ?, '2026-10-15', '8:00 AM', '9:00 AM')")
+    .run(volunteerListInfo.lastInsertRowid, 'Chair Setup');
+  await db.prepare('INSERT INTO volunteer_signup_list_signups (shift_id, member_id) VALUES (?, ?)').run(shiftInfo.lastInsertRowid, parent.studentId);
+
+  const page = await request(app).get('/portal/profile?tab=signups').set('Cookie', parent.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, />October 2026</, 'the month section label');
+  assert.match(page.text, /Fall Festival/);
+  assert.match(page.text, /badge-pill-green">Confirmed</);
+  assert.match(page.text, /Cupcakes/);
+  assert.match(page.text, /x2/, 'the claimed quantity shows when more than 1');
+  assert.match(page.text, /Chair Setup/);
+  assert.match(page.text, /Profile Test Kid/, 'the student who signed up for the volunteer shift');
+
+  // Scoped to this family only - another family's parent gets an empty
+  // Event Signups tab even though the event itself exists globally.
+  const otherParent = await createParentAccount();
+  const otherPage = await request(app).get('/portal/profile?tab=signups').set('Cookie', otherParent.cookie);
+  assert.doesNotMatch(otherPage.text, /Fall Festival/);
+});
+
 test('signing out and hitting the profile page redirects to login', async () => {
   const res = await request(app).get('/portal/profile');
   assert.equal(res.status, 302);

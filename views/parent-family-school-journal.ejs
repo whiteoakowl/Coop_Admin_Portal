@@ -10,17 +10,33 @@
     <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
     <div class="roster-toolbar no-print">
       <h1>Teacher Journal</h1>
-      <% if (familyStudents.length > 0) { %>
-        <form method="GET" action="/parent/family-school/journal" class="category-filter">
-          <label for="journal-student-select">Student</label>
-          <select id="journal-student-select" name="studentId" onchange="this.form.submit()">
-            <% familyStudents.forEach(function(s) { %>
-              <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
-            <% }); %>
-          </select>
-        </form>
-      <% } %>
     </div>
+
+    <%# "Add the following buttons to each page. Export, print, download,
+        filter. Make sure they are the similar size, same height, fit to
+        text." Same restructure as Family Attendance's own toolbar - see
+        that view's comment. Export is this one selected student's
+        journal entries; Download is every family student's - see
+        routes/parent-family-school.js's own /journal/export.csv and
+        /journal/download.csv. %>
+    <% if (familyStudents.length > 0) { %>
+      <div class="roster-btn-row roster-btn-row-fit-text no-print">
+        <a class="roster-action-btn file-action-btn" href="/parent/family-school/journal/export.csv?studentId=<%= selectedStudentId %>">Export</a>
+        <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+        <a class="roster-action-btn file-action-btn" href="/parent/family-school/journal/download.csv">Download</a>
+        <details class="filter-details">
+          <summary class="roster-action-btn">Filter</summary>
+          <form method="GET" action="/parent/family-school/journal" class="filter-panel">
+            <label for="journal-student-select">Student</label>
+            <select id="journal-student-select" name="studentId" onchange="this.form.submit()">
+              <% familyStudents.forEach(function(s) { %>
+                <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
+              <% }); %>
+            </select>
+          </form>
+        </details>
+      </div>
+    <% } %>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>

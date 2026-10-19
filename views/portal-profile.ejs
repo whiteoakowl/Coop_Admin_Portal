@@ -98,46 +98,90 @@
         </div>
       <% } %>
     <% } else if (activeTab === 'schedules') { %>
-      <% if (schedule.length === 0) { %>
+      <%# A real request: "Schedules tab should be organized by family
+          member and then by day under each family member." One section
+          per family member (self first, then the rest - same order the
+          Profile tab's own My Family list uses), each with its own
+          day-by-day class tables instead of one flat table with a Name
+          column. %>
+      <% if (!schedule.some(function(m) { return m.days.length > 0; })) { %>
         <p class="hint">No class schedule on file yet.</p>
       <% } else { %>
-        <div class="roster-scroll">
-          <table class="roster-table">
-            <thead><tr><th>Name</th><th>Role</th><th>Day</th><th>Time</th><th>Class</th><th>Room</th></tr></thead>
-            <tbody>
-              <% schedule.forEach(function(row) { %>
-                <tr>
-                  <td><%= row.memberName %></td>
-                  <td><%= row.role %></td>
-                  <td><%= dayLabels[row.day] || row.day %></td>
-                  <td><%= row.start_time || '' %><% if (row.end_time) { %>&ndash;<%= row.end_time %><% } %></td>
-                  <td><%= row.class_name %></td>
-                  <td><%= row.room || '' %></td>
-                </tr>
+        <% schedule.forEach(function(memberSchedule) { %>
+          <div class="form-section">
+            <h2><%= memberSchedule.memberName %></h2>
+            <% if (memberSchedule.days.length === 0) { %>
+              <p class="hint">No classes scheduled.</p>
+            <% } else { %>
+              <% memberSchedule.days.forEach(function(d) { %>
+                <h3><%= dayLabels[d.day] || d.day %></h3>
+                <div class="roster-scroll">
+                  <table class="roster-table">
+                    <thead><tr><th>Time</th><th>Class</th><th>Room</th><th>Role</th></tr></thead>
+                    <tbody>
+                      <% d.classes.forEach(function(row) { %>
+                        <tr>
+                          <td><%= row.start_time || '' %><% if (row.end_time) { %>&ndash;<%= row.end_time %><% } %></td>
+                          <td><%= row.class_name %></td>
+                          <td><%= row.room || '' %></td>
+                          <td><%= row.role %></td>
+                        </tr>
+                      <% }); %>
+                    </tbody>
+                  </table>
+                </div>
               <% }); %>
-            </tbody>
-          </table>
-        </div>
+            <% } %>
+          </div>
+        <% }); %>
       <% } %>
     <% } else { %>
+      <%# A real request: "Event signup tab should be organized by month
+          and then by event with drop down from the event to show who
+          signed up and what you may have signed up for like food,
+          volunteer etc." One section per month, one plain <details>/
+          <summary> card per event inside it (same no-JS click-to-expand
+          idiom events-detail.ejs's own "Who's Registered" list already
+          uses) - expanding shows this family's own registrations plus
+          any sign-up-list item or volunteer shift claims tied to that
+          event. %>
       <% if (signups.length === 0) { %>
         <p class="hint">No event sign-ups on file yet.</p>
       <% } else { %>
-        <div class="roster-scroll">
-          <table class="roster-table">
-            <thead><tr><th>Name</th><th>Event</th><th>Date</th><th>Status</th></tr></thead>
-            <tbody>
-              <% signups.forEach(function(row) { %>
-                <tr>
-                  <td><%= row.memberName %></td>
-                  <td><%= row.title %></td>
-                  <td><%= (row.starts_at || '').slice(0, 10) %></td>
-                  <td><span class="badge-pill <%= row.status === 'confirmed' ? 'badge-pill-green' : 'badge-pill-orange' %>"><%= row.status.charAt(0).toUpperCase() + row.status.slice(1) %></span></td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
+        <% signups.forEach(function(month) { %>
+          <div class="form-section">
+            <h2><%= month.monthLabel %></h2>
+            <% month.events.forEach(function(ev) { %>
+              <details class="manage-section">
+                <summary><strong><%= ev.title %></strong> <span class="hint"><%= (ev.starts_at || '').slice(0, 10) %></span></summary>
+                <% if (ev.registrations.length > 0) { %>
+                  <p class="hint">Registered:</p>
+                  <ul class="member-profile-plain-list">
+                    <% ev.registrations.forEach(function(r) { %>
+                      <li><%= r.memberName %> <span class="badge-pill <%= r.status === 'confirmed' ? 'badge-pill-green' : 'badge-pill-orange' %>"><%= r.status.charAt(0).toUpperCase() + r.status.slice(1) %></span></li>
+                    <% }); %>
+                  </ul>
+                <% } %>
+                <% if (ev.items.length > 0) { %>
+                  <p class="hint">Signed up to bring:</p>
+                  <ul class="member-profile-plain-list">
+                    <% ev.items.forEach(function(it) { %>
+                      <li><%= it.memberName %> &mdash; <%= it.itemName %><% if (it.quantityClaimed > 1) { %> (x<%= it.quantityClaimed %>)<% } %></li>
+                    <% }); %>
+                  </ul>
+                <% } %>
+                <% if (ev.shifts.length > 0) { %>
+                  <p class="hint">Volunteer shifts:</p>
+                  <ul class="member-profile-plain-list">
+                    <% ev.shifts.forEach(function(s) { %>
+                      <li><%= s.memberName %> &mdash; <%= s.jobName %> (<%= s.shiftDate %><% if (s.startTime) { %> <%= s.startTime %><% if (s.endTime) { %>&ndash;<%= s.endTime %><% } %><% } %>)</li>
+                    <% }); %>
+                  </ul>
+                <% } %>
+              </details>
+            <% }); %>
+          </div>
+        <% }); %>
       <% } %>
     <% } %>
   </main>

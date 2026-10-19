@@ -9,18 +9,37 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
     <div class="roster-toolbar no-print">
-      <h1>Attendance</h1>
-      <% if (familyStudents.length > 0) { %>
-        <form method="GET" action="/parent/family-school/attendance" class="category-filter">
-          <label for="attendance-student-select">Student</label>
-          <select id="attendance-student-select" name="studentId" onchange="this.form.submit()">
-            <% familyStudents.forEach(function(s) { %>
-              <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
-            <% }); %>
-          </select>
-        </form>
-      <% } %>
+      <h1>Family Attendance</h1>
     </div>
+
+    <%# "Add the following buttons to each page. Export, print, download,
+        filter. Make sure they are the similar size, same height, fit to
+        text." The old bare Student <select> moved into the Filter
+        popover below (the same <details>/<summary> idiom admin-
+        rosters.ejs's own Filter button already uses) so all four
+        buttons sit in one same-height, fit-to-text row instead of a
+        differently-shaped dropdown sitting apart from them. Export is
+        this one selected student's attendance; Download is every
+        family student's - see routes/parent-family-school.js's own
+        /attendance/export.csv and /attendance/download.csv. %>
+    <% if (familyStudents.length > 0) { %>
+      <div class="roster-btn-row roster-btn-row-fit-text no-print">
+        <a class="roster-action-btn file-action-btn" href="/parent/family-school/attendance/export.csv?studentId=<%= selectedStudentId %>">Export</a>
+        <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+        <a class="roster-action-btn file-action-btn" href="/parent/family-school/attendance/download.csv">Download</a>
+        <details class="filter-details">
+          <summary class="roster-action-btn">Filter</summary>
+          <form method="GET" action="/parent/family-school/attendance" class="filter-panel">
+            <label for="attendance-student-select">Student</label>
+            <select id="attendance-student-select" name="studentId" onchange="this.form.submit()">
+              <% familyStudents.forEach(function(s) { %>
+                <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
+              <% }); %>
+            </select>
+          </form>
+        </details>
+      </div>
+    <% } %>
 
     <% if (familyStudents.length === 0) { %>
       <p class="roster-empty">No students in your family yet.</p>
@@ -38,16 +57,28 @@
           present (green) -> absent (red) -> unmarked (public/js/family-
           school-attendance.js), one fetch() per click against this
           student's own toggle endpoint - no full page reload. %>
-      <div class="roster-btn-row">
+      <%# A real request: "Preview and next buttons should be on the same
+          row and fit to text" - roster-btn-row-fit-text (same class the
+          Class Edit popup's own button row and others already use) keeps
+          Prev/Next sized to their own text instead of inheriting
+          roster-btn-row-grid.js's equal-width mobile grid, which used to
+          stretch them wide enough to wrap "Prev"/"Next" onto their own
+          rows. %>
+      <div class="roster-btn-row roster-btn-row-fit-text">
         <a class="btn-secondary" href="?studentId=<%= selectedStudentId %>&year=<%= prevYear %>&month=<%= prevMonth %>">&larr; Prev</a>
         <strong><%= MONTH_NAMES[month - 1] %> <%= year %></strong>
         <a class="btn-secondary" href="?studentId=<%= selectedStudentId %>&year=<%= nextYear %>&month=<%= nextMonth %>">Next &rarr;</a>
       </div>
-      <div class="roster-btn-row">
+      <%# "Present and absent labels above the calendar should be fit to
+          text and on the same row" - same fit-text class, and the
+          explanatory hint moved to its own line below instead of sharing
+          the row (it was crowding the two badges off onto separate lines
+          once it wrapped). %>
+      <div class="roster-btn-row roster-btn-row-fit-text">
         <span class="badge-pill fs-attendance-legend-present">Present</span>
         <span class="badge-pill fs-attendance-legend-absent">Absent</span>
-        <span class="hint">Click a date to mark present, click again for absent, a third time to clear it.</span>
       </div>
+      <p class="hint">Click a date to mark present, click again for absent, a third time to clear it.</p>
       <table class="fs-attendance-calendar" data-fs-attendance-calendar data-student-id="<%= selectedStudentId %>" data-toggle-url="/parent/family-school/attendance/<%= selectedStudentId %>/toggle">
         <thead>
           <tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr>
