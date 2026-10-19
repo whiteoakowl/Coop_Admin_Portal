@@ -7,8 +7,14 @@
   <%- include('partials/portal-nav', { portalTitle: 'Teacher Portal' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="hint"><a href="/teacher">&larr; Back to Teacher Portal</a></p>
-    <h1><%= cls.class_name %></h1>
+    <%# A real request: "Teacher portal has an edit class button that
+        goes to a page where they can edit their class information
+        lesson plans etc." - this is that page now (routes/teacher-
+        portal.js's own GET /classes/:id/edit); clicking a class itself
+        lands on the read-only student/parent-style view instead (views/
+        teacher-class-detail.ejs), reached from here by "Back to Class". %>
+    <p class="hint"><a href="/teacher/classes/<%= cls.id %>">&larr; Back to <%= cls.class_name %></a></p>
+    <h1>Edit <%= cls.class_name %></h1>
     <p class="hint"><%= cls.dayLabel %> &middot; <%= cls.timeLabel %> &middot; <%= cls.gradeLabel || 'All grades' %> &middot; Room <%= cls.room || 'Unassigned' %></p>
     <% if (cls.description) { %><p class="hint forum-editable-display"><%- cls.description %></p><% } %>
 

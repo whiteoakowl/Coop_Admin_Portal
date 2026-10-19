@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Teacher Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle"><a href="/teacher">&larr; Teacher Portal</a></p>
+    <%# A real request: "Teacher portal. When clicking on a class they
+        view the class like a student portal or parent portal would and
+        they can click through assignment and such." Same read-only
+        "staff viewing their own class" page Parent Portal's own
+        Classroom Dashboard already shows a teacher/assistant
+        (views/parent-class-dashboard-detail.ejs's own selectedParent
+        branch), reached natively here instead. A later real request
+        ("Then teacher portal has an edit class button that goes to a
+        page where they can edit their class information lesson plans
+        etc.") added Edit Class - the old roster/assignment-management
+        page (views/teacher-roster.ejs), no longer what clicking a class
+        itself lands on. %>
+    <h1><%= cls.class_name %></h1>
+    <%# A real request's own button, same .roster-btn-row-below-h1
+        pattern the Lesson Plans manage page's own "Assign to Class"
+        button uses (not sharing a flex row with the h1 itself - that
+        stretched the button edge-to-edge, the exact bug class a real
+        report already called out once on a different page: ".parent-
+        home-main .roster-action-btn" needed flex-grow: 0 for the same
+        reason). %>
+    <div class="roster-btn-row no-print">
+      <a class="roster-action-btn" href="/teacher/classes/<%= cls.id %>/edit">Edit Class</a>
+    </div>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <%# Assignments/Grades/Attendance are per-STUDENT academic records -
+        meaningless for a teacher looking at their own class, same
+        reasoning as the Parent Portal staff view this mirrors. %>
+    <div class="view-tabs no-print">
+      <a class="view-tab<%= tab === 'details' ? ' active' : '' %>" href="?tab=details">Details</a>
+      <a class="view-tab<%= tab === 'lessons' ? ' active' : '' %>" href="?tab=lessons">Lessons</a>
+      <% if (cls.allow_parent_chat) { %>
+        <a class="view-tab<%= tab === 'chat' ? ' active' : '' %>" href="?tab=chat">Chat</a>
+      <% } %>
+    </div>
+
+    <div class="view-tab-panel">
+      <% if (tab === 'details') { %>
+        <div class="class-detail-v2">
+          <div class="class-detail-v2-rows">
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-calendar-check"/></svg>
+              <div>
+                <span class="class-view-info-label">Schedule</span>
+                <strong class="class-view-info-value"><%= cls.dayLabel %> &middot; <%= cls.timeLabel %></strong>
+              </div>
+            </div>
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-user"/></svg>
+              <div>
+                <span class="class-view-info-label">Teacher(s)</span>
+                <strong class="class-view-info-value"><%= cls.teacherNames.length ? cls.teacherNames.join(', ') : 'None assigned' %></strong>
+              </div>
+            </div>
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-users"/></svg>
+              <div>
+                <span class="class-view-info-label">Assistant(s)</span>
+                <strong class="class-view-info-value"><%= cls.assistantNames && cls.assistantNames.length ? cls.assistantNames.join(', ') : 'None assigned' %></strong>
+              </div>
+            </div>
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-calendar-check"/></svg>
+              <div>
+                <span class="class-view-info-label">Start Date</span>
+                <strong class="class-view-info-value"><%= cls.start_date || 'Not set' %></strong>
+              </div>
+            </div>
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-calendar-check"/></svg>
+              <div>
+                <span class="class-view-info-label">End Date</span>
+                <strong class="class-view-info-value"><%= cls.end_date || 'Not set' %></strong>
+              </div>
+            </div>
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-graduation-cap"/></svg>
+              <div>
+                <span class="class-view-info-label">Grade/Age</span>
+                <strong class="class-view-info-value"><%= cls.gradeLabel || 'Not set' %></strong>
+              </div>
+            </div>
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-map-pin"/></svg>
+              <div>
+                <span class="class-view-info-label">Room</span>
+                <strong class="class-view-info-value"><%= cls.room || 'Not set' %></strong>
+              </div>
+            </div>
+            <div class="class-view-info-item">
+              <svg class="icon"><use href="#icon-users"/></svg>
+              <div>
+                <span class="class-view-info-label">Enrolled</span>
+                <strong class="class-view-info-value"><%= cls.studentCount %><% if (cls.capacity != null) { %> / <%= cls.capacity %><% } %></strong>
+              </div>
+            </div>
+          </div>
+          <div class="class-detail-v2-side">
+            <h3><svg class="icon"><use href="#icon-clipboard-list"/></svg> Supply List</h3>
+            <p class="hint" style="white-space: pre-wrap;"><%= cls.supply_list || 'No supplies required.' %></p>
+          </div>
+        </div>
+        <% if (cls.description) { %>
+          <div class="class-detail-v2-description-box">
+            <h3><svg class="icon"><use href="#icon-megaphone"/></svg> Class Description</h3>
+            <div class="hint forum-editable-display"><%- cls.description %></div>
+          </div>
+        <% } %>
+      <% } else if (tab === 'lessons') { %>
+        <%# A teacher reviewing their own class never gets quiz-taking -
+            same reasoning as Parent Portal's own staff view (canTakeQuiz
+            is always false here, no student to complete anything for). %>
+        <%- include('partials/lessons-view', { lessons, canTakeQuiz: false, quizBasePath: '/teacher', quizQuery: '' }) %>
+      <% } else if (tab === 'chat') { %>
+        <%- include('partials/class-chat', { chatMessages, postUrl: `/teacher/classes/${cls.id}/chat` }) %>
+      <% } %>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Teacher Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle"><a href="/teacher/classes/<%= cls.id %>?tab=lessons">&larr; <%= cls.class_name %> Lessons</a></p>
+    <%- include('partials/lesson-content-detail', { lesson, item, canTakeQuiz: false, quizBasePathLocal: '/teacher', quizQueryLocal: '', nextItemHref }) %>
+  </main>
+</body>
+</html>

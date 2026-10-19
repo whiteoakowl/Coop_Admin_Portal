@@ -34,6 +34,8 @@ const {
   submissionsForContentItem,
   gradeAssignmentSubmission,
   scoreAnswer,
+  lessonsForStudentView,
+  nextContentItemAfter,
 } = require('../utils/academics');
 const { formatDateLabel, formatFriendlyTimestamp, todayISO, formatDateLong } = require('../utils/dates');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
@@ -193,7 +195,87 @@ router.get('/classes', async (req, res) => {
   });
 });
 
+// A real request: "Teacher portal. When clicking on a class they view
+// the class like a student portal or parent portal would and they can
+// click through assignment and such. This way they can use the lesson
+// plans in class as well for easy access." Reuses the exact same
+// read-only "staff viewing their own class" mode Parent Portal's own
+// Classroom Dashboard already built (routes/parent-portal.js's own
+// ?viewer=parent-<id> branch of GET /classes/dashboard/:id - a teacher/
+// assistant with no specific child involved never gets quiz-taking,
+// Assignments/Grades/Attendance tabs, since those are per-STUDENT
+// academic records), just reached natively from Teacher Portal's own
+// URL/nav instead of only through a Parent Portal account that also
+// happens to hold this same teacher role. The old roster/assignment-
+// management page moved to its own "Edit Class" button/route below
+// rather than being what clicking a class lands on first.
+const TEACHER_CLASS_DETAIL_TABS = ['details', 'lessons', 'chat'];
+
 router.get('/classes/:id', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  const cls = classes.find((c) => c.id === parseInt(req.params.id, 10));
+  if (!cls) {
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  }
+  let tab = TEACHER_CLASS_DETAIL_TABS.includes(req.query.tab) ? req.query.tab : 'details';
+  if (tab === 'chat' && !cls.allow_parent_chat) tab = 'details';
+  const lessons = tab === 'lessons' ? await lessonsForStudentView(cls.id, null) : [];
+  const chatMessages =
+    tab === 'chat'
+      ? (await db.prepare('SELECT * FROM class_chat_messages WHERE class_id = ? ORDER BY id ASC').all(cls.id)).map((m) => ({
+          ...m,
+          createdAtLabel: formatFriendlyTimestamp(m.created_at),
+        }))
+      : [];
+  res.render('teacher-class-detail', { title: cls.class_name, cls, tab, lessons, chatMessages, notice: req.query.notice || null });
+});
+
+router.post('/classes/:id/chat', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  const cls = classes.find((c) => c.id === parseInt(req.params.id, 10));
+  const back = `/teacher/classes/${req.params.id}?tab=chat`;
+  if (!cls || !cls.allow_parent_chat) return res.status(404).render('404', { title: 'Not Found' });
+  const body = (req.body.body || '').trim();
+  if (!body) return res.redirect(back + '&error=' + encodeURIComponent('A message is required.'));
+  await db.prepare('INSERT INTO class_chat_messages (class_id, author_name, body) VALUES (?, ?, ?)').run(cls.id, member.name, body);
+  res.redirect(back);
+});
+
+// A real bug report precedent (routes/parent-portal.js's own GET
+// /content/:id, "it won't let me click on class lessons under classroom
+// dashboard") - the teacher-side counterpart, always the no-child/no-quiz
+// read-only mode (there's no specific student to complete anything for).
+router.get('/content/:id', async (req, res) => {
+  const contentItemId = parseInt(req.params.id, 10);
+  const member = await memberForAccount(req.portalAccount.id);
+  const contentItem = await getContentItem(contentItemId);
+  if (!contentItem) return res.status(404).render('404', { title: 'Not Found' });
+  const assignment = await db.prepare('SELECT * FROM class_assignments WHERE id = ?').get(contentItem.assignment_id);
+  if (!assignment) return res.status(404).render('404', { title: 'Not Found' });
+  const classes = await classesForTeacher(member);
+  const cls = classes.find((c) => c.id === assignment.class_id);
+  if (!cls) return res.status(404).render('404', { title: 'Not Found' });
+
+  const lessons = await lessonsForStudentView(cls.id, null);
+  const lesson = lessons.find((l) => l.id === assignment.id);
+  const item = lesson ? lesson.contentItems.find((i) => i.id === contentItemId) : null;
+  if (!lesson || !item) return res.status(404).render('404', { title: 'Not Found' });
+  if (lesson.locked) return res.status(404).render('404', { title: 'Not Found' });
+  // No read-only quiz preview page exists yet (same limitation Parent
+  // Portal's own staff mode already has) - a quiz bar isn't even a link
+  // in this mode (partials/lessons-view.ejs's own isLinkable), so this
+  // only fires if the URL is typed directly.
+  if (item.type === 'quiz') return res.status(404).render('404', { title: 'Not Found' });
+  const nextItem = nextContentItemAfter(lessons, item.id);
+  const nextItemHref = nextItem && nextItem.type !== 'quiz' ? `/teacher/content/${nextItem.id}` : null;
+  res.render('teacher-lesson-content', { title: item.title || 'Assignment', cls, lesson, item, nextItem, nextItemHref });
+});
+
+// The old roster + assignment-management page, now reached via its own
+// "Edit Class" button instead of being what clicking a class lands on.
+router.get('/classes/:id/edit', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const classes = await classesForTeacher(member);
   const cls = classes.find((c) => c.id === parseInt(req.params.id, 10));
@@ -211,7 +293,7 @@ router.post('/classes/:id/assignments', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const classes = await classesForTeacher(member);
   const cls = classes.find((c) => c.id === parseInt(req.params.id, 10));
-  const back = `/teacher/classes/${req.params.id}`;
+  const back = `/teacher/classes/${req.params.id}/edit`;
   if (!cls) {
     return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
   }
