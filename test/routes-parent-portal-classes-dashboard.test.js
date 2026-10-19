@@ -297,12 +297,17 @@ test('Class Dashboard detail, staff view (?viewer=parent-<id>): shows Details/Le
   const detail = await request(app).get(`/parent/classes/dashboard/${taughtClass.id}?viewer=parent-${parentMember.id}`).set('Cookie', parent.cookie);
   assert.equal(detail.status, 200);
   assert.match(detail.text, new RegExp(`${parentMember.name}.*teaches or assists this class`));
-  assert.match(detail.text, />Details</);
-  assert.match(detail.text, />Lessons</);
-  assert.match(detail.text, />Chat</);
-  assert.doesNotMatch(detail.text, />Assignments</);
-  assert.doesNotMatch(detail.text, />Grades</);
-  assert.doesNotMatch(detail.text, />Attendance</);
+  // Scoped to this page's own .view-tabs row, not the whole page - the
+  // Parent Portal sidebar nav now has its own "Attendance" link too
+  // (Family School Management's own Attendance subpage), which would
+  // otherwise false-match the doesNotMatch checks below.
+  const viewTabsSection = /<div class="view-tabs no-print">[\s\S]*?<\/div>/.exec(detail.text)[0];
+  assert.match(viewTabsSection, />Details</);
+  assert.match(viewTabsSection, />Lessons</);
+  assert.match(viewTabsSection, />Chat</);
+  assert.doesNotMatch(viewTabsSection, />Assignments</);
+  assert.doesNotMatch(viewTabsSection, />Grades</);
+  assert.doesNotMatch(viewTabsSection, />Attendance</);
   assert.doesNotMatch(detail.text, /Withdraw/);
 
   // A class this parent does NOT staff, or a parent id outside this

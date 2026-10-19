@@ -126,7 +126,9 @@ const adminTrainingRouter = require('./routes/admin-training');
 const publicSiteRouter = require('./routes/public-site');
 const portalAuthRouter = require('./routes/portal-auth');
 const parentPortalRouter = require('./routes/parent-portal');
+const parentFamilySchoolRouter = require('./routes/parent-family-school');
 const mainAdminRouter = require('./routes/main-admin');
+const mainAdminFamilySchoolRouter = require('./routes/main-admin-family-school');
 // Member/family roster management, natively inside Main Admin - a sibling
 // router (not an edit to routes/main-admin.js itself) for the same reason
 // as every Community & Commerce admin panel below: reuses the existing
@@ -260,6 +262,7 @@ const adminAuditLogRouter = require('./routes/admin-audit-log');
 const searchRouter = require('./routes/search');
 const teacherPortalRouter = require('./routes/teacher-portal');
 const studentPortalRouter = require('./routes/student-portal');
+const studentFamilySchoolRouter = require('./routes/student-family-school');
 const { loadPortalSession } = require('./middleware/portalAuth');
 
 const app = express();
@@ -442,6 +445,7 @@ app.use('/kiosk/class-checkin', kioskClassCheckinRouter);
 app.use('/', require('./middleware/csrfProtection'));
 app.use('/', portalAuthRouter);
 app.use('/parent', parentPortalRouter);
+app.use('/parent', parentFamilySchoolRouter);
 // Registered before the generic '/main-admin' mounts below (Express
 // tries mounted routers in registration order for matching prefixes,
 // and '/main-admin/events' is otherwise just a prefix match away from
@@ -459,6 +463,7 @@ app.use('/parent', parentPortalRouter);
 // re-checks main_admin+manage_events itself.
 app.use('/main-admin/events', adminEventsRouter);
 app.use('/main-admin', mainAdminRouter);
+app.use('/main-admin', mainAdminFamilySchoolRouter);
 app.use('/main-admin/website', adminWebsiteRouter);
 app.use('/main-admin/members', mainAdminMembersRouter);
 app.use('/main-admin/announcements', mainAdminAnnouncementsRouter);
@@ -504,6 +509,7 @@ app.use('/main-admin/audit-log', adminAuditLogRouter);
 app.use('/search', searchRouter);
 app.use('/teacher', teacherPortalRouter);
 app.use('/student', studentPortalRouter);
+app.use('/student', studentFamilySchoolRouter);
 // contact-admins.js and membership.js (both mounted below) gate every one
 // of their own routes behind requireAdmin/requireFullAdmin despite living
 // outside the '/admin' path prefix (their URLs read as top-level, not

@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle"><a href="/student/family-school">&larr; Family School Management</a></p>
+    <h1><%= cls.class_name %></h1>
+    <% if (cls.description) { %><p class="hint"><%= cls.description %></p><% } %>
+
+    <%- include('partials/lessons-view', { lessons, canTakeQuiz: true, quizBasePath: '/student/family-school', quizQuery: '' }) %>
+  </main>
+</body>
+</html>

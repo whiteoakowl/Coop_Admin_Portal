@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="roster-toolbar no-print">
+      <h1>Family School Management</h1>
+      <div class="roster-btn-row">
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog').showModal()">+ New Class</button>
+      </div>
+    </div>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <%# A real request: "parent can create classed, lessons and
+        assignments and assign these classes to their own students in
+        their family." Completely separate from co-op classes - these
+        cards link into this family's own private class/lesson tree
+        (routes/parent-family-school.js), never the co-op Classes grid. %>
+    <% if (classes.length === 0) { %>
+      <p class="roster-empty">No classes yet. Create one to get started.</p>
+    <% } else { %>
+      <div class="team-card-grid">
+        <% classes.forEach(function(c) { %>
+          <div class="team-col">
+            <a class="team-info-card" href="/parent/family-school/classes/<%= c.id %>">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
+              <h3 class="team-info-title"><%= c.class_name %></h3>
+              <% if (c.description) { %><p class="hint"><%= c.description %></p><% } %>
+              <span class="team-info-pill"><%= c.lessonCount %> lesson<%= c.lessonCount === 1 ? '' : 's' %></span>
+              <p class="hint"><%= c.students.length === 0 ? 'Not assigned to any student yet' : c.students.map(function(s) { return s.name; }).join(', ') %></p>
+            </a>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+
+  <dialog id="add-class-dialog" class="class-form-dialog">
+    <form method="POST" action="/parent/family-school/classes">
+      <div class="class-form-dialog-header">
+        <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
+        <h3>New Class</h3>
+      </div>
+      <label>Class Name
+        <input type="text" name="className" required />
+      </label>
+      <label>Description
+        <textarea name="description" rows="2"></textarea>
+      </label>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+        <button type="submit" class="primary-btn">Create Class</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
+    <div class="roster-toolbar no-print">
+      <h1><%= cls.class_name %></h1>
+      <div class="roster-btn-row">
+        <form method="POST" action="/parent/family-school/classes/<%= cls.id %>/delete" data-confirm="Delete the class &quot;<%= cls.class_name %>&quot;? This also removes its lessons and content tied to it. This cannot be undone.">
+          <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete Class</button>
+        </form>
+      </div>
+    </div>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <div class="manage-section">
+      <div class="grid-box-header">
+        <h2>Class Details</h2>
+      </div>
+      <form method="POST" action="/parent/family-school/classes/<%= cls.id %>/edit" class="member-form-grid">
+        <label class="member-form-full">Class Name
+          <input type="text" name="className" value="<%= cls.class_name %>" required />
+        </label>
+        <label class="member-form-full">Description
+          <textarea name="description" rows="2"><%= cls.description || '' %></textarea>
+        </label>
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Save Class Details</button>
+        </div>
+      </form>
+    </div>
+
+    <%# "assign these classes to their own students in their family." A
+        plain checkbox set of this family's own students - unassigned by
+        default, same "pick from a checkbox list, post the whole set"
+        shape assignClassToStudents (utils/familySchool.js) expects. %>
+    <div class="manage-section">
+      <div class="grid-box-header">
+        <h2>Assigned Students</h2>
+      </div>
+      <% if (familyStudents.length === 0) { %>
+        <p class="roster-empty">No students in your family yet.</p>
+      <% } else { %>
+        <form method="POST" action="/parent/family-school/classes/<%= cls.id %>/students" class="stack-form">
+          <% familyStudents.forEach(function(s) { %>
+            <label class="checkbox-option">
+              <input type="checkbox" name="studentIds" value="<%= s.id %>" <%= assignedStudents.some(function(a) { return a.id === s.id; }) ? 'checked' : '' %> />
+              <%= s.name %>
+            </label>
+          <% }); %>
+          <div>
+            <button type="submit" class="primary-btn">Save Assigned Students</button>
+          </div>
+        </form>
+      <% } %>
+    </div>
+
+    <div class="manage-section">
+      <div class="grid-box-header">
+        <h2>Lessons (<%= lessons.length %>)</h2>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-lesson-dialog').showModal()">+ New Lesson</button>
+      </div>
+      <% if (lessons.length === 0) { %>
+        <p class="roster-empty">No lessons yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr><th></th><th>Title</th><th></th></tr>
+            </thead>
+            <tbody data-lesson-reorder-tbody data-class-id="<%= cls.id %>" data-reorder-url="/parent/family-school/classes/<%= cls.id %>/lessons/reorder">
+              <% lessons.forEach(function(l) { %>
+                <tr data-lesson-reorder-row="<%= l.id %>">
+                  <td class="roster-drag-col"><span data-lesson-reorder-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span></td>
+                  <td class="roster-name-col"><%= l.title %></td>
+                  <td class="roster-btn-row accounting-row-icons">
+                    <a class="icon-btn" href="/parent/family-school/lessons/<%= l.id %>" aria-label="Manage" title="Manage"><svg class="icon"><use href="#icon-wrench"/></svg></a>
+                    <form method="POST" action="/parent/family-school/lessons/<%= l.id %>/delete" data-confirm="Delete the lesson &quot;<%= l.title %>&quot;? This also removes its content, submissions, and grades. This cannot be undone.">
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </main>
+
+  <dialog id="add-lesson-dialog" class="class-form-dialog">
+    <form method="POST" action="/parent/family-school/classes/<%= cls.id %>/lessons">
+      <div class="class-form-dialog-header">
+        <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
+        <h3>New Lesson</h3>
+      </div>
+      <label>Title
+        <input type="text" name="title" required />
+      </label>
+      <label>Description
+        <textarea name="description" rows="2"></textarea>
+      </label>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+        <button type="submit" class="primary-btn">Create Lesson</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="/js/lesson-drag-reorder.js"></script>
+</body>
+</html>

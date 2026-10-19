@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle"><a href="/parent/family-school/classes/<%= cls.id %>">&larr; <%= cls.class_name %></a></p>
+    <h1><%= lesson.title %></h1>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <%- include('partials/family-school-content-manage', { lesson, contentItems, basePath }) %>
+  </main>
+</body>
+</html>

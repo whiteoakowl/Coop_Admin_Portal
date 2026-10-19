@@ -5513,7 +5513,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.1in;
+  gap: 0.08in;
   padding: 0.15in;
   box-sizing: border-box;
   overflow: hidden;
@@ -5523,8 +5523,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    sheet-wide regardless of how long a name (= that member's barcode
    value, routes/admin-members.js) is; the total rendered width is then
    left to vary with content, same as any real-world barcode does, capped
-   here so a very long name's barcode can't overflow its cell. */
-.barcode-cell-svg { max-width: 85%; height: 0.9in; }
+   here so a very long name's barcode can't overflow its cell. A real
+   request: "printing barcodes only, should have the member ID number on
+   there as well" shrank this from 0.9in to make room for the new
+   .barcode-cell-id line below the name - see that rule's own override
+   just below .barcode-cell-name. */
+.barcode-cell-svg { max-width: 85%; height: 0.75in; }
 /* A member's own printable event ticket (views/events-ticket-print.ejs) -
    a real request: "add a checkbox for include physical ticket. Members
    will be able to print tickets with a barcode." One ticket, not a many-
@@ -5542,8 +5546,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .event-ticket-barcode { display: block; margin: 1rem auto 0; }
 /* Meant to be read at a glance across a table, not squinted at up close.
    Comfortably clears the cell's remaining vertical space: 1.75in row -
-   0.9in barcode - 0.3in padding - 0.1in gap = ~0.45in left, and 1.6rem at
-   line-height 1.2 is ~0.32in. */
+   0.75in barcode - 0.3in padding - 2 x 0.08in gap - ~0.16in ID line
+   (see .barcode-cell .barcode-cell-id below) = ~0.3in left, and 1.6rem
+   at line-height 1.2 is ~0.32in. */
 .barcode-cell-name {
   font-size: 1.6rem;
   font-weight: 700;
@@ -5559,6 +5564,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A real request: "printing barcodes only, should have the member ID
+   number on there as well" - the same .barcode-cell-id line the Avery
+   barcode-labels sheet already shows (see that rule's own base
+   definition below), just a touch bigger here since this card has more
+   room than a 1in-tall mailing label does. */
+.barcode-cell .barcode-cell-id { font-size: 0.85rem; }
 
 /* Barcode + name + ID mailing-label sheet (views/admin-name-tag-barcode-
    labels-print.ejs): sized to print directly onto Avery 08160-style
@@ -13739,7 +13750,6 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 }
 .teacher-class-list a:hover { background: var(--brand-soft); text-decoration: underline; }
 .teacher-class-name { font-weight: 600; }
-.teacher-class-role { font-size: 0.8rem; color: var(--muted); }
 .teacher-class-meta { font-size: 0.8rem; color: var(--muted); }
 
 .instructor-profile-form { display: flex; flex-direction: column; gap: 0.9rem; max-width: 36rem; }
@@ -13747,3 +13757,37 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .instructor-profile-form input[type="email"],
 .instructor-profile-form input[type="text"],
 .instructor-profile-form textarea { font-weight: 400; }
+
+/* Family School Management - Attendance calendar (views/parent-family-
+   school-attendance.ejs). A real request: "View a calendar and mark days
+   student is present for school by clicking on the date and it
+   highlights gren. If you click again it becomes red for didn't do
+   school." Click-to-cycle handled by public/js/family-school-
+   attendance.js; these rules are just the 3 color states + the legend
+   swatches that share them. */
+.fs-attendance-calendar { border-collapse: collapse; width: 100%; max-width: 32rem; margin-top: 1rem; }
+.fs-attendance-calendar th { font-size: 0.8rem; color: var(--muted); padding: 0.3rem; text-align: center; }
+.fs-attendance-day {
+  border: 1px solid var(--border);
+  text-align: center;
+  padding: 0.6rem 0.3rem;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+  transition: background 0.1s ease, opacity 0.1s ease;
+}
+.fs-attendance-day-empty { border: none; cursor: default; }
+.fs-attendance-day-unmarked { background: var(--surface); }
+.fs-attendance-day-unmarked:hover { background: var(--brand-soft); }
+.fs-attendance-day-present { background: var(--green); color: #fff; }
+.fs-attendance-day-absent { background: var(--red); color: #fff; }
+.fs-attendance-day-saving { opacity: 0.55; }
+.fs-attendance-legend-present { background: var(--green); color: #fff; }
+.fs-attendance-legend-absent { background: var(--red); color: #fff; }
+
+/* Family School Management - Teacher Journal log (views/parent-family-
+   school-journal.ejs). A real request: "Then a log below showing all
+   entries." */
+.fs-journal-log { display: flex; flex-direction: column; gap: 1rem; }
+.fs-journal-entry { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }
+.fs-journal-entry-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }

@@ -208,9 +208,15 @@ test('Classroom Dashboard Details tab has Teacher(s), Description, and Cost per 
   // Tab order: Details, Lessons, Attendance, then Grades last - a real
   // request ("Remove assignment tab from classroom dashboard") dropped
   // the Assignments tab that used to sit between Details and Lessons.
+  // Scoped to this page's own .view-tabs row, not the whole page - the
+  // Parent Portal sidebar nav now has its own "Attendance" link too
+  // (Family School Management's own Attendance subpage), which would
+  // otherwise false-match first since the sidebar renders before this
+  // page's own content.
+  const viewTabsSection = /<div class="view-tabs no-print">[\s\S]*?<\/div>/.exec(detail.text)[0];
   const tabOrder = ['Details', 'Lessons', 'Attendance', 'Grades'];
   const positions = tabOrder.map((label) => {
-    const idx = detail.text.indexOf(`>${label}</a>`);
+    const idx = viewTabsSection.indexOf(`>${label}</a>`);
     assert.ok(idx !== -1, `expected to find tab "${label}"`);
     return idx;
   });

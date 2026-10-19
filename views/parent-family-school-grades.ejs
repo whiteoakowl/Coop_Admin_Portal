@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
+    <div class="roster-toolbar no-print">
+      <h1>Grades</h1>
+      <% if (familyStudents.length > 0) { %>
+        <form method="GET" action="/parent/family-school/grades" class="category-filter">
+          <label for="grades-student-select">Student</label>
+          <select id="grades-student-select" name="studentId" onchange="this.form.submit()">
+            <% familyStudents.forEach(function(s) { %>
+              <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
+            <% }); %>
+          </select>
+        </form>
+      <% } %>
+    </div>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <% if (familyStudents.length === 0) { %>
+      <p class="roster-empty">No students in your family yet.</p>
+    <% } else if (grades.length === 0) { %>
+      <p class="roster-empty">No gradable assignments yet. Add an "Assignment (student uploads work back)" content item to a lesson to see it here.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table table-stack-mobile">
+          <thead>
+            <tr><th>Class</th><th>Lesson</th><th>Assignment</th><th>Due</th><th>Submitted</th><th>Grade</th></tr>
+          </thead>
+          <tbody>
+            <% grades.forEach(function(g) { %>
+              <tr>
+                <td data-label="Class" class="table-stack-heading"><%= g.class_name %></td>
+                <td data-label="Lesson"><%= g.lesson_title %></td>
+                <td data-label="Assignment"><%= g.item_title || '(untitled)' %><% if (g.points_possible != null) { %> <span class="hint">(<%= g.points_possible %> pts)</span><% } %></td>
+                <td data-label="Due"><%= g.dueDateLabel || '—' %></td>
+                <td data-label="Submitted"><%= g.submission_id ? 'Yes' : 'Not yet' %></td>
+                <td data-label="Grade" class="table-stack-full">
+                  <% if (!g.submission_id) { %>
+                    <span class="hint">Nothing submitted yet</span>
+                  <% } else { %>
+                    <form method="POST" action="/parent/family-school/grades/<%= g.content_item_id %>/<%= selectedStudentId %>" class="member-form-grid">
+                      <label>Points Earned
+                        <input type="number" name="pointsEarned" min="0" step="0.01" value="<%= g.points_earned != null ? g.points_earned : '' %>" />
+                      </label>
+                      <label>Letter/Percent Grade
+                        <input type="text" name="gradeLetter" value="<%= g.grade_letter || '' %>" placeholder="e.g. A-, 92%" />
+                      </label>
+                      <label class="member-form-full">Feedback
+                        <textarea name="feedback" rows="2"><%= g.feedback || '' %></textarea>
+                      </label>
+                      <div class="member-form-full">
+                        <button type="submit" class="roster-action-btn">Save Grade</button>
+                      </div>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

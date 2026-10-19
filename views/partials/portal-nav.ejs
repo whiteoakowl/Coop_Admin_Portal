@@ -163,6 +163,12 @@ const MAIN_ADMIN_NAV_LINKS = [
   ] },
   { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
   { href: '/main-admin/academics', icon: 'graduation-cap', label: 'Academics' },
+  // A real request: "Parent portal, student portal and main admin
+  // portal add a tab called family school management... On main admin
+  // the family school management tab simply has settings. Leave
+  // settings for that blank for now." routes/main-admin-family-
+  // school.js - no subpages (there's only the one page).
+  { href: '/main-admin/family-school', icon: 'home-heart', label: 'Family School Management' },
   // Same Training & Learning module as Co-op Admin's own Training tab
   // (routes/main-admin-training.js, shared utils/training.js data) - a
   // real request: "the training tab should also be on main admin
@@ -225,6 +231,18 @@ const PARENT_NAV_LINKS = [
     { href: '/name-tag', label: 'Name Tag Form' },
     { href: '/absence', label: 'Absence/Late Form' },
     { href: '/parent/handbook', label: 'Policy Handbook' },
+  ] },
+  // A real request: "Parent portal, student portal and main admin
+  // portal add a tab called family school management... These classes
+  // are completely seperate from co-op classes and schedules as well as
+  // co-op teachers. It has nothing to do with that at all" - its own
+  // standalone nav entry, deliberately not folded into Co-op Classes
+  // above (routes/parent-family-school.js, a parallel data model).
+  { href: '/parent/family-school', icon: 'home-heart', label: 'Family School Management', subpages: [
+    { href: '/parent/family-school', label: 'Classes' },
+    { href: '/parent/family-school/grades', label: 'Grades' },
+    { href: '/parent/family-school/attendance', label: 'Attendance' },
+    { href: '/parent/family-school/journal', label: 'Teacher Journal' },
   ] },
   { href: '/forums?portal=parent', icon: 'users', label: 'Chat' },
   { href: '/parent/training', icon: 'graduation-cap', label: 'Training' },
@@ -338,6 +356,12 @@ const STUDENT_NAV_LINKS = [
     { href: '/student/classes', label: 'Class Schedule' },
     { href: '/student/classes/dashboard', label: 'Classroom Dashboard' },
   ] },
+  // A real request: "These classes will then appear under the students
+  // portal to work ok and complete" - see Parent Portal's own identical
+  // nav entry comment just above for the full request; this is the
+  // student-facing, read-only-plus-complete side of the same standalone
+  // feature (routes/student-family-school.js).
+  { href: '/student/family-school', icon: 'home-heart', label: 'Family School Management' },
   { href: '/forums?portal=student', icon: 'users', label: 'Chat' },
   { href: '/student/resources', icon: 'book', label: 'Resources' },
   { href: '/photos?portal=student', icon: 'camera', label: 'Photos' },
