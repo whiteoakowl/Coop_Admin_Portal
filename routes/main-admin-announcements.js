@@ -233,6 +233,8 @@ router.get('/text/sms-test', async (req, res) => {
     result: null,
     phone: '',
     message: '',
+    statusResult: null,
+    statusMessageId: '',
   });
 });
 
@@ -250,6 +252,31 @@ router.post('/text/sms-test', async (req, res) => {
     result,
     phone,
     message,
+    statusResult: null,
+    statusMessageId: '',
+  });
+});
+
+// A real request: Telnyx's own Reporting/Messaging Logs UI showed
+// nothing for a message their API had already reported "sent" -
+// queries the message directly by id instead of trusting that UI,
+// since the initial send() response only means Telnyx *accepted* the
+// request, not that a carrier delivered it.
+router.post('/text/sms-test/status', async (req, res) => {
+  const smsProvider = require('../utils/smsProvider');
+  const statusMessageId = (req.body.messageId || '').trim();
+  const statusResult = statusMessageId ? await smsProvider.getStatus(statusMessageId) : { error: 'No message ID given.' };
+  res.render('main-admin-sms-test', {
+    title: 'SMS Test',
+    isConfigured: smsProvider.isConfigured(),
+    hasApiKey: !!process.env.TELNYX_API_KEY,
+    hasProfileId: !!process.env.TELNYX_MESSAGING_PROFILE_ID,
+    hasFromNumber: !!process.env.TELNYX_FROM_NUMBER,
+    result: null,
+    phone: '',
+    message: '',
+    statusResult,
+    statusMessageId,
   });
 });
 

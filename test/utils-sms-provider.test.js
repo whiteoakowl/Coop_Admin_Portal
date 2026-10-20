@@ -155,3 +155,63 @@ test('send(): a network/fetch-level error also reports "failed", with the except
   assert.equal(result.status, 'failed');
   assert.equal(result.detail, 'getaddrinfo ENOTFOUND api.telnyx.com');
 });
+
+test('getStatus(): with no API key configured, returns an error without calling fetch', async () => {
+  const smsProvider = require('../utils/smsProvider');
+  global.fetch = async () => {
+    throw new Error('fetch should not have been called');
+  };
+
+  const result = await smsProvider.getStatus('msg_123');
+  assert.match(result.error, /no sms provider configured/i);
+});
+
+test('getStatus(): a successful lookup reports the per-recipient delivery status, GETting the message by id', async () => {
+  process.env.TELNYX_API_KEY = 'test-key';
+  const smsProvider = require('../utils/smsProvider');
+
+  let capturedUrl, capturedOptions;
+  global.fetch = async (url, options) => {
+    capturedUrl = url;
+    capturedOptions = options;
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          to: [{ phone_number: '+15551234567', status: 'delivered' }],
+          from: { phone_number: '+15555550123' },
+          sent_at: '2026-01-01T00:00:00Z',
+          completed_at: '2026-01-01T00:00:05Z',
+          errors: [],
+        },
+      }),
+    };
+  };
+
+  const result = await smsProvider.getStatus('msg_123');
+  assert.equal(capturedUrl, 'https://api.telnyx.com/v2/messages/msg_123');
+  assert.equal(capturedOptions.headers.Authorization, 'Bearer test-key');
+  assert.deepEqual(result, {
+    to: '+15551234567',
+    status: 'delivered',
+    from: '+15555550123',
+    sentAt: '2026-01-01T00:00:00Z',
+    completedAt: '2026-01-01T00:00:05Z',
+    errors: [],
+  });
+});
+
+test('getStatus(): a Telnyx error response (e.g. a message older than 10 days, or an unknown id) returns that error, never a fake status', async () => {
+  process.env.TELNYX_API_KEY = 'test-key';
+  const smsProvider = require('../utils/smsProvider');
+
+  global.fetch = async () => ({
+    ok: false,
+    status: 404,
+    json: async () => ({ errors: [{ code: '10007', title: 'Record not found', detail: 'The requested resource could not be found.' }] }),
+  });
+
+  const result = await smsProvider.getStatus('does-not-exist');
+  assert.equal(result.error, 'The requested resource could not be found.');
+});

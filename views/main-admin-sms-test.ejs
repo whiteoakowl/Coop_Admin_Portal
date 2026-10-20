@@ -53,7 +53,7 @@
           <% if (result.messageId) { %><li>Telnyx Message ID: <code><%= result.messageId %></code></li><% } %>
         </ul>
         <% if (result.status === 'sent') { %>
-          <p class="hint">Telnyx accepted the message - search Telnyx's Messaging Logs/Reporting for the Message ID above for final delivery status, and check the phone itself.</p>
+          <p class="hint">Telnyx accepted the message - that only means they took the request, not that a carrier delivered it. Use the Message ID below to check its real status.</p>
         <% } else if (result.status === 'skipped') { %>
           <p class="hint">Never reached Telnyx at all - see the detail above for exactly why (missing phone, bad number format, or not configured).</p>
         <% } else if (result.status === 'failed') { %>
@@ -61,6 +61,37 @@
         <% } %>
       </div>
     <% } %>
+
+    <div class="manage-section">
+      <div class="grid-box-header">
+        <h2>Check Delivery Status</h2>
+      </div>
+      <p class="hint">Looks up a message directly by its Telnyx ID instead of relying on Telnyx's Reporting/Messaging Logs page.</p>
+      <form method="POST" action="/main-admin/announcements/text/sms-test/status" class="member-form-grid">
+        <label class="member-form-full">Telnyx Message ID
+          <input type="text" name="messageId" value="<%= statusMessageId %>" placeholder="e.g. 4031a158-5cbf-41ee-97e8-151197e0cacf" required />
+        </label>
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Check Status</button>
+        </div>
+      </form>
+      <% if (statusResult) { %>
+        <% if (statusResult.error) { %>
+          <p class="alert alert-error"><%= statusResult.error %></p>
+        <% } else { %>
+          <ul class="member-profile-plain-list">
+            <li>Delivery Status: <span class="badge-pill <%= statusResult.status === 'delivered' ? 'badge-pill-green' : (statusResult.status === 'delivery_failed' || statusResult.status === 'sending_failed') ? 'badge-pill-red' : 'badge-pill-gray' %>"><%= statusResult.status || 'unknown' %></span></li>
+            <li>To: <%= statusResult.to || '' %></li>
+            <li>From: <%= statusResult.from || '' %></li>
+            <li>Sent At: <%= statusResult.sentAt || '' %></li>
+            <li>Completed At: <%= statusResult.completedAt || 'not yet completed' %></li>
+            <% if (statusResult.errors && statusResult.errors.length) { %>
+              <li>Errors: <%= statusResult.errors.map(function(e) { return e.detail || e.title; }).join('; ') %></li>
+            <% } %>
+          </ul>
+        <% } %>
+      <% } %>
+    </div>
   </main>
 </body>
 </html>

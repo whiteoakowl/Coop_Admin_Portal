@@ -71,4 +71,33 @@ async function send(phone, message) {
   }
 }
 
-module.exports = { isConfigured, send, toE164 };
+// Looks up a message's final delivery status by its Telnyx-assigned id -
+// the initial send() response only confirms Telnyx *accepted* the
+// request, not that a carrier actually delivered it. Used by the Main
+// Admin SMS Test page's "Check Delivery Status" lookup, bypassing
+// Telnyx's own Reporting UI entirely.
+async function getStatus(messageId) {
+  if (!process.env.TELNYX_API_KEY) return { error: 'No SMS provider configured.' };
+  try {
+    const res = await fetch(`${TELNYX_API_URL}/${encodeURIComponent(messageId)}`, {
+      headers: { Authorization: `Bearer ${process.env.TELNYX_API_KEY}` },
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      return { error: data?.errors?.[0]?.detail || data?.errors?.[0]?.title || `Telnyx error (HTTP ${res.status})` };
+    }
+    const msg = data?.data;
+    return {
+      to: msg?.to?.[0]?.phone_number || null,
+      status: msg?.to?.[0]?.status || null,
+      from: msg?.from?.phone_number || null,
+      sentAt: msg?.sent_at || null,
+      completedAt: msg?.completed_at || null,
+      errors: msg?.errors || [],
+    };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+module.exports = { isConfigured, send, toE164, getStatus };

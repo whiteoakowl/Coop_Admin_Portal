@@ -74,3 +74,17 @@ test('submitting with no phone number shows the "no phone number on file" detail
   assert.equal(res.status, 200);
   assert.match(res.text, /No phone number on file/);
 });
+
+test('checking delivery status with no Telnyx configured shows the exact error, never a fake status', async () => {
+  const cookie = await loginAsMainAdmin();
+  const csrfPage = await request(app).get('/main-admin/announcements/text/sms-test').set('Cookie', cookie);
+  const csrf = /name="csrf-token" content="([^"]*)"/.exec(csrfPage.text)[1];
+
+  const res = await request(app)
+    .post('/main-admin/announcements/text/sms-test/status')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ messageId: 'msg_123', _csrf: csrf });
+  assert.equal(res.status, 200);
+  assert.match(res.text, /No SMS provider configured/);
+});
