@@ -55,6 +55,12 @@ test('GET /main-admin/settings renders a card for every settings-area destinatio
   assert.match(res.text, /href="\/main-admin\/faq"[^]*?FAQ/);
   assert.match(res.text, /href="\/main-admin\/quick-links"[^]*?Quick Links/);
   assert.match(res.text, /href="\/main-admin\/audit-log"[^]*?Audit Log/);
+  // A real request: quick links to the public Request Membership form and
+  // Privacy Policy page from Main Admin's own Settings hub - needed as a
+  // handy reference (e.g. when filling out Telnyx's 10DLC campaign form,
+  // which asks for these exact public URLs).
+  assert.match(res.text, /href="\/register"[^]*?Request Membership Form/);
+  assert.match(res.text, /href="\/privacy-policy"[^]*?Privacy Policy/);
 
   // A real request: "co-op admin portal link should not be a tab card
   // under main admin gear settings." (the portal-switcher's own,
