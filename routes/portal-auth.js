@@ -106,8 +106,28 @@ router.get('/privacy-policy', (req, res) => {
   res.render('portal-privacy-policy', { title: 'Privacy Policy', lastUpdated: new Date().toISOString().slice(0, 10) });
 });
 
+// 10DLC compliance - Telnyx's own compliance guide: "Privacy Policy and
+// Terms links should be included in the registration, and Terms must be
+// a link or on-page text rather than a pop-up." Public (no login), same
+// reasoning as /privacy-policy above.
+router.get('/terms-and-conditions', (req, res) => {
+  res.render('portal-terms', { title: 'Terms and Conditions', lastUpdated: new Date().toISOString().slice(0, 10) });
+});
+
+// A real request: the "Request Membership Form" quick link under Main
+// Admin's own Settings hub always bounced straight to the portal picker
+// instead of showing the form, since a Main Admin is necessarily logged
+// in - the real "already logged in, don't let someone re-register"
+// protection below is still exactly right for every other already-
+// registered account (a parent/student/teacher clicking a stale
+// bookmark), just not for Main Admin previewing/screenshotting this
+// public page (e.g. for a Telnyx 10DLC campaign submission).
+function isMainAdmin(req) {
+  return (req.portalRoles || []).some((r) => r.key === 'main_admin');
+}
+
 router.get('/register', async (req, res) => {
-  if (req.portalAccount) return res.redirect('/portal');
+  if (req.portalAccount && !isMainAdmin(req)) return res.redirect('/portal');
   res.render('portal-register', {
     title: 'Request Membership',
     error: null,

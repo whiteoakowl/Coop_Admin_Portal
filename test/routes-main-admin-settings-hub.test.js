@@ -61,6 +61,7 @@ test('GET /main-admin/settings renders a card for every settings-area destinatio
   // which asks for these exact public URLs).
   assert.match(res.text, /href="\/register"[^]*?Request Membership Form/);
   assert.match(res.text, /href="\/privacy-policy"[^]*?Privacy Policy/);
+  assert.match(res.text, /href="\/terms-and-conditions"[^]*?Terms and Conditions/);
 
   // A real request: "co-op admin portal link should not be a tab card
   // under main admin gear settings." (the portal-switcher's own,

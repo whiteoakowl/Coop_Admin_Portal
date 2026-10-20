@@ -19,6 +19,8 @@ process.env.UPLOADS_DIR = testUploadsDir;
 process.env.SESSION_SECRET = 'test-secret-not-for-real-use';
 process.env.ADMIN_USERNAME = 'testadmin';
 process.env.ADMIN_PASSWORD = 'testpassword123';
+process.env.MAIN_ADMIN_EMAIL = 'mainadmin@coop.local';
+process.env.MAIN_ADMIN_PASSWORD = 'changeme123';
 
 const request = require('supertest');
 const app = require('../server');
@@ -32,6 +34,11 @@ test.after(() => {
   fs.rmSync(`${testDbPath}-shm`, { force: true });
   fs.rmSync(testUploadsDir, { recursive: true, force: true });
 });
+
+async function loginAsMainAdmin() {
+  const loginRes = await request(app).post('/login').type('form').send({ email: process.env.MAIN_ADMIN_EMAIL, password: process.env.MAIN_ADMIN_PASSWORD, next: '/main-admin' });
+  return loginRes.headers['set-cookie'];
+}
 
 function baseRegistration(overrides) {
   return {
@@ -126,4 +133,41 @@ test('GET /privacy-policy is public and includes the required SMS data-sharing d
   assert.equal(res.status, 200);
   assert.match(res.text, /Privacy Policy/);
   assert.match(res.text, /will not be sold or shared with third parties for promotional or marketing purposes/i);
+});
+
+// A real request: the "Request Membership Form" quick link under Main
+// Admin's own Settings hub always bounced to the portal picker instead
+// of showing the form, since clicking it necessarily happens while
+// logged in as Main Admin.
+test('GET /register shows the actual form for a logged-in Main Admin instead of bouncing to the portal picker', async () => {
+  const cookie = await loginAsMainAdmin();
+  const res = await request(app).get('/register').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /Request Membership/);
+  assert.match(res.text, /name="phone"/);
+});
+
+test('GET /register still redirects a logged-in parent (not Main Admin) to the portal picker', async () => {
+  const registerRes = await request(app)
+    .post('/register')
+    .type('form')
+    .send(baseRegistration({ email: 'already-registered@example.com' }));
+  assert.match(registerRes.text, /Registration Submitted/);
+  await db.prepare("UPDATE member_accounts SET status = 'active' WHERE email = 'already-registered@example.com'").run();
+
+  const loginRes = await request(app).post('/login').type('form').send({ email: 'already-registered@example.com', password: 'testpassword123', next: '/portal' });
+  const cookie = loginRes.headers['set-cookie'];
+  const registerPageRes = await request(app).get('/register').set('Cookie', cookie);
+  assert.equal(registerPageRes.status, 302);
+  assert.equal(registerPageRes.headers.location, '/portal');
+});
+
+test('GET /terms-and-conditions is public and GET /register links to both it and the Privacy Policy', async () => {
+  const res = await request(app).get('/terms-and-conditions');
+  assert.equal(res.status, 200);
+  assert.match(res.text, /Terms and Conditions/);
+
+  const registerRes = await request(app).get('/register');
+  assert.match(registerRes.text, /href="\/terms-and-conditions"/);
+  assert.match(registerRes.text, /href="\/privacy-policy"/);
 });
