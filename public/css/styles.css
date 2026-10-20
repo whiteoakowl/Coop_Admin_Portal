@@ -13833,6 +13833,13 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    controls. */
 .fs-planner-grid-table th, .fs-planner-grid-table td { white-space: nowrap; }
 .fs-planner-cell-input { width: 100%; min-width: 8rem; border: 1px solid var(--border); border-radius: var(--control-radius); padding: 0.3rem 0.4rem; font: inherit; }
+/* A real request: "Make sure all family school management pages,
+   subpages and popups have adequate space between buttons, text bars
+   and features. No overlapping." Each column/row header packs a label
+   next to its own delete icon - a plain <th> has no flex behavior of
+   its own, so without this the label's text and the icon button only
+   ever had a single collapsed whitespace character between them. */
+.fs-planner-header-cell { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
 
 /* Family School Management - Teacher Journal log (views/parent-family-
    school-journal.ejs). A real request: "Then a log below showing all

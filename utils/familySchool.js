@@ -559,9 +559,10 @@ async function deleteCurriculumItem(id) {
   await db.prepare('DELETE FROM family_school_curriculum_items WHERE id = ?').run(id);
 }
 
-// --- Schedule Planner (its own subpage - a real request: "The other
+// --- Weekly Planner (its own subpage - a real request: "The other
 // new planner page under family school management should be called
-// schedule planner." Its own per-week spreadsheet grid, with a real
+// schedule planner" (later renamed again: "Change schedule planner to
+// weekly planner"). Its own per-week spreadsheet grid, with a real
 // decision behind its shape:
 // "View weekly plan grid for each student. Be able to add rows and
 // columns to create plan grid for the week per student," confirmed to

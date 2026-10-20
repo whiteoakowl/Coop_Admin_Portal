@@ -9,11 +9,11 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
     <div class="roster-toolbar no-print">
-      <h1>Schedule Planner</h1>
+      <h1>Weekly Planner</h1>
       <% if (familyStudents.length > 0) { %>
-        <form method="GET" action="/parent/family-school/schedule-planner" class="category-filter">
-          <label for="schedule-planner-student-select">Student</label>
-          <select id="schedule-planner-student-select" name="studentId" onchange="this.form.submit()">
+        <form method="GET" action="/parent/family-school/weekly-planner" class="category-filter">
+          <label for="weekly-planner-student-select">Student</label>
+          <select id="weekly-planner-student-select" name="studentId" onchange="this.form.submit()">
             <% familyStudents.forEach(function(s) { %>
               <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
             <% }); %>
@@ -39,16 +39,18 @@
       </div>
 
       <div class="roster-scroll">
-        <table class="roster-table condensed-table fs-planner-grid-table" data-fs-planner-grid data-cell-url="/parent/family-school/schedule-planner/cell">
+        <table class="roster-table condensed-table fs-planner-grid-table" data-fs-planner-grid data-cell-url="/parent/family-school/weekly-planner/cell">
           <thead>
             <tr>
               <th></th>
               <% weeklyGrid.columns.forEach(function(c) { %>
                 <th>
-                  <%= c.label %>
-                  <form method="POST" action="/parent/family-school/schedule-planner/columns/<%= c.id %>/delete" data-confirm="Delete the &quot;<%= c.label %>&quot; column? This removes its cell content too." class="inline-block-form">
-                    <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete column" title="Delete column"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                  </form>
+                  <div class="fs-planner-header-cell">
+                    <span><%= c.label %></span>
+                    <form method="POST" action="/parent/family-school/weekly-planner/columns/<%= c.id %>/delete" data-confirm="Delete the &quot;<%= c.label %>&quot; column? This removes its cell content too." class="inline-block-form">
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete column" title="Delete column"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </div>
                 </th>
               <% }); %>
             </tr>
@@ -60,10 +62,12 @@
             <% weeklyGrid.rows.forEach(function(r) { %>
               <tr>
                 <th>
-                  <%= r.label %>
-                  <form method="POST" action="/parent/family-school/schedule-planner/rows/<%= r.id %>/delete" data-confirm="Delete the &quot;<%= r.label %>&quot; row? This removes its cell content too." class="inline-block-form">
-                    <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete row" title="Delete row"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                  </form>
+                  <div class="fs-planner-header-cell">
+                    <span><%= r.label %></span>
+                    <form method="POST" action="/parent/family-school/weekly-planner/rows/<%= r.id %>/delete" data-confirm="Delete the &quot;<%= r.label %>&quot; row? This removes its cell content too." class="inline-block-form">
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete row" title="Delete row"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </div>
                 </th>
                 <% r.cells.forEach(function(cell) { %>
                   <td>
@@ -77,11 +81,11 @@
       </div>
 
       <div class="roster-btn-row no-print">
-        <form method="POST" action="/parent/family-school/schedule-planner/<%= weeklyGrid.planId %>/columns" class="category-filter">
+        <form method="POST" action="/parent/family-school/weekly-planner/<%= weeklyGrid.planId %>/columns" class="category-filter">
           <input type="text" name="label" placeholder="New column label" required />
           <button type="submit" class="roster-action-btn">+ Column</button>
         </form>
-        <form method="POST" action="/parent/family-school/schedule-planner/<%= weeklyGrid.planId %>/rows" class="category-filter">
+        <form method="POST" action="/parent/family-school/weekly-planner/<%= weeklyGrid.planId %>/rows" class="category-filter">
           <input type="text" name="label" placeholder="New row label" required />
           <button type="submit" class="roster-action-btn">+ Row</button>
         </form>

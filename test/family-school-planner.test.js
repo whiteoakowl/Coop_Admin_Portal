@@ -8,8 +8,9 @@
 // organized by student and you add curriculum under each student. Pop
 // up asks for curriculum name, brand, level and price," and "The other
 // new planner page under family school management should be called
-// schedule planner." (utils/familySchool.js, routes/parent-family-
-// school.js's own /annual-planner and /schedule-planner routes).
+// schedule planner" (renamed again shortly after: "Change schedule
+// planner to weekly planner"). (utils/familySchool.js, routes/parent-
+// family-school.js's own /annual-planner and /weekly-planner routes).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -69,12 +70,12 @@ async function csrfFrom(cookie, url) {
   return /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
 }
 
-test('Annual Planner and Schedule Planner nav entries appear under Family School Management', async () => {
+test('Annual Planner and Weekly Planner nav entries appear under Family School Management', async () => {
   const familyId = await createFamily('Planner Nav Family');
   const parent = await createPortalMember({ name: 'Planner Nav Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const page = await request(app).get('/parent').set('Cookie', parent.cookie);
   assert.match(page.text, /href="\/parent\/family-school\/annual-planner"/);
-  assert.match(page.text, /href="\/parent\/family-school\/schedule-planner"/);
+  assert.match(page.text, /href="\/parent\/family-school\/weekly-planner"/);
 });
 
 test('Annual Planner: organized by student, a parent can add and delete curriculum items', async () => {
@@ -133,14 +134,14 @@ test('Annual Planner: a curriculum name is required, and another family cannot d
   assert.ok(await db.prepare('SELECT 1 FROM family_school_curriculum_items WHERE id = ?').get(itemId), "another family's parent must not be able to delete this item");
 });
 
-test('Schedule Planner: opening a week lazily creates a 7-day grid, and a parent can add/delete rows and columns and save cell content', async () => {
-  const familyId = await createFamily('Schedule Planner Family');
-  const parent = await createPortalMember({ name: 'Schedule Planner Parent', familyId, memberType: 'parent', roleKey: 'parent' });
-  const student = await createPortalMember({ name: 'Schedule Planner Student', familyId, memberType: 'student', roleKey: 'student' });
+test('Weekly Planner: opening a week lazily creates a 7-day grid, and a parent can add/delete rows and columns and save cell content', async () => {
+  const familyId = await createFamily('Weekly Planner Family');
+  const parent = await createPortalMember({ name: 'Weekly Planner Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Weekly Planner Student', familyId, memberType: 'student', roleKey: 'student' });
 
   // 2026-09-07 is a Monday - opening the grid for any day that week
   // should land on (and lazily create) the same Monday-keyed plan.
-  const page = await request(app).get(`/parent/family-school/schedule-planner?studentId=${student.memberId}&week=2026-09-09`).set('Cookie', parent.cookie);
+  const page = await request(app).get(`/parent/family-school/weekly-planner?studentId=${student.memberId}&week=2026-09-09`).set('Cookie', parent.cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /Monday/);
   assert.match(page.text, /Sunday/);
@@ -150,9 +151,9 @@ test('Schedule Planner: opening a week lazily creates a 7-day grid, and a parent
   const columnCount = Number((await db.prepare('SELECT COUNT(*) AS n FROM family_school_weekly_plan_columns WHERE plan_id = ?').get(plan.id)).n);
   assert.equal(columnCount, 7, 'a brand new week is seeded with exactly 7 day columns');
 
-  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/schedule-planner');
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/weekly-planner');
   await request(app)
-    .post(`/parent/family-school/schedule-planner/${plan.id}/rows`)
+    .post(`/parent/family-school/weekly-planner/${plan.id}/rows`)
     .set('Cookie', parent.cookie)
     .type('form')
     .send({ label: 'Math', _csrf: csrf });
@@ -160,7 +161,7 @@ test('Schedule Planner: opening a week lazily creates a 7-day grid, and a parent
   assert.equal(row.label, 'Math');
 
   await request(app)
-    .post(`/parent/family-school/schedule-planner/${plan.id}/columns`)
+    .post(`/parent/family-school/weekly-planner/${plan.id}/columns`)
     .set('Cookie', parent.cookie)
     .type('form')
     .send({ label: 'Notes', _csrf: csrf });
@@ -169,7 +170,7 @@ test('Schedule Planner: opening a week lazily creates a 7-day grid, and a parent
   const notesColumn = await db.prepare("SELECT * FROM family_school_weekly_plan_columns WHERE plan_id = ? AND label = 'Notes'").get(plan.id);
 
   const cellRes = await request(app)
-    .post('/parent/family-school/schedule-planner/cell')
+    .post('/parent/family-school/weekly-planner/cell')
     .set('Cookie', parent.cookie)
     .type('form')
     .send({ rowId: row.id, columnId: notesColumn.id, content: 'Fractions worksheet', _csrf: csrf });
@@ -177,35 +178,35 @@ test('Schedule Planner: opening a week lazily creates a 7-day grid, and a parent
   const cell = await db.prepare('SELECT content FROM family_school_weekly_plan_cells WHERE row_id = ? AND column_id = ?').get(row.id, notesColumn.id);
   assert.equal(cell.content, 'Fractions worksheet');
 
-  const gridPage = await request(app).get(`/parent/family-school/schedule-planner?studentId=${student.memberId}&week=2026-09-07`).set('Cookie', parent.cookie);
+  const gridPage = await request(app).get(`/parent/family-school/weekly-planner?studentId=${student.memberId}&week=2026-09-07`).set('Cookie', parent.cookie);
   assert.match(gridPage.text, /value="Fractions worksheet"/);
 
-  await request(app).post(`/parent/family-school/schedule-planner/rows/${row.id}/delete`).set('Cookie', parent.cookie).type('form').send({ _csrf: csrf });
+  await request(app).post(`/parent/family-school/weekly-planner/rows/${row.id}/delete`).set('Cookie', parent.cookie).type('form').send({ _csrf: csrf });
   assert.equal(await db.prepare('SELECT 1 FROM family_school_weekly_plan_rows WHERE id = ?').get(row.id), undefined);
   assert.equal(await db.prepare('SELECT 1 FROM family_school_weekly_plan_cells WHERE row_id = ?').get(row.id), undefined, "deleting a row also removes its own cells");
 
-  await request(app).post(`/parent/family-school/schedule-planner/columns/${notesColumn.id}/delete`).set('Cookie', parent.cookie).type('form').send({ _csrf: csrf });
+  await request(app).post(`/parent/family-school/weekly-planner/columns/${notesColumn.id}/delete`).set('Cookie', parent.cookie).type('form').send({ _csrf: csrf });
   assert.equal(await db.prepare('SELECT 1 FROM family_school_weekly_plan_columns WHERE id = ?').get(notesColumn.id), undefined);
 });
 
-test('Schedule Planner: a different week for the same student is an independent grid, and another family cannot touch it', async () => {
-  const familyId = await createFamily('Schedule Planner Isolation Family');
+test('Weekly Planner: a different week for the same student is an independent grid, and another family cannot touch it', async () => {
+  const familyId = await createFamily('Weekly Planner Isolation Family');
   const parent = await createPortalMember({ name: 'Schedule Isolation Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const student = await createPortalMember({ name: 'Schedule Isolation Student', familyId, memberType: 'student', roleKey: 'student' });
-  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/schedule-planner');
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/weekly-planner');
 
-  await request(app).get(`/parent/family-school/schedule-planner?studentId=${student.memberId}&week=2026-09-07`).set('Cookie', parent.cookie);
+  await request(app).get(`/parent/family-school/weekly-planner?studentId=${student.memberId}&week=2026-09-07`).set('Cookie', parent.cookie);
   const weekOnePlan = await db.prepare('SELECT * FROM family_school_weekly_plans WHERE student_id = ? AND week_start_date = ?').get(student.memberId, '2026-09-07');
-  await request(app).post(`/parent/family-school/schedule-planner/${weekOnePlan.id}/rows`).set('Cookie', parent.cookie).type('form').send({ label: 'Week One Only Row', _csrf: csrf });
+  await request(app).post(`/parent/family-school/weekly-planner/${weekOnePlan.id}/rows`).set('Cookie', parent.cookie).type('form').send({ label: 'Week One Only Row', _csrf: csrf });
 
-  const weekTwoPage = await request(app).get(`/parent/family-school/schedule-planner?studentId=${student.memberId}&week=2026-09-14`).set('Cookie', parent.cookie);
+  const weekTwoPage = await request(app).get(`/parent/family-school/weekly-planner?studentId=${student.memberId}&week=2026-09-14`).set('Cookie', parent.cookie);
   assert.doesNotMatch(weekTwoPage.text, /Week One Only Row/, "a different week's grid must not inherit another week's own rows");
 
-  const otherFamilyId = await createFamily('Schedule Planner Other Family');
+  const otherFamilyId = await createFamily('Weekly Planner Other Family');
   const otherParent = await createPortalMember({ name: 'Schedule Other Parent', familyId: otherFamilyId, memberType: 'parent', roleKey: 'parent' });
-  const otherCsrf = await csrfFrom(otherParent.cookie, '/parent/family-school/schedule-planner');
+  const otherCsrf = await csrfFrom(otherParent.cookie, '/parent/family-school/weekly-planner');
   const hijackRowRes = await request(app)
-    .post(`/parent/family-school/schedule-planner/${weekOnePlan.id}/rows`)
+    .post(`/parent/family-school/weekly-planner/${weekOnePlan.id}/rows`)
     .set('Cookie', otherParent.cookie)
     .type('form')
     .send({ label: 'Hijacked Row', _csrf: otherCsrf });
@@ -214,7 +215,7 @@ test('Schedule Planner: a different week for the same student is an independent 
   const row = await db.prepare('SELECT * FROM family_school_weekly_plan_rows WHERE plan_id = ? AND label = ?').get(weekOnePlan.id, 'Week One Only Row');
   const column = await db.prepare('SELECT * FROM family_school_weekly_plan_columns WHERE plan_id = ? LIMIT 1').get(weekOnePlan.id);
   const hijackCellRes = await request(app)
-    .post('/parent/family-school/schedule-planner/cell')
+    .post('/parent/family-school/weekly-planner/cell')
     .set('Cookie', otherParent.cookie)
     .type('form')
     .send({ rowId: row.id, columnId: column.id, content: 'Hijacked content', _csrf: otherCsrf });
