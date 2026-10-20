@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle"><a href="/main-admin/announcements/text">&larr; Communication &middot; Text</a></p>
+    <h1>SMS Test</h1>
+    <p class="hint">Sends directly through smsProvider.send() - bypassing notifications, recipient lists, and opt-in preferences entirely - so you see exactly what Telnyx (or the lack of configuration) actually reports back.</p>
+
+    <div class="manage-section">
+      <div class="grid-box-header">
+        <h2>Configuration</h2>
+      </div>
+      <ul class="member-profile-plain-list">
+        <li>TELNYX_API_KEY: <span class="badge-pill <%= hasApiKey ? 'badge-pill-green' : 'badge-pill-red' %>"><%= hasApiKey ? 'Set' : 'Not set' %></span></li>
+        <li>TELNYX_MESSAGING_PROFILE_ID: <span class="badge-pill <%= hasProfileId ? 'badge-pill-green' : 'badge-pill-gray' %>"><%= hasProfileId ? 'Set' : 'Not set' %></span></li>
+        <li>TELNYX_FROM_NUMBER: <span class="badge-pill <%= hasFromNumber ? 'badge-pill-green' : 'badge-pill-gray' %>"><%= hasFromNumber ? 'Set' : 'Not set' %></span></li>
+        <li><strong>Overall: <span class="badge-pill <%= isConfigured ? 'badge-pill-green' : 'badge-pill-red' %>"><%= isConfigured ? 'Configured' : 'NOT configured' %></span></strong></li>
+      </ul>
+      <% if (!isConfigured) { %>
+        <p class="hint">Not configured means every send is skipped before it ever reaches Telnyx - check the exact env var names in Netlify for typos, and confirm the latest deploy actually includes them.</p>
+      <% } %>
+    </div>
+
+    <div class="manage-section">
+      <div class="grid-box-header">
+        <h2>Send a Test Text</h2>
+      </div>
+      <form method="POST" action="/main-admin/announcements/text/sms-test" class="member-form-grid">
+        <label>Phone Number
+          <input type="text" name="phone" value="<%= phone %>" placeholder="555-123-4567" required />
+        </label>
+        <label class="member-form-full">Message
+          <input type="text" name="message" value="<%= message %>" placeholder="Test message from Co-op Admin Portal." />
+        </label>
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Send Test</button>
+        </div>
+      </form>
+    </div>
+
+    <% if (result) { %>
+      <div class="manage-section">
+        <div class="grid-box-header">
+          <h2>Result</h2>
+        </div>
+        <ul class="member-profile-plain-list">
+          <li>Status: <span class="badge-pill <%= result.status === 'sent' ? 'badge-pill-green' : result.status === 'failed' ? 'badge-pill-red' : 'badge-pill-gray' %>"><%= result.status %></span></li>
+          <% if (result.detail) { %><li>Detail: <%= result.detail %></li><% } %>
+          <% if (result.messageId) { %><li>Telnyx Message ID: <code><%= result.messageId %></code></li><% } %>
+        </ul>
+        <% if (result.status === 'sent') { %>
+          <p class="hint">Telnyx accepted the message - that only means they took the request, not that a carrier delivered it. Use the Message ID below to check its real status.</p>
+        <% } else if (result.status === 'skipped') { %>
+          <p class="hint">Never reached Telnyx at all - see the detail above for exactly why (missing phone, bad number format, or not configured).</p>
+        <% } else if (result.status === 'failed') { %>
+          <p class="hint">Telnyx (or the network request itself) rejected this - the detail above is Telnyx's own error message.</p>
+        <% } %>
+      </div>
+    <% } %>
+
+    <div class="manage-section">
+      <div class="grid-box-header">
+        <h2>Check Delivery Status</h2>
+      </div>
+      <p class="hint">Looks up a message directly by its Telnyx ID instead of relying on Telnyx's Reporting/Messaging Logs page.</p>
+      <form method="POST" action="/main-admin/announcements/text/sms-test/status" class="member-form-grid">
+        <label class="member-form-full">Telnyx Message ID
+          <input type="text" name="messageId" value="<%= statusMessageId %>" placeholder="e.g. 4031a158-5cbf-41ee-97e8-151197e0cacf" required />
+        </label>
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Check Status</button>
+        </div>
+      </form>
+      <% if (statusResult) { %>
+        <% if (statusResult.error) { %>
+          <p class="alert alert-error"><%= statusResult.error %></p>
+        <% } else { %>
+          <ul class="member-profile-plain-list">
+            <li>Delivery Status: <span class="badge-pill <%= statusResult.status === 'delivered' ? 'badge-pill-green' : (statusResult.status === 'delivery_failed' || statusResult.status === 'sending_failed') ? 'badge-pill-red' : 'badge-pill-gray' %>"><%= statusResult.status || 'unknown' %></span></li>
+            <li>To: <%= statusResult.to || '' %></li>
+            <li>From: <%= statusResult.from || '' %></li>
+            <li>Sent At: <%= statusResult.sentAt || '' %></li>
+            <li>Completed At: <%= statusResult.completedAt || 'not yet completed' %></li>
+            <% if (statusResult.errors && statusResult.errors.length) { %>
+              <li>Errors: <%= statusResult.errors.map(function(e) { return e.detail || e.title; }).join('; ') %></li>
+            <% } %>
+          </ul>
+        <% } %>
+      <% } %>
+    </div>
+  </main>
+</body>
+</html>
