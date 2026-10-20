@@ -12,6 +12,7 @@ const multer = require('multer');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
 const { lessonAttachmentFileFilter } = require('../utils/uploads');
+const { todayISO, isValidISODate, addDays, formatDateLabel } = require('../utils/dates');
 const {
   classesForStudent,
   lessonsForStudentView,
@@ -21,6 +22,10 @@ const {
   markLessonItemComplete,
   submitAssignment,
   saveAttachment,
+  overviewForFamily,
+  gradesForStudent,
+  mondayOf,
+  weeklyPlanGrid,
 } = require('../utils/familySchool');
 
 router.use(requirePortalAuth, requirePortal('student'));
@@ -30,6 +35,37 @@ router.get('/family-school', async (req, res) => {
   res.render('student-family-school-classes', {
     title: 'Family School Management',
     classes: await classesForStudent(member.id),
+  });
+});
+
+// A real request: "Student portal add a tab that says family
+// homeschooling. Subpages are, homeschool overview, homeschool classes,
+// homeschool grades, weekly planner." Read-only - reuses the exact same
+// functions Parent Portal's own identical pages use (utils/
+// familySchool.js), just always scoped to the signed-in student's own
+// id/family, never a posted/query id, same rule this file's own header
+// comment already states for every route here.
+router.get('/family-school/overview', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const overview = member.family_id ? await overviewForFamily(member.family_id) : [];
+  const own = overview.find((s) => s.id === member.id) || null;
+  res.render('student-family-school-overview', { title: 'Homeschool Overview', student: own });
+});
+
+router.get('/family-school/grades', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  res.render('student-family-school-grades', { title: 'Homeschool Grades', grades: await gradesForStudent(member.id) });
+});
+
+router.get('/family-school/weekly-planner', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const weekStartDate = mondayOf(isValidISODate(req.query.week) ? req.query.week : todayISO());
+  res.render('student-family-school-weekly-planner', {
+    title: 'Weekly Planner',
+    weeklyGrid: await weeklyPlanGrid(member.id, weekStartDate),
+    weekStartLabel: formatDateLabel(weekStartDate),
+    prevWeek: addDays(weekStartDate, -7),
+    nextWeek: addDays(weekStartDate, 7),
   });
 });
 

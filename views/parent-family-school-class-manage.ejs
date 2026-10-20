@@ -95,8 +95,14 @@
     </div>
   </main>
 
+  <%# A real request: "Family school management tab, subpage, pages,
+      popups etc. Make sure all buttons, text bars, lists etc all have
+      adequate space between rows and no overlapping." Same missing-
+      .stack-form bug as the New Class dialog (parent-family-school-
+      classes.ejs's own comment on this) - this dialog's bare <label>
+      elements had no display:block or row spacing of their own. %>
   <dialog id="add-lesson-dialog" class="class-form-dialog">
-    <form method="POST" action="/parent/family-school/classes/<%= cls.id %>/lessons">
+    <form method="POST" action="/parent/family-school/classes/<%= cls.id %>/lessons" class="stack-form">
       <div class="class-form-dialog-header">
         <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
         <h3>New Lesson</h3>

@@ -162,7 +162,13 @@ const MAIN_ADMIN_NAV_LINKS = [
     { href: '/main-admin/babysitters?tab=settings', label: 'Settings' },
   ] },
   { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
-  { href: '/main-admin/academics', icon: 'graduation-cap', label: 'Academics' },
+  // A real request: "Main admin portal, remove academics tab and
+  // features. Only parent portal has those pages and admin doesn't need
+  // to control them with any settings." Diplomas/transcripts are entirely
+  // a Parent Portal self-service feature now (views/parent-academics-
+  // diplomas.ejs's own designer, routes/parent-portal.js's own
+  // transcript builder) - Main Admin's old issue-a-diploma/add-a-
+  // transcript-entry control panel (routes/main-admin.js) is gone.
   // A real request: "Parent portal, student portal and main admin
   // portal add a tab called family school management... On main admin
   // the family school management tab simply has settings. Leave
@@ -238,6 +244,12 @@ const PARENT_NAV_LINKS = [
   // co-op teachers. It has nothing to do with that at all" - its own
   // standalone nav entry, deliberately not folded into Co-op Classes
   // above (routes/parent-family-school.js, a parallel data model).
+  // A real request: "Parent portal move transcripts to a subpage under
+  // family school management. Move diploma subpage to family school
+  // management tab. Remove stand alone academics tab and make name tags
+  // its own tab." Transcripts/Diplomas keep their own existing
+  // /parent/academics* routes (routes/parent-portal.js) - only their nav
+  // placement moved, same as Name Tags' own standalone entry below.
   { href: '/parent/family-school', icon: 'home-heart', label: 'Family School Management', subpages: [
     { href: '/parent/family-school', label: 'Family School Management' },
     { href: '/parent/family-school/classes', label: 'Family Classes' },
@@ -246,6 +258,8 @@ const PARENT_NAV_LINKS = [
     { href: '/parent/family-school/journal', label: 'Daily Learning Log' },
     { href: '/parent/family-school/annual-planner', label: 'Annual Planner' },
     { href: '/parent/family-school/weekly-planner', label: 'Weekly Planner' },
+    { href: '/parent/academics', label: 'Transcripts' },
+    { href: '/parent/academics/diplomas', label: 'Diplomas' },
   ] },
   { href: '/forums?portal=parent', icon: 'users', label: 'Chat' },
   { href: '/parent/training', icon: 'graduation-cap', label: 'Training' },
@@ -255,11 +269,7 @@ const PARENT_NAV_LINKS = [
   { href: '/parent/documents', icon: 'file-text', label: 'Documents' },
   { href: '/store', icon: 'grid', label: 'Store' },
   { href: '/photos?portal=parent', icon: 'camera', label: 'Photos' },
-  { href: '/parent/academics', icon: 'clipboard-list', label: 'Academics', subpages: [
-    { href: '/parent/academics', label: 'Transcripts' },
-    { href: '/parent/academics/diplomas', label: 'Diplomas' },
-    { href: '/parent/name-tags', label: 'Name Tags' },
-  ] },
+  { href: '/parent/name-tags', icon: 'badge', label: 'Name Tags' },
   { href: '/parent/babysitters', icon: 'user', label: 'Babysitters' },
   // A real request: "remove library log sub page. It is now a button on
   // the library page" - My Library Log dropped back out of this nav
@@ -305,7 +315,7 @@ const TEACHER_NAV_LINKS = [
   { href: '/teacher', icon: 'home', label: 'Home' },
   { href: '/teacher/attendance', icon: 'calendar-check', label: 'Attendance' },
   { href: '/teacher/classes', icon: 'graduation-cap', label: 'Class Schedule' },
-  { href: '/training', icon: 'graduation-cap', label: 'Training' },
+  { href: '/teacher/training', icon: 'graduation-cap', label: 'Training' },
   { href: '/teacher/assignments', icon: 'clipboard-list', label: 'Assignments' },
   { href: '/forums?portal=teacher', icon: 'users', label: 'Chat' },
   { href: '/photos?portal=teacher', icon: 'camera', label: 'Photos' },
@@ -363,8 +373,19 @@ const STUDENT_NAV_LINKS = [
   // portal to work ok and complete" - see Parent Portal's own identical
   // nav entry comment just above for the full request; this is the
   // student-facing, read-only-plus-complete side of the same standalone
-  // feature (routes/student-family-school.js).
-  { href: '/student/family-school', icon: 'home-heart', label: 'Family School Management' },
+  // feature (routes/student-family-school.js). A later real request
+  // ("Student portal add a tab that says family homeschooling. Subpages
+  // are, homeschool overview, homeschool classes, homeschool grades,
+  // weekly planner") gave it subpages, same as Parent Portal's own
+  // Family School Management entry above - every page here is read-only
+  // for a student (grading/editing stays a parent-only action on their
+  // own identical Parent Portal pages).
+  { href: '/student/family-school', icon: 'home-heart', label: 'Family Homeschooling', subpages: [
+    { href: '/student/family-school/overview', label: 'Homeschool Overview' },
+    { href: '/student/family-school', label: 'Homeschool Classes' },
+    { href: '/student/family-school/grades', label: 'Homeschool Grades' },
+    { href: '/student/family-school/weekly-planner', label: 'Weekly Planner' },
+  ] },
   { href: '/forums?portal=student', icon: 'users', label: 'Chat' },
   { href: '/student/resources', icon: 'book', label: 'Resources' },
   { href: '/photos?portal=student', icon: 'camera', label: 'Photos' },
@@ -382,7 +403,7 @@ const STUDENT_ACTIVITY_LINKS = [
   { href: '/student/achievements', icon: 'star', label: 'Achievements' },
   { href: '/student/leaderboard', icon: 'trophy', label: 'Leaderboard' },
   { href: '/student/nature-news', icon: 'sprout', label: 'Nature News' },
-  { href: '/student/spelling-bee', icon: 'type', label: 'Spelling Bee' },
+  { href: '/student/vocabulary', icon: 'type', label: 'Vocabulary' },
 ];
 const primaryNavLinks =
   portalTitle === 'Main Admin' ? MAIN_ADMIN_NAV_LINKS

@@ -22,7 +22,7 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p><a href="/forums/<%= category.id %>">&larr; <%= category.name %></a></p>
+    <p><a href="/forums/<%= category.id %><%= portalParam ? '?portal=' + portalParam : '' %>">&larr; <%= category.name %></a></p>
 
     <div class="grid-box-header">
       <% if (category.is_chat_room) { %>
@@ -41,20 +41,21 @@
     <% if (canModerate && !category.is_chat_room) { %>
       <div class="roster-toolbar">
         <div class="roster-btn-row">
+          <% var threadActionPortalQuery = portalParam ? '?portal=' + portalParam : ''; %>
           <% if (thread.is_pinned) { %>
-            <form method="POST" action="/forums/threads/<%= thread.id %>/unpin" class="inline-block-form"><button type="submit" class="roster-action-btn">Unpin</button></form>
+            <form method="POST" action="/forums/threads/<%= thread.id %>/unpin<%= threadActionPortalQuery %>" class="inline-block-form"><button type="submit" class="roster-action-btn">Unpin</button></form>
           <% } else { %>
-            <form method="POST" action="/forums/threads/<%= thread.id %>/pin" class="inline-block-form"><button type="submit" class="roster-action-btn">Pin</button></form>
+            <form method="POST" action="/forums/threads/<%= thread.id %>/pin<%= threadActionPortalQuery %>" class="inline-block-form"><button type="submit" class="roster-action-btn">Pin</button></form>
           <% } %>
           <% if (thread.is_locked) { %>
-            <form method="POST" action="/forums/threads/<%= thread.id %>/unlock" class="inline-block-form"><button type="submit" class="roster-action-btn">Unlock</button></form>
+            <form method="POST" action="/forums/threads/<%= thread.id %>/unlock<%= threadActionPortalQuery %>" class="inline-block-form"><button type="submit" class="roster-action-btn">Unlock</button></form>
           <% } else { %>
-            <form method="POST" action="/forums/threads/<%= thread.id %>/lock" class="inline-block-form"><button type="submit" class="roster-action-btn">Lock</button></form>
+            <form method="POST" action="/forums/threads/<%= thread.id %>/lock<%= threadActionPortalQuery %>" class="inline-block-form"><button type="submit" class="roster-action-btn">Lock</button></form>
           <% } %>
           <% if (thread.status === 'archived') { %>
-            <form method="POST" action="/forums/threads/<%= thread.id %>/unarchive" class="inline-block-form"><button type="submit" class="roster-action-btn">Unarchive</button></form>
+            <form method="POST" action="/forums/threads/<%= thread.id %>/unarchive<%= threadActionPortalQuery %>" class="inline-block-form"><button type="submit" class="roster-action-btn">Unarchive</button></form>
           <% } else { %>
-            <form method="POST" action="/forums/threads/<%= thread.id %>/archive" class="inline-block-form"><button type="submit" class="roster-action-btn roster-action-btn-danger">Archive</button></form>
+            <form method="POST" action="/forums/threads/<%= thread.id %>/archive<%= threadActionPortalQuery %>" class="inline-block-form"><button type="submit" class="roster-action-btn roster-action-btn-danger">Archive</button></form>
           <% } %>
         </div>
       </div>
@@ -114,7 +115,7 @@
                 <% } %>
                 <% if (canModerate) { %>
                   <% if (p.status === 'active') { %>
-                    <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/remove" class="inline-block-form">
+                    <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/remove<%= threadActionPortalQuery %>" class="inline-block-form">
                       <% if (category.is_chat_room) { %>
                         <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                       <% } else { %>
@@ -122,7 +123,7 @@
                       <% } %>
                     </form>
                   <% } else { %>
-                    <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/restore" class="inline-block-form"><button type="submit" class="roster-action-btn">Restore</button></form>
+                    <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/restore<%= threadActionPortalQuery %>" class="inline-block-form"><button type="submit" class="roster-action-btn">Restore</button></form>
                   <% } %>
                 <% } %>
               </div>
@@ -131,7 +132,7 @@
 
           <% if (p.status === 'active' && canEditThisPost) { %>
             <dialog id="edit-post-<%= p.id %>" class="member-picker-dialog">
-              <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/edit" data-forum-editor>
+              <form method="POST" action="/forums/threads/<%= thread.id %>/posts/<%= p.id %>/edit<%= threadActionPortalQuery %>" data-forum-editor>
                 <h3>Edit Post</h3>
                 <%- include(category.is_chat_room ? 'partials/forum-editor-toolbar-chat' : 'partials/forum-editor-toolbar') %>
                 <div class="forum-editable" data-forum-editable contenteditable="true"><%- p.body_html %></div>
@@ -149,7 +150,7 @@
       <% if (!category.is_chat_room && canModerate) { %>
         <div class="manage-section">
           <div class="grid-box-header"><h2>Move Thread</h2></div>
-          <form method="POST" action="/forums/threads/<%= thread.id %>/move" class="inline-block-form">
+          <form method="POST" action="/forums/threads/<%= thread.id %>/move<%= portalParam ? '?portal=' + portalParam : '' %>" class="inline-block-form">
             <input type="number" name="categoryId" placeholder="Target chat ID" required />
             <button type="submit" class="roster-action-btn">Move</button>
           </form>
@@ -159,7 +160,7 @@
       <% if (thread.status === 'active' && (!thread.is_locked || canModerate) && (category.allow_comments || canModerate)) { %>
         <div class="manage-section">
           <% if (!category.is_chat_room) { %><div class="grid-box-header"><h2>Reply</h2></div><% } %>
-          <form method="POST" action="/forums/threads/<%= thread.id %>/posts" data-forum-editor <% if (category.is_chat_room) { %>data-chat-room-form<% } %>>
+          <form method="POST" action="/forums/threads/<%= thread.id %>/posts<%= portalParam ? '?portal=' + portalParam : '' %>" data-forum-editor <% if (category.is_chat_room) { %>data-chat-room-form<% } %>>
             <%- include(category.is_chat_room ? 'partials/forum-editor-toolbar-chat' : 'partials/forum-editor-toolbar') %>
             <div class="forum-editable" data-forum-editable contenteditable="true"></div>
             <input type="hidden" name="body" data-forum-body-input />

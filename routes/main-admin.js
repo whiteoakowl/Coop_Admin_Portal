@@ -10,10 +10,6 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
-const { isValidISODate } = require('../utils/dates');
-const { allDiplomas, issueDiploma, allTranscriptEntries, addTranscriptEntry, generateTranscriptsForEndedClasses } = require('../utils/academics');
-const { CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
-const { GRADE_OPTIONS } = require('../utils/membership');
 const events = require('../utils/events');
 const babysitters = require('../utils/babysitters');
 const photos = require('../utils/photos');
@@ -354,63 +350,6 @@ router.post('/faq/categories/bulk-save', requirePortalPermission('manage_website
 router.post('/faq/categories/:id/delete', requirePortalPermission('manage_website'), async (req, res) => {
   await db.prepare('DELETE FROM faq_categories WHERE id = ?').run(req.params.id);
   res.redirect('/main-admin/faq?notice=' + encodeURIComponent('Category removed.'));
-});
-
-// --- Academics: diplomas + transcripts (utils/academics.js) ---
-// One combined page (nav tab: "Academics") - a Main Admin issues
-// diplomas here, and can also hand-add a past term to a student's
-// transcript for history that predates this feature or a transfer
-// student's prior co-op record. Transcript entries for a class that has
-// simply run its course are generated automatically once that class's
-// own end_date passes (generateTranscriptsForEndedClasses) - backfilled
-// lazily right here rather than needing its own scheduled job.
-
-router.get('/academics', requirePortalPermission('manage_academics'), async (req, res) => {
-  await generateTranscriptsForEndedClasses();
-  const diplomas = await allDiplomas();
-  const transcriptEntries = await allTranscriptEntries();
-  const students = await db.prepare("SELECT id, name FROM members WHERE member_type = 'student' AND active = 1 ORDER BY LOWER(name)").all();
-  res.render('main-admin-academics', {
-    title: 'Academics',
-    diplomas,
-    transcriptEntries,
-    students,
-    dayLabels: CLASS_DAY_LABELS_FULL,
-    gradeOptions: GRADE_OPTIONS,
-    error: req.query.error || null,
-    notice: req.query.notice || null,
-  });
-});
-
-router.post('/academics/diploma', requirePortalPermission('manage_academics'), async (req, res) => {
-  const studentId = parseInt(req.body.studentId, 10);
-  const title = (req.body.title || '').trim() || 'Diploma of Completion';
-  const issuedDate = req.body.issuedDate;
-  const back = '/main-admin/academics';
-  if (!studentId || !isValidISODate(issuedDate)) {
-    return res.redirect(back + '?error=' + encodeURIComponent('A student and a valid issue date are required.'));
-  }
-  await issueDiploma({ studentId, title, issuedDate, bodyText: (req.body.bodyText || '').trim(), issuedByAccountId: req.portalAccount.id });
-  res.redirect(back + '?notice=' + encodeURIComponent('Diploma issued.'));
-});
-
-router.post('/academics/transcript', requirePortalPermission('manage_academics'), async (req, res) => {
-  const studentId = parseInt(req.body.studentId, 10);
-  const className = (req.body.className || '').trim();
-  const termEndedAt = req.body.termEndedAt;
-  const back = '/main-admin/academics';
-  if (!studentId || !className || !isValidISODate(termEndedAt)) {
-    return res.redirect(back + '?error=' + encodeURIComponent('A student, class name, and a valid term-ended date are required.'));
-  }
-  await addTranscriptEntry({
-    studentId,
-    className,
-    day: req.body.day || null,
-    ageGroup: req.body.ageGroup || null,
-    teacherNames: (req.body.teacherNames || '').trim(),
-    termEndedAt,
-  });
-  res.redirect(back + '?notice=' + encodeURIComponent('Transcript entry added.'));
 });
 
 module.exports = router;

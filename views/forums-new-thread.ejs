@@ -23,11 +23,11 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>New Thread &mdash; <%= category.name %></h1>
-    <p><a href="/forums/<%= category.id %>">&larr; Back</a></p>
+    <p><a href="/forums/<%= category.id %><%= portalParam ? '?portal=' + portalParam : '' %>">&larr; Back</a></p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <form method="POST" action="/forums/<%= category.id %>/threads" class="member-form-grid">
+    <form method="POST" action="/forums/<%= category.id %>/threads<%= portalParam ? '?portal=' + portalParam : '' %>" class="member-form-grid">
       <label class="member-form-full">Title
         <input type="text" name="title" required />
       </label>

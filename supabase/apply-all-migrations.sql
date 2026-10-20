@@ -5239,6 +5239,52 @@ create table if not exists parent_transcript_entries (
 );
 create index if not exists idx_parent_transcript_entries_student on parent_transcript_entries(student_id, school_year);
 
+-- Parent Portal - Diploma designer (template/color/signatures). See the
+-- diploma_design migration's own header comment.
+alter table diplomas add column if not exists template text not null default 'classic';
+alter table diplomas add column if not exists color text not null default '#2e6da4';
+alter table diplomas add column if not exists display_name text;
+alter table diplomas add column if not exists signature1_name text;
+alter table diplomas add column if not exists signature1_title text;
+alter table diplomas add column if not exists signature2_name text;
+alter table diplomas add column if not exists signature2_title text;
+
+-- Main Admin - remove the now-unused 'manage_academics' permission. See
+-- the remove_academics_permission migration's own header comment.
+delete from permissions where key = 'manage_academics';
+
+-- Daily Learning Log attachments. See the family_school_journal_
+-- attachments migration's own header comment.
+create table if not exists family_school_journal_attachments (
+  id integer generated always as identity primary key,
+  journal_entry_id integer not null references family_school_journal_entries(id) on delete cascade,
+  file_key text not null,
+  file_name text not null,
+  content_type text,
+  created_at text not null default now_text()
+);
+create index if not exists idx_family_school_journal_attachments_entry on family_school_journal_attachments(journal_entry_id);
+
+-- Public Homepage menu. See the homepage_menu_items migration's own
+-- header comment.
+create table if not exists homepage_menu_items (
+  id integer generated always as identity primary key,
+  position integer not null default 0,
+  label text not null,
+  url text not null,
+  created_at text not null default now_text(),
+  updated_at text not null default now_text()
+);
+create index if not exists idx_homepage_menu_items_position on homepage_menu_items(position);
+
+-- Portal picker descriptions. See the update_role_descriptions
+-- migration's own header comment.
+UPDATE roles SET description = 'Class registration, event registration, family homeschool management, etc.' WHERE key = 'parent';
+UPDATE roles SET description = 'View and complete lessons, chat with friends. Challenges, play games etc.' WHERE key = 'student';
+UPDATE roles SET description = 'Attendance, manage classes. Lesson plans. Etc.' WHERE key = 'teacher';
+UPDATE roles SET description = 'Co-op classes, schedules, floaters, name tags, attendance etc.' WHERE key = 'coop_admin';
+UPDATE roles SET description = 'Group management, events, chat groups, approvals, website settings etc.' WHERE key = 'main_admin';
+
 -- SMS opt-in consent (10DLC compliance) - a real Telnyx campaign review
 -- rejection: "add a link/screenshot of the opt-in form... showing the
 -- phone number field and full SMS opt-in language" - the public /register

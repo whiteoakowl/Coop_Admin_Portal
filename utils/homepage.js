@@ -70,4 +70,55 @@ async function reorderBlocks(blockIds) {
   });
 }
 
-module.exports = { HOMEPAGE_IMAGES_BUCKET, homepageImageUrl, listBlocks, getBlock, addBlock, updateBlock, deleteBlock, reorderBlocks };
+// Homepage Menu - a real request: "Should be able to edit or add menu
+// tabs to the homepage." An ordered list of label+URL links shown in
+// the public homepage's own header (views/public-home.ejs) - same
+// ordered-list-managed-by-a-drag-canvas shape as homepage_blocks above,
+// just a much simpler row (no block_type/text/image/button fields to
+// branch on).
+async function listMenuItems() {
+  return db.prepare('SELECT * FROM homepage_menu_items ORDER BY position, id').all();
+}
+
+async function getMenuItem(id) {
+  return db.prepare('SELECT * FROM homepage_menu_items WHERE id = ?').get(id);
+}
+
+async function addMenuItem({ label, url }) {
+  const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM homepage_menu_items').get()).p) + 1;
+  const info = await db.prepare('INSERT INTO homepage_menu_items (position, label, url) VALUES (?, ?, ?)').run(position, label, url);
+  return info.lastInsertRowid;
+}
+
+async function updateMenuItem(id, { label, url }) {
+  await db.prepare('UPDATE homepage_menu_items SET label = ?, url = ?, updated_at = now_text() WHERE id = ?').run(label, url, id);
+}
+
+async function deleteMenuItem(id) {
+  await db.prepare('DELETE FROM homepage_menu_items WHERE id = ?').run(id);
+}
+
+async function reorderMenuItems(menuItemIds) {
+  await db.withTransaction(async (tx) => {
+    for (let i = 0; i < menuItemIds.length; i++) {
+      await tx.prepare('UPDATE homepage_menu_items SET position = ? WHERE id = ?').run(i, menuItemIds[i]);
+    }
+  });
+}
+
+module.exports = {
+  HOMEPAGE_IMAGES_BUCKET,
+  homepageImageUrl,
+  listBlocks,
+  getBlock,
+  addBlock,
+  updateBlock,
+  deleteBlock,
+  reorderBlocks,
+  listMenuItems,
+  getMenuItem,
+  addMenuItem,
+  updateMenuItem,
+  deleteMenuItem,
+  reorderMenuItems,
+};

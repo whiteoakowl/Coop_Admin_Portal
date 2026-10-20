@@ -19,6 +19,7 @@ router.get('/', async (req, res) => {
   const announcements = announcementRows.map((a) => ({ ...a, publishedLabel: formatFriendlyTimestamp(a.published_at) }));
   const faqs = await db.prepare('SELECT * FROM faqs WHERE is_public = 1 ORDER BY position, id').all();
   const blocks = await homepage.listBlocks();
+  const menuItems = await homepage.listMenuItems();
   // A real request: "Check box to be viewable to public on public
   // homepage" - a read-only showcase of whichever Schedule Grids an
   // admin has opted into (Edit Schedule Grids popup's own new checkbox).
@@ -39,6 +40,7 @@ router.get('/', async (req, res) => {
     announcements,
     faqs,
     blocks,
+    menuItems,
     showcaseClasses,
   });
 });

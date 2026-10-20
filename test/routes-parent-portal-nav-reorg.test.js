@@ -57,7 +57,15 @@ test('Parent Portal nav is one flat list in the exact requested order, no separa
   // rest of the page, and not the mobile tabs bar further down, which
   // repeats the same labels in the same order right after it).
   const navSection = res.text.slice(res.text.indexOf('id="admin-nav-links"'), res.text.indexOf('</nav>'));
-  const labels = ['Home', 'Events', 'Co-op Classes', 'Chat', 'Business Directory', 'Classifieds', 'Resources', 'Documents', 'Store', 'Photos', 'Academics', 'Babysitters', 'Library', 'Reading Challenge', 'Accounting'];
+  // A later real request ("Parent portal move transcripts to a subpage
+  // under family school management. Move diploma subpage to family
+  // school management tab. Remove stand alone academics tab and make
+  // name tags its own tab.") dropped the standalone Academics tab this
+  // test originally asked for (Transcripts/Diplomas moved to Family
+  // School Management's own subpages instead) and replaced it with Name
+  // Tags at that same position - views/partials/portal-nav.ejs's own
+  // PARENT_NAV_LINKS for exactly where.
+  const labels = ['Home', 'Events', 'Co-op Classes', 'Chat', 'Business Directory', 'Classifieds', 'Resources', 'Documents', 'Store', 'Photos', 'Name Tags', 'Babysitters', 'Library', 'Reading Challenge', 'Accounting'];
   const positions = labels.map((label) => {
     const idx = navSection.indexOf(label);
     assert.ok(idx !== -1, `expected to find nav label "${label}"`);

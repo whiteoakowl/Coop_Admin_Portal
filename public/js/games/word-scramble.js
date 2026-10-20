@@ -41,7 +41,7 @@
     if (index >= order.length) {
       scrambledEl.textContent = 'Done!';
       feedbackEl.textContent = 'Score: ' + score + ' / ' + order.length;
-      feedbackEl.className = 'spelling-bee-feedback';
+      feedbackEl.className = 'vocabulary-game-feedback';
       input.disabled = true;
       scoreEl.textContent = String(score);
       if (typeof window.reportGameScore === 'function') window.reportGameScore('word-scramble', score);
@@ -52,7 +52,7 @@
     input.value = '';
     input.disabled = false;
     feedbackEl.textContent = '';
-    feedbackEl.className = 'spelling-bee-feedback';
+    feedbackEl.className = 'vocabulary-game-feedback';
     input.focus();
   }
 
@@ -62,7 +62,7 @@
     var ok = input.value.trim().toLowerCase() === word;
     if (ok) score += 1;
     feedbackEl.textContent = ok ? 'Correct!' : 'It was "' + word + '".';
-    feedbackEl.className = 'spelling-bee-feedback ' + (ok ? 'spelling-bee-feedback-correct' : 'spelling-bee-feedback-wrong');
+    feedbackEl.className = 'vocabulary-game-feedback ' + (ok ? 'vocabulary-game-feedback-correct' : 'vocabulary-game-feedback-wrong');
     input.disabled = true;
     locked = true;
     setTimeout(function () { locked = false; index += 1; showWord(); }, 1000);

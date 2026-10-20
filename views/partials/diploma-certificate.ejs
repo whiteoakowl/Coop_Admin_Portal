@@ -1,0 +1,41 @@
+<%
+// Shared certificate markup for every page that shows a diploma -
+// Parent Portal's own design dialog preview, both print pages (parent +
+// student), and nothing else reads it. A real request: "Diploma
+// subpage. Be able to design and create a diploma with four templates to
+// choose from, colors and edit name, dates, and signatures." Every field
+// here has a sane fallback so this renders fine even for a diploma saved
+// before this feature existed (template/color default server-side via
+// the migration; everything else is just blank). `compact` renders the
+// smaller card-list preview (views/parent-academics-diplomas.ejs's own
+// per-child summary) instead of the full print/dialog size - one partial,
+// one markup shape, so a template/color change never has to be kept in
+// sync across two separate copies of this certificate.
+const tpl = (diploma && diploma.template) || 'classic';
+const color = (diploma && diploma.color) || '#2e6da4';
+const certName = (diploma && diploma.display_name) || member.name;
+const certTitle = (diploma && diploma.title) || 'Diploma of Completion';
+const certIssuedDate = (diploma && diploma.issued_date) || '';
+const certBody = (diploma && diploma.body_text) || '';
+const sig1Name = (diploma && diploma.signature1_name) || '';
+const sig1Title = (diploma && diploma.signature1_title) || '';
+const sig2Name = (diploma && diploma.signature2_name) || '';
+const sig2Title = (diploma && diploma.signature2_title) || '';
+%>
+<div class="diploma-cert diploma-tpl-<%= tpl %><%= typeof compact !== 'undefined' && compact ? ' diploma-cert-compact' : '' %>" style="--diploma-color: <%= color %>;">
+  <h2 class="diploma-cert-title"><%= certTitle %></h2>
+  <p class="diploma-cert-presented">This certifies that</p>
+  <p class="diploma-cert-name" data-default-name="<%= member.name %>"><%= certName %></p>
+  <p class="diploma-cert-body" style="<%= certBody ? '' : 'display:none;' %>"><%= certBody %></p>
+  <p class="diploma-cert-date">Issued <%= certIssuedDate %></p>
+  <div class="diploma-cert-signatures">
+    <div class="diploma-cert-signature" data-signature="1" style="<%= sig1Name ? '' : 'display:none;' %>">
+      <p class="diploma-cert-signature-name"><%= sig1Name %></p>
+      <p class="diploma-cert-signature-title"><%= sig1Title %></p>
+    </div>
+    <div class="diploma-cert-signature" data-signature="2" style="<%= sig2Name ? '' : 'display:none;' %>">
+      <p class="diploma-cert-signature-name"><%= sig2Name %></p>
+      <p class="diploma-cert-signature-title"><%= sig2Title %></p>
+    </div>
+  </div>
+</div>

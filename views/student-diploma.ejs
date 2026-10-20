@@ -13,13 +13,7 @@
       <p class="roster-empty">No diploma has been issued yet.</p>
     <% } else { %>
       <button type="button" class="roster-action-btn print-action-btn no-print" onclick="window.print()">Print</button>
-      <section class="portal-dashboard-card portal-dashboard-card-wide">
-        <h2><%= diploma.title %></h2>
-        <p>This certifies that</p>
-        <h3><%= member.name %></h3>
-        <% if (diploma.body_text) { %><p><%= diploma.body_text %></p><% } %>
-        <p class="hint">Issued <%= diploma.issued_date %></p>
-      </section>
+      <%- include('partials/diploma-certificate', { diploma, member }) %>
     <% } %>
   </main>
 </body>

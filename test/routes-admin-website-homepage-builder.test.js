@@ -75,12 +75,20 @@ test('the builder page has no top-of-page description and no bottom announcement
   assert.doesNotMatch(page.text, /Public homepage announcements are now posted and managed from/);
 });
 
-test('the builder canvas and add-block buttons are desktop-only in markup (hidden under 900px via CSS)', async () => {
+// A real request: "Make the homepage design features mobile friendly" -
+// reverses this feature's own earlier "desktop only" restriction. The
+// canvas/add-block buttons used to be wrapped in a .homepage-builder-
+// desktop-only div hidden below 900px, with a "requires a desktop
+// screen" fallback notice shown instead - none of that markup exists
+// any more, so the canvas and its own add-block buttons just always
+// render, same markup at any screen width.
+test('the builder canvas and add-block buttons render unconditionally - no desktop-only gate left in markup', async () => {
   const admin = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/website').set('Cookie', admin.cookie);
-  assert.match(page.text, /class="homepage-builder-desktop-only"/);
+  assert.doesNotMatch(page.text, /homepage-builder-desktop-only/);
+  assert.doesNotMatch(page.text, /requires a desktop screen/);
   assert.match(page.text, /class="roster-btn-row homepage-builder-add-row no-print"/);
-  assert.match(page.text, /Editing the homepage requires a desktop screen\./);
+  assert.match(page.text, /data-homepage-blocks-container data-reorder-url="\/main-admin\/website\/blocks\/reorder"/);
 });
 
 test('adding, editing, reordering, and deleting a text block all work', async () => {
@@ -224,4 +232,74 @@ test('an image block over the 5MB limit redirects with a friendly error, not a 5
   assert.match(res.headers.location, /\/main-admin\/website/);
   const notice = decodeURIComponent(/error=([^&]*)/.exec(res.headers.location)[1]);
   assert.match(notice, /too large/i);
+});
+
+// A real request: "Should be able to edit or add menu tabs to the
+// homepage." (utils/homepage.js's own listMenuItems/addMenuItem/
+// updateMenuItem/deleteMenuItem/reorderMenuItems, routes/admin-
+// website.js's own /menu-items routes, rendered in views/public-home.ejs's
+// own header).
+test('adding, editing, reordering, and deleting a menu tab all work, and it renders in the public homepage header', async () => {
+  const admin = await loginAsMainAdmin();
+
+  const publicBefore = await request(app).get('/welcome');
+  assert.doesNotMatch(publicBefore.text, /site-header-menu/, 'no menu section at all with zero menu items');
+
+  const addRes = await request(app)
+    .post('/main-admin/website/menu-items')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ label: 'Events', url: '/events', _csrf: admin.csrfToken });
+  assert.equal(addRes.status, 302);
+  const added = await db.prepare("SELECT * FROM homepage_menu_items WHERE label = 'Events'").get();
+  assert.ok(added);
+  assert.equal(added.url, '/events');
+
+  const builderPage = await request(app).get('/main-admin/website').set('Cookie', admin.cookie);
+  assert.match(builderPage.text, /Events/);
+
+  const publicAfter = await request(app).get('/welcome');
+  assert.match(publicAfter.text, /<nav class="site-header-menu" aria-label="Site menu">/);
+  assert.match(publicAfter.text, /<a href="\/events">Events<\/a>/);
+
+  const updateRes = await request(app)
+    .post(`/main-admin/website/menu-items/${added.id}/update`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ label: 'Our Events', url: '/events', _csrf: admin.csrfToken });
+  assert.equal(updateRes.status, 302);
+  const updated = await db.prepare('SELECT * FROM homepage_menu_items WHERE id = ?').get(added.id);
+  assert.equal(updated.label, 'Our Events');
+
+  // Add a second item, then reorder so the second one comes first.
+  await request(app).post('/main-admin/website/menu-items').set('Cookie', admin.cookie).type('form').send({ label: 'Classes', url: '/classes', _csrf: admin.csrfToken });
+  const secondItem = await db.prepare("SELECT * FROM homepage_menu_items WHERE label = 'Classes'").get();
+  const reorderRes = await request(app)
+    .post('/main-admin/website/menu-items/reorder')
+    .set('Cookie', admin.cookie)
+    .set('X-CSRF-Token', admin.csrfToken)
+    .send({ blockIds: [secondItem.id, updated.id] });
+  assert.equal(reorderRes.status, 200);
+  const firstAfterReorder = await db.prepare('SELECT id FROM homepage_menu_items ORDER BY position LIMIT 1').get();
+  assert.equal(firstAfterReorder.id, secondItem.id);
+
+  const deleteRes = await request(app)
+    .post(`/main-admin/website/menu-items/${secondItem.id}/delete`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: admin.csrfToken });
+  assert.equal(deleteRes.status, 302);
+  const afterDelete = await db.prepare('SELECT id FROM homepage_menu_items WHERE id = ?').get(secondItem.id);
+  assert.equal(afterDelete, undefined);
+});
+
+test('a menu tab requires both a label and a URL', async () => {
+  const admin = await loginAsMainAdmin();
+  const res = await request(app)
+    .post('/main-admin/website/menu-items')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ label: '', url: '', _csrf: admin.csrfToken });
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /error=/);
 });

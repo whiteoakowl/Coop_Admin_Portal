@@ -12,17 +12,40 @@
       <h1>Family Attendance</h1>
     </div>
 
-    <%# "Add the following buttons to each page. Export, print, download,
-        filter. Make sure they are the similar size, same height, fit to
-        text." The old bare Student <select> moved into the Filter
-        popover below (the same <details>/<summary> idiom admin-
-        rosters.ejs's own Filter button already uses) so all four
-        buttons sit in one same-height, fit-to-text row instead of a
-        differently-shaped dropdown sitting apart from them. Export is
-        this one selected student's attendance; Download is every
-        family student's - see routes/parent-family-school.js's own
-        /attendance/export.csv and /attendance/download.csv. %>
-    <% if (familyStudents.length > 0) { %>
+    <% if (familyStudents.length === 0) { %>
+      <p class="roster-empty">No students in your family yet.</p>
+    <% } else { %>
+      <%
+        var prevMonth = month === 1 ? 12 : month - 1;
+        var prevYear = month === 1 ? year - 1 : year;
+        var nextMonth = month === 12 ? 1 : month + 1;
+        var nextYear = month === 12 ? year + 1 : year;
+        var MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      %>
+      <%# A real request: "Present and absent keys should be to the left,
+          not centered and just under the title. The description goes
+          under the key bubbles." roster-btn-row-fit-text's own mobile
+          rule centers a row's contents (public/css/styles.css's own
+          comment on that class) - fs-attendance-row-left (two classes,
+          so it wins over that single-class mobile rule regardless of
+          source order) overrides it back to left-aligned, the same
+          left-start default this row already has at desktop widths. %>
+      <div class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left">
+        <span class="badge-pill fs-attendance-legend-present">Present</span>
+        <span class="badge-pill fs-attendance-legend-absent">Absent</span>
+      </div>
+      <p class="hint">Click a date to mark present, click again for absent, a third time to clear it.</p>
+
+      <%# "Add the following buttons to each page. Export, print,
+          download, filter. Make sure they are the similar size, same
+          height, fit to text." The old bare Student <select> moved into
+          the Filter popover below (the same <details>/<summary> idiom
+          admin-rosters.ejs's own Filter button already uses) so all four
+          buttons sit in one same-height, fit-to-text row instead of a
+          differently-shaped dropdown sitting apart from them. Export is
+          this one selected student's attendance; Download is every
+          family student's - see routes/parent-family-school.js's own
+          /attendance/export.csv and /attendance/download.csv. %>
       <div class="roster-btn-row roster-btn-row-fit-text no-print">
         <a class="roster-action-btn file-action-btn" href="/parent/family-school/attendance/export.csv?studentId=<%= selectedStudentId %>">Export</a>
         <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
@@ -39,46 +62,38 @@
           </form>
         </details>
       </div>
-    <% } %>
 
-    <% if (familyStudents.length === 0) { %>
-      <p class="roster-empty">No students in your family yet.</p>
-    <% } else { %>
-      <%
-        var prevMonth = month === 1 ? 12 : month - 1;
-        var prevYear = month === 1 ? year - 1 : year;
-        var nextMonth = month === 12 ? 1 : month + 1;
-        var nextYear = month === 12 ? year + 1 : year;
-        var MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      %>
       <%# "View a calendar and mark days student is present for school by
           clicking on the date and it highlights gren. If you click again
           it becomes red for didn't do school." Click cycles unmarked ->
           present (green) -> absent (red) -> unmarked (public/js/family-
           school-attendance.js), one fetch() per click against this
           student's own toggle endpoint - no full page reload. %>
-      <%# A real request: "Preview and next buttons should be on the same
-          row and fit to text" - roster-btn-row-fit-text (same class the
-          Class Edit popup's own button row and others already use) keeps
-          Prev/Next sized to their own text instead of inheriting
-          roster-btn-row-grid.js's equal-width mobile grid, which used to
-          stretch them wide enough to wrap "Prev"/"Next" onto their own
-          rows. %>
-      <div class="roster-btn-row roster-btn-row-fit-text">
-        <a class="btn-secondary" href="?studentId=<%= selectedStudentId %>&year=<%= prevYear %>&month=<%= prevMonth %>">&larr; Prev</a>
-        <strong><%= MONTH_NAMES[month - 1] %> <%= year %></strong>
-        <a class="btn-secondary" href="?studentId=<%= selectedStudentId %>&year=<%= nextYear %>&month=<%= nextMonth %>">Next &rarr;</a>
-      </div>
-      <%# "Present and absent labels above the calendar should be fit to
-          text and on the same row" - same fit-text class, and the
-          explanatory hint moved to its own line below instead of sharing
-          the row (it was crowding the two badges off onto separate lines
-          once it wrapped). %>
-      <div class="roster-btn-row roster-btn-row-fit-text">
-        <span class="badge-pill fs-attendance-legend-present">Present</span>
-        <span class="badge-pill fs-attendance-legend-absent">Absent</span>
-      </div>
-      <p class="hint">Click a date to mark present, click again for absent, a third time to clear it.</p>
+      <%# A real request: "Then the blue arrow buttons that should be
+          shrunk a lot and the month should be a drop down choice of
+          months/years. Move this row to the left." fs-attendance-nav-btn
+          shrinks Prev/Next well below the usual .btn-secondary size;
+          the two new <select>s (auto-submitting the same GET this page
+          already reads year/month from) sit between them as a direct
+          jump-to-month/year alternative to stepping one month at a
+          time. fs-attendance-row-left is the same left-alignment
+          override the Present/Absent row above uses. %>
+      <form method="GET" action="/parent/family-school/attendance" class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left fs-attendance-nav-row">
+        <input type="hidden" name="studentId" value="<%= selectedStudentId %>" />
+        <a class="btn-secondary fs-attendance-nav-btn" href="?studentId=<%= selectedStudentId %>&year=<%= prevYear %>&month=<%= prevMonth %>" aria-label="Previous month">&larr; Prev</a>
+        <select name="month" aria-label="Month" onchange="this.form.submit()">
+          <% MONTH_NAMES.forEach(function(name, i) { %>
+            <option value="<%= i + 1 %>" <%= month === i + 1 ? 'selected' : '' %>><%= name %></option>
+          <% }); %>
+        </select>
+        <select name="year" aria-label="Year" onchange="this.form.submit()">
+          <% yearOptions.forEach(function(y) { %>
+            <option value="<%= y %>" <%= year === y ? 'selected' : '' %>><%= y %></option>
+          <% }); %>
+        </select>
+        <a class="btn-secondary fs-attendance-nav-btn" href="?studentId=<%= selectedStudentId %>&year=<%= nextYear %>&month=<%= nextMonth %>" aria-label="Next month">Next &rarr;</a>
+      </form>
+
       <table class="fs-attendance-calendar" data-fs-attendance-calendar data-student-id="<%= selectedStudentId %>" data-toggle-url="/parent/family-school/attendance/<%= selectedStudentId %>/toggle">
         <thead>
           <tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr>

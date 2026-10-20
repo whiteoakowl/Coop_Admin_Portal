@@ -25,10 +25,10 @@
     <div class="grid-box-header">
       <h1><%= category.name %></h1>
       <% if (!category.is_locked || canModerate) { %>
-        <a class="roster-action-btn" href="/forums/<%= category.id %>/new">+ New Thread</a>
+        <a class="roster-action-btn" href="/forums/<%= category.id %>/new<%= portalParam ? '?portal=' + portalParam : '' %>">+ New Thread</a>
       <% } %>
     </div>
-    <p><a href="/forums">&larr; All Chats</a></p>
+    <p><a href="/forums<%= portalParam ? '?portal=' + portalParam : '' %>">&larr; All Chats</a></p>
     <% if (category.description) { %><p class="hint"><%= category.description %></p><% } %>
     <% if (category.is_locked) { %><p class="hint">This chat is locked - only moderators can start new threads.</p><% } %>
 
@@ -49,7 +49,7 @@
             <% threads.forEach(function(t) { %>
               <tr>
                 <td class="roster-name-col">
-                  <a href="/forums/threads/<%= t.id %>"><%= t.title %></a>
+                  <a href="/forums/threads/<%= t.id %><%= portalParam ? '?portal=' + portalParam : '' %>"><%= t.title %></a>
                   <% if (t.is_pinned) { %> <span class="badge-pill">Pinned</span><% } %>
                   <% if (t.is_locked) { %> <span class="badge-pill badge-pill-gray">Locked</span><% } %>
                   <% if (t.status === 'archived') { %> <span class="badge-pill badge-pill-gray">Archived</span><% } %>

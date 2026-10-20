@@ -37,6 +37,27 @@ function wantsJson(req) {
   return !!(req.headers.accept && req.headers.accept.includes('application/json'));
 }
 
+// A real bug report: "Chat groups on teacher portal switch to parent
+// portal." TEACHER_NAV_LINKS' own Chat link already tags itself
+// ?portal=teacher (same fix as events.js's own portalParam) so
+// sharedPortalTitle (middleware/portalAuth.js) resolves correctly for a
+// dual-role (e.g. parent+teacher) account on the Chat list itself - but
+// every link one click deeper (a category, a thread, New Thread, a
+// moderation action) dropped that query param, so the SECOND page a
+// dual-role account landed on fell back to sharedPortalTitle's own
+// Parent > Student > Teacher priority order instead of staying tagged.
+// portalParam(req) + withPortal(path, portalParam) thread it through
+// every further link/redirect on every page in this router, the same
+// way events.js's own portalParam already does for its own pages. A POST
+// form's action carries the query string the same as any GET link, so
+// req.query.portal still reads here even on a POST route.
+function portalParam(req) {
+  return req.query.portal === 'parent' || req.query.portal === 'student' || req.query.portal === 'teacher' ? req.query.portal : null;
+}
+function withPortal(path, portal) {
+  return portal ? `${path}${path.includes('?') ? '&' : '?'}portal=${portal}` : path;
+}
+
 async function canModerate(req) {
   if (req.portalPermissions.has('manage_forum')) return true;
   if (!req.category) return false;
@@ -53,7 +74,7 @@ async function loadCategory(req, res, next) {
   if (!category) return res.status(404).render('404', { title: 'Not Found' });
   const family = await familyForAccount(req.portalAccount.id);
   if (!(await forums.canAccessCategory(category, family, req.portalRoles.map((r) => r.key)))) {
-    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have access to this chat.", backHref: '/forums', backLabel: 'Back to Chat' });
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have access to this chat.", backHref: withPortal('/forums', portalParam(req)), backLabel: 'Back to Chat' });
   }
   req.category = category;
   req.family = family;
@@ -68,7 +89,7 @@ async function loadThread(req, res, next) {
   const category = await forums.getCategory(thread.category_id);
   const family = await familyForAccount(req.portalAccount.id);
   if (!(await forums.canAccessCategory(category, family, req.portalRoles.map((r) => r.key)))) {
-    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have access to this chat.", backHref: '/forums', backLabel: 'Back to Chat' });
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have access to this chat.", backHref: withPortal('/forums', portalParam(req)), backLabel: 'Back to Chat' });
   }
   req.thread = thread;
   req.category = category;
@@ -78,38 +99,41 @@ async function loadThread(req, res, next) {
 router.get('/', async (req, res) => {
   const family = await familyForAccount(req.portalAccount.id);
   const categories = await forums.accessibleCategories(family, req.portalRoles.map((r) => r.key));
-  res.render('forums-list', { title: 'Chat', categories });
+  res.render('forums-list', { title: 'Chat', categories, portalParam: portalParam(req) });
 });
 
 router.get('/:categoryId', loadCategory, async (req, res) => {
+  const portal = portalParam(req);
   // A chat room has exactly one underlying thread (its own live feed) -
   // land straight on it instead of a thread list with one row.
-  if (req.category.is_chat_room) return res.redirect(`/forums/threads/${req.category.room_thread_id}`);
+  if (req.category.is_chat_room) return res.redirect(withPortal(`/forums/threads/${req.category.room_thread_id}`, portal));
   const threads = await forums.listThreads(req.category.id);
-  res.render('forums-category', { title: req.category.name, category: req.category, threads, canModerate: await canModerate(req) });
+  res.render('forums-category', { title: req.category.name, category: req.category, threads, canModerate: await canModerate(req), portalParam: portal });
 });
 
 router.get('/:categoryId/new', loadCategory, async (req, res) => {
-  if (req.category.is_chat_room) return res.redirect(`/forums/threads/${req.category.room_thread_id}`);
+  const portal = portalParam(req);
+  if (req.category.is_chat_room) return res.redirect(withPortal(`/forums/threads/${req.category.room_thread_id}`, portal));
   if (req.category.is_locked && !(await canModerate(req))) {
-    return res.status(403).render('403', { title: 'Not Authorized', message: 'This chat is locked - only moderators can start new threads.', backHref: `/forums/${req.category.id}`, backLabel: 'Back' });
+    return res.status(403).render('403', { title: 'Not Authorized', message: 'This chat is locked - only moderators can start new threads.', backHref: withPortal(`/forums/${req.category.id}`, portal), backLabel: 'Back' });
   }
-  res.render('forums-new-thread', { title: `New Thread - ${req.category.name}`, category: req.category, error: req.query.error || null });
+  res.render('forums-new-thread', { title: `New Thread - ${req.category.name}`, category: req.category, error: req.query.error || null, portalParam: portal });
 });
 
 router.post('/:categoryId/threads', loadCategory, async (req, res) => {
-  if (req.category.is_chat_room) return res.redirect(`/forums/threads/${req.category.room_thread_id}`);
+  const portal = portalParam(req);
+  if (req.category.is_chat_room) return res.redirect(withPortal(`/forums/threads/${req.category.room_thread_id}`, portal));
   if (req.category.is_locked && !(await canModerate(req))) {
-    return res.status(403).render('403', { title: 'Not Authorized', message: 'This chat is locked.', backHref: `/forums/${req.category.id}`, backLabel: 'Back' });
+    return res.status(403).render('403', { title: 'Not Authorized', message: 'This chat is locked.', backHref: withPortal(`/forums/${req.category.id}`, portal), backLabel: 'Back' });
   }
   const title = (req.body.title || '').trim();
   const body = (req.body.body || '').trim();
   if (!title || !body) {
-    return res.redirect(`/forums/${req.category.id}/new?error=` + encodeURIComponent('Title and a message are both required.'));
+    return res.redirect(withPortal(`/forums/${req.category.id}/new?error=` + encodeURIComponent('Title and a message are both required.'), portal));
   }
   const self = await memberForAccount(req.portalAccount.id);
   const threadId = await forums.createThread(req.category.id, title, body, self.id, req.portalAccount.id);
-  res.redirect(`/forums/threads/${threadId}`);
+  res.redirect(withPortal(`/forums/threads/${threadId}`, portal));
 });
 
 router.get('/threads/:threadId', loadThread, async (req, res) => {
@@ -123,6 +147,7 @@ router.get('/threads/:threadId', loadThread, async (req, res) => {
     canModerate: await canModerate(req),
     selfMemberId: self ? self.id : null,
     error: req.query.error || null,
+    portalParam: portalParam(req),
   });
 });
 
@@ -137,11 +162,12 @@ router.get('/threads/:threadId/feed.json', loadThread, async (req, res) => {
 });
 
 router.post('/threads/:threadId/posts', loadThread, async (req, res) => {
+  const portal = portalParam(req);
   const moderator = await canModerate(req);
   if ((req.thread.status !== 'active' || req.thread.is_locked) && !moderator) {
     const message = 'This thread is locked.';
     if (wantsJson(req)) return res.status(422).json({ ok: false, error: message });
-    return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent(message));
+    return res.redirect(withPortal(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent(message), portal));
   }
   // Moderate tab's own "allow comments" checkbox (utils/forums.js's
   // updateCategorySettings) - a category with it off is announcement-
@@ -149,13 +175,13 @@ router.post('/threads/:threadId/posts', loadThread, async (req, res) => {
   if (!req.category.allow_comments && !moderator) {
     const message = 'Comments are turned off for this chat.';
     if (wantsJson(req)) return res.status(422).json({ ok: false, error: message });
-    return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent(message));
+    return res.redirect(withPortal(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent(message), portal));
   }
   const body = (req.body.body || '').trim();
   if (!body) {
     const message = 'A message is required.';
     if (wantsJson(req)) return res.status(422).json({ ok: false, error: message });
-    return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent(message));
+    return res.redirect(withPortal(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent(message), portal));
   }
   const self = await memberForAccount(req.portalAccount.id);
   const postId = await forums.addPost(req.thread.id, body, self.id, req.portalAccount.id);
@@ -168,10 +194,11 @@ router.post('/threads/:threadId/posts', loadThread, async (req, res) => {
   // new message without a full page reload - everyone else (the normal
   // threaded-reply form) still gets the usual redirect.
   if (wantsJson(req)) return res.json({ post: await forums.getPostWithAuthor(postId) });
-  res.redirect(`/forums/threads/${req.thread.id}`);
+  res.redirect(withPortal(`/forums/threads/${req.thread.id}`, portal));
 });
 
 router.post('/threads/:threadId/posts/:postId/edit', loadThread, async (req, res) => {
+  const portal = portalParam(req);
   const post = await forums.getPost(req.params.postId);
   const self = await memberForAccount(req.portalAccount.id);
   const isAuthor = post && self && post.member_id === self.id;
@@ -183,61 +210,62 @@ router.post('/threads/:threadId/posts/:postId/edit', loadThread, async (req, res
   // button there either.
   const allowed = req.category.is_chat_room ? moderator : (isAuthor || moderator);
   if (!post || !allowed) {
-    return res.status(403).render('403', { title: 'Not Authorized', message: 'You can only edit your own posts.', backHref: `/forums/threads/${req.thread.id}`, backLabel: 'Back' });
+    return res.status(403).render('403', { title: 'Not Authorized', message: 'You can only edit your own posts.', backHref: withPortal(`/forums/threads/${req.thread.id}`, portal), backLabel: 'Back' });
   }
   const body = (req.body.body || '').trim();
-  if (!body) return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent('A message is required.'));
+  if (!body) return res.redirect(withPortal(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent('A message is required.'), portal));
   await forums.editPost(post.id, body);
   if (!isAuthor) await forums.logEdit(req.portalAccount.id, post.id);
-  res.redirect(`/forums/threads/${req.thread.id}`);
+  res.redirect(withPortal(`/forums/threads/${req.thread.id}`, portal));
 });
 
 async function requireModerator(req, res, next) {
-  if (!(await canModerate(req))) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have permission to moderate chats.", backHref: '/forums', backLabel: 'Back to Chat' });
+  if (!(await canModerate(req))) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have permission to moderate chats.", backHref: withPortal('/forums', portalParam(req)), backLabel: 'Back to Chat' });
   next();
 }
 
 router.post('/threads/:threadId/posts/:postId/remove', loadThread, requireModerator, async (req, res) => {
   await forums.removePost(req.params.postId, req.portalAccount.id);
-  res.redirect(`/forums/threads/${req.thread.id}`);
+  res.redirect(withPortal(`/forums/threads/${req.thread.id}`, portalParam(req)));
 });
 
 router.post('/threads/:threadId/posts/:postId/restore', loadThread, requireModerator, async (req, res) => {
   await forums.restorePost(req.params.postId, req.portalAccount.id);
-  res.redirect(`/forums/threads/${req.thread.id}`);
+  res.redirect(withPortal(`/forums/threads/${req.thread.id}`, portalParam(req)));
 });
 
 router.post('/threads/:threadId/pin', loadThread, requireModerator, async (req, res) => {
   await forums.setThreadPinned(req.thread.id, true, req.portalAccount.id);
-  res.redirect(`/forums/threads/${req.thread.id}`);
+  res.redirect(withPortal(`/forums/threads/${req.thread.id}`, portalParam(req)));
 });
 router.post('/threads/:threadId/unpin', loadThread, requireModerator, async (req, res) => {
   await forums.setThreadPinned(req.thread.id, false, req.portalAccount.id);
-  res.redirect(`/forums/threads/${req.thread.id}`);
+  res.redirect(withPortal(`/forums/threads/${req.thread.id}`, portalParam(req)));
 });
 router.post('/threads/:threadId/lock', loadThread, requireModerator, async (req, res) => {
   await forums.setThreadLocked(req.thread.id, true, req.portalAccount.id);
-  res.redirect(`/forums/threads/${req.thread.id}`);
+  res.redirect(withPortal(`/forums/threads/${req.thread.id}`, portalParam(req)));
 });
 router.post('/threads/:threadId/unlock', loadThread, requireModerator, async (req, res) => {
   await forums.setThreadLocked(req.thread.id, false, req.portalAccount.id);
-  res.redirect(`/forums/threads/${req.thread.id}`);
+  res.redirect(withPortal(`/forums/threads/${req.thread.id}`, portalParam(req)));
 });
 router.post('/threads/:threadId/archive', loadThread, requireModerator, async (req, res) => {
   await forums.setThreadArchived(req.thread.id, true, req.portalAccount.id);
-  res.redirect(`/forums/threads/${req.thread.id}`);
+  res.redirect(withPortal(`/forums/threads/${req.thread.id}`, portalParam(req)));
 });
 router.post('/threads/:threadId/unarchive', loadThread, requireModerator, async (req, res) => {
   await forums.setThreadArchived(req.thread.id, false, req.portalAccount.id);
-  res.redirect(`/forums/threads/${req.thread.id}`);
+  res.redirect(withPortal(`/forums/threads/${req.thread.id}`, portalParam(req)));
 });
 
 router.post('/threads/:threadId/move', loadThread, requireModerator, async (req, res) => {
+  const portal = portalParam(req);
   const newCategoryId = parseInt(req.body.categoryId, 10);
   const target = await forums.getCategory(newCategoryId);
-  if (!target) return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent('That chat does not exist.'));
+  if (!target) return res.redirect(withPortal(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent('That chat does not exist.'), portal));
   await forums.moveThread(req.thread.id, newCategoryId, req.portalAccount.id);
-  res.redirect(`/forums/threads/${req.thread.id}`);
+  res.redirect(withPortal(`/forums/threads/${req.thread.id}`, portal));
 });
 
 module.exports = router;

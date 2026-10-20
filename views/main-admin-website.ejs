@@ -39,8 +39,12 @@
     <%
       // A real request: "edit the entire homepage like you would on
       // Spotify or wix. Drag and drop images and text of different size
-      // choices. Add buttons and links. These features will be desktop
-      // only." homepage_blocks (supabase/migrations/20261118010000_
+      // choices. Add buttons and links." This canvas used to be desktop-
+      // only (a later real request, "Make the homepage design features
+      // mobile friendly," reversed that - see public/css/styles.css's
+      // own comment on this section for why it was safe to just remove
+      // the restriction rather than build a second, separate mobile UI).
+      // homepage_blocks (supabase/migrations/20261118010000_
       // homepage_builder.sql) is an ordered list of text/image/button
       // blocks - this canvas is the admin's own drag-and-drop editor for
       // that list; views/public-home.ejs renders the same list, in the
@@ -57,37 +61,106 @@
         </div>
       </div>
 
-      <div class="homepage-builder-desktop-only">
-        <% if (blocks.length === 0) { %>
-          <p class="roster-empty">No homepage content yet - add a text, image, or button block above.</p>
-        <% } else { %>
-          <div class="homepage-builder-canvas" data-homepage-blocks-container data-reorder-url="/main-admin/website/blocks/reorder">
-            <% blocks.forEach(function(b) { %>
-              <div class="homepage-builder-block" data-homepage-block-row="<%= b.id %>">
-                <span data-homepage-block-drag-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span>
-                <div class="homepage-builder-block-preview">
-                  <span class="badge-pill badge-pill-gray homepage-builder-block-type"><%= BLOCK_TYPE_LABELS[b.block_type] %></span>
-                  <% if (b.block_type === 'text') { %>
-                    <span class="homepage-builder-block-text-preview homepage-text-<%= b.text_size %>"><%= b.text_body || '(empty)' %></span>
-                  <% } else if (b.block_type === 'image') { %>
-                    <% if (b.imageUrl) { %><img src="<%= b.imageUrl %>" alt="" class="homepage-builder-block-image-preview" /><% } else { %><span class="hint">No image chosen yet</span><% } %>
-                  <% } else if (b.block_type === 'button') { %>
-                    <span class="homepage-builder-block-button-preview"><%= b.button_label || '(untitled button)' %> &rarr; <%= b.button_url || '(no link)' %></span>
-                  <% } %>
-                </div>
-                <div class="homepage-builder-block-actions">
-                  <button type="button" class="icon-btn" onclick="document.getElementById('edit-block-dialog-<%= b.id %>').showModal()" aria-label="Edit block" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
-                  <form method="POST" action="/main-admin/website/blocks/<%= b.id %>/delete" data-confirm="Remove this block?" class="inline-block-form">
-                    <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete block" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                  </form>
-                </div>
+      <% if (blocks.length === 0) { %>
+        <p class="roster-empty">No homepage content yet - add a text, image, or button block above.</p>
+      <% } else { %>
+        <div class="homepage-builder-canvas" data-homepage-blocks-container data-reorder-url="/main-admin/website/blocks/reorder">
+          <% blocks.forEach(function(b) { %>
+            <div class="homepage-builder-block" data-homepage-block-row="<%= b.id %>">
+              <span data-homepage-block-drag-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span>
+              <div class="homepage-builder-block-preview">
+                <span class="badge-pill badge-pill-gray homepage-builder-block-type"><%= BLOCK_TYPE_LABELS[b.block_type] %></span>
+                <% if (b.block_type === 'text') { %>
+                  <span class="homepage-builder-block-text-preview homepage-text-<%= b.text_size %>"><%= b.text_body || '(empty)' %></span>
+                <% } else if (b.block_type === 'image') { %>
+                  <% if (b.imageUrl) { %><img src="<%= b.imageUrl %>" alt="" class="homepage-builder-block-image-preview" /><% } else { %><span class="hint">No image chosen yet</span><% } %>
+                <% } else if (b.block_type === 'button') { %>
+                  <span class="homepage-builder-block-button-preview"><%= b.button_label || '(untitled button)' %> &rarr; <%= b.button_url || '(no link)' %></span>
+                <% } %>
               </div>
-            <% }); %>
-          </div>
-        <% } %>
-      </div>
-      <p class="hint homepage-builder-mobile-notice">Editing the homepage requires a desktop screen. Open this page on a larger screen to add, edit, or reorder content.</p>
+              <div class="homepage-builder-block-actions">
+                <button type="button" class="icon-btn" onclick="document.getElementById('edit-block-dialog-<%= b.id %>').showModal()" aria-label="Edit block" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
+                <form method="POST" action="/main-admin/website/blocks/<%= b.id %>/delete" data-confirm="Remove this block?" class="inline-block-form">
+                  <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete block" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                </form>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
     </section>
+
+    <%# A real request: "Should be able to edit or add menu tabs to the
+        homepage." A much simpler ordered list than the content blocks
+        above (label + URL, no type to branch on) - reuses the exact same
+        drag-reorder script (public/js/homepage-block-reorder.js is
+        generic over its own data-homepage-block-row/data-homepage-
+        blocks-container attributes), just pointed at its own reorder
+        endpoint via data-reorder-url. %>
+    <section class="manage-section homepage-builder-section">
+      <div class="grid-box-header">
+        <h2>Menu Tabs</h2>
+        <div class="roster-btn-row no-print">
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-menu-item-dialog').showModal()">+ Menu Tab</button>
+        </div>
+      </div>
+      <p class="hint">Shown as a row of links in the public homepage's own header. Leave empty for no menu.</p>
+
+      <% if (menuItems.length === 0) { %>
+        <p class="roster-empty">No menu tabs yet - add one above.</p>
+      <% } else { %>
+        <div class="homepage-builder-canvas" data-homepage-blocks-container data-reorder-url="/main-admin/website/menu-items/reorder">
+          <% menuItems.forEach(function(item) { %>
+            <div class="homepage-builder-block" data-homepage-block-row="<%= item.id %>">
+              <span data-homepage-block-drag-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span>
+              <div class="homepage-builder-block-preview">
+                <span class="homepage-builder-block-button-preview"><%= item.label %> &rarr; <%= item.url %></span>
+              </div>
+              <div class="homepage-builder-block-actions">
+                <button type="button" class="icon-btn" onclick="document.getElementById('edit-menu-item-dialog-<%= item.id %>').showModal()" aria-label="Edit menu tab" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
+                <form method="POST" action="/main-admin/website/menu-items/<%= item.id %>/delete" data-confirm="Remove this menu tab?" class="inline-block-form">
+                  <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete menu tab" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                </form>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    </section>
+
+    <dialog id="add-menu-item-dialog" class="member-picker-dialog dialog-label-stack">
+      <form method="POST" action="/main-admin/website/menu-items">
+        <h3>Add Menu Tab</h3>
+        <label>Label
+          <input type="text" name="label" required />
+        </label>
+        <label>URL
+          <input type="text" name="url" placeholder="https://... or /events" required />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add Menu Tab</button>
+        </div>
+      </form>
+    </dialog>
+
+    <% menuItems.forEach(function(item) { %>
+      <dialog id="edit-menu-item-dialog-<%= item.id %>" class="member-picker-dialog dialog-label-stack">
+        <form method="POST" action="/main-admin/website/menu-items/<%= item.id %>/update">
+          <h3>Edit Menu Tab</h3>
+          <label>Label
+            <input type="text" name="label" value="<%= item.label %>" required />
+          </label>
+          <label>URL
+            <input type="text" name="url" value="<%= item.url %>" placeholder="https://... or /events" required />
+          </label>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Save Changes</button>
+          </div>
+        </form>
+      </dialog>
+    <% }); %>
 
     <%# Per-block Edit dialogs. %>
     <% blocks.forEach(function(b) { %>

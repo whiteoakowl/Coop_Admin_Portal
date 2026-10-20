@@ -1,0 +1,12 @@
+-- A real request: "Main admin portal, remove academics tab and
+-- features. Only parent portal has those pages and admin doesn't need
+-- to control them with any settings." Main Admin's own /academics
+-- page/nav tab is gone (routes/main-admin.js, views/partials/portal-
+-- nav.ejs) - this removes the now-meaningless 'manage_academics'
+-- permission it used to gate, from any database that already seeded it
+-- (db/bootstrapPg.js's own seed list no longer offers it to a fresh
+-- one). role_permissions/admin_position_permissions both cascade on
+-- delete, so this also quietly drops any existing grant of it - nothing
+-- left reads that permission's key, so a stale grant would otherwise
+-- just sit there unused.
+delete from permissions where key = 'manage_academics';

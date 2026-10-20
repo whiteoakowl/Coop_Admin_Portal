@@ -43,7 +43,19 @@
   </main>
 
   <dialog id="add-class-dialog" class="class-form-dialog">
-    <form method="POST" action="/parent/family-school/classes">
+    <%# A real request: "Family school management tab, subpage, pages,
+        popups etc. Make sure all buttons, text bars, lists etc all have
+        adequate space between rows and no overlapping." This dialog
+        reused .class-form-dialog for its outer shell (header/width/
+        shadow) but, unlike every OTHER dialog on the site, never paired
+        it with .stack-form/.dialog-label-stack/.member-picker-dialog -
+        its bare <label> elements had no display:block or margin of
+        their own, so Class Name and Description ran together inline
+        with no real row gap between them. .stack-form (same fix as
+        admin-announcements.ejs's own form) gives every direct child,
+        .notes-dialog-actions included, a real stacked column with
+        space between each row. %>
+    <form method="POST" action="/parent/family-school/classes" class="stack-form">
       <div class="class-form-dialog-header">
         <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
         <h3>New Class</h3>

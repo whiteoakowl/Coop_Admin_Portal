@@ -117,7 +117,14 @@ test('Category/Fiscal Year page: no description paragraph, and each category/fis
   assert.equal(updatedFy.end_date, '2028-06-30');
 });
 
-test('Portal switcher (2+ roles): plain centered title-only cards, no descriptions', async () => {
+// A later real request ("Add description under each portal title. On
+// choose portal page...") brought a description back under each card's
+// title (views/portal-switcher.ejs's own role.description), with the
+// user's own exact wording per portal (db/bootstrapPg.js's own
+// PORTAL_ROLES) - this test's own name/assertions were updated to match;
+// see test/portal-chat-dual-role-and-training.test.js for full coverage
+// of the new wording itself.
+test('Portal switcher (2+ roles): centered title cards, each with its own description', async () => {
   const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('SwitcherFamily') RETURNING id").get()).id;
   const code = await generateMemberCode();
   const memberId = (
@@ -141,6 +148,7 @@ test('Portal switcher (2+ roles): plain centered title-only cards, no descriptio
   const page = await request(app).get('/portal').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.doesNotMatch(page.text, /Choose a portal to continue/);
-  assert.doesNotMatch(page.text, /portal-picker-desc/);
   assert.match(page.text, /portal-picker-title/);
+  assert.match(page.text, /<span class="portal-picker-description">Class registration, event registration, family homeschool management, etc\.<\/span>/);
+  assert.match(page.text, /<span class="portal-picker-description">Attendance, manage classes\. Lesson plans\. Etc\.<\/span>/);
 });
