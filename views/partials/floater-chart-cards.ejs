@@ -44,11 +44,20 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
           <h3><%= hour.label %></h3>
         </div>
         <table class="floater-card-table floater-chart-table">
-          <thead><tr><th>Position</th><th>Room</th><th>Floater</th></tr></thead>
+          <thead><tr><th class="floater-notify-col no-print">Text</th><th>Position</th><th>Room</th><th>Floater</th></tr></thead>
           <tbody>
             <% hour.slots.forEach(function(slot) { %>
               <% var isApproved = slot.assigned && slot.assigned.status === 'approved'; %>
               <tr class="<%= slot.noneAvailable ? 'floater-row-noavail' : '' %>">
+                <td class="floater-notify-col no-print">
+                  <% if (slot.assigned) { %>
+                    <input type="checkbox" class="floater-notify-checkbox" aria-label="Text <%= slot.assigned.name %> about <%= slot.label %>"
+                      data-member-id="<%= slot.assigned.id %>"
+                      data-position="<%= slot.label %>"
+                      data-room="<%= slot.room || '' %>"
+                      data-hour="<%= hour.label %>" />
+                  <% } %>
+                </td>
                 <td class="floater-card-position">
                   <%= slot.label %>
                   <% if ((slot.slotType === 'class' || slot.slotType === 'vacancy') && slot.reason) { %><span class="floater-slot-reason"><%= slot.reason %></span><% } %>

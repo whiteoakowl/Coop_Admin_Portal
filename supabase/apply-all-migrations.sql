@@ -5294,3 +5294,9 @@ UPDATE roles SET description = 'Group management, events, chat groups, approvals
 -- type sms/email toggles, which only exist for an already-active account.
 alter table members add column if not exists sms_consent boolean not null default false;
 alter table members add column if not exists sms_consent_at text;
+
+-- Floater Assignments - "Text Notification" button. See the
+-- floater_assignment_notification_type migration's own header comment.
+insert into notification_types (key, label, description) values
+  ('floater_assignment', 'Floater Assignment', 'You were texted a floater position assignment (position, hour, and room) for an upcoming co-op session.')
+on conflict (key) do nothing;

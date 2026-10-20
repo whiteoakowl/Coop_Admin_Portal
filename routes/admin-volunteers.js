@@ -44,6 +44,7 @@ const {
 } = require('../utils/substitutes');
 const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
 const { comboSemesterId, qsSemester, appendSemester, findComboId } = require('../utils/scheduleComboLinks');
+const { notify } = require('../utils/notifications');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
@@ -274,6 +275,44 @@ router.get('/volunteers/:day/fragment', requireAdmin, requireClassDay, async (re
   const selectedDate = activeDates.includes(req.query.date) ? req.query.date : defaultDate;
   const hourSections = await buildHourSections(day, selectedDate, list.semester_id);
   res.render('floater-chart-cards-fragment', { day, dayLabel: DAY_LABELS[day], selectedDate, hourSections, semesterId: qsSemester(list.semester_id) });
+});
+
+// A real request: "Add a button that says text notification. When you
+// click this button a check box appears next to each floater
+// assignment. When you click the check boxes then click text
+// notifications. It send a notification showing the floater position,
+// hour and room number." Routes through notify() (utils/notifications.js)
+// like every other feature in this app, rather than a raw
+// smsProvider.send() - a member's SMS opt-out preference for this type
+// is respected the same way any other notification is, and it also
+// creates a real in-app Notification Center entry.
+router.post('/volunteers/:day/floater-text-notify', requireAdmin, requireClassDay, async (req, res) => {
+  const assignments = Array.isArray(req.body.notify) ? req.body.notify : [];
+  const results = [];
+  for (const item of assignments) {
+    const memberId = Number(item && item.memberId);
+    if (!memberId) continue;
+    const member = await db.prepare('SELECT name FROM members WHERE id = ?').get(memberId);
+    if (!member) continue;
+
+    const position = (item.position || '').trim();
+    const room = (item.room || '').trim();
+    const hour = (item.hour || '').trim();
+    const body = `You're assigned: ${position}${hour ? ` at ${hour}` : ''}${room ? ` in Room ${room}` : ''}.`;
+
+    const account = await db.prepare("SELECT id FROM member_accounts WHERE member_id = ? AND status = 'active'").get(memberId);
+    if (!account) {
+      results.push({ memberId, name: member.name, status: 'skipped', detail: 'No portal account on file.' });
+      continue;
+    }
+
+    const notificationId = await notify(account.id, 'floater_assignment', { title: 'Floater Assignment', body });
+    const delivery = await db.prepare("SELECT status, detail FROM notification_deliveries WHERE notification_id = ? AND channel = 'sms'").get(notificationId);
+    results.push({ memberId, name: member.name, status: delivery ? delivery.status : 'skipped', detail: delivery ? delivery.detail : null });
+  }
+
+  const sentCount = results.filter((r) => r.status === 'sent').length;
+  res.json({ ok: true, sentCount, total: results.length, results });
 });
 
 router.post('/volunteers/:day/dates/add', requireAdmin, requireClassDay, async (req, res) => {

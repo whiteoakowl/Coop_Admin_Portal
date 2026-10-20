@@ -33,6 +33,13 @@
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-temp-job-dialog').showModal()">+ Add/Edit Temporary Position</button>
           <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/export.csv?semesterId=<%= semesterId %>">Export</a>
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+          <%# A real request: "Add a button that says text notification.
+              When you click this button a check box appears next to
+              each floater assignment. When you click the check boxes
+              then click text notifications. It send a notification
+              showing the floater position, hour and room number." See
+              public/js/floater-text-notify.js. %>
+          <button type="button" class="roster-action-btn no-print" id="floater-text-notify-btn">Text Notification</button>
         </div>
       </div>
 
@@ -242,5 +249,6 @@
   </main>
   <script src="/js/date-list.js"></script>
   <script src="/js/floater-assign.js"></script>
+  <script src="/js/floater-text-notify.js"></script>
 </body>
 </html>

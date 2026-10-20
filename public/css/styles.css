@@ -6368,6 +6368,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .floater-card-position { font-weight: 600; }
 .floater-card-unassigned { color: var(--muted); font-style: italic; }
 
+/* "Text Notification" select-mode column (public/js/floater-text-
+   notify.js) - hidden until the toolbar's own Text Notification button
+   is clicked once, and only on this one table: .floater-card-table's
+   own nth-child widths above are shared with two unrelated tables
+   (Setup/Cleanup Assignments, floater-assignment-cards) that don't have
+   this column at all, so the override below needs the extra .floater-
+   chart-table specificity rather than touching those shared rules. */
+.floater-notify-col { display: none; }
+.floater-notify-select-mode .floater-notify-col { display: table-cell; }
+.floater-card-table.floater-chart-table th:nth-child(1), .floater-card-table.floater-chart-table td:nth-child(1) { width: 2.2rem; }
+.floater-card-table.floater-chart-table th:nth-child(2), .floater-card-table.floater-chart-table td:nth-child(2) { width: 38%; }
+.floater-card-table.floater-chart-table th:nth-child(3), .floater-card-table.floater-chart-table td:nth-child(3) { width: 23%; }
+.floater-card-table.floater-chart-table th:nth-child(4), .floater-card-table.floater-chart-table td:nth-child(4) { width: 35%; }
+
 /* Setup/Cleanup Assignments' own version of .floater-card-table - a real
    request: "just line the assignments under each member like mobile."
    Used to be a real multi-column table (Member | Task 1 | Task 2 | Task
