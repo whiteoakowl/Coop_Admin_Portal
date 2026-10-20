@@ -65,7 +65,7 @@ async function send(phone, message) {
       const detail = data?.errors?.[0]?.detail || data?.errors?.[0]?.title || `Telnyx error (HTTP ${res.status})`;
       return { status: 'failed', detail };
     }
-    return { status: 'sent', detail: null };
+    return { status: 'sent', detail: null, messageId: data?.data?.id || null };
   } catch (err) {
     return { status: 'failed', detail: err.message };
   }

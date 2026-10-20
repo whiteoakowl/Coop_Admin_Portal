@@ -99,7 +99,7 @@ test('send(): a successful Telnyx response reports "sent", posting to the Messag
   };
 
   const result = await smsProvider.send('555-123-4567', 'Hello from the co-op');
-  assert.deepEqual(result, { status: 'sent', detail: null });
+  assert.deepEqual(result, { status: 'sent', detail: null, messageId: 'msg_123' });
   assert.equal(capturedUrl, 'https://api.telnyx.com/v2/messages');
   assert.equal(capturedOptions.method, 'POST');
   assert.equal(capturedOptions.headers.Authorization, 'Bearer test-key');

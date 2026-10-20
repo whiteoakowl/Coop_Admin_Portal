@@ -50,9 +50,10 @@
         <ul class="member-profile-plain-list">
           <li>Status: <span class="badge-pill <%= result.status === 'sent' ? 'badge-pill-green' : result.status === 'failed' ? 'badge-pill-red' : 'badge-pill-gray' %>"><%= result.status %></span></li>
           <% if (result.detail) { %><li>Detail: <%= result.detail %></li><% } %>
+          <% if (result.messageId) { %><li>Telnyx Message ID: <code><%= result.messageId %></code></li><% } %>
         </ul>
         <% if (result.status === 'sent') { %>
-          <p class="hint">Telnyx accepted the message - check Telnyx's own Messaging Logs for final delivery status, and check the phone itself.</p>
+          <p class="hint">Telnyx accepted the message - search Telnyx's Messaging Logs/Reporting for the Message ID above for final delivery status, and check the phone itself.</p>
         <% } else if (result.status === 'skipped') { %>
           <p class="hint">Never reached Telnyx at all - see the detail above for exactly why (missing phone, bad number format, or not configured).</p>
         <% } else if (result.status === 'failed') { %>
