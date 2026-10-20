@@ -79,3 +79,51 @@ test('POST /register with handbookRead=1 succeeds, creating a pending account', 
   assert.ok(account, 'expected a member_accounts row to be created');
   assert.equal(account.status, 'pending');
 });
+
+// Coverage for a real Telnyx 10DLC campaign review rejection: "add a
+// link/screenshot of the opt-in form... showing the phone number field
+// and full SMS opt-in language" - /register had neither until now.
+test('GET /register shows a phone field, an unchecked SMS opt-in checkbox, and a link to the Privacy Policy', async () => {
+  const res = await request(app).get('/register');
+  assert.equal(res.status, 200);
+  assert.match(res.text, /name="phone"/);
+  assert.match(res.text, /name="smsOptIn"/);
+  assert.doesNotMatch(res.text, /name="smsOptIn"[^>]*checked/, 'the SMS opt-in checkbox must be unchecked by default');
+  assert.match(res.text, /href="\/privacy-policy"/);
+  assert.match(res.text, /Reply STOP/);
+});
+
+test('POST /register without checking SMS opt-in saves the phone number but leaves sms_consent false', async () => {
+  const res = await request(app)
+    .post('/register')
+    .type('form')
+    .send(baseRegistration({ email: 'no-sms-optin@example.com', phone: '555-111-2222' }));
+  assert.equal(res.status, 200);
+
+  const member = await db.prepare("SELECT phone, sms_consent, sms_consent_at FROM members WHERE email = 'no-sms-optin@example.com'").get();
+  assert.ok(member, 'expected a members row to be created');
+  assert.equal(member.phone, '555-111-2222');
+  assert.equal(!!member.sms_consent, false);
+  assert.equal(member.sms_consent_at, null);
+});
+
+test('POST /register with smsOptIn=1 records sms_consent and a consent timestamp', async () => {
+  const res = await request(app)
+    .post('/register')
+    .type('form')
+    .send(baseRegistration({ email: 'sms-optin@example.com', phone: '555-333-4444', smsOptIn: '1' }));
+  assert.equal(res.status, 200);
+
+  const member = await db.prepare("SELECT phone, sms_consent, sms_consent_at FROM members WHERE email = 'sms-optin@example.com'").get();
+  assert.ok(member, 'expected a members row to be created');
+  assert.equal(member.phone, '555-333-4444');
+  assert.equal(!!member.sms_consent, true);
+  assert.ok(member.sms_consent_at, 'expected a consent timestamp to be recorded');
+});
+
+test('GET /privacy-policy is public and includes the required SMS data-sharing disclosure', async () => {
+  const res = await request(app).get('/privacy-policy');
+  assert.equal(res.status, 200);
+  assert.match(res.text, /Privacy Policy/);
+  assert.match(res.text, /will not be sold or shared with third parties for promotional or marketing purposes/i);
+});

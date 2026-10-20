@@ -97,6 +97,15 @@ router.get('/handbook-file', async (req, res) => {
   res.send(buffer);
 });
 
+// 10DLC compliance - a real Telnyx campaign review rejection: "no privacy
+// policy link was provided... /privacy and /privacy-policy return 404,
+// and no privacy verbiage exists on any reachable page of the portal."
+// Public (no login), same reasoning as /handbook-file above - linked
+// from the SMS opt-in checkbox on /register, which is itself public.
+router.get('/privacy-policy', (req, res) => {
+  res.render('portal-privacy-policy', { title: 'Privacy Policy', lastUpdated: new Date().toISOString().slice(0, 10) });
+});
+
 router.get('/register', async (req, res) => {
   if (req.portalAccount) return res.redirect('/portal');
   res.render('portal-register', {
@@ -162,8 +171,10 @@ router.post('/register', async (req, res) => {
   const firstName = (req.body.firstName || '').trim();
   const lastName = (req.body.lastName || '').trim();
   const email = (req.body.email || '').trim();
+  const phone = (req.body.phone || '').trim();
+  const smsOptIn = req.body.smsOptIn === '1';
   const password = req.body.password || '';
-  const formValues = { firstName, lastName, email, customFields: req.body.customFields };
+  const formValues = { firstName, lastName, email, phone, customFields: req.body.customFields };
 
   const rawChildren = parseChildren(req.body).map((c, index) => ({ ...c, index }));
   // A blank block the visitor never filled in (or removed down to zero
@@ -258,9 +269,17 @@ router.post('/register', async (req, res) => {
       familyId = (await tx.prepare('INSERT INTO families (name) VALUES (?)').run(familyName)).lastInsertRowid;
       const code = await generateMemberCode(tx);
       const info = await tx
-        .prepare("INSERT INTO members (name, barcode, member_code, member_type, email, family_id, is_primary_parent) VALUES (?, ?, ?, 'parent', ?, ?, 1)")
-        .run(fullName, code, code, email, familyId);
+        .prepare(
+          `INSERT INTO members (name, barcode, member_code, member_type, email, phone, family_id, is_primary_parent, sms_consent, sms_consent_at)
+           VALUES (?, ?, ?, 'parent', ?, ?, ?, 1, ?, ?)`
+        )
+        .run(fullName, code, code, email, phone || null, familyId, smsOptIn, smsOptIn ? new Date().toISOString() : null);
       member = await tx.prepare('SELECT * FROM members WHERE id = ?').get(info.lastInsertRowid);
+    } else if (phone && !member.phone) {
+      await tx.prepare('UPDATE members SET phone = ? WHERE id = ?').run(phone, member.id);
+    }
+    if (smsOptIn && !member.sms_consent) {
+      await tx.prepare('UPDATE members SET sms_consent = true, sms_consent_at = ? WHERE id = ?').run(new Date().toISOString(), member.id);
     }
     newParentMemberId = member.id;
 

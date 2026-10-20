@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="public-page">
+  <%- include('partials/icon-sprite') %>
+  <main id="main-content" tabindex="-1" class="form-wrap">
+    <div class="kiosk-header">
+      <img class="form-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
+      <h1>Privacy Policy</h1>
+    </div>
+    <div class="form-outer-panel">
+      <h2>Information We Collect</h2>
+      <p>When you register for the Sanford Homeschoolers member portal, we collect information you provide directly, such as your name, email address, phone number, mailing address, and information about your children (name, birthdate, grade level). This information is used solely to operate the co-op: managing memberships, classes, attendance, events, and communicating with you about co-op business.</p>
+
+      <h2>SMS / Text Messaging</h2>
+      <p>If you opt in to SMS notifications during registration (or later update your preferences), we use your phone number to send you text messages about co-op announcements, event reminders, schedule changes, and similar co-op business. Message frequency varies. Message and data rates may apply. You can opt out at any time by replying STOP to any text, or by updating your Notification Preferences in your account. Reply HELP for help.</p>
+      <p><strong>Your mobile information will not be sold or shared with third parties for promotional or marketing purposes.</strong> Text messaging originator opt-in data and consent is not shared with any third parties for any purpose, including for marketing purposes, except as necessary to provide the SMS service itself (such as our SMS delivery provider, who is contractually bound to use this information only to deliver these messages).</p>
+
+      <h2>How We Share Information</h2>
+      <p>We do not sell your personal information. We share information only as needed to operate the co-op (for example, with co-op admins and teachers for class rosters and attendance), with service providers who help us run the portal (such as hosting and messaging providers, bound by their own confidentiality obligations), or when required by law.</p>
+
+      <h2>Your Choices</h2>
+      <p>You can review and update your contact information, and your email/SMS notification preferences, at any time from your account. You may also contact a co-op administrator to request changes or removal of your information, subject to records we're required to keep for membership and safety purposes.</p>
+
+      <h2>Contact Us</h2>
+      <p>Questions about this policy or your information? Contact a co-op administrator through the portal.</p>
+
+      <p class="hint">Last updated: <%= lastUpdated %></p>
+      <a class="primary-btn" href="/">Back to Home</a>
+    </div>
+  </main>
+</body>
+</html>

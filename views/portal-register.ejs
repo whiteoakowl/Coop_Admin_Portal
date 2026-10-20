@@ -26,6 +26,9 @@
           <label class="member-form-full">Email
             <input type="email" name="email" value="<%= formValues.email || '' %>" required autocomplete="email" />
           </label>
+          <label class="member-form-full">Phone Number
+            <input type="tel" name="phone" value="<%= formValues.phone || '' %>" placeholder="555-123-4567" autocomplete="tel" />
+          </label>
         </div>
         <% parentFields.forEach(function(f) { %>
           <%- include('partials/membership-form-field', { field: f, namePrefix: 'customFields', values: formValues.customFields }) %>
@@ -52,6 +55,26 @@
             <input type="password" name="confirmPassword" required minlength="8" autocomplete="new-password" />
           </label>
         </div>
+      </div>
+
+      <%# 10DLC compliance - a real Telnyx campaign review rejection asked
+          for "a link/screenshot of the opt-in form... showing the phone
+          number field and full SMS opt-in language," separate from (and
+          never bundled into) the handbook-read checkbox below: a
+          dedicated, unchecked-by-default checkbox naming the brand,
+          what SMS is used for, that message frequency varies, the
+          standard "Msg & data rates may apply" notice, STOP/HELP
+          instructions, and a link to the Privacy Policy - everything
+          carriers want visible on the actual form that collects the
+          phone number above, not just described after the fact. %>
+      <div class="form-section">
+        <h2>SMS Notifications</h2>
+        <p class="hint">Sanford Homeschoolers may send SMS text messages to the phone number above for co-op announcements, event reminders, and schedule changes. Message frequency varies. Msg &amp; data rates may apply. Reply STOP to a message at any time to opt out, or HELP for help. See our <a href="/privacy-policy" target="_blank">Privacy Policy</a>.</p>
+        <label class="checkbox-option">
+          <input type="checkbox" name="smsOptIn" value="1" />
+          I agree to receive SMS text messages from Sanford Homeschoolers at the phone number provided above.
+        </label>
+        <p class="hint">Optional - you can still register without opting in to SMS, and can change this later from your account's Notification Preferences.</p>
       </div>
 
       <%# A real request: "there should be a place at the bottom of the
