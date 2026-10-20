@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Homeschool Grades</h1>
+
+    <% if (grades.length === 0) { %>
+      <p class="roster-empty">No gradable assignments yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table table-stack-mobile">
+          <thead>
+            <tr><th>Class</th><th>Lesson</th><th>Assignment</th><th>Due</th><th>Submitted</th><th>Grade</th></tr>
+          </thead>
+          <tbody>
+            <% grades.forEach(function(g) { %>
+              <tr>
+                <td data-label="Class" class="table-stack-heading"><%= g.class_name %></td>
+                <td data-label="Lesson"><%= g.lesson_title %></td>
+                <td data-label="Assignment"><%= g.item_title || '(untitled)' %><% if (g.points_possible != null) { %> <span class="hint">(<%= g.points_possible %> pts)</span><% } %></td>
+                <td data-label="Due"><%= g.dueDateLabel || '—' %></td>
+                <td data-label="Submitted"><%= g.submission_id ? 'Yes' : 'Not yet' %></td>
+                <td data-label="Grade">
+                  <% if (g.grade_letter || g.points_earned != null) { %>
+                    <%= g.grade_letter || g.points_earned %>
+                    <% if (g.feedback) { %><p class="hint"><%= g.feedback %></p><% } %>
+                  <% } else { %>
+                    <span class="hint">Not graded yet</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

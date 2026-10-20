@@ -121,12 +121,17 @@ async function seedIfMissing(db) {
 // this, nobody could ever reach the Main Admin Portal to grant that role
 // to anyone else in the first place. Same "seed once on a fresh database"
 // pattern as the rest of seedIfMissing above, not a repeatable backfill.
+// Each description below is the user's own exact wording from a real
+// request ("Add description under each portal title. On choose portal
+// page...") - see views/portal-switcher.ejs's own comment on why this
+// field (already selected by utils/portalAuth.js's rolesForAccount) went
+// unrendered there for a while.
 const PORTAL_ROLES = [
-  { key: 'parent', label: 'Parent', description: 'Manages their family, registers students for classes, and tracks accounting/training.', isSystem: true },
-  { key: 'student', label: 'Student', description: "Views their own classes, assignments, grades, and training.", isSystem: true },
-  { key: 'teacher', label: 'Teacher', description: 'Manages their own classes: rosters, attendance, lessons, and grading.', isSystem: true },
-  { key: 'coop_admin', label: 'Co-op Admin', description: 'Operational co-op admin: check-in/out, scheduling, floaters, setup/cleanup.', isSystem: true },
-  { key: 'main_admin', label: 'Main Admin', description: 'Platform control center: users, roles, website content, and every other portal.', isSystem: true },
+  { key: 'parent', label: 'Parent', description: 'Class registration, event registration, family homeschool management, etc.', isSystem: true },
+  { key: 'student', label: 'Student', description: 'View and complete lessons, chat with friends. Challenges, play games etc.', isSystem: true },
+  { key: 'teacher', label: 'Teacher', description: 'Attendance, manage classes. Lesson plans. Etc.', isSystem: true },
+  { key: 'coop_admin', label: 'Co-op Admin', description: 'Co-op classes, schedules, floaters, name tags, attendance etc.', isSystem: true },
+  { key: 'main_admin', label: 'Main Admin', description: 'Group management, events, chat groups, approvals, website settings etc.', isSystem: true },
 ];
 
 const PORTAL_PERMISSIONS = [
@@ -148,7 +153,6 @@ const PORTAL_PERMISSIONS = [
   { key: 'manage_directory', label: 'Manage Directory', description: 'Manage the member and business directories.' },
   { key: 'manage_communications', label: 'Manage Communications', description: 'Assemble/send the weekly newsletter and control SMS/notification settings.' },
   { key: 'view_audit_log', label: 'View Audit Log', description: 'View the record of financial changes, moderation, and deletions across the app.' },
-  { key: 'manage_academics', label: 'Manage Academics', description: 'Issue diplomas and review student academic records.' },
   { key: 'manage_members', label: 'Manage Members', description: 'Add, edit, archive, and organize the member/family roster.' },
   { key: 'send_announcements', label: 'Send Announcements', description: 'Compose and send announcements to members, shown on their portal home page.' },
   { key: 'manage_resources', label: 'Manage Resource Links', description: 'Add and remove the curated resource links shown on member portals.' },

@@ -53,7 +53,7 @@
         <div class="grid-box-header">
           <h2>New Entry</h2>
         </div>
-        <form method="POST" action="/parent/family-school/journal" class="member-form-grid">
+        <form method="POST" action="/parent/family-school/journal" enctype="multipart/form-data" class="member-form-grid">
           <input type="hidden" name="studentId" value="<%= selectedStudentId %>" />
           <label class="member-form-full">Date
             <input type="date" name="entryDate" value="<%= new Date().toISOString().slice(0, 10) %>" required />
@@ -64,6 +64,12 @@
             <div class="forum-editable" data-forum-editable contenteditable="true"></div>
             <input type="hidden" name="body" data-forum-body-input />
           </div>
+          <%# A real request: "Be able to upload images or documents to
+              daily learning log." Up to 5 files at once - see
+              routes/parent-family-school.js's own uploadJournalAttachments. %>
+          <label class="member-form-full">Attachments <span class="hint">(optional - images or documents, up to 5 files)</span>
+            <input type="file" name="attachments" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp" multiple />
+          </label>
           <div class="member-form-full">
             <button type="submit" class="primary-btn">Add Journal Entry</button>
           </div>
@@ -89,6 +95,26 @@
                   </form>
                 </div>
                 <div class="forum-editable-display"><%- e.body %></div>
+                <% if (e.attachments && e.attachments.length > 0) { %>
+                  <div class="fs-journal-attachments">
+                    <% e.attachments.forEach(function(a) { %>
+                      <div class="fs-journal-attachment">
+                        <% if ((a.content_type || '').startsWith('image/')) { %>
+                          <a href="<%= a.url %>" target="_blank" class="fs-journal-attachment-image-link">
+                            <img src="<%= a.url %>" alt="<%= a.file_name %>" class="fs-journal-attachment-image" />
+                          </a>
+                        <% } else { %>
+                          <a href="<%= a.url %>" target="_blank" class="fs-journal-attachment-file-link">
+                            <svg class="icon"><use href="#icon-file-text"/></svg> <%= a.file_name %>
+                          </a>
+                        <% } %>
+                        <form method="POST" action="/parent/family-school/journal/<%= e.id %>/attachments/<%= a.id %>/delete" onsubmit="return confirm('Remove this attachment?');" class="inline-block-form">
+                          <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete attachment" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                        </form>
+                      </div>
+                    <% }); %>
+                  </div>
+                <% } %>
               </div>
             <% }); %>
           </div>

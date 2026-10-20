@@ -83,8 +83,12 @@ test('Family School Management nav tab appears on Parent, Student, and Main Admi
   const parentHome = await request(app).get('/parent').set('Cookie', parent.cookie);
   assert.match(parentHome.text, />Family School Management</);
 
+  // A later real request ("Student portal add a tab that says family
+  // homeschooling...") renamed Student Portal's own nav entry for this
+  // feature and gave it subpages - see test/student-family-homeschooling-
+  // tab.test.js for coverage of that tab itself.
   const studentHome = await request(app).get('/student').set('Cookie', student.cookie);
-  assert.match(studentHome.text, />Family School Management</);
+  assert.match(studentHome.text, />Family Homeschooling</);
 
   const mainAdminHome = await request(app).get('/main-admin').set('Cookie', mainAdmin.cookie);
   assert.match(mainAdminHome.text, />Family School Management</);
@@ -275,7 +279,13 @@ test('Attendance: clicking a date cycles present (green) -> absent (red) -> unma
 
   const page = await request(app).get(`/parent/family-school/attendance?studentId=${student.memberId}&year=2026&month=3`).set('Cookie', parent.cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /March 2026/);
+  // A later real request ("the month should be a drop down choice of
+  // months/years") replaced the old static "March 2026" text label with
+  // month/year <select>s - see test/parent-family-attendance-layout.
+  // test.js for full coverage of that; this test only needs to confirm
+  // the right month/year is still selected.
+  assert.match(page.text, /<option value="3" selected>March<\/option>/);
+  assert.match(page.text, /<option value="2026" selected>2026<\/option>/);
   const csrf = await csrfFrom(parent.cookie, `/parent/family-school/attendance?studentId=${student.memberId}`);
 
   const toggle1 = await request(app).post(`/parent/family-school/attendance/${student.memberId}/toggle`).set('Cookie', parent.cookie).type('form').send({ date: '2026-03-10', _csrf: csrf });

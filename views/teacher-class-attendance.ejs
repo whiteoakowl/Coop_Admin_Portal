@@ -8,7 +8,23 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <p><a href="/teacher/attendance">&larr; Back to Attendance</a></p>
-    <h1><%= cls.class_name %> Attendance</h1>
+    <%# A real request: "There should also be the purple check in and out
+        buttons for barcode scanning." Same .class-checkin-btn look/
+        markup/scan flow as the Kiosk's own Class Check-In attendance
+        screen (views/kiosk-class-checkin-attendance.ejs), just pointed
+        at this teacher's own scan routes (routes/teacher-portal.js's own
+        GET /classes/:id/scan). %>
+    <div class="class-checkin-attendance-header">
+      <h1><%= cls.class_name %> Attendance</h1>
+      <div class="class-checkin-actions">
+        <a class="class-checkin-btn" href="/teacher/classes/<%= cls.id %>/scan?mode=checkin">
+          <svg class="icon"><use href="#icon-check"/></svg> Check In
+        </a>
+        <a class="class-checkin-btn" href="/teacher/classes/<%= cls.id %>/scan?mode=checkout">
+          <svg class="icon"><use href="#icon-log-out"/></svg> Check Out
+        </a>
+      </div>
+    </div>
     <p class="hint"><%= dateLabel %></p>
 
     <% if (rows.length === 0) { %>

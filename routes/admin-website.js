@@ -84,7 +84,8 @@ async function deleteBlockImageFile(key) {
 router.get('/', async (req, res) => {
   const settings = await db.prepare('SELECT * FROM site_settings WHERE id = 1').get();
   const blocks = await homepage.listBlocks();
-  res.render('main-admin-website', { title: 'Public Homepage', settings, blocks, notice: req.query.notice || null, error: req.query.error || null });
+  const menuItems = await homepage.listMenuItems();
+  res.render('main-admin-website', { title: 'Public Homepage', settings, blocks, menuItems, notice: req.query.notice || null, error: req.query.error || null });
 });
 
 // Org Name/Contact Email/Contact Phone - the only homepage-related fields
@@ -144,6 +145,41 @@ router.post('/blocks/:id/delete', async (req, res) => {
 router.post('/blocks/reorder', express.json(), async (req, res) => {
   const blockIds = [].concat(req.body.blockIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
   await homepage.reorderBlocks(blockIds);
+  res.json({ ok: true });
+});
+
+// Homepage Menu - a real request: "Should be able to edit or add menu
+// tabs to the homepage." A plain label+URL row, reusing the exact same
+// drag-reorder mechanism (public/js/homepage-block-reorder.js is generic
+// over any container/row carrying its own data-homepage-block-row/
+// data-homepage-blocks-container attributes - menu rows just point their
+// own data-reorder-url at this route instead of /blocks/reorder).
+router.post('/menu-items', async (req, res) => {
+  const label = (req.body.label || '').trim();
+  const url = (req.body.url || '').trim();
+  if (!label || !url) return res.redirect('/main-admin/website?error=' + encodeURIComponent('A label and a URL are required.'));
+  await homepage.addMenuItem({ label, url });
+  res.redirect('/main-admin/website?notice=' + encodeURIComponent('Menu tab added.'));
+});
+
+router.post('/menu-items/:id/update', async (req, res) => {
+  const existing = await homepage.getMenuItem(req.params.id);
+  if (!existing) return res.status(404).render('404', { title: 'Not Found' });
+  const label = (req.body.label || '').trim();
+  const url = (req.body.url || '').trim();
+  if (!label || !url) return res.redirect('/main-admin/website?error=' + encodeURIComponent('A label and a URL are required.'));
+  await homepage.updateMenuItem(req.params.id, { label, url });
+  res.redirect('/main-admin/website?notice=' + encodeURIComponent('Menu tab saved.'));
+});
+
+router.post('/menu-items/:id/delete', async (req, res) => {
+  await homepage.deleteMenuItem(req.params.id);
+  res.redirect('/main-admin/website?notice=' + encodeURIComponent('Menu tab removed.'));
+});
+
+router.post('/menu-items/reorder', express.json(), async (req, res) => {
+  const menuItemIds = [].concat(req.body.blockIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  await homepage.reorderMenuItems(menuItemIds);
   res.json({ ok: true });
 });
 

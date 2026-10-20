@@ -55,6 +55,10 @@ const {
   updateJournalEntry,
   deleteJournalEntry,
   getJournalEntry,
+  attachmentsForJournalEntry,
+  getJournalAttachment,
+  addJournalAttachment,
+  deleteJournalAttachment,
   curriculumForStudent,
   createCurriculumItem,
   getCurriculumItem,
@@ -490,12 +494,23 @@ router.get('/family-school/attendance', async (req, res) => {
   const now = new Date();
   const year = req.query.year ? parseInt(req.query.year, 10) : now.getUTCFullYear();
   const month = req.query.month ? parseInt(req.query.month, 10) : now.getUTCMonth() + 1;
+  // A real request: "the month should be a drop down choice of months/
+  // years." currentYear is always included in the range regardless of
+  // which year is actually selected, so jumping to an old year (e.g. via
+  // a bookmarked/shared link) never drops that year's own option out of
+  // its own <select>.
+  const currentYear = now.getUTCFullYear();
+  const yearRangeStart = Math.min(year, currentYear - 2);
+  const yearRangeEnd = Math.max(year, currentYear + 1);
+  const yearOptions = [];
+  for (let y = yearRangeStart; y <= yearRangeEnd; y++) yearOptions.push(y);
   res.render('parent-family-school-attendance', {
     title: 'Family Attendance',
     familyStudents,
     selectedStudentId: isOwnStudent ? selectedStudentId : null,
     year,
     month,
+    yearOptions,
     weeks: monthGridDays(year, month),
     attendanceByDate: isOwnStudent ? await attendanceForStudent(selectedStudentId, year, month) : {},
   });
@@ -550,11 +565,13 @@ router.get('/family-school/journal', async (req, res) => {
   const familyStudents = await studentsForFamily(familyId);
   const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
   const isOwnStudent = selectedStudentId && familyStudents.some((s) => s.id === selectedStudentId);
+  const entries = isOwnStudent ? await journalEntriesForStudent(selectedStudentId) : [];
+  for (const e of entries) e.attachments = await attachmentsForJournalEntry(e.id);
   res.render('parent-family-school-journal', {
     title: 'Daily Learning Log',
     familyStudents,
     selectedStudentId: isOwnStudent ? selectedStudentId : null,
-    entries: isOwnStudent ? await journalEntriesForStudent(selectedStudentId) : [],
+    entries,
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
@@ -587,14 +604,34 @@ async function requireOwnStudent(req, studentId) {
   return familyStudents.some((s) => s.id === studentId);
 }
 
-router.post('/family-school/journal', async (req, res) => {
+// A real request: "Be able to upload images or documents to daily
+// learning log." Up to 5 files per entry, same attachmentUpload config
+// (size limit/allowed types) the lesson-content attachment route above
+// already uses - just .array() instead of .single() since an entry can
+// carry more than one file.
+function uploadJournalAttachments(req, res, next) {
+  attachmentUpload.array('attachments', 5)(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') {
+      return res.redirect(
+        `/parent/family-school/journal?studentId=${req.body.studentId || ''}&error=` +
+          encodeURIComponent(`One of those files is too large - attachments are limited to ${MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB each.`)
+      );
+    }
+    next(err);
+  });
+}
+
+router.post('/family-school/journal', uploadJournalAttachments, async (req, res) => {
   const studentId = parseInt(req.body.studentId, 10);
   if (!(await requireOwnStudent(req, studentId))) return res.status(404).send('Not found');
   const entryDate = (req.body.entryDate || '').trim();
   const body = sanitizePostBody(req.body.body || '');
   if (!entryDate) return res.redirect(`/parent/family-school/journal?studentId=${studentId}&error=` + encodeURIComponent('Choose a date.'));
   if (!body || body === '<p></p>') return res.redirect(`/parent/family-school/journal?studentId=${studentId}&error=` + encodeURIComponent('Write something first.'));
-  await createJournalEntry({ studentId, entryDate, body, createdByAccountId: req.portalAccount.id });
+  const entryId = await createJournalEntry({ studentId, entryDate, body, createdByAccountId: req.portalAccount.id });
+  for (const file of req.files || []) {
+    await addJournalAttachment({ journalEntryId: entryId, file });
+  }
   res.redirect(`/parent/family-school/journal?studentId=${studentId}&notice=` + encodeURIComponent('Journal entry added.'));
 });
 
@@ -603,6 +640,15 @@ router.post('/family-school/journal/:id/delete', async (req, res) => {
   if (!entry || !(await requireOwnStudent(req, entry.student_id))) return res.status(404).send('Not found');
   await deleteJournalEntry(entry.id);
   res.redirect(`/parent/family-school/journal?studentId=${entry.student_id}&notice=` + encodeURIComponent('Entry removed.'));
+});
+
+router.post('/family-school/journal/:id/attachments/:attachmentId/delete', async (req, res) => {
+  const entry = await getJournalEntry(parseInt(req.params.id, 10));
+  if (!entry || !(await requireOwnStudent(req, entry.student_id))) return res.status(404).send('Not found');
+  const attachment = await getJournalAttachment(parseInt(req.params.attachmentId, 10));
+  if (!attachment || attachment.journal_entry_id !== entry.id) return res.status(404).send('Not found');
+  await deleteJournalAttachment(attachment.id);
+  res.redirect(`/parent/family-school/journal?studentId=${entry.student_id}&notice=` + encodeURIComponent('Attachment removed.'));
 });
 
 // --- Annual Planner subpage - a real request: "Family management

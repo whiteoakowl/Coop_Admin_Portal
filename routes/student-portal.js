@@ -34,6 +34,7 @@ const {
   saveLessonAttachment,
   contentItemsForAssignment,
   markLessonItemComplete,
+  generateTranscriptsForEndedClasses,
 } = require('../utils/academics');
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
 const forums = require('../utils/forums');
@@ -446,7 +447,16 @@ router.get('/assignments', async (req, res) => {
   res.render('student-assignments', { title: 'Assignments', assignments });
 });
 
+// A real request: "Main admin portal, remove academics tab and
+// features. Only parent portal has those pages and admin doesn't need
+// to control them with any settings." Main Admin's own /academics page
+// (the only place that ever called generateTranscriptsForEndedClasses)
+// is gone - this student-facing transcript view is untouched by that
+// request, so the lazy backfill moves here instead, the same "run it on
+// whichever read route actually needs fresh data" pattern Main Admin's
+// own route used.
 router.get('/transcript', async (req, res) => {
+  await generateTranscriptsForEndedClasses();
   const member = await memberForAccount(req.portalAccount.id);
   const { current, history } = member ? await transcriptForStudent(member.id) : { current: [], history: [] };
   res.render('student-transcript', { title: 'Transcript', member, current, history, dayLabels: CLASS_DAY_LABELS_FULL });
@@ -786,12 +796,16 @@ router.post('/games/score', async (req, res) => {
   res.json(result);
 });
 
-// Spelling Bee - a real request: "this page will have a spelling game
+// Vocabulary - a real request: "this page will have a spelling game
 // with vocabulary words for every grade level. grade level on students
 // member profile determines their vocabulary level for the spelling
-// game." See utils/spellingBee.js's own header comment for how
-// members.grade_level (two different vocabularies depending on how the
-// student was enrolled) maps to elementary/middle/high.
+// game." A later real request ("Student portal change spelling game to
+// vocabulary game") renamed this from "Spelling Bee" - the underlying
+// word list/clue mechanic (type the word matching a definition clue) was
+// already a vocabulary exercise, so only the route/view/branding moved;
+// utils/spellingBee.js's own module/function names are left as internal
+// implementation detail (see that file's own header comment for how
+// members.grade_level maps to elementary/middle/high).
 function shuffle(arr) {
   const copy = arr.slice();
   for (let i = copy.length - 1; i > 0; i--) {
@@ -801,13 +815,13 @@ function shuffle(arr) {
   return copy;
 }
 
-router.get('/spelling-bee', async (req, res) => {
+router.get('/vocabulary', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const level = spellingBee.levelForMember(member);
   const round = shuffle(spellingBee.wordsForLevel(level)).slice(0, 8);
   const topPlayers = await spellingBee.topPlayers(5);
-  res.render('student-spelling-bee', {
-    title: 'Spelling Bee',
+  res.render('student-vocabulary', {
+    title: 'Vocabulary',
     level,
     levelLabel: spellingBee.LEVEL_LABELS[level],
     round,
@@ -815,7 +829,7 @@ router.get('/spelling-bee', async (req, res) => {
   });
 });
 
-router.post('/spelling-bee/score', async (req, res) => {
+router.post('/vocabulary/score', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   if (!member) return res.status(401).json({ ok: false });
   const correctCount = Math.max(0, Math.min(50, parseInt(req.body.correctCount, 10) || 0));

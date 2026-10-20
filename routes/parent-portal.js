@@ -71,6 +71,7 @@ const {
   updateTranscriptEntry,
   deleteTranscriptEntry,
   coopClassNamesForStudent,
+  DIPLOMA_TEMPLATES,
 } = require('../utils/academics');
 const { classesForStudent: familySchoolClassesForStudent } = require('../utils/familySchool');
 const notifications = require('../utils/notifications');
@@ -1279,12 +1280,13 @@ router.get('/academics/transcripts/:studentId/print', async (req, res) => {
 });
 
 // Diplomas - a real request: "Diplomas allows parents to design and print
-// a diploma for their students." Reuses the exact same diplomas table/
-// issueDiploma upsert Main Admin's own /main-admin/academics uses (see
-// utils/academics.js), just scoped to the parent's own children instead
-// of gated behind manage_academics - a parent can create/edit (never
-// issue on someone else's behalf) their own child's diploma wording and
-// print it, the same one-diploma-per-student row either side writes to.
+// a diploma for their students." A parent can create/edit (never issue
+// on someone else's behalf) their own child's diploma design/wording and
+// print it. Main Admin used to have its own parallel issue-a-diploma
+// control panel writing the same table - removed per a later real
+// request ("Main admin portal, remove academics tab and features. Only
+// parent portal has those pages and admin doesn't need to control them
+// with any settings."), so this is the only way a diploma gets made now.
 router.get('/academics/diplomas', async (req, res) => {
   const children = await childrenForAccount(req.portalAccount);
   const diplomas = [];
@@ -1292,7 +1294,7 @@ router.get('/academics/diplomas', async (req, res) => {
     const diploma = await diplomaForStudent(child.id);
     diplomas.push({ child, diploma });
   }
-  res.render('parent-academics-diplomas', { title: 'Diplomas', diplomas, todayISO: todayISO() });
+  res.render('parent-academics-diplomas', { title: 'Diplomas', diplomas, todayISO: todayISO(), DIPLOMA_TEMPLATES });
 });
 
 router.post('/academics/diplomas', async (req, res) => {
@@ -1303,7 +1305,21 @@ router.post('/academics/diplomas', async (req, res) => {
   }
   const title = (req.body.title || '').trim() || 'Diploma of Completion';
   const issuedDate = req.body.issuedDate || todayISO();
-  await issueDiploma({ studentId, title, issuedDate, bodyText: req.body.bodyText, issuedByAccountId: req.portalAccount.id });
+  const template = DIPLOMA_TEMPLATES.includes(req.body.template) ? req.body.template : 'classic';
+  await issueDiploma({
+    studentId,
+    title,
+    issuedDate,
+    bodyText: req.body.bodyText,
+    issuedByAccountId: req.portalAccount.id,
+    template,
+    color: (req.body.color || '').trim() || '#2e6da4',
+    displayName: (req.body.displayName || '').trim(),
+    signature1Name: (req.body.signature1Name || '').trim(),
+    signature1Title: (req.body.signature1Title || '').trim(),
+    signature2Name: (req.body.signature2Name || '').trim(),
+    signature2Title: (req.body.signature2Title || '').trim(),
+  });
   res.redirect('/parent/academics/diplomas?notice=' + encodeURIComponent('Diploma saved.'));
 });
 

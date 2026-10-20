@@ -151,15 +151,32 @@ async function allDiplomas() {
     .all();
 }
 
-async function issueDiploma({ studentId, title, issuedDate, bodyText, issuedByAccountId }) {
+// Diplomas are entirely a Parent Portal self-service feature (routes/
+// parent-portal.js's own /academics/diplomas - a parent designs/edits
+// their own child's diploma, never anyone else's). template/color
+// default to the migration's own fallback values when a caller doesn't
+// pass one; every other design field is nullable (no signature 2
+// entered just means no signature 2 on the printed certificate).
+async function issueDiploma({ studentId, title, issuedDate, bodyText, issuedByAccountId, template, color, displayName, signature1Name, signature1Title, signature2Name, signature2Title }) {
   await db
     .prepare(
-      `INSERT INTO diplomas (student_id, title, issued_date, body_text, issued_by_account_id)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT (student_id) DO UPDATE SET title = ?, issued_date = ?, body_text = ?, issued_by_account_id = ?, created_at = now_text()`
+      `INSERT INTO diplomas (student_id, title, issued_date, body_text, issued_by_account_id, template, color, display_name, signature1_name, signature1_title, signature2_name, signature2_title)
+       VALUES (?, ?, ?, ?, ?, COALESCE(?, 'classic'), COALESCE(?, '#2e6da4'), ?, ?, ?, ?, ?)
+       ON CONFLICT (student_id) DO UPDATE SET
+         title = ?, issued_date = ?, body_text = ?, issued_by_account_id = ?,
+         template = COALESCE(?, 'classic'), color = COALESCE(?, '#2e6da4'),
+         display_name = ?, signature1_name = ?, signature1_title = ?, signature2_name = ?, signature2_title = ?,
+         created_at = now_text()`
     )
-    .run(studentId, title, issuedDate, bodyText || null, issuedByAccountId, title, issuedDate, bodyText || null, issuedByAccountId);
+    .run(
+      studentId, title, issuedDate, bodyText || null, issuedByAccountId,
+      template || null, color || null, displayName || null, signature1Name || null, signature1Title || null, signature2Name || null, signature2Title || null,
+      title, issuedDate, bodyText || null, issuedByAccountId,
+      template || null, color || null, displayName || null, signature1Name || null, signature1Title || null, signature2Name || null, signature2Title || null
+    );
 }
+
+const DIPLOMA_TEMPLATES = ['classic', 'modern', 'elegant', 'bold'];
 
 // Past-term history (see the migration's own comment on why this only
 // covers terms archived after this feature existed) plus, so the page
@@ -872,6 +889,7 @@ module.exports = {
   diplomaForStudent,
   allDiplomas,
   issueDiploma,
+  DIPLOMA_TEMPLATES,
   transcriptForStudent,
   allTranscriptEntries,
   addTranscriptEntry,

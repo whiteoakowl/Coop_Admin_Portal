@@ -11,7 +11,18 @@ const path = require('path');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
-const { allClassesList, listSemesters, roomGridForDay, hoursForDay, listActiveClassDays, hideClassesNotVisibleToMembers } = require('../utils/classSchedule');
+const {
+  allClassesList,
+  listSemesters,
+  roomGridForDay,
+  hoursForDay,
+  listActiveClassDays,
+  hideClassesNotVisibleToMembers,
+  getClass,
+  classImageUrl,
+  formatGradeRange,
+  ensureDayRoster,
+} = require('../utils/classSchedule');
 const { CLASS_DAY_ORDER, CLASS_DAY_LABELS_FULL } = require('../utils/classDays');
 const {
   assignmentsForClass,
@@ -44,6 +55,15 @@ const { instructorProfile, saveInstructorProfile } = require('../utils/instructo
 const { buildRosterGridData } = require('../utils/rosterGrid');
 const { lessonAttachmentFileFilter } = require('../utils/uploads');
 const notifications = require('../utils/notifications');
+const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
+const { findMemberByBarcodeOrName } = require('../utils/memberLookup');
+const { createRateLimiter } = require('../utils/rateLimit');
+const trainingModule = require('../utils/training');
+
+// Same per-device throttle shape as the kiosk's own Class Check-In scan
+// (routes/kiosk-class-checkin.js's own classScanLimiter) - its own
+// independent counter, scoped to this Teacher Portal surface only.
+const teacherScanLimiter = createRateLimiter({ windowMs: 60 * 1000, maxAttempts: 40 });
 
 router.use(requirePortalAuth, requirePortal('teacher'));
 
@@ -210,6 +230,32 @@ router.get('/classes', async (req, res) => {
 // management page moved to its own "Edit Class" button/route below
 // rather than being what clicking a class lands on first.
 const TEACHER_CLASS_DETAIL_TABS = ['details', 'lessons', 'chat'];
+
+// A real request: "Teacher portal, class schedule, ... Be able to click
+// on classes and see the details and read the descriptions." The Class
+// Schedule page's own Grid view (views/teacher-classes.ejs) shows every
+// class in the co-op, not just this teacher's own (see that view's own
+// comment) - unlike GET /classes/:id below, this is a read-only info
+// popup reachable for ANY class, the same way Parent Portal's own class-
+// card click popup (routes/parent-portal.js's own /classes/:id/fragment)
+// isn't gated to "already registered" either. No register/join/leave
+// controls here at all - a teacher browsing the whole schedule isn't
+// signing up for anything, just looking up what a class actually is.
+router.get('/classes/:id/fragment', async (req, res) => {
+  const cls = await getClass(parseInt(req.params.id, 10));
+  if (!cls) return res.status(404).send('Not found');
+  const staff = cls.staff || [];
+  const enrolledCount = Number((await db.prepare('SELECT COUNT(*) AS c FROM class_enrollments WHERE class_id = ?').get(cls.id)).c);
+  res.render('teacher-class-fragment', {
+    cls,
+    classImageUrl: classImageUrl(cls.image_key),
+    dayLabels: CLASS_DAY_LABELS_FULL,
+    gradeLabel: formatGradeRange(cls.age_group),
+    teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
+    assistantNames: staff.filter((s) => s.role === 'assistant').map((s) => s.name),
+    enrolledCount,
+  });
+});
 
 router.get('/classes/:id', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
@@ -715,6 +761,155 @@ router.post('/classes/:id/attendance', async (req, res) => {
   res.redirect(`/teacher/classes/${cls.id}/attendance`);
 });
 
+// A real request: "Teacher portal. Attendance, click on a class to take
+// Attendance, you can click on each block to add Attendance manually.
+// There should also be the purple check in and out buttons for barcode
+// scanning." The manual click-a-block marking above already exists
+// (each cell's own colored .roster-cell-select, same convention every
+// other attendance grid in this app uses); this is the SAME barcode-scan
+// flow the Kiosk's own Class Check-In surface already has (routes/kiosk-
+// class-checkin.js's own GET /classes/:id/scan + POST .../scan/checkin|
+// checkout, reusing its exact same views/kiosk-class-checkin-scan.ejs -
+// that view/its own script are already fully generic, driven by
+// scanBaseUrl/completeUrl/mode body data attributes, not hardcoded kiosk
+// paths), just gated by this teacher's own portal login + class
+// ownership (classesForTeacher) instead of the kiosk's shared PIN. A
+// teacher marking attendance for their OWN class is already trusted with
+// manual present/late/absent above; scanning barcodes for that same
+// class is the same trust level, reached without re-entering a PIN that
+// isn't theirs to begin with.
+const SCAN_MODES = ['checkin', 'checkout'];
+
+router.get('/classes/:id/scan', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  const cls = classes.find((c) => c.id === parseInt(req.params.id, 10));
+  if (!cls) {
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher/attendance', backLabel: 'Back to Attendance' });
+  }
+  const mode = SCAN_MODES.includes(req.query.mode) ? req.query.mode : 'checkin';
+  res.render('kiosk-class-checkin-scan', {
+    title: `${mode === 'checkout' ? 'Check Out' : 'Check In'} - ${cls.class_name}`,
+    mode,
+    dateLabel: formatDateLong(todayISO()),
+    heading: cls.class_name,
+    scanBaseUrl: `/teacher/classes/${cls.id}`,
+    completeUrl: `/teacher/classes/${cls.id}/attendance`,
+  });
+});
+
+// Shared setup for both scan actions below - same resolve-the-member/
+// is-the-class-in-session-today shape as routes/kiosk-class-checkin.js's
+// own resolveScan, just re-deriving this teacher's own staffed classes
+// instead of trusting req.session.classCheckinUnlocked. Returns null
+// (having already sent a JSON error response) on any failure, same
+// `const ctx = await resolveTeacherScan(...); if (!ctx) return;` shape.
+async function resolveTeacherScan(req, res, member) {
+  const classId = parseInt(req.params.id, 10);
+  const classes = await classesForTeacher(member);
+  const cls = classes.find((c) => c.id === classId);
+  if (!cls || !cls.roster_id) {
+    res.json({ ok: false, message: 'Class not found.' });
+    return null;
+  }
+  const activeSemesterId = await getActiveKioskSemesterId();
+  if (activeSemesterId != null && cls.semester_id !== activeSemesterId) {
+    res.json({ ok: false, message: `${cls.class_name} is not part of the Kiosk's current semester.` });
+    return null;
+  }
+
+  const { member: scannedMember, ambiguous } = await findMemberByBarcodeOrName(req.body.barcode);
+  if (ambiguous) {
+    res.json({ ok: false, message: 'More than one member has that name - please scan a barcode instead.' });
+    return null;
+  }
+  if (!scannedMember) {
+    res.json({ ok: false, message: 'Not recognized. Please see an attendant.' });
+    return null;
+  }
+
+  const today = todayISO();
+  // A class roster has no session dates of its own - it borrows them
+  // from the day's Student roster (same reasoning kiosk-class-
+  // checkin.js's own resolveScan documents), so "is this class in
+  // session today" has to check the day's Student roster's own
+  // roster_dates, not cls.roster_id.
+  const studentRosterId = await ensureDayRoster(cls.day, 'student');
+  const inSessionToday = await db.prepare('SELECT 1 FROM roster_dates WHERE roster_id = ? AND session_date = ?').get(studentRosterId, today);
+  if (!inSessionToday) {
+    res.json({ ok: false, message: `${cls.class_name} isn't in session today.` });
+    return null;
+  }
+
+  const enrolled = await db.prepare('SELECT 1 FROM roster_members WHERE roster_id = ? AND member_id = ?').get(cls.roster_id, scannedMember.id);
+  if (!enrolled) {
+    res.json({ ok: false, message: `${scannedMember.name} is not enrolled in ${cls.class_name}.` });
+    return null;
+  }
+
+  return { cls, member: scannedMember, today };
+}
+
+router.post('/classes/:id/scan/checkin', async (req, res) => {
+  if (teacherScanLimiter.isLimited(req.ip)) {
+    return res.json({ ok: false, message: 'Too many check-ins from this device right now. Please wait a moment and try again.' });
+  }
+  teacherScanLimiter.recordAttempt(req.ip);
+
+  const member = await memberForAccount(req.portalAccount.id);
+  const ctx = await resolveTeacherScan(req, res, member);
+  if (!ctx) return;
+  const { cls, member: scannedMember, today } = ctx;
+
+  const existing = await db
+    .prepare('SELECT status FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?')
+    .get(scannedMember.id, cls.roster_id, today);
+  if (existing && existing.status === 'present') {
+    return res.json({ ok: true, alreadyChecked: true, name: scannedMember.name, message: `${scannedMember.name} is already checked in to ${cls.class_name}.` });
+  }
+
+  await db
+    .prepare(
+      `INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time, source)
+       VALUES (?, ?, ?, 'present', ?, 'teacher_portal_checkin')
+       ON CONFLICT(member_id, roster_id, session_date)
+       DO UPDATE SET status = 'present', check_in_time = excluded.check_in_time, source = 'teacher_portal_checkin', recorded_at = now_text()`
+    )
+    .run(scannedMember.id, cls.roster_id, today, Date.now());
+
+  res.json({ ok: true, name: scannedMember.name, message: `Welcome, ${scannedMember.name}!` });
+});
+
+router.post('/classes/:id/scan/checkout', async (req, res) => {
+  if (teacherScanLimiter.isLimited(req.ip)) {
+    return res.json({ ok: false, message: 'Too many check-outs from this device right now. Please wait a moment and try again.' });
+  }
+  teacherScanLimiter.recordAttempt(req.ip);
+
+  const member = await memberForAccount(req.portalAccount.id);
+  const ctx = await resolveTeacherScan(req, res, member);
+  if (!ctx) return;
+  const { cls, member: scannedMember, today } = ctx;
+
+  const existing = await db
+    .prepare('SELECT check_out_time FROM checkouts WHERE member_id = ? AND roster_id = ? AND session_date = ?')
+    .get(scannedMember.id, cls.roster_id, today);
+  if (existing) {
+    return res.json({ ok: true, alreadyChecked: true, name: scannedMember.name, message: `${scannedMember.name} is already checked out of ${cls.class_name}.` });
+  }
+
+  await db
+    .prepare(
+      `INSERT INTO checkouts (member_id, roster_id, session_date, number, check_out_time)
+       VALUES (?, ?, ?, NULL, ?)
+       ON CONFLICT(member_id, roster_id, session_date)
+       DO UPDATE SET check_out_time = excluded.check_out_time, recorded_at = now_text()`
+    )
+    .run(scannedMember.id, cls.roster_id, today, Date.now());
+
+  res.json({ ok: true, name: scannedMember.name, message: `${scannedMember.name} checked out of ${cls.class_name}.` });
+});
+
 // --- Assignments tab (across every class this teacher is staffed on) ---
 
 router.get('/assignments', async (req, res) => {
@@ -786,6 +981,27 @@ router.post('/instructor-profile', async (req, res) => {
     qualificationsVisible: !!req.body.qualificationsVisible,
   });
   res.redirect('/teacher/instructor-profile?notice=' + encodeURIComponent('Instructor profile saved.'));
+});
+
+// A real bug report: "Teacher portal. When clicking on training tab it
+// goes to parent portal. It should stay in teacher portal." Mirrors
+// routes/parent-portal.js's own GET /training exactly - the shared,
+// originally-anonymous-only Training module (routes/training.js) has no
+// Teacher Portal equivalent of Parent Portal's own nav-shelled bridging
+// page, so Teacher Portal's own nav link fell straight through to the
+// bare "pick your name" picker (effectively landing on no portal shell
+// at all, perceived as "goes to parent portal" since that's the other
+// shell these shared Training routes DO already special-case via
+// routes/training.js's own signedInPortalTitle). This auto-resolves the
+// signed-in teacher's own member id and writes it straight into
+// req.session.trainingMemberId, skipping the picker entirely, the same
+// way the parent one does - the shared /training/:id/play etc. routes
+// then keep working unchanged afterward.
+router.get('/training', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.render('teacher-training', { title: 'Training', assignments: [] });
+  req.session.trainingMemberId = member.id;
+  res.render('teacher-training', { title: 'Training', assignments: await trainingModule.myAssignments(member.id) });
 });
 
 module.exports = router;

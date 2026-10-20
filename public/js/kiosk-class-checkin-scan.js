@@ -99,9 +99,15 @@
 
     let lockMs = 2000;
     try {
+      // X-CSRF-Token is a no-op on the Kiosk's own unauthenticated
+      // session (middleware/csrfProtection.js only ever checks it for an
+      // authenticated admin/portal session, which the Kiosk never has) -
+      // added so this same view/script also works from Teacher Portal's
+      // own scan routes (routes/teacher-portal.js), which DO run under
+      // an authenticated session and need it.
       const res = await fetch(`${scanBaseUrl}/scan/${mode}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
         body: 'barcode=' + encodeURIComponent(value),
       });
       const data = await res.json();

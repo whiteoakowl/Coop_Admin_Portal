@@ -78,11 +78,11 @@
                         &nbsp;
                       <% } else { %>
                         <% cell.classes.forEach(function(cls) { %>
-                          <div class="teacher-schedule-grid-card" style="border-left-color: <%= cls.color %>;">
+                          <button type="button" class="teacher-schedule-grid-card" style="border-left-color: <%= cls.color %>;" data-view-class="<%= cls.id %>" aria-label="View <%= cls.class_name %> details">
                             <strong><%= cls.class_name %></strong>
                             <% if (cls.gradeLabel) { %><div class="hint"><%= cls.gradeLabel %></div><% } %>
                             <div class="hint">Teacher: <%= cls.teacherNames.length ? cls.teacherNames.join(', ') : '—' %></div>
-                          </div>
+                          </button>
                         <% }); %>
                       <% } %>
                     </td>
@@ -113,5 +113,8 @@
       <% }); %>
     <% } %>
   </main>
+  <dialog id="teacher-class-dialog" class="parent-class-dialog"></dialog>
+  <script src="/js/fragment-dialog.js"></script>
+  <script src="/js/teacher-class-view.js"></script>
 </body>
 </html>

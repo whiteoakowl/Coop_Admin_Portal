@@ -535,6 +535,49 @@ async function deleteJournalEntry(id) {
   await db.prepare('DELETE FROM family_school_journal_entries WHERE id = ?').run(id);
 }
 
+// A real request: "Be able to upload images or documents to daily
+// learning log." One entry can carry more than one file, so these are
+// their own child rows (family_school_journal_attachments), not a
+// column on the entry - saveAttachment/ATTACHMENTS_BUCKET above are
+// reused as-is, the same shared bucket lesson content attachments
+// already use.
+async function attachmentsForJournalEntry(journalEntryId) {
+  const rows = await db
+    .prepare('SELECT * FROM family_school_journal_attachments WHERE journal_entry_id = ? ORDER BY id')
+    .all(journalEntryId);
+  for (const a of rows) a.url = attachmentUrl(a.file_key);
+  return rows;
+}
+
+async function getJournalAttachment(id) {
+  return db.prepare('SELECT * FROM family_school_journal_attachments WHERE id = ?').get(id);
+}
+
+async function addJournalAttachment({ journalEntryId, file }) {
+  const fileKey = await saveAttachment(file);
+  const info = await db
+    .prepare('INSERT INTO family_school_journal_attachments (journal_entry_id, file_key, file_name, content_type) VALUES (?, ?, ?, ?)')
+    .run(journalEntryId, fileKey, file.originalname, file.mimetype || null);
+  return info.lastInsertRowid;
+}
+
+// Removes the DB row AND the stored file itself - same local-disk-vs-
+// Storage branching saveAttachment's own existingKey cleanup uses,
+// since nothing else in family_school_journal_attachments ever points
+// at that same file_key once this row is gone.
+async function deleteJournalAttachment(id) {
+  const attachment = await getJournalAttachment(id);
+  if (!attachment) return;
+  await db.prepare('DELETE FROM family_school_journal_attachments WHERE id = ?').run(id);
+  const client = createStorageClient();
+  if (client) {
+    await deleteFile(client, ATTACHMENTS_BUCKET, attachment.file_key);
+  } else {
+    const filePath = path.join(ATTACHMENT_DIR, attachment.file_key);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  }
+}
+
 // --- Annual Planner (its own subpage - a real request: "Family
 // management should also have a subpage called annual planner where
 // it is organized by student and you add curriculum under each
@@ -708,6 +751,10 @@ module.exports = {
   createJournalEntry,
   updateJournalEntry,
   deleteJournalEntry,
+  attachmentsForJournalEntry,
+  getJournalAttachment,
+  addJournalAttachment,
+  deleteJournalAttachment,
   curriculumForStudent,
   createCurriculumItem,
   getCurriculumItem,

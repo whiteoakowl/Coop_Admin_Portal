@@ -25,6 +25,14 @@
         <% roles.forEach(function(role) { %>
           <a class="portal-picker-card" href="<%= portalHomeRoutes[role.key] || '/portal' %>">
             <span class="portal-picker-title"><%= role.label %></span>
+            <%# A real request: "Add description under each portal title.
+                On choose portal page [...exact wording per portal]" -
+                role.description is the same column rolesForAccount
+                already selects (utils/portalAuth.js), just rendered here
+                again after the earlier "delete all descriptions" request
+                removed only this line (see this file's own header
+                comment above). %>
+            <% if (role.description) { %><span class="portal-picker-description"><%= role.description %></span><% } %>
           </a>
         <% }); %>
       </div>

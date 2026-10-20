@@ -7,8 +7,14 @@
 // entry (student_academic_history) for a student who completed a class -
 // generateTranscriptsForEndedClasses (utils/academics.js) replaces that:
 // once a class's own end_date has passed, its enrolled students each get
-// a transcript row automatically, backfilled lazily on the Main Admin
-// Academics page's own GET route rather than through any admin action.
+// a transcript row automatically, backfilled lazily on a transcript-
+// reading GET route rather than through any admin action. That backfill
+// used to run on Main Admin's own /academics page; a later real request
+// ("Main admin portal, remove academics tab and features. Only parent
+// portal has those pages and admin doesn't need to control them with any
+// settings.") removed that whole page, so it moved to Student Portal's
+// own /student/transcript route - the one other place that already read
+// this same data.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -50,56 +56,61 @@ async function loginAsAdmin() {
   return { cookie, csrfToken: extractCsrf(page.text) };
 }
 
-async function loginAsMainAdmin() {
-  const loginRes = await request(app)
-    .post('/login')
-    .type('form')
-    .send({ email: process.env.MAIN_ADMIN_EMAIL, password: process.env.MAIN_ADMIN_PASSWORD, next: '/main-admin' });
-  const cookie = loginRes.headers['set-cookie'];
-  return { cookie };
+let counter = 0;
+async function loginAsStudent(name) {
+  counter += 1;
+  const code = `transcript-student-${counter}`;
+  const { hashPassword } = require('../utils/portalAuth');
+  const email = `${code}@example.com`;
+  const studentInfo = await db
+    .prepare("INSERT INTO members (name, barcode, member_type, active) VALUES (?, ?, 'student', 1)")
+    .run(name, code);
+  const studentId = studentInfo.lastInsertRowid;
+  const acctId = (
+    await db
+      .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text()) RETURNING id")
+      .get(studentId, email, hashPassword('testpassword123'))
+  ).id;
+  const role = await db.prepare("SELECT id FROM roles WHERE key = 'student'").get();
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(acctId, role.id);
+  const loginRes = await request(app).post('/login').type('form').send({ email, password: 'testpassword123', next: '/student' });
+  return { studentId, cookie: loginRes.headers['set-cookie'] };
 }
 
-test('a class whose end_date has passed gets its enrolled students auto-transcribed the next time the Academics page loads', async () => {
-  const mainAdmin = await loginAsMainAdmin();
+test('a class whose end_date has passed gets its enrolled students auto-transcribed the next time their own Transcript page loads', async () => {
   const yesterday = addDays(todayISO(), -1);
 
   const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'Ended Pottery Class', endDate: yesterday });
-  const studentInfo = await db
-    .prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Transcript Kid', 'transcript-kid', 'student', 1)")
-    .run();
-  const studentId = studentInfo.lastInsertRowid;
-  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId, studentId);
+  const student = await loginAsStudent('Transcript Kid');
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId, student.studentId);
   const teacherInfo = await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Pottery Teacher', 'pottery-teacher', 'parent', 1)").run();
   await db.prepare("INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, 'teacher')").run(classId, teacherInfo.lastInsertRowid);
 
-  const page = await request(app).get('/main-admin/academics').set('Cookie', mainAdmin.cookie);
+  const page = await request(app).get('/student/transcript').set('Cookie', student.cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /Ended Pottery Class/);
   assert.match(page.text, /Pottery Teacher/);
 
-  const row = await db.prepare('SELECT * FROM student_academic_history WHERE student_id = ? AND class_id = ?').get(studentId, classId);
+  const row = await db.prepare('SELECT * FROM student_academic_history WHERE student_id = ? AND class_id = ?').get(student.studentId, classId);
   assert.ok(row, 'a transcript row should have been auto-generated');
   assert.equal(row.class_name, 'Ended Pottery Class');
   assert.equal(row.term_ended_at, yesterday);
 
   // Loading the page again must not duplicate the row.
-  await request(app).get('/main-admin/academics').set('Cookie', mainAdmin.cookie);
-  const countRow = await db.prepare('SELECT COUNT(*) AS c FROM student_academic_history WHERE student_id = ? AND class_id = ?').get(studentId, classId);
-  assert.equal(Number(countRow.c), 1, 'revisiting the Academics page should not create a second transcript row for the same class');
+  await request(app).get('/student/transcript').set('Cookie', student.cookie);
+  const countRow = await db.prepare('SELECT COUNT(*) AS c FROM student_academic_history WHERE student_id = ? AND class_id = ?').get(student.studentId, classId);
+  assert.equal(Number(countRow.c), 1, 'revisiting the Transcript page should not create a second transcript row for the same class');
 });
 
 test('a class whose end_date has not passed yet is left alone', async () => {
-  const mainAdmin = await loginAsMainAdmin();
   const tomorrow = addDays(todayISO(), 1);
 
   const classId = await createClass({ day: 'wednesday', hourPosition: 1, className: 'Still Running Class', endDate: tomorrow });
-  const studentInfo = await db
-    .prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Still Enrolled Kid', 'still-enrolled-kid', 'student', 1)")
-    .run();
-  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId, studentInfo.lastInsertRowid);
+  const student = await loginAsStudent('Still Enrolled Kid');
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId, student.studentId);
 
-  await request(app).get('/main-admin/academics').set('Cookie', mainAdmin.cookie);
-  const row = await db.prepare('SELECT * FROM student_academic_history WHERE student_id = ? AND class_id = ?').get(studentInfo.lastInsertRowid, classId);
+  await request(app).get('/student/transcript').set('Cookie', student.cookie);
+  const row = await db.prepare('SELECT * FROM student_academic_history WHERE student_id = ? AND class_id = ?').get(student.studentId, classId);
   assert.equal(row, undefined, 'a still-running class should not generate a transcript entry yet');
 });
 

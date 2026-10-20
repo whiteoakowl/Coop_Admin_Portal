@@ -1,21 +1,21 @@
-// Student Portal > Spelling Bee - client-side round runner. The word
-// list itself (SPELLING_ROUND, grade-level-appropriate) is rendered
-// server-side by views/student-spelling-bee.ejs since it depends on the
+// Student Portal > Vocabulary - client-side round runner. The word
+// list itself (VOCABULARY_ROUND, grade-level-appropriate) is rendered
+// server-side by views/student-vocabulary.ejs since it depends on the
 // signed-in student's own member record; this file just drives one
 // clue-at-a-time round and reports the final score at the end.
 (function () {
-  var progressEl = document.getElementById('sb-progress');
-  var clueEl = document.getElementById('sb-clue');
-  var input = document.getElementById('sb-input');
-  var feedbackEl = document.getElementById('sb-feedback');
-  var submitBtn = document.getElementById('sb-submit');
-  var card = document.getElementById('sb-card');
-  var resultCard = document.getElementById('sb-result');
-  var resultText = document.getElementById('sb-result-text');
-  var againBtn = document.getElementById('sb-again');
-  if (!progressEl || !window.SPELLING_ROUND || !window.SPELLING_ROUND.length) return;
+  var progressEl = document.getElementById('vg-progress');
+  var clueEl = document.getElementById('vg-clue');
+  var input = document.getElementById('vg-input');
+  var feedbackEl = document.getElementById('vg-feedback');
+  var submitBtn = document.getElementById('vg-submit');
+  var card = document.getElementById('vg-card');
+  var resultCard = document.getElementById('vg-result');
+  var resultText = document.getElementById('vg-result-text');
+  var againBtn = document.getElementById('vg-again');
+  if (!progressEl || !window.VOCABULARY_ROUND || !window.VOCABULARY_ROUND.length) return;
 
-  var round = window.SPELLING_ROUND;
+  var round = window.VOCABULARY_ROUND;
   var index, correct, locked;
 
   function start() {
@@ -34,7 +34,7 @@
     input.value = '';
     input.disabled = false;
     feedbackEl.textContent = '';
-    feedbackEl.className = 'spelling-bee-feedback';
+    feedbackEl.className = 'vocabulary-game-feedback';
     input.focus();
   }
 
@@ -44,8 +44,8 @@
     var typed = input.value.trim().toLowerCase();
     var ok = typed === item.word.toLowerCase();
     if (ok) correct += 1;
-    feedbackEl.textContent = ok ? 'Correct!' : 'Not quite - it\'s spelled "' + item.word + '".';
-    feedbackEl.className = 'spelling-bee-feedback ' + (ok ? 'spelling-bee-feedback-correct' : 'spelling-bee-feedback-wrong');
+    feedbackEl.textContent = ok ? 'Correct!' : 'Not quite - the word is "' + item.word + '".';
+    feedbackEl.className = 'vocabulary-game-feedback ' + (ok ? 'vocabulary-game-feedback-correct' : 'vocabulary-game-feedback-wrong');
     input.disabled = true;
     locked = true;
     setTimeout(function () {
@@ -59,8 +59,8 @@
   function finish() {
     card.hidden = true;
     resultCard.hidden = false;
-    resultText.textContent = 'You spelled ' + correct + ' out of ' + round.length + ' words correctly!';
-    fetch('/student/spelling-bee/score', {
+    resultText.textContent = 'You got ' + correct + ' out of ' + round.length + ' words correct!';
+    fetch('/student/vocabulary/score', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
       body: JSON.stringify({ correctCount: correct, roundTotal: round.length }),

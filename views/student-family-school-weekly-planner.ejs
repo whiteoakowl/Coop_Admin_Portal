@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Weekly Planner</h1>
+
+    <div class="roster-btn-row roster-btn-row-fit-text">
+      <a class="btn-secondary" href="?week=<%= prevWeek %>">&larr; Prev Week</a>
+      <strong><%= weekStartLabel %></strong>
+      <a class="btn-secondary" href="?week=<%= nextWeek %>">Next Week &rarr;</a>
+    </div>
+
+    <div class="roster-scroll">
+      <table class="roster-table condensed-table fs-planner-grid-table">
+        <thead>
+          <tr>
+            <th></th>
+            <% weeklyGrid.columns.forEach(function(c) { %>
+              <th><%= c.label %></th>
+            <% }); %>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (weeklyGrid.rows.length === 0) { %>
+            <tr><td colspan="<%= weeklyGrid.columns.length + 1 %>" class="roster-empty">Nothing planned for this week yet.</td></tr>
+          <% } %>
+          <% weeklyGrid.rows.forEach(function(r) { %>
+            <tr>
+              <th><%= r.label %></th>
+              <% r.cells.forEach(function(cell) { %>
+                <td><%= cell.content %></td>
+              <% }); %>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>

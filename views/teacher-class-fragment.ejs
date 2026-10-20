@@ -1,0 +1,94 @@
+<%# Fragment (no <html>/<body>) - fetched by public/js/teacher-class-view.js
+    and injected into the shared #teacher-class-dialog on the Class
+    Schedule grid, so viewing a class never leaves the grid page. Same
+    .class-view-* header/info-row/people-box/description markup Parent
+    Portal's own click-a-class-card popup uses (views/parent-class-
+    fragment.ejs), with every register/join/leave section stripped out -
+    a teacher browsing the whole schedule isn't registering anyone. %>
+<div class="class-view-header-v2">
+  <div class="class-view-icon-badge" style="background: <%= cls.color %>;">
+    <svg class="icon"><use href="#icon-book"/></svg>
+  </div>
+  <div class="class-view-header-text">
+    <h3><%= cls.class_name %></h3>
+    <span class="class-view-eyebrow">Class Details</span>
+  </div>
+  <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+</div>
+
+<div class="parent-class-body">
+  <% if (classImageUrl) { %>
+    <img src="<%= classImageUrl %>" alt="" style="max-width: 100%; border-radius: var(--radius); display: block; margin-bottom: 0.75rem;" />
+  <% } %>
+
+  <% if (teacherNames.length || assistantNames.length) { %>
+    <div class="class-view-people-box">
+      <% if (teacherNames.length) { %>
+        <div class="class-view-person">
+          <span class="class-view-avatar"><svg class="icon"><use href="#icon-user"/></svg></span>
+          <div>
+            <span class="class-view-info-label">Teacher</span>
+            <strong class="class-view-info-value"><%= teacherNames.join(', ') %></strong>
+          </div>
+        </div>
+      <% } %>
+      <% if (teacherNames.length && assistantNames.length) { %><hr class="class-view-people-divider" /><% } %>
+      <% if (assistantNames.length) { %>
+        <div class="class-view-person">
+          <span class="class-view-avatar class-view-avatar-alt"><svg class="icon"><use href="#icon-user"/></svg></span>
+          <div>
+            <span class="class-view-info-label">Assistant</span>
+            <strong class="class-view-info-value"><%= assistantNames.join(', ') %></strong>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  <% } %>
+
+  <div class="class-view-info-row">
+    <% if (gradeLabel) { %>
+      <div class="class-view-info-item">
+        <svg class="icon"><use href="#icon-graduation-cap"/></svg>
+        <div>
+          <span class="class-view-info-label">Grade Level</span>
+          <strong class="class-view-info-value"><%= gradeLabel %></strong>
+        </div>
+      </div>
+      <div class="class-view-info-divider"></div>
+    <% } %>
+    <div class="class-view-info-item">
+      <svg class="icon"><use href="#icon-calendar-check"/></svg>
+      <div>
+        <span class="class-view-info-label">Day &amp; Time</span>
+        <strong class="class-view-info-value">
+          <%= dayLabels[cls.day] || cls.day %>
+          <% if (cls.start_time || cls.end_time) { %><br /><%= cls.start_time || '?' %>&ndash;<%= cls.end_time || '?' %><% } %>
+        </strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="class-view-info-row">
+    <% if (cls.room) { %>
+      <div class="class-view-info-item">
+        <svg class="icon"><use href="#icon-map-pin"/></svg>
+        <div>
+          <span class="class-view-info-label">Location</span>
+          <strong class="class-view-info-value">Room <%= cls.room %></strong>
+        </div>
+      </div>
+      <div class="class-view-info-divider"></div>
+    <% } %>
+    <div class="class-view-info-item">
+      <svg class="icon"><use href="#icon-graduation-cap"/></svg>
+      <div>
+        <span class="class-view-info-label">Students</span>
+        <strong class="class-view-info-value"><%= enrolledCount %><% if (cls.capacity != null) { %> / <%= cls.capacity %><% } %> signed up</strong>
+      </div>
+    </div>
+  </div>
+
+  <% if (cls.description) { %>
+    <div class="hint forum-editable-display parent-class-description"><%- cls.description %></div>
+  <% } %>
+</div>
