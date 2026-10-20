@@ -214,6 +214,45 @@ router.post('/text/:id/send', async (req, res) => {
   res.redirect('/main-admin/announcements/text?notice=' + encodeURIComponent(`Sent to ${campaign.recipient_count} member(s).`));
 });
 
+// A real request: "Do a test page to find the problem quickly" - calls
+// smsProvider.send() directly (bypassing notify()/the notification_
+// deliveries table entirely) and shows the exact {status, detail} it
+// returns right on the page, so a misconfigured env var, a bad phone
+// number, or a real Telnyx-side rejection are each immediately visible
+// instead of silently landing in a delivery log nobody's looking at.
+// Temporary-by-nature troubleshooting tool, gated the same Main-Admin-
+// only way as the rest of this file.
+router.get('/text/sms-test', async (req, res) => {
+  const smsProvider = require('../utils/smsProvider');
+  res.render('main-admin-sms-test', {
+    title: 'SMS Test',
+    isConfigured: smsProvider.isConfigured(),
+    hasApiKey: !!process.env.TELNYX_API_KEY,
+    hasProfileId: !!process.env.TELNYX_MESSAGING_PROFILE_ID,
+    hasFromNumber: !!process.env.TELNYX_FROM_NUMBER,
+    result: null,
+    phone: '',
+    message: '',
+  });
+});
+
+router.post('/text/sms-test', async (req, res) => {
+  const smsProvider = require('../utils/smsProvider');
+  const phone = (req.body.phone || '').trim();
+  const message = (req.body.message || '').trim() || 'Test message from Co-op Admin Portal.';
+  const result = await smsProvider.send(phone, message);
+  res.render('main-admin-sms-test', {
+    title: 'SMS Test',
+    isConfigured: smsProvider.isConfigured(),
+    hasApiKey: !!process.env.TELNYX_API_KEY,
+    hasProfileId: !!process.env.TELNYX_MESSAGING_PROFILE_ID,
+    hasFromNumber: !!process.env.TELNYX_FROM_NUMBER,
+    result,
+    phone,
+    message,
+  });
+});
+
 // Must come last - /:id matches a single path segment just like every
 // literal /email.../text... route above (Express tries routes in
 // registration order), so registering this first would have caught
