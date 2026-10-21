@@ -98,6 +98,13 @@ test('GET /register shows a phone field, an unchecked SMS opt-in checkbox, and a
   assert.doesNotMatch(res.text, /name="smsOptIn"[^>]*checked/, 'the SMS opt-in checkbox must be unchecked by default');
   assert.match(res.text, /href="\/privacy-policy"/);
   assert.match(res.text, /Reply STOP/);
+  // A later real request: "the phone number field is far away from the
+  // request, should there be another phone number bar close to the
+  // permissions" - a live echo of the phone field sits right next to the
+  // SMS opt-in checkbox, scripted by public/js/portal-register-form.js.
+  assert.match(res.text, /<input type="tel" id="register-phone-input" name="phone"/);
+  assert.match(res.text, /<strong id="sms-opt-in-phone-echo">\(enter your phone number above\)<\/strong>/);
+  assert.match(res.text, /<script src="\/js\/portal-register-form\.js">/);
 });
 
 test('POST /register without checking SMS opt-in saves the phone number but leaves sms_consent false', async () => {

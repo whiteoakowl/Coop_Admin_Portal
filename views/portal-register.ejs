@@ -27,7 +27,7 @@
             <input type="email" name="email" value="<%= formValues.email || '' %>" required autocomplete="email" />
           </label>
           <label class="member-form-full">Phone Number
-            <input type="tel" name="phone" value="<%= formValues.phone || '' %>" placeholder="555-123-4567" autocomplete="tel" />
+            <input type="tel" id="register-phone-input" name="phone" value="<%= formValues.phone || '' %>" placeholder="555-123-4567" autocomplete="tel" />
           </label>
         </div>
         <% parentFields.forEach(function(f) { %>
@@ -69,6 +69,16 @@
           phone number above, not just described after the fact. %>
       <div class="form-section">
         <h2>SMS Notifications</h2>
+        <%# A real request: "the phone number field is far away from the
+            request, should there be another phone number bar close to
+            the permissions" - the actual <input name="phone"> stays up
+            in Parent/Guardian (it's one real field, no duplicate to keep
+            in sync), but this section echoes its current value live
+            (public/js/portal-register-form.js) so this section alone -
+            phone number, opt-in language, and the checkbox - is a
+            self-contained screenshot/link target, without scrolling back
+            up to prove a phone number was actually entered. %>
+        <p class="hint">Texting: <strong id="sms-opt-in-phone-echo">(enter your phone number above)</strong></p>
         <p class="hint">Sanford Homeschoolers may send SMS text messages to the phone number above for co-op announcements, event reminders, and schedule changes. Message frequency varies. Msg &amp; data rates may apply. Reply STOP to a message at any time to opt out, or HELP for help. See our <a href="/privacy-policy" target="_blank">Privacy Policy</a> and <a href="/terms-and-conditions" target="_blank">Terms and Conditions</a>.</p>
         <label class="checkbox-option">
           <input type="checkbox" name="smsOptIn" value="1" />

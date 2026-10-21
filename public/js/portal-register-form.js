@@ -50,6 +50,23 @@
     });
   }
 
+  // A real request: "the phone number field is far away from the
+  // request, should there be another phone number bar close to the
+  // permissions" - echoes the real phone field's live value next to the
+  // SMS opt-in checkbox (see views/portal-register.ejs's own comment on
+  // #sms-opt-in-phone-echo), so that section alone shows a reviewer both
+  // the phone number and the opt-in language together.
+  const phoneInput = document.getElementById('register-phone-input');
+  const phoneEcho = document.getElementById('sms-opt-in-phone-echo');
+  if (phoneInput && phoneEcho) {
+    function updatePhoneEcho() {
+      const value = phoneInput.value.trim();
+      phoneEcho.textContent = value || '(enter your phone number above)';
+    }
+    phoneInput.addEventListener('input', updatePhoneEcho);
+    updatePhoneEcho();
+  }
+
   // A real request: "can't check the box until you have scrolled
   // through the entire handbook." The checkbox starts `disabled` (see
   // views/portal-register.ejs) so it can't be checked at all until this
