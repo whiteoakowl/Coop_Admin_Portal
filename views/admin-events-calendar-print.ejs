@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.4in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Events Calendar</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Events Calendar</p>
+      </div>
+    </div>
+
+    <% if (calendarView === 'list') { %>
+      <% if (calendarList.length === 0) { %>
+        <p class="roster-empty">No published events this month.</p>
+      <% } else { %>
+        <table class="roster-table condensed-table">
+          <thead><tr><th>Title</th><th>Starts</th><th>Location</th><th>Category</th></tr></thead>
+          <tbody>
+            <% calendarList.forEach(function(e) { %>
+              <tr>
+                <td><%= e.title %><% if (e.status === 'cancelled') { %> CANCELED<% } %></td>
+                <td><%= e.startsLabel %></td>
+                <td><%= e.location || '—' %></td>
+                <td><%= e.categoryName || '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    <% } else { %>
+      <%- include('partials/event-calendar-grid', {
+        calendar: calendar,
+        monthLinkBase: '/main-admin/events/print?view=calendar',
+        eventHref: function (e) { return `/main-admin/events/${e.id}/builder`; },
+      }) %>
+    <% } %>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

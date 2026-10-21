@@ -76,4 +76,17 @@ test('Design/Print hub Requests tab', async (t) => {
     assert.equal(res.status, 200);
     assert.match(res.text, /Jordan Requestor/);
   });
+
+  await t.test('the Print button on the Requests tab is a link to a dedicated print preview page', async () => {
+    const res = await request(app).get('/admin/design?tab=requests&archived=1').set('Cookie', cookie);
+    assert.match(res.text, /<a class="icon-btn" href="\/admin\/design\/requests\/print\?archived=1" target="_blank" aria-label="Print"/);
+  });
+
+  await t.test('GET /admin/design/requests/print renders a print preview with the request', async () => {
+    const res = await request(app).get('/admin/design/requests/print?archived=1').set('Cookie', cookie);
+    assert.equal(res.status, 200);
+    assert.match(res.text, /print-preview-header/);
+    assert.match(res.text, /onclick="window\.print\(\)"/);
+    assert.match(res.text, /Jordan Requestor/);
+  });
 });

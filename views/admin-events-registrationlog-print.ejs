@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Event Registration Log</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-page">
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub">Event Registration Log</p>
+        </div>
+      </div>
+
+      <table class="roster-table members-table condensed-table event-reglog-print-table">
+        <thead>
+          <tr><th>Date</th><th>Family</th><th>Name</th><th>Event</th><th>Event Date</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <% if (allSubmissions.length === 0) { %>
+            <tr><td colspan="6" class="roster-empty">No event registrations or cancellations<%= dateFilter ? ' for this date' : ' yet' %>.</td></tr>
+          <% } %>
+          <% allSubmissions.forEach(function(r) { %>
+            <tr>
+              <td><%= r.dateLabel %></td>
+              <td><%= r.familyName || '—' %></td>
+              <td><%= r.memberName %></td>
+              <td><%= r.eventTitle %></td>
+              <td><%= r.eventStartsLabel %></td>
+              <td><span class="status-badge <%= r.actionLabel === 'Cancelled' ? 'status-badge-absent' : r.actionLabel === 'Waitlisted' ? 'status-badge-late' : 'status-badge-present' %>"><%= r.actionLabel %></span></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

@@ -490,6 +490,44 @@ router.get('/', async (req, res) => {
   });
 });
 
+// "All print button should show a print preview full real page on a page
+// with a print button" - the Calendar tab's own window.print() button
+// used to jump straight to the browser's own print dialog on the live
+// page; it's a dedicated preview page now, this app's own print-button
+// convention (see views/admin-rosters-print.ejs), reusing the exact same
+// month-grid/list data the tab itself renders so the preview always
+// matches whichever view (Grid or List) and month was on screen.
+router.get('/print', async (req, res) => {
+  const published = await events.listEvents({ status: ['published', 'cancelled'] });
+  const calendar = events.monthGrid(req.query.month, published);
+  const calendarView = req.query.view === 'list' ? 'list' : 'calendar';
+  const calendarList =
+    calendarView === 'list'
+      ? calendar.weeks
+          .flat()
+          .filter((day) => day.inMonth)
+          .flatMap((day) => day.events)
+          .map((e) => ({ ...e, startsLabel: formatFriendlyTimestamp(e.starts_at) }))
+      : [];
+  res.render('admin-events-calendar-print', {
+    title: 'Events Calendar Print Preview',
+    calendar,
+    calendarView,
+    calendarList,
+  });
+});
+
+router.get('/registrationlog/print', async (req, res) => {
+  const dateFilter = req.query.date || '';
+  const allActions = await events.allEventRegistrationActions();
+  const allSubmissions = dateFilter ? allActions.filter((a) => a.date === dateFilter) : allActions;
+  res.render('admin-events-registrationlog-print', {
+    title: 'Event Registration Log Print Preview',
+    allSubmissions,
+    dateFilter,
+  });
+});
+
 router.get('/registrationlog/export.csv', async (req, res) => {
   const dateFilter = req.query.date || '';
   const allActions = await events.allEventRegistrationActions();

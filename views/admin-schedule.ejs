@@ -220,7 +220,7 @@
           <% if (dateFilter) { %><a class="roster-action-btn" href="/admin/schedule?tab=classregistrationlog">Clear</a><% } %>
           <div class="roster-btn-row">
             <a class="icon-btn" href="/admin/schedule/classregistrationlog/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-            <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
+            <a class="icon-btn" href="/admin/schedule/classregistrationlog/print<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
           </div>
         </div>
 

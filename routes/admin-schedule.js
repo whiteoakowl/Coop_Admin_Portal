@@ -989,6 +989,24 @@ router.get('/schedule/classregistrationlog/export.csv', requireAdmin, async (req
   sendCsv(res, 'class-registration-log.csv', buildClassRegistrationLogExportCsvLines(actions));
 });
 
+// "All print button should show a print preview full real page on a page
+// with a print button" - this log's own window.print() button used to
+// jump straight to the browser's own print dialog on the live page (see
+// public/css/styles.css's own .logs-print-table); it's a dedicated
+// preview page now, this app's own print-button convention (see views/
+// admin-rosters-print.ejs), with the same full (unpaginated) date-
+// filtered list the on-screen log's own hidden print table already used.
+router.get('/schedule/classregistrationlog/print', requireAdmin, async (req, res) => {
+  const dateFilter = req.query.date || '';
+  const allActions = await allClassRegistrationActions();
+  const allSubmissions = dateFilter ? allActions.filter((a) => a.date === dateFilter) : allActions;
+  res.render('admin-schedule-classregistrationlog-print', {
+    title: 'Class Registration Log Print Preview',
+    allSubmissions,
+    dateFilter,
+  });
+});
+
 router.get('/schedule/export.csv', requireFullAdmin, async (req, res) => {
   const activeDays = await listActiveClassDays();
   const filters = {

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.4in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/portal-nav', { portalTitle: 'Teacher Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Class Schedule</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Class Schedule</p>
+      </div>
+    </div>
+
+    <% if (view === 'grid') { %>
+      <% if (roomGrid.rows.length === 0) { %>
+        <p class="roster-empty">No classes have been scheduled yet.</p>
+      <% } else { %>
+        <table class="roster-table class-schedule-room-grid">
+          <thead>
+            <tr>
+              <th class="class-schedule-room-col">Room</th>
+              <% hours.forEach(function(h) { %>
+                <th><%= h.label %></th>
+              <% }); %>
+            </tr>
+          </thead>
+          <tbody>
+            <% roomGrid.rows.forEach(function(row) { %>
+              <tr>
+                <td class="class-schedule-room-col"><%= row.room %></td>
+                <% row.cells.forEach(function(cell) { %>
+                  <td colspan="<%= cell.span %>" class="class-schedule-cell">
+                    <% if (cell.classes.length === 0) { %>
+                      &nbsp;
+                    <% } else { %>
+                      <% cell.classes.forEach(function(cls) { %>
+                        <div style="border-left: 3px solid <%= cls.color %>; padding-left: 0.3rem;">
+                          <strong><%= cls.class_name %></strong>
+                          <% if (cls.gradeLabel) { %><div class="hint"><%= cls.gradeLabel %></div><% } %>
+                          <div class="hint">Teacher: <%= cls.teacherNames.length ? cls.teacherNames.join(', ') : '—' %></div>
+                        </div>
+                      <% }); %>
+                    <% } %>
+                  </td>
+                <% }); %>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    <% } else if (byDay.length === 0) { %>
+      <p class="roster-empty">You're not staffed on any classes yet.</p>
+    <% } else { %>
+      <% byDay.forEach(function(group) { %>
+        <h2><%= group.dayLabel %></h2>
+        <table class="roster-table schedule-print-table">
+          <thead><tr><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>
+          <tbody>
+            <% group.classes.forEach(function(c) { %>
+              <tr>
+                <td><%= c.timeLabel || '—' %></td>
+                <td><%= c.class_name %></td>
+                <td><%= c.room || '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% }); %>
+    <% } %>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

@@ -223,6 +223,30 @@ router.get('/design/requests/export.csv', async (req, res) => {
   sendCsv(res, `name-tag-${showArchived ? 'archived' : 'requests'}.csv`, lines);
 });
 
+// "All print button should show a print preview full real page on a page
+// with a print button" - the Requests tab's own window.print() button
+// used to jump straight to the browser's own print dialog on the live
+// page; it's a dedicated preview page now, this app's own print-button
+// convention (see views/admin-rosters-print.ejs), with the same full
+// (unarchived/archived, date-filtered) list the on-screen tab's own
+// hidden print table already used.
+router.get('/design/requests/print', async (req, res) => {
+  const showArchived = req.query.archived === '1';
+  const dateFilter = req.query.date || '';
+  const allSubmissions = (await nameTagSubmissions(showArchived, dateFilter)).map((r) => ({
+    timestamp: formatTimestamp(r.createdAt),
+    memberName: r.memberName,
+    requestTypeLabel: REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
+    dayLabel: NAME_TAG_DAY_LABELS[r.day] || r.day,
+    description: r.description || '—',
+  }));
+  res.render('admin-design-requests-print', {
+    title: `${showArchived ? 'Archived ' : ''}Name Tag Requests Print Preview`,
+    allSubmissions,
+    showArchived,
+  });
+});
+
 router.post('/design/requests/:id/archive', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   await db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(id);
