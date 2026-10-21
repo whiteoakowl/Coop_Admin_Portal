@@ -1618,18 +1618,35 @@ async function absenceFormMemberIdsForDate(date) {
 // be where they're expected today" signal the floater-assignment board
 // uses, both to keep someone out of the substitute pool and to decide
 // whether a class needs a floater covering for one of its own teachers or
-// assistants. Maps member id -> whichever status was recorded ('absent'
-// wins if a member somehow has mixed statuses across rosters for the same
-// date).
+// assistants. Maps member id -> whichever status was recorded.
+//
+// A member can hold an attendance row on more than one roster for the
+// same date (their own class's roster, plus the general Monday/
+// Wednesday Parent/Student roster everyone's also on) - a real request:
+// "when someone is marked present on the semesters monday/wednesday
+// attendance sheet manually... if they are checked in manually they
+// should not be triggered as needing a floater." An explicit 'present'
+// on ANY of a member's rosters for the date - including a plain manual
+// mark on the general roster (routes/admin-rosters.js's own POST
+// /rosters/:tab/attendance), not just a kiosk check-in - now wins over a
+// stale 'absent'/'late' row left on a different roster (e.g. an earlier
+// Absence form, or a class roster nobody's touched today yet): they're
+// confirmed here today, so a floater is never actually needed for them.
 async function missingMemberIdsForDate(date) {
   if (!date) return new Map();
   const rows = await db
-    .prepare(`SELECT member_id, status FROM attendance WHERE session_date = ? AND status IN ('absent', 'late')`)
+    .prepare(`SELECT member_id, status FROM attendance WHERE session_date = ? AND status IN ('absent', 'late', 'present')`)
     .all(date);
   const map = new Map();
+  const presentIds = new Set();
   rows.forEach((r) => {
+    if (r.status === 'present') {
+      presentIds.add(r.member_id);
+      return;
+    }
     if (r.status === 'absent' || !map.has(r.member_id)) map.set(r.member_id, r.status);
   });
+  presentIds.forEach((id) => map.delete(id));
   return map;
 }
 

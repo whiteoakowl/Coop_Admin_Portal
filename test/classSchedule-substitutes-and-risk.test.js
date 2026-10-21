@@ -78,6 +78,24 @@ test('classesNeedingStaffForDay only flags an ASSIGNED teacher/assistant who is 
     assert.equal(flagged.missingTeacher, true);
     assert.equal(flagged.missingAssistant, false, 'no assistant was ever assigned, so there is nothing to flag as missing');
   });
+
+  // A real request: "when someone is marked present on the semesters
+  // monday/wednesday attendance sheet manually... if they are checked in
+  // manually they should not be triggered as needing a floater." The
+  // teacher's own class roster still has that stale 'absent' row from
+  // the subtest above - a separate, later manual mark of 'present' on a
+  // DIFFERENT roster for the same date (the general Monday/Wednesday
+  // attendance sheet, not the class's own roster) is the exact shape
+  // routes/admin-rosters.js's own POST /rosters/:tab/attendance writes.
+  await t.test('once that same teacher is marked present on a different roster for the same date, the class is no longer flagged', async () => {
+    const generalRosterId = (await db.prepare("INSERT INTO rosters (name, category) VALUES ('Monday Parent', 'Monday/Wednesday') RETURNING id").get()).id;
+    await db
+      .prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, '2026-02-02', 'present', 'manual')")
+      .run(teacherId, generalRosterId);
+
+    const result = await classesNeedingStaffForDay('monday', '2026-02-02');
+    assert.equal(result.find((c) => c.className === 'Sub Needed Class'), undefined, 'a present mark on any roster should override the stale absent mark on another');
+  });
 });
 
 test('classesAtRiskForDay only counts students with a submitted Absence form, not any "absent" status', async (t) => {
