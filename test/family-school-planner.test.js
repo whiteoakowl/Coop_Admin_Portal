@@ -134,91 +134,244 @@ test('Annual Planner: a curriculum name is required, and another family cannot d
   assert.ok(await db.prepare('SELECT 1 FROM family_school_curriculum_items WHERE id = ?').get(itemId), "another family's parent must not be able to delete this item");
 });
 
-test('Weekly Planner: opening a week lazily creates a 7-day grid, and a parent can add/delete rows and columns and save cell content', async () => {
+// A real request: "add curriculum, add a subject bar... Add a dropdown
+// menu for selecting a school year." (routes/parent-family-school.js's
+// own resolveSchoolYearFilter/currentSchoolYear/schoolYearOptions).
+test('Annual Planner: a curriculum item carries a Subject and a School Year, and the year dropdown filters the page', async () => {
+  const familyId = await createFamily('School Year Family');
+  const parent = await createPortalMember({ name: 'School Year Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'School Year Student', familyId, memberType: 'student', roleKey: 'student' });
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/annual-planner');
+
+  const createRes = await request(app)
+    .post('/parent/family-school/annual-planner')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: student.memberId, name: 'Saxon Math 5', subject: 'Math', brand: 'Saxon', level: '5th Grade', price: '79.99', schoolYear: '2026-2027', _csrf: csrf });
+  assert.equal(createRes.status, 302);
+
+  const matchingYear = await request(app).get('/parent/family-school/annual-planner?schoolYear=2026-2027').set('Cookie', parent.cookie);
+  assert.match(matchingYear.text, /Saxon Math 5/);
+  assert.match(matchingYear.text, /Math<\/td>/);
+
+  const otherYear = await request(app).get('/parent/family-school/annual-planner?schoolYear=2020-2021').set('Cookie', parent.cookie);
+  assert.doesNotMatch(otherYear.text, /Saxon Math 5/);
+
+  const allYears = await request(app).get('/parent/family-school/annual-planner?schoolYear=all').set('Cookie', parent.cookie);
+  assert.match(allYears.text, /Saxon Math 5/);
+
+  const item = await db.prepare('SELECT subject, school_year FROM family_school_curriculum_items WHERE student_id = ?').get(student.memberId);
+  assert.equal(item.subject, 'Math');
+  assert.equal(item.school_year, '2026-2027');
+});
+
+// A real request: "add a print, pdf and export icons."
+test('Annual Planner: Export CSV, Print preview, and Download PDF all respect the selected school year', async () => {
+  const familyId = await createFamily('Planner Buttons Family');
+  const parent = await createPortalMember({ name: 'Planner Buttons Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Planner Buttons Student', familyId, memberType: 'student', roleKey: 'student' });
+  const { createCurriculumItem } = require('../utils/familySchool');
+  await createCurriculumItem({ studentId: student.memberId, name: 'Button Curriculum', subject: 'Science', brand: null, level: null, price: 20, schoolYear: '2026-2027', createdByAccountId: null });
+
+  const liveRes = await request(app).get('/parent/family-school/annual-planner').set('Cookie', parent.cookie);
+  assert.match(liveRes.text, /href="\/parent\/family-school\/annual-planner\/export\.csv\?schoolYear=/);
+  assert.match(liveRes.text, /href="\/parent\/family-school\/annual-planner\/print\?schoolYear=[^"]*" target="_blank" aria-label="Print"/);
+  assert.match(liveRes.text, /href="\/parent\/family-school\/annual-planner\/download\.pdf\?schoolYear=/);
+
+  const csvRes = await request(app).get('/parent/family-school/annual-planner/export.csv?schoolYear=2026-2027').set('Cookie', parent.cookie);
+  assert.equal(csvRes.status, 200);
+  assert.match(csvRes.text, /"Button Curriculum"/);
+  assert.match(csvRes.text, /"Science"/);
+
+  const previewRes = await request(app).get('/parent/family-school/annual-planner/print?schoolYear=2026-2027').set('Cookie', parent.cookie);
+  assert.equal(previewRes.status, 200);
+  assert.match(previewRes.text, /print-preview-header/);
+  assert.match(previewRes.text, /onclick="window\.print\(\)"/);
+  assert.match(previewRes.text, /Button Curriculum/);
+
+  const pdfRes = await request(app)
+    .get('/parent/family-school/annual-planner/download.pdf?schoolYear=2026-2027')
+    .set('Cookie', parent.cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
+});
+
+// A real follow-up request completely redesigned Weekly Planner: "Add
+// week button. Popup allows you to choose up to 7 dates. And add a
+// title such as week 1, week 2 etc... Add an assignment button. Pop up
+// allows you to write subject, title of assignment or dropdown to
+// choose an assignment from family management assignments from parent
+// created classes... Weekly plan should allow you to make a different
+// weekly plan for each student, parent weekly plan and family weekly
+// plan."
+test('Weekly Planner: a parent can create a named week from chosen dates, add a free-text assignment, and delete both', async () => {
   const familyId = await createFamily('Weekly Planner Family');
   const parent = await createPortalMember({ name: 'Weekly Planner Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const student = await createPortalMember({ name: 'Weekly Planner Student', familyId, memberType: 'student', roleKey: 'student' });
-
-  // 2026-09-07 is a Monday - opening the grid for any day that week
-  // should land on (and lazily create) the same Monday-keyed plan.
-  const page = await request(app).get(`/parent/family-school/weekly-planner?studentId=${student.memberId}&week=2026-09-09`).set('Cookie', parent.cookie);
-  assert.equal(page.status, 200);
-  assert.match(page.text, /Monday/);
-  assert.match(page.text, /Sunday/);
-
-  const plan = await db.prepare('SELECT * FROM family_school_weekly_plans WHERE student_id = ?').get(student.memberId);
-  assert.equal(plan.week_start_date, '2026-09-07', "the grid is keyed to that week's own Monday regardless of which day was requested");
-  const columnCount = Number((await db.prepare('SELECT COUNT(*) AS n FROM family_school_weekly_plan_columns WHERE plan_id = ?').get(plan.id)).n);
-  assert.equal(columnCount, 7, 'a brand new week is seeded with exactly 7 day columns');
-
   const csrf = await csrfFrom(parent.cookie, '/parent/family-school/weekly-planner');
-  await request(app)
-    .post(`/parent/family-school/weekly-planner/${plan.id}/rows`)
+
+  // Deliberately not 7 consecutive days - "choose up to 7 dates", not a
+  // real calendar week.
+  const createRes = await request(app)
+    .post('/parent/family-school/weekly-planner')
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ label: 'Math', _csrf: csrf });
-  const row = await db.prepare('SELECT * FROM family_school_weekly_plan_rows WHERE plan_id = ?').get(plan.id);
-  assert.equal(row.label, 'Math');
+    .send({ ownerType: 'student', studentId: student.memberId, title: 'Week 1', date: ['2026-09-07', '2026-09-09', '2026-09-30'], _csrf: csrf });
+  assert.equal(createRes.status, 302);
+  assert.match(createRes.headers.location, /notice=/);
 
-  await request(app)
-    .post(`/parent/family-school/weekly-planner/${plan.id}/columns`)
+  const week = await db.prepare("SELECT * FROM family_school_weeks WHERE title = 'Week 1'").get();
+  assert.equal(week.owner_type, 'student');
+  assert.equal(week.student_id, student.memberId);
+  const weekDates = await db.prepare('SELECT date FROM family_school_week_dates WHERE week_id = ? ORDER BY position').all(week.id);
+  assert.deepEqual(weekDates.map((d) => d.date), ['2026-09-07', '2026-09-09', '2026-09-30']);
+
+  const page = await request(app).get(`/parent/family-school/weekly-planner?owner=${student.memberId}&weekId=${week.id}`).set('Cookie', parent.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /Week 1/);
+
+  const dateRow = await db.prepare('SELECT id FROM family_school_week_dates WHERE week_id = ? AND date = ?').get(week.id, '2026-09-09');
+  const assignRes = await request(app)
+    .post(`/parent/family-school/weekly-planner/dates/${dateRow.id}/assignments`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ label: 'Notes', _csrf: csrf });
-  const columnCountAfter = Number((await db.prepare('SELECT COUNT(*) AS n FROM family_school_weekly_plan_columns WHERE plan_id = ?').get(plan.id)).n);
-  assert.equal(columnCountAfter, 8, 'a parent can add columns beyond the 7 seeded day columns');
-  const notesColumn = await db.prepare("SELECT * FROM family_school_weekly_plan_columns WHERE plan_id = ? AND label = 'Notes'").get(plan.id);
+    .send({ subject: 'Math', title: 'Fractions worksheet', _csrf: csrf });
+  assert.equal(assignRes.status, 302);
+  const assignment = await db.prepare('SELECT * FROM family_school_week_assignments WHERE week_date_id = ?').get(dateRow.id);
+  assert.equal(assignment.subject, 'Math');
+  assert.equal(assignment.title, 'Fractions worksheet');
 
-  const cellRes = await request(app)
-    .post('/parent/family-school/weekly-planner/cell')
-    .set('Cookie', parent.cookie)
-    .type('form')
-    .send({ rowId: row.id, columnId: notesColumn.id, content: 'Fractions worksheet', _csrf: csrf });
-  assert.equal(cellRes.status, 200);
-  const cell = await db.prepare('SELECT content FROM family_school_weekly_plan_cells WHERE row_id = ? AND column_id = ?').get(row.id, notesColumn.id);
-  assert.equal(cell.content, 'Fractions worksheet');
+  const gridPage = await request(app).get(`/parent/family-school/weekly-planner?owner=${student.memberId}&weekId=${week.id}`).set('Cookie', parent.cookie);
+  assert.match(gridPage.text, /Fractions worksheet/);
 
-  const gridPage = await request(app).get(`/parent/family-school/weekly-planner?studentId=${student.memberId}&week=2026-09-07`).set('Cookie', parent.cookie);
-  assert.match(gridPage.text, /value="Fractions worksheet"/);
+  await request(app).post(`/parent/family-school/weekly-planner/assignments/${assignment.id}/delete`).set('Cookie', parent.cookie).type('form').send({ _csrf: csrf });
+  assert.equal(await db.prepare('SELECT 1 FROM family_school_week_assignments WHERE id = ?').get(assignment.id), undefined);
 
-  await request(app).post(`/parent/family-school/weekly-planner/rows/${row.id}/delete`).set('Cookie', parent.cookie).type('form').send({ _csrf: csrf });
-  assert.equal(await db.prepare('SELECT 1 FROM family_school_weekly_plan_rows WHERE id = ?').get(row.id), undefined);
-  assert.equal(await db.prepare('SELECT 1 FROM family_school_weekly_plan_cells WHERE row_id = ?').get(row.id), undefined, "deleting a row also removes its own cells");
-
-  await request(app).post(`/parent/family-school/weekly-planner/columns/${notesColumn.id}/delete`).set('Cookie', parent.cookie).type('form').send({ _csrf: csrf });
-  assert.equal(await db.prepare('SELECT 1 FROM family_school_weekly_plan_columns WHERE id = ?').get(notesColumn.id), undefined);
+  await request(app).post(`/parent/family-school/weekly-planner/${week.id}/delete`).set('Cookie', parent.cookie).type('form').send({ _csrf: csrf });
+  assert.equal(await db.prepare('SELECT 1 FROM family_school_weeks WHERE id = ?').get(week.id), undefined);
+  assert.equal(await db.prepare('SELECT 1 FROM family_school_week_dates WHERE week_id = ?').get(week.id), undefined, 'deleting a week also removes its own dates');
 });
 
-test('Weekly Planner: a different week for the same student is an independent grid, and another family cannot touch it', async () => {
-  const familyId = await createFamily('Weekly Planner Isolation Family');
-  const parent = await createPortalMember({ name: 'Schedule Isolation Parent', familyId, memberType: 'parent', roleKey: 'parent' });
-  const student = await createPortalMember({ name: 'Schedule Isolation Student', familyId, memberType: 'student', roleKey: 'student' });
+test('Weekly Planner: an assignment can be picked from an existing class assignment instead of typed by hand', async () => {
+  const familyId = await createFamily('Weekly Planner Dropdown Family');
+  const parent = await createPortalMember({ name: 'Weekly Planner Dropdown Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Weekly Planner Dropdown Student', familyId, memberType: 'student', roleKey: 'student' });
+  const { createClass, createLesson, createContentItem, createWeek, createWeekAssignment } = require('../utils/familySchool');
+  const classId = await createClass({ familyId, className: 'Dropdown Class', description: null, createdByAccountId: null });
+  const lessonId = await createLesson({ classId, title: 'Dropdown Lesson', description: null, createdByAccountId: null });
+  const itemId = await createContentItem({ lessonId, type: 'assignment_upload', title: 'Essay Draft', pointsPossible: 10 });
+  const weekId = await createWeek({ familyId, ownerType: 'student', studentId: student.memberId, title: 'Week 2', dates: ['2026-10-05'], createdByAccountId: null });
+  const dateRow = await db.prepare('SELECT id FROM family_school_week_dates WHERE week_id = ?').get(weekId);
+
+  const page = await request(app).get(`/parent/family-school/weekly-planner?owner=${student.memberId}&weekId=${weekId}`).set('Cookie', parent.cookie);
+  assert.match(page.text, /Dropdown Class.*Essay Draft|Essay Draft/);
   const csrf = await csrfFrom(parent.cookie, '/parent/family-school/weekly-planner');
 
-  await request(app).get(`/parent/family-school/weekly-planner?studentId=${student.memberId}&week=2026-09-07`).set('Cookie', parent.cookie);
-  const weekOnePlan = await db.prepare('SELECT * FROM family_school_weekly_plans WHERE student_id = ? AND week_start_date = ?').get(student.memberId, '2026-09-07');
-  await request(app).post(`/parent/family-school/weekly-planner/${weekOnePlan.id}/rows`).set('Cookie', parent.cookie).type('form').send({ label: 'Week One Only Row', _csrf: csrf });
+  const assignRes = await request(app)
+    .post(`/parent/family-school/weekly-planner/dates/${dateRow.id}/assignments`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ contentItemId: itemId, subject: '', title: '', _csrf: csrf });
+  assert.equal(assignRes.status, 302);
+  const assignment = await db.prepare('SELECT * FROM family_school_week_assignments WHERE week_date_id = ?').get(dateRow.id);
+  assert.equal(assignment.content_item_id, itemId);
+  assert.equal(assignment.title, 'Essay Draft');
+  assert.equal(assignment.subject, 'Dropdown Class');
 
-  const weekTwoPage = await request(app).get(`/parent/family-school/weekly-planner?studentId=${student.memberId}&week=2026-09-14`).set('Cookie', parent.cookie);
-  assert.doesNotMatch(weekTwoPage.text, /Week One Only Row/, "a different week's grid must not inherit another week's own rows");
+  // Direct function coverage too, independent of the route's own
+  // request shape.
+  const directId = await createWeekAssignment({ weekDateId: dateRow.id, subject: 'Science', title: 'Lab report', contentItemId: null });
+  assert.ok(directId);
+});
+
+test('Weekly Planner: student, parent, and family weeks for the same family are independent, and another family cannot touch any of them', async () => {
+  const familyId = await createFamily('Weekly Planner Isolation Family');
+  const parent = await createPortalMember({ name: 'Isolation Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Isolation Student', familyId, memberType: 'student', roleKey: 'student' });
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/weekly-planner');
+
+  await request(app)
+    .post('/parent/family-school/weekly-planner')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ ownerType: 'student', studentId: student.memberId, title: 'Student Week', date: ['2026-11-02'], _csrf: csrf });
+  await request(app)
+    .post('/parent/family-school/weekly-planner')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ ownerType: 'parent', title: 'Parent Week', date: ['2026-11-02'], _csrf: csrf });
+  await request(app)
+    .post('/parent/family-school/weekly-planner')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ ownerType: 'family', title: 'Family Week', date: ['2026-11-02'], _csrf: csrf });
+
+  const studentWeeksPage = await request(app).get(`/parent/family-school/weekly-planner?owner=${student.memberId}`).set('Cookie', parent.cookie);
+  assert.match(studentWeeksPage.text, /Student Week/);
+  assert.doesNotMatch(studentWeeksPage.text, /Parent Week/);
+  assert.doesNotMatch(studentWeeksPage.text, /Family Week/);
+
+  const parentWeeksPage = await request(app).get('/parent/family-school/weekly-planner?owner=parent').set('Cookie', parent.cookie);
+  assert.match(parentWeeksPage.text, /Parent Week/);
+  assert.doesNotMatch(parentWeeksPage.text, /Student Week/);
+
+  const familyWeeksPage = await request(app).get('/parent/family-school/weekly-planner?owner=family').set('Cookie', parent.cookie);
+  assert.match(familyWeeksPage.text, /Family Week/);
+  assert.doesNotMatch(familyWeeksPage.text, /Parent Week/);
+
+  // A student sees their own week and the family's, never the parent's.
+  const studentWeek = await db.prepare("SELECT id FROM family_school_weeks WHERE title = 'Student Week'").get();
+  const studentPortalPage = await request(app).get('/student/family-school/weekly-planner').set('Cookie', student.cookie);
+  assert.match(studentPortalPage.text, /Student Week/);
+  assert.match(studentPortalPage.text, /Family Week/);
+  assert.doesNotMatch(studentPortalPage.text, /Parent Week/);
 
   const otherFamilyId = await createFamily('Weekly Planner Other Family');
-  const otherParent = await createPortalMember({ name: 'Schedule Other Parent', familyId: otherFamilyId, memberType: 'parent', roleKey: 'parent' });
+  const otherParent = await createPortalMember({ name: 'Other Family Parent', familyId: otherFamilyId, memberType: 'parent', roleKey: 'parent' });
   const otherCsrf = await csrfFrom(otherParent.cookie, '/parent/family-school/weekly-planner');
-  const hijackRowRes = await request(app)
-    .post(`/parent/family-school/weekly-planner/${weekOnePlan.id}/rows`)
-    .set('Cookie', otherParent.cookie)
-    .type('form')
-    .send({ label: 'Hijacked Row', _csrf: otherCsrf });
-  assert.equal(hijackRowRes.status, 404);
+  const hijackRes = await request(app).post(`/parent/family-school/weekly-planner/${studentWeek.id}/delete`).set('Cookie', otherParent.cookie).type('form').send({ _csrf: otherCsrf });
+  assert.equal(hijackRes.status, 404);
+  assert.ok(await db.prepare('SELECT 1 FROM family_school_weeks WHERE id = ?').get(studentWeek.id), "another family's parent must not be able to delete this week");
+});
 
-  const row = await db.prepare('SELECT * FROM family_school_weekly_plan_rows WHERE plan_id = ? AND label = ?').get(weekOnePlan.id, 'Week One Only Row');
-  const column = await db.prepare('SELECT * FROM family_school_weekly_plan_columns WHERE plan_id = ? LIMIT 1').get(weekOnePlan.id);
-  const hijackCellRes = await request(app)
-    .post('/parent/family-school/weekly-planner/cell')
-    .set('Cookie', otherParent.cookie)
-    .type('form')
-    .send({ rowId: row.id, columnId: column.id, content: 'Hijacked content', _csrf: otherCsrf });
-  assert.equal(hijackCellRes.status, 404);
-  assert.equal(await db.prepare('SELECT 1 FROM family_school_weekly_plan_cells WHERE row_id = ?').get(row.id), undefined);
+test('Weekly Planner: Print preview and Download PDF title the page with the owner and the date range', async () => {
+  const familyId = await createFamily('Weekly Planner Print Family');
+  const parent = await createPortalMember({ name: 'Weekly Planner Print Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Weekly Planner Print Student', familyId, memberType: 'student', roleKey: 'student' });
+  const { createWeek, createWeekAssignment } = require('../utils/familySchool');
+  const weekId = await createWeek({ familyId, ownerType: 'student', studentId: student.memberId, title: 'Week 3', dates: ['2026-12-01', '2026-12-04'], createdByAccountId: null });
+  const dateRow = await db.prepare('SELECT id FROM family_school_week_dates WHERE week_id = ? ORDER BY position LIMIT 1').get(weekId);
+  await createWeekAssignment({ weekDateId: dateRow.id, subject: 'History', title: 'Read chapter 4', contentItemId: null });
+
+  const liveRes = await request(app).get(`/parent/family-school/weekly-planner?owner=${student.memberId}&weekId=${weekId}`).set('Cookie', parent.cookie);
+  assert.match(liveRes.text, new RegExp(`href="/parent/family-school/weekly-planner/print\\?weekId=${weekId}" target="_blank" aria-label="Print"`));
+  assert.match(liveRes.text, new RegExp(`href="/parent/family-school/weekly-planner/download\\.pdf\\?weekId=${weekId}" aria-label="Download PDF"`));
+
+  const previewRes = await request(app).get(`/parent/family-school/weekly-planner/print?weekId=${weekId}`).set('Cookie', parent.cookie);
+  assert.equal(previewRes.status, 200);
+  assert.match(previewRes.text, /print-preview-header/);
+  assert.match(previewRes.text, /onclick="window\.print\(\)"/);
+  assert.match(previewRes.text, /Weekly Planner Print Student/, 'title should be the student\'s own name');
+  assert.match(previewRes.text, /Dec(ember)? 1.*Dec(ember)? 4/, 'title should carry the date range for the week');
+  assert.match(previewRes.text, /Read chapter 4/);
+
+  const pdfRes = await request(app)
+    .get(`/parent/family-school/weekly-planner/download.pdf?weekId=${weekId}`)
+    .set('Cookie', parent.cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
 });

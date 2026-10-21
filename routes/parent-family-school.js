@@ -48,8 +48,10 @@ const {
   gradesForStudent,
   attendanceForStudent,
   allAttendanceForStudent,
+  attendanceForSchoolYear,
   toggleAttendance,
   familyAttendanceForMonth,
+  familyAttendanceForSchoolYear,
   toggleFamilyAttendance,
   monthGridDays,
   journalEntriesForStudent,
@@ -61,23 +63,40 @@ const {
   getJournalAttachment,
   addJournalAttachment,
   deleteJournalAttachment,
+  currentSchoolYear,
+  schoolYearOptions,
   curriculumForStudent,
   createCurriculumItem,
   getCurriculumItem,
   deleteCurriculumItem,
-  mondayOf,
-  getWeeklyPlanById,
-  getWeeklyPlanColumn,
-  getWeeklyPlanRow,
-  weeklyPlanGrid,
-  addWeeklyPlanColumn,
-  addWeeklyPlanRow,
-  deleteWeeklyPlanColumn,
-  deleteWeeklyPlanRow,
-  setWeeklyPlanCell,
+  weeksForOwner,
+  getWeek,
+  createWeek,
+  deleteWeek,
+  getWeekDate,
+  weekGrid,
+  weekDateRangeLabel,
+  createWeekAssignment,
+  getWeekAssignment,
+  deleteWeekAssignment,
+  assignmentOptionsForFamily,
 } = require('../utils/familySchool');
-const { todayISO, isValidISODate, addDays, formatDateLabel } = require('../utils/dates');
+const { isValidISODate, formatDateLabel } = require('../utils/dates');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { renderViewToPdf } = require('../utils/pdfRender');
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - sends a headless-Chromium-rendered
+// PDF of viewName (one of this router's own *-print.ejs views) instead
+// of a CSV, under the same filename convention (now .pdf) the old
+// download.csv route used.
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
 
 // Journal entries are stored as sanitized HTML (the rich-text editor's
 // own output) - plain text for a CSV cell, same inline strip-tags idiom
@@ -169,18 +188,36 @@ router.get('/family-school/export.csv', async (req, res) => {
   sendCsv(res, 'family-school-management.csv', lines);
 });
 
-router.get('/family-school/download.csv', async (req, res) => {
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - every family student's own
+// per-class breakdown, the same scope the old download.csv route
+// used, now a PDF built from the exact same -print.ejs view the Print
+// button opens.
+router.get('/family-school/download.pdf', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const students = await overviewForFamily(familyId);
-  const lines = [toCsvRow(['Student', 'Class', 'Grade %', 'Grade Letter'])];
-  for (const s of students) {
-    if (s.classes.length === 0) {
-      lines.push(toCsvRow([s.name, '', '', '']));
-      continue;
-    }
-    for (const c of s.classes) lines.push(toCsvRow([s.name, c.class_name, c.gradePercent != null ? c.gradePercent.toFixed(1) : '', c.gradeLetter || '']));
-  }
-  sendCsv(res, 'family-school-management-detail.csv', lines);
+  const pdf = await renderViewToPdf(req, 'parent-family-school-overview-print', {
+    title: 'Family School Management',
+    mode: 'family',
+    students,
+  });
+  sendPdf(res, 'family-school-management-detail.pdf', pdf);
+});
+
+// A real request: "All print button should show a print preview full
+// real page on a page with a print button." Mirrors the live page's
+// own (filtered) card grid, not the full unfiltered detail Download
+// above covers.
+router.get('/family-school/print', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const students = await overviewForFamily(familyId);
+  const filterStudentIds = [].concat(req.query.studentId || []).map((v) => parseInt(v, 10));
+  res.render('parent-family-school-overview-print', {
+    title: 'Family School Management',
+    mode: 'single',
+    students: filterStudentIds.length ? students.filter((s) => filterStudentIds.includes(s.id)) : students,
+    avatarColorFor,
+  });
 });
 
 router.get('/family-school/classes', async (req, res) => {
@@ -446,19 +483,36 @@ router.get('/family-school/grades/export.csv', async (req, res) => {
   sendCsv(res, 'family-grades.csv', lines);
 });
 
-router.get('/family-school/grades/download.csv', async (req, res) => {
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - every family student's own grades,
+// the same scope the old download.csv route used, now a PDF built from
+// the exact same -print.ejs view the Print button opens.
+router.get('/family-school/grades/download.pdf', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
-  const lines = [toCsvRow(['Student', 'Class', 'Lesson', 'Assignment', 'Due', 'Submitted', 'Points Earned', 'Points Possible', 'Grade Letter'])];
-  for (const student of familyStudents) {
-    const grades = await gradesForStudent(student.id);
-    for (const g of grades) {
-      lines.push(
-        toCsvRow([student.name, g.class_name, g.lesson_title, g.item_title || '', g.dueDateLabel || '', g.submission_id ? 'Yes' : 'No', g.points_earned != null ? g.points_earned : '', g.points_possible != null ? g.points_possible : '', g.grade_letter || ''])
-      );
-    }
-  }
-  sendCsv(res, 'family-grades-all.csv', lines);
+  const familyRows = [];
+  for (const student of familyStudents) familyRows.push({ student, grades: await gradesForStudent(student.id) });
+  const pdf = await renderViewToPdf(req, 'parent-family-school-grades-print', {
+    title: 'Family Grades',
+    mode: 'family',
+    familyRows,
+  });
+  sendPdf(res, 'family-grades-all.pdf', pdf);
+});
+
+// A real request: "All print button should show a print preview full
+// real page on a page with a print button."
+router.get('/family-school/grades/print', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
+  const student = familyStudents.find((s) => s.id === selectedStudentId);
+  res.render('parent-family-school-grades-print', {
+    title: 'Family Grades',
+    mode: 'single',
+    studentLabel: student ? student.name : '',
+    grades: student ? await gradesForStudent(student.id) : [],
+  });
 });
 
 router.post('/family-school/grades/:contentItemId/:studentId', async (req, res) => {
@@ -589,15 +643,76 @@ router.get('/family-school/attendance/export.csv', async (req, res) => {
   sendCsv(res, 'family-attendance.csv', lines);
 });
 
-router.get('/family-school/attendance/download.csv', async (req, res) => {
+// A real request: "Pdf and print should show all 12 months, August-
+// July 2026-2027." Aug-Jul school year containing whatever month/year
+// the live calendar currently has selected (so Print/Download always
+// cover the school year the person was actually looking at); with
+// neither given, the school year containing today.
+function schoolYearStartFromQuery(req) {
+  if (req.query.year && req.query.month) {
+    const year = parseInt(req.query.year, 10);
+    const month = parseInt(req.query.month, 10);
+    return month >= 8 ? year : year - 1;
+  }
+  return parseInt(currentSchoolYear().split('-')[0], 10);
+}
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - every family student's own full
+// school year, the same Aug-Jul span the Print preview below covers,
+// now a PDF built from the exact same -print.ejs view the Print button
+// opens.
+router.get('/family-school/attendance/download.pdf', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
-  const lines = [toCsvRow(['Student', 'Date', 'Status'])];
-  for (const student of familyStudents) {
-    const rows = await allAttendanceForStudent(student.id);
-    for (const r of rows) lines.push(toCsvRow([student.name, r.attendance_date, r.status]));
+  const schoolYearStart = schoolYearStartFromQuery(req);
+  const familyRows = [];
+  for (const student of familyStudents) familyRows.push({ student, months: await attendanceForSchoolYear(student.id, schoolYearStart) });
+  const pdf = await renderViewToPdf(req, 'parent-family-school-attendance-print', {
+    title: 'Family Attendance',
+    mode: 'family',
+    schoolYearLabel: `${schoolYearStart}-${schoolYearStart + 1}`,
+    MONTH_NAMES,
+    familyRows,
+  });
+  sendPdf(res, 'family-attendance-all.pdf', pdf);
+});
+
+// A real request: "All print button should show a print preview full
+// real page on a page with a print button," later refined to: "Pdf and
+// print should show all 12 months, August-July 2026-2027" - same
+// student/family selection the live calendar shows, but every month of
+// that selection's own school year, not just the one currently open.
+router.get('/family-school/attendance/print', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const isFamilyMode = req.query.studentId === 'family';
+  const selectedStudentId = isFamilyMode
+    ? null
+    : req.query.studentId
+      ? parseInt(req.query.studentId, 10)
+      : familyStudents[0]
+        ? familyStudents[0].id
+        : null;
+  const student = familyStudents.find((s) => s.id === selectedStudentId);
+  const schoolYearStart = schoolYearStartFromQuery(req);
+  let months = [];
+  let studentLabel = '';
+  if (isFamilyMode) {
+    months = await familyAttendanceForSchoolYear(familyStudents.map((s) => s.id), schoolYearStart);
+    studentLabel = 'Whole Family';
+  } else if (student) {
+    months = await attendanceForSchoolYear(student.id, schoolYearStart);
+    studentLabel = student.name;
   }
-  sendCsv(res, 'family-attendance-all.csv', lines);
+  res.render('parent-family-school-attendance-print', {
+    title: 'Family Attendance',
+    mode: 'single',
+    studentLabel,
+    MONTH_NAMES,
+    schoolYearLabel: `${schoolYearStart}-${schoolYearStart + 1}`,
+    months,
+  });
 });
 
 // --- Teacher Journal subpage - a real request: "Subpage for teacher
@@ -636,15 +751,42 @@ router.get('/family-school/journal/export.csv', async (req, res) => {
   sendCsv(res, 'teacher-journal.csv', lines);
 });
 
-router.get('/family-school/journal/download.csv', async (req, res) => {
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - every family student's own
+// entries, the same scope the old download.csv route used, now a PDF
+// built from the exact same -print.ejs view the Print button opens.
+router.get('/family-school/journal/download.pdf', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
-  const lines = [toCsvRow(['Student', 'Date', 'Notes'])];
+  const familyRows = [];
   for (const student of familyStudents) {
     const entries = await journalEntriesForStudent(student.id);
-    for (const e of entries) lines.push(toCsvRow([student.name, e.entry_date, plainText(e.body)]));
+    for (const e of entries) e.attachments = await attachmentsForJournalEntry(e.id);
+    familyRows.push({ student, entries });
   }
-  sendCsv(res, 'teacher-journal-all.csv', lines);
+  const pdf = await renderViewToPdf(req, 'parent-family-school-journal-print', {
+    title: 'Daily Learning Log',
+    mode: 'family',
+    familyRows,
+  });
+  sendPdf(res, 'teacher-journal-all.pdf', pdf);
+});
+
+// A real request: "All print button should show a print preview full
+// real page on a page with a print button."
+router.get('/family-school/journal/print', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
+  const student = familyStudents.find((s) => s.id === selectedStudentId);
+  const entries = student ? await journalEntriesForStudent(student.id) : [];
+  for (const e of entries) e.attachments = await attachmentsForJournalEntry(e.id);
+  res.render('parent-family-school-journal-print', {
+    title: 'Daily Learning Log',
+    mode: 'single',
+    studentLabel: student ? student.name : '',
+    entries,
+  });
 });
 
 async function requireOwnStudent(req, studentId) {
@@ -705,15 +847,31 @@ router.post('/family-school/journal/:id/attachments/:attachmentId/delete', async
 // organized by student and you add curriculum under each student. Pop
 // up asks for curriculum name, brand, level and price." ---
 
+// A real request: "Add a dropdown menu for selecting a school year...
+// and so on." 'all' is the one non-"YYYY-YYYY" value the dropdown can
+// carry - resolved to null (curriculumForStudent's own "no filter" mode)
+// everywhere a school year is read from the query string.
+function resolveSchoolYearFilter(req) {
+  return req.query.schoolYear === 'all' ? null : req.query.schoolYear || currentSchoolYear();
+}
+
+async function curriculumByStudentFor(familyStudents, schoolYear) {
+  const curriculumByStudent = {};
+  for (const s of familyStudents) curriculumByStudent[s.id] = await curriculumForStudent(s.id, schoolYear);
+  return curriculumByStudent;
+}
+
 router.get('/family-school/annual-planner', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
-  const curriculumByStudent = {};
-  for (const s of familyStudents) curriculumByStudent[s.id] = await curriculumForStudent(s.id);
+  const schoolYear = resolveSchoolYearFilter(req);
   res.render('parent-family-school-annual-planner', {
     title: 'Annual Planner',
     familyStudents,
-    curriculumByStudent,
+    curriculumByStudent: await curriculumByStudentFor(familyStudents, schoolYear),
+    schoolYear: schoolYear || 'all',
+    currentSchoolYearValue: currentSchoolYear(),
+    yearOptions: schoolYearOptions(schoolYear),
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
@@ -727,9 +885,11 @@ router.post('/family-school/annual-planner', async (req, res) => {
   await createCurriculumItem({
     studentId,
     name,
+    subject: (req.body.subject || '').trim(),
     brand: (req.body.brand || '').trim(),
     level: (req.body.level || '').trim(),
     price: (req.body.price || '').trim(),
+    schoolYear: (req.body.schoolYear || '').trim() || currentSchoolYear(),
     createdByAccountId: req.portalAccount.id,
   });
   res.redirect('/parent/family-school/annual-planner?notice=' + encodeURIComponent('Curriculum added.'));
@@ -742,96 +902,221 @@ router.post('/family-school/annual-planner/:id/delete', async (req, res) => {
   res.redirect('/parent/family-school/annual-planner?notice=' + encodeURIComponent('Curriculum removed.'));
 });
 
-// --- Weekly Planner subpage - a real request: "The other new planner
-// page under family school management should be called schedule
-// planner" (later renamed again: "Change schedule planner to weekly
-// planner") ("View weekly plan grid for each student. Be able to add
-// rows and columns to create plan grid for the week per student.") ---
+// A real request: "Add a print, pdf and export icons." Export/Download
+// both cover the same current school-year filter (this page has no
+// per-student selector the way Attendance/Grades/Journal do - it always
+// shows every family student at once), so unlike those pages there's no
+// separate "one student vs whole family" scope split here.
+function curriculumCsvRows(curriculumByStudent, familyStudents) {
+  const lines = [toCsvRow(['Student', 'Subject', 'Curriculum', 'Brand', 'Level', 'Price', 'School Year'])];
+  for (const s of familyStudents) {
+    for (const item of curriculumByStudent[s.id]) {
+      lines.push(toCsvRow([s.name, item.subject || '', item.name, item.brand || '', item.level || '', item.price != null ? item.price : '', item.school_year || '']));
+    }
+  }
+  return lines;
+}
+
+router.get('/family-school/annual-planner/export.csv', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const schoolYear = resolveSchoolYearFilter(req);
+  sendCsv(res, 'annual-planner.csv', curriculumCsvRows(await curriculumByStudentFor(familyStudents, schoolYear), familyStudents));
+});
+
+router.get('/family-school/annual-planner/download.pdf', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const schoolYear = resolveSchoolYearFilter(req);
+  const pdf = await renderViewToPdf(req, 'parent-family-school-annual-planner-print', {
+    title: 'Annual Planner',
+    familyStudents,
+    curriculumByStudent: await curriculumByStudentFor(familyStudents, schoolYear),
+    schoolYear: schoolYear || 'All Years',
+  });
+  sendPdf(res, 'annual-planner.pdf', pdf);
+});
+
+router.get('/family-school/annual-planner/print', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const schoolYear = resolveSchoolYearFilter(req);
+  res.render('parent-family-school-annual-planner-print', {
+    title: 'Annual Planner',
+    familyStudents,
+    curriculumByStudent: await curriculumByStudentFor(familyStudents, schoolYear),
+    schoolYear: schoolYear || 'All Years',
+  });
+});
+
+// --- Weekly Planner subpage - originally "The other new planner page
+// under family school management should be called schedule planner"
+// (later renamed: "Change schedule planner to weekly planner"), then
+// redesigned by a real follow-up request: "Add week button. Popup
+// allows you to choose up to 7 dates. And add a title such as week 1,
+// week 2 etc. Create and cancel buttons. Then it creates a grid with
+// those dates. Add an assignment button. Pop up allows you to write
+// subject, title of assignment or dropdown to choose an assignment
+// from family management assignments from parent created classes.
+// Save, cancel. Buttons. Print should show the whole week on one page
+// clean. Title should be the students name and the date range for the
+// week. Weekly plan should allow you to make a different weekly plan
+// for each student, parent weekly plan and family weekly plan." ---
+
+// 'parent' and 'family' are the two non-student owners the request
+// above calls for; anything else is read as a specific family student
+// id. Falls back to the family's first student (or 'family' if there
+// are none) - never an id that isn't actually this family's own.
+function resolveWeekOwner(req, familyStudents) {
+  const raw = req.query.owner || (familyStudents[0] ? String(familyStudents[0].id) : 'family');
+  if (raw === 'parent' || raw === 'family') return { ownerType: raw, studentId: null };
+  const studentId = parseInt(raw, 10);
+  if (familyStudents.some((s) => s.id === studentId)) return { ownerType: 'student', studentId };
+  return { ownerType: 'family', studentId: null };
+}
+
+function ownerParam(owner) {
+  return owner.ownerType === 'student' ? String(owner.studentId) : owner.ownerType;
+}
+
+function ownerDisplayLabel(owner, familyStudents) {
+  if (owner.ownerType === 'parent') return 'Parent';
+  if (owner.ownerType === 'family') return 'Whole Family';
+  const student = familyStudents.find((s) => s.id === owner.studentId);
+  return student ? student.name : '';
+}
+
+// Shared by every write route below - a week outside this account's own
+// family is simply not found, never a raw/unscoped lookup (same "never
+// trust an id from the request alone" rule requireOwnClass/
+// requireOwnLesson already document above).
+async function requireOwnWeek(req, weekId) {
+  const week = await getWeek(weekId);
+  if (!week) return null;
+  const familyId = await familyIdForAccount(req.portalAccount);
+  return week.family_id === familyId ? week : null;
+}
 
 router.get('/family-school/weekly-planner', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
-  const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
-  const isOwnStudent = selectedStudentId && familyStudents.some((s) => s.id === selectedStudentId);
-
-  const weekStartDate = mondayOf(isValidISODate(req.query.week) ? req.query.week : todayISO());
-  const prevWeek = addDays(weekStartDate, -7);
-  const nextWeek = addDays(weekStartDate, 7);
+  const owner = resolveWeekOwner(req, familyStudents);
+  const weeks = await weeksForOwner(familyId, owner.ownerType, owner.studentId);
+  const selectedWeekId = req.query.weekId ? parseInt(req.query.weekId, 10) : null;
+  const selectedWeek = selectedWeekId ? weeks.find((w) => w.id === selectedWeekId) : null;
+  let grid = null;
+  if (selectedWeek) {
+    grid = await weekGrid(selectedWeek.id);
+    grid.forEach((d) => { d.dateLabel = formatDateLabel(d.date); });
+  }
 
   res.render('parent-family-school-weekly-planner', {
     title: 'Weekly Planner',
     familyStudents,
-    selectedStudentId: isOwnStudent ? selectedStudentId : null,
-    weeklyGrid: isOwnStudent ? await weeklyPlanGrid(selectedStudentId, weekStartDate) : null,
-    weekStartLabel: formatDateLabel(weekStartDate),
-    prevWeek,
-    nextWeek,
+    owner,
+    ownerParam: ownerParam(owner),
+    weeks,
+    selectedWeek,
+    grid,
+    assignmentOptions: await assignmentOptionsForFamily(familyId),
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
 });
 
-// Shared by every Weekly Planner write route below - a planId outside
-// this account's own family is simply not found, never a raw/unscoped
-// lookup (same "never trust an id from the request alone" rule
-// requireOwnClass/requireOwnLesson already document above).
-async function requireOwnWeeklyPlan(req, planId) {
-  const plan = await getWeeklyPlanById(planId);
-  if (!plan || !(await requireOwnStudent(req, plan.student_id))) return null;
-  return plan;
+router.post('/family-school/weekly-planner', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const ownerTypeRaw = (req.body.ownerType || '').trim();
+  const studentId = ownerTypeRaw === 'student' ? parseInt(req.body.studentId, 10) : null;
+  const backUrl = `/parent/family-school/weekly-planner?owner=${encodeURIComponent(req.body.ownerType === 'student' ? req.body.studentId : ownerTypeRaw)}`;
+  if (!['student', 'parent', 'family'].includes(ownerTypeRaw)) return res.redirect(`${backUrl}&error=` + encodeURIComponent('Choose who this week is for.'));
+  if (ownerTypeRaw === 'student' && !familyStudents.some((s) => s.id === studentId)) return res.status(404).send('Not found');
+  const title = (req.body.title || '').trim();
+  if (!title) return res.redirect(`${backUrl}&error=` + encodeURIComponent('A title (e.g. "Week 1") is required.'));
+  // "Choose up to 7 dates" - the form sends up to 7 same-named fields;
+  // blanks (left-empty optional date pickers) are dropped, and at least
+  // one real date is required to make a grid out of.
+  const dates = [...new Set([].concat(req.body.date || []).map((d) => (d || '').trim()).filter((d) => isValidISODate(d)))].slice(0, 7);
+  if (dates.length === 0) return res.redirect(`${backUrl}&error=` + encodeURIComponent('Choose at least one date.'));
+  const weekId = await createWeek({ familyId, ownerType: ownerTypeRaw, studentId, title, dates, createdByAccountId: req.portalAccount.id });
+  res.redirect(`/parent/family-school/weekly-planner?owner=${encodeURIComponent(ownerTypeRaw === 'student' ? studentId : ownerTypeRaw)}&weekId=${weekId}&notice=` + encodeURIComponent('Week created.'));
+});
+
+router.post('/family-school/weekly-planner/:id/delete', async (req, res) => {
+  const week = await requireOwnWeek(req, parseInt(req.params.id, 10));
+  if (!week) return res.status(404).send('Not found');
+  await deleteWeek(week.id);
+  const owner = week.owner_type === 'student' ? week.student_id : week.owner_type;
+  res.redirect(`/parent/family-school/weekly-planner?owner=${encodeURIComponent(owner)}&notice=` + encodeURIComponent('Week removed.'));
+});
+
+router.post('/family-school/weekly-planner/dates/:dateId/assignments', async (req, res) => {
+  const weekDate = await getWeekDate(parseInt(req.params.dateId, 10));
+  const week = weekDate && (await requireOwnWeek(req, weekDate.week_id));
+  if (!week) return res.status(404).send('Not found');
+  const owner = week.owner_type === 'student' ? week.student_id : week.owner_type;
+  const backUrl = `/parent/family-school/weekly-planner?owner=${encodeURIComponent(owner)}&weekId=${week.id}`;
+
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const contentItemId = req.body.contentItemId ? parseInt(req.body.contentItemId, 10) : null;
+  let subject = (req.body.subject || '').trim();
+  let title = (req.body.title || '').trim();
+  if (contentItemId) {
+    // "Dropdown to choose an assignment from family management
+    // assignments from parent created classes" - only ever a real
+    // assignment this same family actually created; never trusts the
+    // posted contentItemId blindly (same join assignmentOptionsForFamily
+    // itself already scopes by family_id).
+    const picked = (await assignmentOptionsForFamily(familyId)).find((a) => a.id === contentItemId);
+    if (!picked) return res.status(404).send('Not found');
+    subject = subject || picked.class_name;
+    title = title || picked.title || picked.class_name;
+  }
+  if (!title) return res.redirect(`${backUrl}&error=` + encodeURIComponent('A title is required.'));
+  await createWeekAssignment({ weekDateId: weekDate.id, subject, title, contentItemId });
+  res.redirect(`${backUrl}&notice=` + encodeURIComponent('Assignment added.'));
+});
+
+router.post('/family-school/weekly-planner/assignments/:id/delete', async (req, res) => {
+  const assignment = await getWeekAssignment(parseInt(req.params.id, 10));
+  const weekDate = assignment && (await getWeekDate(assignment.week_date_id));
+  const week = weekDate && (await requireOwnWeek(req, weekDate.week_id));
+  if (!week) return res.status(404).send('Not found');
+  await deleteWeekAssignment(assignment.id);
+  const owner = week.owner_type === 'student' ? week.student_id : week.owner_type;
+  res.redirect(`/parent/family-school/weekly-planner?owner=${encodeURIComponent(owner)}&weekId=${week.id}&notice=` + encodeURIComponent('Assignment removed.'));
+});
+
+// A real request: "Print should show the whole week on one page clean.
+// Title should be the students name and the date range for the week."
+async function weeklyPlannerPrintLocals(req) {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const week = await requireOwnWeek(req, parseInt(req.query.weekId, 10));
+  if (!week) return null;
+  const dates = await weekGrid(week.id);
+  dates.forEach((d) => { d.dateLabel = formatDateLabel(d.date); });
+  return {
+    title: 'Weekly Planner',
+    week,
+    ownerLabel: ownerDisplayLabel(week.owner_type === 'student' ? { ownerType: 'student', studentId: week.student_id } : { ownerType: week.owner_type }, familyStudents),
+    dateRangeLabel: weekDateRangeLabel(dates),
+    dates,
+  };
 }
 
-function weeklyPlannerBackUrl(plan) {
-  return `/parent/family-school/weekly-planner?studentId=${plan.student_id}&week=${plan.week_start_date}`;
-}
-
-router.post('/family-school/weekly-planner/:planId/columns', async (req, res) => {
-  const plan = await requireOwnWeeklyPlan(req, parseInt(req.params.planId, 10));
-  if (!plan) return res.status(404).send('Not found');
-  const label = (req.body.label || '').trim();
-  if (!label) return res.redirect(`${weeklyPlannerBackUrl(plan)}&error=` + encodeURIComponent('A column label is required.'));
-  await addWeeklyPlanColumn(plan.id, label);
-  res.redirect(weeklyPlannerBackUrl(plan));
+router.get('/family-school/weekly-planner/print', async (req, res) => {
+  const locals = await weeklyPlannerPrintLocals(req);
+  if (!locals) return res.status(404).send('Not found');
+  res.render('parent-family-school-weekly-planner-print', locals);
 });
 
-router.post('/family-school/weekly-planner/:planId/rows', async (req, res) => {
-  const plan = await requireOwnWeeklyPlan(req, parseInt(req.params.planId, 10));
-  if (!plan) return res.status(404).send('Not found');
-  const label = (req.body.label || '').trim();
-  if (!label) return res.redirect(`${weeklyPlannerBackUrl(plan)}&error=` + encodeURIComponent('A row label is required.'));
-  await addWeeklyPlanRow(plan.id, label);
-  res.redirect(weeklyPlannerBackUrl(plan));
-});
-
-router.post('/family-school/weekly-planner/columns/:id/delete', async (req, res) => {
-  const column = await getWeeklyPlanColumn(parseInt(req.params.id, 10));
-  const plan = column && (await requireOwnWeeklyPlan(req, column.plan_id));
-  if (!plan) return res.status(404).send('Not found');
-  await deleteWeeklyPlanColumn(column.id);
-  res.redirect(weeklyPlannerBackUrl(plan));
-});
-
-router.post('/family-school/weekly-planner/rows/:id/delete', async (req, res) => {
-  const row = await getWeeklyPlanRow(parseInt(req.params.id, 10));
-  const plan = row && (await requireOwnWeeklyPlan(req, row.plan_id));
-  if (!plan) return res.status(404).send('Not found');
-  await deleteWeeklyPlanRow(row.id);
-  res.redirect(weeklyPlannerBackUrl(plan));
-});
-
-// AJAX endpoint (public/js/family-school-planner.js) - saves one cell's
-// own content on blur, no full page reload, same shape public/js/
-// family-school-attendance.js's own toggle fetch() already uses.
-router.post('/family-school/weekly-planner/cell', async (req, res) => {
-  const rowId = parseInt(req.body.rowId, 10);
-  const columnId = parseInt(req.body.columnId, 10);
-  const row = await getWeeklyPlanRow(rowId);
-  const plan = row && (await requireOwnWeeklyPlan(req, row.plan_id));
-  if (!plan) return res.status(404).json({ ok: false });
-  const column = await getWeeklyPlanColumn(columnId);
-  if (!column || column.plan_id !== row.plan_id) return res.status(404).json({ ok: false });
-  await setWeeklyPlanCell(rowId, columnId, (req.body.content || '').trim());
-  res.json({ ok: true });
+router.get('/family-school/weekly-planner/download.pdf', async (req, res) => {
+  const locals = await weeklyPlannerPrintLocals(req);
+  if (!locals) return res.status(404).send('Not found');
+  const pdf = await renderViewToPdf(req, 'parent-family-school-weekly-planner-print', locals);
+  sendPdf(res, 'weekly-planner.pdf', pdf);
 });
 
 module.exports = router;

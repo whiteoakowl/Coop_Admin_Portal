@@ -138,7 +138,7 @@ const MAIN_ADMIN_NAV_LINKS = [
     { href: '/main-admin/resource-links', label: 'Resources' },
     { href: '/main-admin/resource-links?tab=approvals', label: 'Approvals' },
   ] },
-  { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory', subpages: [
+  { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory', mobileLabel: 'Business<br>Directory', subpages: [
     { href: '/main-admin/directory', label: 'Directory' },
     { href: '/main-admin/directory?tab=requests', label: 'Requests' },
     { href: '/main-admin/directory?tab=archive', label: 'Archive' },
@@ -174,7 +174,7 @@ const MAIN_ADMIN_NAV_LINKS = [
   // the family school management tab simply has settings. Leave
   // settings for that blank for now." routes/main-admin-family-
   // school.js - no subpages (there's only the one page).
-  { href: '/main-admin/family-school', icon: 'home-heart', label: 'Family School Management' },
+  { href: '/main-admin/family-school', icon: 'home-heart', label: 'Family School Management', mobileLabel: 'Family School<br>Management' },
   // Same Training & Learning module as Co-op Admin's own Training tab
   // (routes/main-admin-training.js, shared utils/training.js data) - a
   // real request: "the training tab should also be on main admin
@@ -231,7 +231,7 @@ const PARENT_NAV_LINKS = [
   // Registrations" button (its toolbar, Parent Portal only) is the only
   // way there now.
   { href: '/events?view=calendar&portal=parent', icon: 'calendar-check', label: 'Events' },
-  { href: '/parent/classes', icon: 'graduation-cap', label: 'Co-op Classes', subpages: [
+  { href: '/parent/classes', icon: 'graduation-cap', label: 'Co-op Classes', mobileLabel: 'Co-op<br>Classes', subpages: [
     { href: '/parent/classes', label: 'Class Registration' },
     { href: '/parent/classes/dashboard', label: 'Classroom Dashboard' },
     { href: '/name-tag', label: 'Name Tag Form' },
@@ -250,7 +250,7 @@ const PARENT_NAV_LINKS = [
   // its own tab." Transcripts/Diplomas keep their own existing
   // /parent/academics* routes (routes/parent-portal.js) - only their nav
   // placement moved, same as Name Tags' own standalone entry below.
-  { href: '/parent/family-school', icon: 'home-heart', label: 'Family School Management', subpages: [
+  { href: '/parent/family-school', icon: 'home-heart', label: 'Family School Management', mobileLabel: 'Family School<br>Management', subpages: [
     { href: '/parent/family-school', label: 'Family School Management' },
     { href: '/parent/family-school/classes', label: 'Family Classes' },
     { href: '/parent/family-school/grades', label: 'Family Grades' },
@@ -263,7 +263,7 @@ const PARENT_NAV_LINKS = [
   ] },
   { href: '/forums?portal=parent', icon: 'users', label: 'Chat' },
   { href: '/parent/training', icon: 'graduation-cap', label: 'Training' },
-  { href: '/directory', icon: 'map-pin', label: 'Business Directory' },
+  { href: '/directory', icon: 'map-pin', label: 'Business Directory', mobileLabel: 'Business<br>Directory' },
   { href: '/classifieds', icon: 'tag', label: 'Classifieds' },
   { href: '/parent/resources', icon: 'book', label: 'Resources' },
   { href: '/parent/documents', icon: 'file-text', label: 'Documents' },
@@ -276,7 +276,7 @@ const PARENT_NAV_LINKS = [
   // entry's own subpages array; parent-library.ejs's own "My Library
   // Log" button (right next to its <h1>) is the only way there now.
   { href: '/parent/library', icon: 'book', label: 'Library' },
-  { href: '/parent/reading', icon: 'book', label: 'Reading Challenge' },
+  { href: '/parent/reading', icon: 'book', label: 'Reading Challenge', mobileLabel: 'Reading<br>Challenge' },
   { href: '/accounting', icon: 'check-circle', label: 'Accounting' },
 ];
 // Teacher Portal's own primary nav - same anti-drift reasoning as
@@ -327,7 +327,7 @@ const TEACHER_NAV_LINKS = [
   // teacher-portal.js's own GET /instructor-profile), which shows a
   // plain "not enabled yet" message instead of the edit form rather than
   // this nav conditionally disappearing.
-  { href: '/teacher/instructor-profile', icon: 'user-check', label: 'Instructor Profile' },
+  { href: '/teacher/instructor-profile', icon: 'user-check', label: 'Instructor Profile', mobileLabel: 'Instructor<br>Profile' },
 ];
 // Student Portal's own primary nav - a real request: "dashboard panel
 // tabs. They should be these titles and in this order," plus a labeled
@@ -399,7 +399,7 @@ const STUDENT_NAV_LINKS = [
 const STUDENT_ACTIVITY_LINKS = [
   { href: '/student/games', icon: 'gamepad', label: 'Games' },
   { href: '/student/pets', icon: 'paw', label: 'Pet' },
-  { href: '/student/reading', icon: 'book', label: 'Reading Challenge' },
+  { href: '/student/reading', icon: 'book', label: 'Reading Challenge', mobileLabel: 'Reading<br>Challenge' },
   { href: '/student/achievements', icon: 'star', label: 'Achievements' },
   { href: '/student/leaderboard', icon: 'trophy', label: 'Leaderboard' },
   { href: '/student/nature-news', icon: 'sprout', label: 'Nature News' },
@@ -463,7 +463,7 @@ const COMMUNITY_LINKS = [
   { href: '/events', icon: 'calendar-check', label: 'Events' },
   { href: '/forums', icon: 'users', label: 'Chat' },
   { href: '/member-directory', icon: 'user', label: 'Member Directory' },
-  { href: '/directory', icon: 'map-pin', label: 'Business Directory' },
+  { href: '/directory', icon: 'map-pin', label: 'Business Directory', mobileLabel: 'Business<br>Directory' },
   { href: '/classifieds', icon: 'tag', label: 'Classifieds' },
   { href: '/forms', icon: 'clipboard-list', label: 'Forms' },
   { href: '/store', icon: 'grid', label: 'Store' },
@@ -660,7 +660,7 @@ const communityLinks =
     <% if (link.subpages && link.subpages.length) { %>
       <%- include('mobile-subpages-tab', { link: link }) %>
     <% } else { %>
-      <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
+      <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%- link.mobileLabel || link.label %></span></a>
     <% } %>
   <% }); %>
   <%# Same classLinks as the desktop sidebar's own #class-nav-links block
@@ -675,7 +675,7 @@ const communityLinks =
       <% if (link.subpages && link.subpages.length) { %>
         <%- include('mobile-subpages-tab', { link: link }) %>
       <% } else { %>
-        <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
+        <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%- link.mobileLabel || link.label %></span></a>
       <% } %>
     <% }); %>
   <% } %>
@@ -687,7 +687,7 @@ const communityLinks =
       mobile-overflow pattern, not something to invent a second version of
       here. %>
   <% communityLinks.forEach(function(link) { %>
-    <a href="<%= link.href %>"><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
+    <a href="<%= link.href %>"><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%- link.mobileLabel || link.label %></span></a>
   <% }); %>
 </nav>
 

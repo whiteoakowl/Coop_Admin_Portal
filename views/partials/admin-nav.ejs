@@ -45,7 +45,7 @@
         { href: '/admin/rosters?tab=classes', label: 'Class Rosters' },
         { href: '/admin/rosters?tab=playground', label: 'Playground Check in/out' },
       ] },
-      { href: '/admin/volunteers', icon: 'users', label: 'Floater Assignments' },
+      { href: '/admin/volunteers', icon: 'users', label: 'Floater Assignments', mobileLabel: 'Floater<br>Assignments' },
       { href: '/admin/setup', icon: 'broom', label: 'Setup/Cleanup' },
       { href: '/admin/schedule', icon: 'clock', match: '/admin/class-schedule', label: 'Classes', subpages: [
         // A real bug report: "co-op main menu, classes page should have
@@ -82,7 +82,7 @@
       // GET /teachers and GET /teachers/assistants) - the group label
       // itself stays Teachers/Assistants, still an accurate umbrella name
       // for the group.
-      { href: '/admin/teachers', icon: 'user-check', label: 'Teachers/Assistants', subpages: [
+      { href: '/admin/teachers', icon: 'user-check', label: 'Teachers/Assistants', mobileLabel: 'Teachers<br>Assistants', subpages: [
         { href: '/admin/teachers', label: 'Teachers' },
         { href: '/admin/teachers/assistants', label: 'Assistants' },
         { href: '/admin/teachers/instructor-profiles', label: 'Instructor Profiles' },
@@ -245,7 +245,7 @@
     <% if (link.subpages && link.subpages.length) { %>
       <%- include('mobile-subpages-tab', { link: link }) %>
     <% } else { %>
-      <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
+      <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%- link.mobileLabel || link.label %></span></a>
     <% } %>
   <% }); %>
 </nav>

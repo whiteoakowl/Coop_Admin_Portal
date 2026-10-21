@@ -86,16 +86,23 @@
           differently-shaped dropdown sitting apart from them. Export is
           this one selected student's attendance; Download is every
           family student's - see routes/parent-family-school.js's own
-          /attendance/export.csv and /attendance/download.csv. A real
+          /attendance/export.csv and /attendance/download.pdf. A real
           follow-up request, later corrected to a PDF icon: "all
           down[load] icons across the app should be a puff [cloud]
           icon... it looks the same as export" / "Should be a pdf. Pdf
           icon." - Export keeps icon-download (tray + arrow), Download
-          now uses the distinct icon-pdf. %>
+          now uses the distinct icon-pdf. A further real request: "the
+          download should be a pdf of exactly how it would also look
+          when printing" - Download is now a real PDF (see
+          parent-family-school-attendance-print.ejs), not a CSV. "All
+          print button should show a print preview full real page on a
+          page with a print button" - Print now opens that same preview
+          page in a new tab instead of calling window.print() on this
+          live, editable calendar. %>
       <div class="roster-btn-row roster-btn-row-fit-text no-print">
         <a class="icon-btn" href="/parent/family-school/attendance/export.csv?studentId=<%= studentIdParam %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-        <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
-        <a class="icon-btn" href="/parent/family-school/attendance/download.csv" aria-label="Download CSV" title="Download CSV"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/attendance/print?studentId=<%= studentIdParam %>&year=<%= year %>&month=<%= month %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/attendance/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         <details class="filter-details">
           <summary class="roster-action-btn">Filter</summary>
           <form method="GET" action="/parent/family-school/attendance" class="filter-panel">

@@ -26,5 +26,5 @@
 const dialogId = 'mobile-subpages-' + link.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 %>
 <button type="button" class="mobile-tab-subpages-trigger" data-subpages-dialog="<%= dialogId %>" data-href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>>
-  <svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span>
+  <svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%- link.mobileLabel || link.label %></span>
 </button>

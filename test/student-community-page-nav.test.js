@@ -63,7 +63,12 @@ async function loginAsStudent() {
 function bottomTabLabels(html) {
   const match = html.match(/<nav class="admin-mobile-tabs"[\s\S]*?<\/nav>/);
   if (!match) return null;
-  return [...match[0].matchAll(/<span>([^<]+)<\/span>/g)].map((m) => m[1]);
+  // A real request ("split the words into two rows to help shrink the
+  // width of the tabs") renders some of these spans as e.g. "Reading<br>
+  // Challenge" instead of plain text - [\s\S]*? (not [^<]+) still finds
+  // the span, and the <br> -> space swap recovers the same plain label
+  // this test already asserts on, same two-row split or not.
+  return [...match[0].matchAll(/<span>([\s\S]*?)<\/span>/g)].map((m) => m[1].replace(/<br\s*\/?>/gi, ' ').trim());
 }
 
 test('a signed-in student sees their own bottom tab bar on the Calendar page, not a missing one', async () => {

@@ -2040,6 +2040,16 @@ body.public-page .roster-empty {
   }
   .admin-mobile-tabs > a.active .icon,
   .admin-mobile-tabs > button.active .icon { opacity: 1; }
+  /* A real request: "Add vertical lines between each tab for better
+     visuals." A translucent white line (not a hard-coded dark color)
+     reads against this bar's own var(--accent) background in both light
+     and dark mode, the same reasoning this app's other overlay dividers
+     on a colored surface already use. Scoped to :not(:last-child) so the
+     bar's own right edge never gets a trailing line with nothing after it. */
+  .admin-mobile-tabs > a:not(:last-child),
+  .admin-mobile-tabs > button:not(:last-child) {
+    border-right: 1px solid rgba(255, 255, 255, 0.35);
+  }
 }
 
 /* Opaque so the page body's blue background (--bg) never shows through
@@ -3413,6 +3423,26 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-risk-print-table th:nth-child(7), .class-risk-print-table td:nth-child(7) { width: 10%; }
 
 .roster-table thead th { background: var(--brand-soft); color: var(--ink); font-weight: 700; }
+
+/* The Weekly Planner's own grid (parent-family-school-weekly-planner.ejs,
+   -print.ejs) - one column per chosen date, each a tall cell holding
+   that date's own assignment list. table-layout: fixed divides the up-
+   to-7 date columns evenly instead of letting one long assignment title
+   stretch its own column at every other date's expense. vertical-align:
+   top keeps a short column's content pinned to the header instead of
+   centering in whatever the tallest column's own height turns out to
+   be. */
+.fs-weekly-plan-grid { table-layout: fixed; }
+.fs-weekly-plan-grid td { vertical-align: top; text-align: left; }
+.fs-weekly-plan-assignment-list { list-style: none; margin: 0 0 0.5rem; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.fs-weekly-plan-assignment-list li { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.4rem; }
+.fs-weekly-plan-add-btn { font-size: 0.8rem; padding: 0.3rem 0.6rem; }
+/* "Print should show the whole week on one page clean." No per-date Add
+   buttons or delete icons on the printed/PDF version - @page's own
+   landscape letter size (parent-family-school-weekly-planner-print.ejs)
+   already gives up to 7 columns real room; this just keeps what little
+   room there is free of controls nobody can click on paper. */
+.fs-weekly-plan-print-grid .fs-weekly-plan-assignment-list li { display: block; }
 
 .roster-name-col { text-align: left !important; position: sticky; left: 0; background: var(--surface); font-weight: 600; }
 .roster-table thead .roster-name-col { background: var(--brand-soft); }
@@ -13901,6 +13931,37 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .fs-attendance-day-saving { opacity: 0.55; }
 .fs-attendance-legend-present { background: var(--green); color: #fff; }
 .fs-attendance-legend-absent { background: var(--red); color: #fff; }
+
+/* The Download-as-PDF print view's own "every family student" mode
+   (parent-family-school-attendance-print.ejs, routes/parent-family-
+   school.js's own /attendance/download.pdf) - one section (heading +
+   table, wrapped together in one container) per student, each starting
+   on its own printed page rather than letting a short trailing table
+   bleed into the next student's own heading. test/print-blank-page-
+   regression.test.js locks in why this breaks AFTER each section,
+   :not(:last-child), rather than before each one: a page-break-before
+   on every item (even with a :first-child override) is the confirmed
+   "first page comes out blank" bug shape - breaking after every item
+   except the last produces the exact same visual result (a break
+   between every pair of consecutive sections) without ever asking the
+   print engine to break before the very first thing in the document. */
+.fs-print-family-section:not(:first-child) { margin-top: 2rem; }
+@media print {
+  .fs-print-family-section:not(:last-child) { page-break-after: always; break-after: page; }
+}
+
+/* A real request: "Pdf and print should show all 12 months, August-
+   July 2026-2027" (parent-family-school-attendance-print.ejs) - one
+   calendar grid per month, each starting its own printed page. Same
+   :not(:last-child) page-break-after shape as .fs-print-family-section
+   just above (see that rule's own comment on why), nested independently
+   of it - in "every family student" mode this is 12 month breaks inside
+   each already-paginated student section, not one combined sequence. */
+.fs-attendance-print-month:not(:first-child) { margin-top: 2rem; }
+.fs-attendance-print-month h3 { margin: 0 0 0.5rem; }
+@media print {
+  .fs-attendance-print-month:not(:last-child) { page-break-after: always; break-after: page; }
+}
 
 /* A real request: "Present and absent keys should be to the left, not
    centered and just under the title... Move this row to the left.

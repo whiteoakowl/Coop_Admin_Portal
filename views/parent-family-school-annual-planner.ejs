@@ -17,6 +17,27 @@
       <% } %>
     </div>
 
+    <%# A real request: "add a print, pdf and export icons. Add a
+        dropdown menu for selecting a school year." Same Export/Print/
+        Download-PDF icon-btn row the rest of Family School Management
+        already uses - see routes/parent-family-school.js's own
+        /annual-planner/export.csv, /annual-planner/print, and
+        /annual-planner/download.pdf. %>
+    <div class="roster-btn-row roster-btn-row-fit-text no-print">
+      <a class="icon-btn" href="/parent/family-school/annual-planner/export.csv?schoolYear=<%= schoolYear %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+      <a class="icon-btn" href="/parent/family-school/annual-planner/print?schoolYear=<%= schoolYear %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+      <a class="icon-btn" href="/parent/family-school/annual-planner/download.pdf?schoolYear=<%= schoolYear %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+      <form method="GET" action="/parent/family-school/annual-planner" class="roster-btn-row roster-btn-row-fit-text">
+        <label class="hint" for="annual-planner-school-year">School Year</label>
+        <select id="annual-planner-school-year" name="schoolYear" onchange="this.form.submit()">
+          <option value="all" <%= schoolYear === 'all' ? 'selected' : '' %>>All Years</option>
+          <% yearOptions.forEach(function(y) { %>
+            <option value="<%= y %>" <%= schoolYear === y ? 'selected' : '' %>><%= y %></option>
+          <% }); %>
+        </select>
+      </form>
+    </div>
+
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
@@ -38,11 +59,12 @@
           <% } else { %>
             <div class="roster-scroll">
               <table class="roster-table members-table condensed-table table-stack-mobile">
-                <thead><tr><th>Curriculum</th><th>Brand</th><th>Level</th><th>Price</th><th></th></tr></thead>
+                <thead><tr><th>Subject</th><th>Curriculum</th><th>Brand</th><th>Level</th><th>Price</th><th></th></tr></thead>
                 <tbody>
                   <% items.forEach(function(item) { %>
                     <tr>
-                      <td data-label="Curriculum" class="table-stack-heading"><%= item.name %></td>
+                      <td data-label="Subject" class="table-stack-heading"><%= item.subject || '—' %></td>
+                      <td data-label="Curriculum"><%= item.name %></td>
                       <td data-label="Brand"><%= item.brand || '' %></td>
                       <td data-label="Level"><%= item.level || '' %></td>
                       <td data-label="Price"><%= item.price != null ? '$' + Number(item.price).toFixed(2) : '' %></td>
@@ -82,6 +104,9 @@
             <% }); %>
           </select>
         </label>
+        <label>Subject
+          <input type="text" name="subject" placeholder="e.g. Math, Language Arts" />
+        </label>
         <label>Curriculum Name
           <input type="text" name="name" required />
         </label>
@@ -93,6 +118,14 @@
         </label>
         <label>Price
           <input type="number" name="price" min="0" step="0.01" />
+        </label>
+        <label>School Year
+          <select name="schoolYear">
+            <% var dialogDefaultYear = schoolYear === 'all' ? currentSchoolYearValue : schoolYear; %>
+            <% yearOptions.forEach(function(y) { %>
+              <option value="<%= y %>" <%= y === dialogDefaultYear ? 'selected' : '' %>><%= y %></option>
+            <% }); %>
+          </select>
         </label>
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>

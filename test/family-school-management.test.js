@@ -80,8 +80,12 @@ test('Family School Management nav tab appears on Parent, Student, and Main Admi
   const student = await createPortalMember({ name: 'Nav Student', familyId, memberType: 'student', roleKey: 'student' });
   const mainAdmin = await createPortalMember({ name: 'Nav Admin', familyId: null, memberType: 'admin', roleKey: 'main_admin' });
 
+  // A later real request ("split the words into two rows to help
+  // shrink the width of the tabs") renders the bottom mobile tab bar's
+  // own copy of this label as "Family School<br>Management" instead of
+  // plain text - allow either shape.
   const parentHome = await request(app).get('/parent').set('Cookie', parent.cookie);
-  assert.match(parentHome.text, />Family School Management</);
+  assert.match(parentHome.text, />Family School(?:<br\/?>| )Management</);
 
   // A later real request ("Student portal add a tab that says family
   // homeschooling...") renamed Student Portal's own nav entry for this
@@ -91,7 +95,7 @@ test('Family School Management nav tab appears on Parent, Student, and Main Admi
   assert.match(studentHome.text, />Family Homeschooling</);
 
   const mainAdminHome = await request(app).get('/main-admin').set('Cookie', mainAdmin.cookie);
-  assert.match(mainAdminHome.text, />Family School Management</);
+  assert.match(mainAdminHome.text, />Family School(?:<br\/?>| )Management</);
 });
 
 test('Main Admin Family School Management tab is just a blank Settings page', async () => {
@@ -451,9 +455,23 @@ test('Overview: Export/Download CSV buttons and the Filter checkbox set', async 
   assert.match(summaryCsv.text, /CSV Student A/);
   assert.match(summaryCsv.text, /CSV Student B/);
 
-  const detailCsv = await request(app).get('/parent/family-school/download.csv').set('Cookie', parent.cookie);
-  assert.equal(detailCsv.status, 200);
-  assert.match(detailCsv.text, /CSV Class/);
+  // A real follow-up request: "the download should be a pdf of exactly
+  // how it would also look when printing" - Download is now a real PDF
+  // (utils/pdfRender.js), not a CSV; see test/parent-family-school-
+  // print-preview-and-pdf.test.js for coverage of what it actually
+  // contains via that same data's -print.ejs preview page.
+  const detailPdf = await request(app)
+    .get('/parent/family-school/download.pdf')
+    .set('Cookie', parent.cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+  assert.equal(detailPdf.status, 200);
+  assert.equal(detailPdf.headers['content-type'], 'application/pdf');
+  assert.equal(detailPdf.body.slice(0, 5).toString(), '%PDF-');
 
   // The Filter checkbox set narrows the Overview page's own cards (not
   // the CSV downloads, which always cover the whole family). Student B
@@ -485,30 +503,53 @@ test('Grades/Attendance/Journal: Export (one student) and Download (whole family
   await createJournalEntry({ studentId: studentA.memberId, entryDate: '2026-04-01', body: '<p>Student A did great</p>', createdByAccountId: parent.accountId });
   await createJournalEntry({ studentId: studentB.memberId, entryDate: '2026-04-02', body: '<p>Student B did ok</p>', createdByAccountId: parent.accountId });
 
+  // A real follow-up request: "the download should be a pdf of exactly
+  // how it would also look when printing" - Download is now a real PDF
+  // (utils/pdfRender.js) for all three pages, not a CSV; see test/
+  // parent-family-school-print-preview-and-pdf.test.js for coverage of
+  // what it actually contains via that same data's -print.ejs preview
+  // page. getPdf here only confirms each Download route still produces
+  // one, scoped to the whole family as before.
+  async function getPdf(url, cookie) {
+    return request(app)
+      .get(url)
+      .set('Cookie', cookie)
+      .buffer(true)
+      .parse((res, cb) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => cb(null, Buffer.concat(chunks)));
+      });
+  }
+
   const gradesExport = await request(app).get(`/parent/family-school/grades/export.csv?studentId=${studentA.memberId}`).set('Cookie', parent.cookie);
   assert.match(gradesExport.text, /Export Student A/);
   assert.doesNotMatch(gradesExport.text, /Export Student B/);
-  const gradesDownload = await request(app).get('/parent/family-school/grades/download.csv').set('Cookie', parent.cookie);
-  assert.match(gradesDownload.text, /Export Student A/);
-  assert.match(gradesDownload.text, /Export Student B/);
+  const gradesDownload = await getPdf('/parent/family-school/grades/download.pdf', parent.cookie);
+  assert.equal(gradesDownload.status, 200);
+  assert.equal(gradesDownload.headers['content-type'], 'application/pdf');
+  assert.equal(gradesDownload.body.slice(0, 5).toString(), '%PDF-');
 
   const attendanceExport = await request(app).get(`/parent/family-school/attendance/export.csv?studentId=${studentA.memberId}`).set('Cookie', parent.cookie);
   assert.match(attendanceExport.text, /2026-04-01/);
   assert.doesNotMatch(attendanceExport.text, /2026-04-02/);
-  const attendanceDownload = await request(app).get('/parent/family-school/attendance/download.csv').set('Cookie', parent.cookie);
-  assert.match(attendanceDownload.text, /2026-04-01/);
-  assert.match(attendanceDownload.text, /2026-04-02/);
+  const attendanceDownload = await getPdf('/parent/family-school/attendance/download.pdf', parent.cookie);
+  assert.equal(attendanceDownload.status, 200);
+  assert.equal(attendanceDownload.headers['content-type'], 'application/pdf');
+  assert.equal(attendanceDownload.body.slice(0, 5).toString(), '%PDF-');
 
   const journalExport = await request(app).get(`/parent/family-school/journal/export.csv?studentId=${studentA.memberId}`).set('Cookie', parent.cookie);
   assert.match(journalExport.text, /Student A did great/);
   assert.doesNotMatch(journalExport.text, /Student B did ok/);
-  const journalDownload = await request(app).get('/parent/family-school/journal/download.csv').set('Cookie', parent.cookie);
-  assert.match(journalDownload.text, /Student A did great/);
-  assert.match(journalDownload.text, /Student B did ok/);
+  const journalDownload = await getPdf('/parent/family-school/journal/download.pdf', parent.cookie);
+  assert.equal(journalDownload.status, 200);
+  assert.equal(journalDownload.headers['content-type'], 'application/pdf');
+  assert.equal(journalDownload.body.slice(0, 5).toString(), '%PDF-');
 
   // Scoped to this family only.
   const otherFamilyId = await createFamily('Export Other Family');
   const otherParent = await createPortalMember({ name: 'Export Other Parent', familyId: otherFamilyId, memberType: 'parent', roleKey: 'parent' });
-  const otherGradesDownload = await request(app).get('/parent/family-school/grades/download.csv').set('Cookie', otherParent.cookie);
-  assert.doesNotMatch(otherGradesDownload.text, /Export Student/);
+  const otherGradesDownload = await getPdf('/parent/family-school/grades/download.pdf', otherParent.cookie);
+  assert.equal(otherGradesDownload.status, 200);
+  assert.equal(otherGradesDownload.body.slice(0, 5).toString(), '%PDF-');
 });

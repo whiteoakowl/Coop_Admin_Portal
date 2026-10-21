@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.5in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Annual Planner</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Annual Planner &mdash; <%= schoolYear %></p>
+      </div>
+    </div>
+
+    <% if (familyStudents.length === 0) { %>
+      <p class="roster-empty">No students in your family yet.</p>
+    <% } else { %>
+      <% familyStudents.forEach(function(s) { %>
+        <% var items = curriculumByStudent[s.id]; %>
+        <div class="fs-print-family-section">
+          <h2><%= s.name %></h2>
+          <% if (items.length === 0) { %>
+            <p class="roster-empty">No curriculum added yet.</p>
+          <% } else { %>
+            <table class="roster-table">
+              <thead><tr><th>Subject</th><th>Curriculum</th><th>Brand</th><th>Level</th><th>Price</th></tr></thead>
+              <tbody>
+                <% items.forEach(function(item) { %>
+                  <tr>
+                    <td><%= item.subject || '—' %></td>
+                    <td><%= item.name %></td>
+                    <td><%= item.brand || '' %></td>
+                    <td><%= item.level || '' %></td>
+                    <td><%= item.price != null ? '$' + Number(item.price).toFixed(2) : '' %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+      <% }); %>
+    <% } %>
+  </main>
+</body>
+</html>

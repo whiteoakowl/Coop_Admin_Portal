@@ -10,88 +10,155 @@
     <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
     <div class="roster-toolbar no-print">
       <h1>Weekly Planner</h1>
-      <% if (familyStudents.length > 0) { %>
-        <form method="GET" action="/parent/family-school/weekly-planner" class="category-filter">
-          <label for="weekly-planner-student-select">Student</label>
-          <select id="weekly-planner-student-select" name="studentId" onchange="this.form.submit()">
-            <% familyStudents.forEach(function(s) { %>
-              <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
-            <% }); %>
-          </select>
-        </form>
-      <% } %>
     </div>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <% if (familyStudents.length === 0) { %>
-      <p class="roster-empty">No students in your family yet.</p>
+    <%# A real request: "Weekly plan should allow you to make a
+        different weekly plan for each student, parent weekly plan and
+        family weekly plan." %>
+    <form method="GET" action="/parent/family-school/weekly-planner" class="category-filter no-print">
+      <label for="weekly-planner-owner-select">Plan for</label>
+      <select id="weekly-planner-owner-select" name="owner" onchange="this.form.submit()">
+        <% familyStudents.forEach(function(s) { %>
+          <option value="<%= s.id %>" <%= ownerParam === String(s.id) ? 'selected' : '' %>><%= s.name %></option>
+        <% }); %>
+        <option value="parent" <%= ownerParam === 'parent' ? 'selected' : '' %>>Parent</option>
+        <option value="family" <%= ownerParam === 'family' ? 'selected' : '' %>>Whole Family</option>
+      </select>
+    </form>
+
+    <%# "Add week button... Then it creates a grid with those dates." -
+        every week already created for the currently selected owner,
+        plus the button that opens the Add Week popup. %>
+    <div class="roster-btn-row roster-btn-row-fit-text no-print">
+      <% weeks.forEach(function(w) { %>
+        <a class="btn-secondary<% if (selectedWeek && selectedWeek.id === w.id) { %> active<% } %>" href="?owner=<%= encodeURIComponent(ownerParam) %>&weekId=<%= w.id %>"><%= w.title %></a>
+      <% }); %>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-week-dialog').showModal()">+ Add Week</button>
+    </div>
+
+    <% if (!selectedWeek) { %>
+      <% if (weeks.length === 0) { %>
+        <p class="roster-empty">No weeks yet. Click "+ Add Week" to create one.</p>
+      <% } else { %>
+        <p class="roster-empty">Pick a week above to see its grid.</p>
+      <% } %>
     <% } else { %>
-      <%# "View weekly plan grid for each student. Be able to add rows
-          and columns to create plan grid for the week per student."
-          Prev/Next Week nav mirrors Family Attendance's own Prev/Next
-          Month row exactly (same roster-btn-row-fit-text fix). %>
-      <div class="roster-btn-row roster-btn-row-fit-text">
-        <a class="btn-secondary" href="?studentId=<%= selectedStudentId %>&week=<%= prevWeek %>">&larr; Prev Week</a>
-        <strong><%= weekStartLabel %></strong>
-        <a class="btn-secondary" href="?studentId=<%= selectedStudentId %>&week=<%= nextWeek %>">Next Week &rarr;</a>
+      <%# A real request: "Add a print, pdf and export icons" (app-wide
+          convention) - Weekly Planner only ever has one real "export"
+          shape (this one week, as a PDF that matches print), so there's
+          no separate CSV Export button the way the other Family School
+          Management pages have. %>
+      <div class="roster-btn-row roster-btn-row-fit-text no-print">
+        <a class="icon-btn" href="/parent/family-school/weekly-planner/print?weekId=<%= selectedWeek.id %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/weekly-planner/download.pdf?weekId=<%= selectedWeek.id %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+        <form method="POST" action="/parent/family-school/weekly-planner/<%= selectedWeek.id %>/delete" data-confirm="Delete &quot;<%= selectedWeek.title %>&quot;? This removes every assignment in it too." class="inline-block-form">
+          <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete week" title="Delete week"><svg class="icon"><use href="#icon-trash"/></svg></button>
+        </form>
       </div>
 
       <div class="roster-scroll">
-        <table class="roster-table condensed-table fs-planner-grid-table" data-fs-planner-grid data-cell-url="/parent/family-school/weekly-planner/cell">
+        <table class="roster-table condensed-table fs-weekly-plan-grid">
           <thead>
             <tr>
-              <th></th>
-              <% weeklyGrid.columns.forEach(function(c) { %>
-                <th>
-                  <div class="fs-planner-header-cell">
-                    <span><%= c.label %></span>
-                    <form method="POST" action="/parent/family-school/weekly-planner/columns/<%= c.id %>/delete" data-confirm="Delete the &quot;<%= c.label %>&quot; column? This removes its cell content too." class="inline-block-form">
-                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete column" title="Delete column"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                    </form>
-                  </div>
-                </th>
-              <% }); %>
+              <% grid.forEach(function(d) { %><th><%= d.dateLabel %></th><% }); %>
             </tr>
           </thead>
           <tbody>
-            <% if (weeklyGrid.rows.length === 0) { %>
-              <tr><td colspan="<%= weeklyGrid.columns.length + 1 %>" class="roster-empty">No rows yet. Add one below (e.g. a subject or period).</td></tr>
-            <% } %>
-            <% weeklyGrid.rows.forEach(function(r) { %>
-              <tr>
-                <th>
-                  <div class="fs-planner-header-cell">
-                    <span><%= r.label %></span>
-                    <form method="POST" action="/parent/family-school/weekly-planner/rows/<%= r.id %>/delete" data-confirm="Delete the &quot;<%= r.label %>&quot; row? This removes its cell content too." class="inline-block-form">
-                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete row" title="Delete row"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                    </form>
-                  </div>
-                </th>
-                <% r.cells.forEach(function(cell) { %>
-                  <td>
-                    <input type="text" class="fs-planner-cell-input" data-fs-planner-cell data-row-id="<%= r.id %>" data-column-id="<%= cell.columnId %>" data-saved-content="<%= cell.content %>" value="<%= cell.content %>" />
-                  </td>
-                <% }); %>
-              </tr>
-            <% }); %>
+            <tr>
+              <% grid.forEach(function(d) { %>
+                <td>
+                  <% if (d.assignments.length === 0) { %>
+                    <p class="roster-empty">Nothing yet.</p>
+                  <% } else { %>
+                    <ul class="fs-weekly-plan-assignment-list">
+                      <% d.assignments.forEach(function(a) { %>
+                        <li>
+                          <span><% if (a.subject) { %><strong><%= a.subject %>:</strong> <% } %><%= a.title %></span>
+                          <form method="POST" action="/parent/family-school/weekly-planner/assignments/<%= a.id %>/delete" class="inline-block-form">
+                            <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete assignment" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                          </form>
+                        </li>
+                      <% }); %>
+                    </ul>
+                  <% } %>
+                  <button type="button" class="roster-action-btn fs-weekly-plan-add-btn" onclick="document.getElementById('add-assignment-dialog-<%= d.id %>').showModal()">+ Assignment</button>
+                </td>
+              <% }); %>
+            </tr>
           </tbody>
         </table>
       </div>
 
-      <div class="roster-btn-row no-print">
-        <form method="POST" action="/parent/family-school/weekly-planner/<%= weeklyGrid.planId %>/columns" class="category-filter">
-          <input type="text" name="label" placeholder="New column label" required />
-          <button type="submit" class="roster-action-btn">+ Column</button>
-        </form>
-        <form method="POST" action="/parent/family-school/weekly-planner/<%= weeklyGrid.planId %>/rows" class="category-filter">
-          <input type="text" name="label" placeholder="New row label" required />
-          <button type="submit" class="roster-action-btn">+ Row</button>
-        </form>
-      </div>
+      <%# "Add an assignment button. Pop up allows you to write subject,
+          title of assignment or dropdown to choose an assignment from
+          family management assignments from parent created classes.
+          Save, cancel. Buttons." One dialog per date column - each
+          posts straight to that one date, so there's no need for JS to
+          retarget a single shared dialog's form action. %>
+      <% grid.forEach(function(d) { %>
+        <dialog id="add-assignment-dialog-<%= d.id %>" class="class-form-dialog">
+          <form method="POST" action="/parent/family-school/weekly-planner/dates/<%= d.id %>/assignments" class="stack-form">
+            <div class="class-form-dialog-header">
+              <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
+              <h3>Add Assignment &mdash; <%= d.dateLabel %></h3>
+            </div>
+            <% if (assignmentOptions.length > 0) { %>
+              <label>Choose from a class assignment
+                <select name="contentItemId">
+                  <option value="">(write my own below instead)</option>
+                  <% assignmentOptions.forEach(function(a) { %>
+                    <option value="<%= a.id %>"><%= a.class_name %> &mdash; <%= a.title %></option>
+                  <% }); %>
+                </select>
+              </label>
+            <% } %>
+            <label>Subject
+              <input type="text" name="subject" placeholder="e.g. Math" />
+            </label>
+            <label>Title
+              <input type="text" name="title" placeholder="e.g. Chapter 3 worksheet" />
+            </label>
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Save</button>
+            </div>
+          </form>
+        </dialog>
+      <% }); %>
     <% } %>
+
+    <%# "Add week button. Popup allows you to choose up to 7 dates. And
+        add a title such as week 1, week 2 etc. Create and cancel
+        buttons." Exactly 7 plain date inputs sharing the one "date"
+        name (read back as an array - routes/parent-family-school.js's
+        own POST /weekly-planner) rather than a custom multi-date-picker
+        widget, matching this app's plain-HTML-forms style everywhere
+        else. Only the first is required - "up to 7" allows fewer. %>
+    <dialog id="add-week-dialog" class="class-form-dialog">
+      <form method="POST" action="/parent/family-school/weekly-planner" class="stack-form">
+        <div class="class-form-dialog-header">
+          <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
+          <h3>Add Week</h3>
+        </div>
+        <input type="hidden" name="ownerType" value="<%= owner.ownerType %>" />
+        <% if (owner.ownerType === 'student') { %><input type="hidden" name="studentId" value="<%= owner.studentId %>" /><% } %>
+        <label>Title
+          <input type="text" name="title" placeholder="e.g. Week 1" required />
+        </label>
+        <% for (var i = 0; i < 7; i++) { %>
+          <label>Date <%= i + 1 %><% if (i > 0) { %> <span class="hint">(optional)</span><% } %>
+            <input type="date" name="date" <%= i === 0 ? 'required' : '' %> />
+          </label>
+        <% } %>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Create</button>
+        </div>
+      </form>
+    </dialog>
   </main>
-  <script src="/js/family-school-planner.js"></script>
 </body>
 </html>

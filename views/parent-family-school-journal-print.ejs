@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.5in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Daily Learning Log</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Daily Learning Log</p>
+      </div>
+    </div>
+
+    <%
+      function renderEntries(entries) {
+    %>
+      <% if (entries.length === 0) { %>
+        <p class="roster-empty">No journal entries yet.</p>
+      <% } else { %>
+        <div class="fs-journal-log">
+          <% entries.forEach(function(e) { %>
+            <div class="fs-journal-entry">
+              <div class="fs-journal-entry-header"><strong><%= e.entry_date %></strong></div>
+              <div class="forum-editable-display"><%- e.body %></div>
+              <% if (e.attachments && e.attachments.length > 0) { %>
+                <div class="fs-journal-attachments">
+                  <% e.attachments.forEach(function(a) { %>
+                    <div class="fs-journal-attachment">
+                      <% if ((a.content_type || '').startsWith('image/')) { %>
+                        <img src="<%= a.url %>" alt="<%= a.file_name %>" class="fs-journal-attachment-image" />
+                      <% } else { %>
+                        <span class="fs-journal-attachment-file-link"><svg class="icon"><use href="#icon-file-text"/></svg> <%= a.file_name %></span>
+                      <% } %>
+                    </div>
+                  <% }); %>
+                </div>
+              <% } %>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    <%
+      }
+    %>
+
+    <% if (mode === 'single') { %>
+      <h2><%= studentLabel %></h2>
+      <% renderEntries(entries) %>
+    <% } else { %>
+      <%# Download PDF mode - every family student's own entries, the
+          same scope teacher-journal-all.csv used before this became a
+          PDF (routes/parent-family-school.js's own /journal/download.pdf). %>
+      <% familyRows.forEach(function(group) { %>
+        <div class="fs-print-family-section">
+          <h2><%= group.student.name %></h2>
+          <% renderEntries(group.entries) %>
+        </div>
+      <% }); %>
+    <% } %>
+  </main>
+</body>
+</html>

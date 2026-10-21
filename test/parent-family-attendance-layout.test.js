@@ -107,7 +107,7 @@ test('the description, legend row, month navigation, and orange buttons render i
   // same as export" / "Should be a pdf. Pdf icon." - Export keeps
   // icon-download, Download gets its own distinct icon-pdf.
   assert.match(res.text, /aria-label="Export CSV"[^>]*><svg class="icon"><use href="#icon-download"\/>/);
-  assert.match(res.text, /aria-label="Download CSV"[^>]*><svg class="icon"><use href="#icon-pdf"\/>/);
+  assert.match(res.text, /aria-label="Download PDF"[^>]*><svg class="icon"><use href="#icon-pdf"\/>/);
 });
 
 test('the year dropdown always includes the currently selected year, even an old one outside the default window', async () => {

@@ -23,6 +23,15 @@
   command = "npm install"
   publish = "public"
 
+[build.environment]
+  # A real request: "the download should be a pdf of exactly how it
+  # would also look when printing" (utils/pdfRender.js) - @sparticuz/
+  # chromium (the Lambda-sized Chromium build that backs real, browser-
+  # rendered PDFs on Netlify) requires Node ^22.17 or >=24; pinned here
+  # so a Netlify Function cold start doesn't silently fall back to
+  # whatever older default Node version Netlify would otherwise pick.
+  NODE_VERSION = "22"
+
 [functions]
   directory = "netlify/functions"
   # Node built-ins (fs, path, crypto) plus this app's own deps (express,
@@ -48,7 +57,17 @@
   # Marking both external tells Netlify to include their real
   # node_modules files in the function bundle instead of trying to
   # statically trace them.
-  external_node_modules = ["ejs", "xlsx"]
+  # `@sparticuz/chromium` ships a ~67MB Chromium binary (node_modules/
+  # @sparticuz/chromium/bin) read straight off disk at runtime (utils/
+  # pdfRender.js's own chromium.executablePath()), never require()'d
+  # itself - the same category of problem as `ejs`/`xlsx` below, so it
+  # gets the same fix: include its real node_modules files instead of
+  # letting esbuild try (and fail) to trace/bundle a binary blob. NOT
+  # confirmed against a real Netlify deploy from this sandboxed dev
+  # session - Lambda's own function-package size limit is a real risk
+  # worth checking on the first actual deploy that exercises a Download
+  # button (see utils/pdfRender.js's own header comment).
+  external_node_modules = ["ejs", "xlsx", "@sparticuz/chromium"]
   # esbuild only bundles the JS module graph it can trace via require() -
   # it has no idea these files are read straight from disk at runtime by
   # code that never `require()`s them:

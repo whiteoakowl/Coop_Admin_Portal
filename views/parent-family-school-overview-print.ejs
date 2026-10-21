@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.5in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Family School Management</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Family School Management</p>
+      </div>
+    </div>
+
+    <%
+      function gradeBadgeClass(letter) {
+        if (letter === 'A' || letter === 'B') return 'badge-pill-green';
+        if (letter === 'C') return 'badge-pill-gold';
+        if (letter === 'D' || letter === 'F') return 'badge-pill-red';
+        return 'badge-pill-gray';
+      }
+    %>
+
+    <% if (mode === 'single') { %>
+      <%# Print preview mode - the same (filtered) card grid the live
+          page itself shows, the summary Export already covers. %>
+      <% if (students.length === 0) { %>
+        <p class="roster-empty">No students in your family yet.</p>
+      <% } else { %>
+        <div class="fs-overview-grid">
+          <% students.forEach(function(s) { %>
+            <div class="fs-overview-card">
+              <div class="fs-overview-card-header">
+                <span class="member-avatar fs-overview-avatar member-avatar-<%= avatarColorFor(s.id) %>">
+                  <% if (s.photoUrl) { %><img src="<%= s.photoUrl %>" alt="" /><% } else { %><%= s.name.charAt(0).toUpperCase() %><% } %>
+                </span>
+                <div>
+                  <h3 class="fs-overview-name"><%= s.name %></h3>
+                  <p class="hint"><%= s.grade_level || 'No grade level set' %></p>
+                </div>
+              </div>
+              <div class="fs-overview-stats">
+                <div class="fs-overview-stat">
+                  <span class="fs-overview-stat-label">GPA</span>
+                  <span class="fs-overview-stat-value"><%= s.gpa != null ? s.gpa.toFixed(2) : '—' %></span>
+                </div>
+                <div class="fs-overview-stat">
+                  <span class="fs-overview-stat-label">Attendance</span>
+                  <span class="fs-overview-stat-value"><%= s.presentDays %>/<%= s.attendanceTargetDays %></span>
+                </div>
+              </div>
+              <div class="fs-overview-classes">
+                <% if (s.classes.length === 0) { %>
+                  <p class="roster-empty">Not assigned to any family classes yet.</p>
+                <% } else { %>
+                  <ul class="fs-overview-classes-list">
+                    <% s.classes.forEach(function(c) { %>
+                      <li><%= c.class_name %> <span class="badge-pill <%= gradeBadgeClass(c.gradeLetter) %>"><%= c.gradeLetter || 'No grade yet' %></span></li>
+                    <% }); %>
+                  </ul>
+                <% } %>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    <% } else { %>
+      <%# Download PDF mode - every family student's own per-class
+          breakdown, the same detail scope family-school-management-
+          detail.csv used before this became a PDF (routes/parent-
+          family-school.js's own /download.pdf). %>
+      <% students.forEach(function(s) { %>
+        <div class="fs-print-family-section">
+          <h2><%= s.name %></h2>
+          <% if (s.classes.length === 0) { %>
+            <p class="roster-empty">Not assigned to any family classes yet.</p>
+          <% } else { %>
+            <table class="roster-table">
+              <thead><tr><th>Class</th><th>Grade %</th><th>Grade Letter</th></tr></thead>
+              <tbody>
+                <% s.classes.forEach(function(c) { %>
+                  <tr><td><%= c.class_name %></td><td><%= c.gradePercent != null ? c.gradePercent.toFixed(1) : '—' %></td><td><%= c.gradeLetter || '—' %></td></tr>
+                <% }); %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+      <% }); %>
+    <% } %>
+  </main>
+</body>
+</html>

@@ -31,9 +31,8 @@ const {
   createContentItem,
   submitAssignment,
   gradeAssignmentSubmission,
-  weeklyPlanGrid,
-  addWeeklyPlanRow,
-  setWeeklyPlanCell,
+  createWeek,
+  createWeekAssignment,
 } = require('../utils/familySchool');
 
 test.after(() => {
@@ -114,23 +113,26 @@ test('Homeschool Grades shows this one student\'s own graded/ungraded assignment
   assert.match(page.text, /Not graded yet/);
 });
 
-test('Weekly Planner shows this one student\'s own grid, read-only (no add row/column or cell-edit controls)', async () => {
+test('Weekly Planner shows this one student\'s own week and the family\'s own weeks, read-only (no add/delete controls)', async () => {
   const familyId = await createFamily('Planner Family');
   const student = await createStudent('Planner Student', familyId);
-  // 2026-09-07 is a Monday - lazily creates the plan row the same way
-  // the GET route itself does.
-  const grid = await weeklyPlanGrid(student.memberId, '2026-09-07');
-  await addWeeklyPlanRow(grid.planId, 'Math');
-  const row = await db.prepare('SELECT * FROM family_school_weekly_plan_rows WHERE plan_id = ? AND label = ?').get(grid.planId, 'Math');
-  await setWeeklyPlanCell(row.id, grid.columns[0].id, 'Chapter 4');
+  const weekId = await createWeek({ familyId, ownerType: 'student', studentId: student.memberId, title: 'Week 1', dates: ['2026-09-07', '2026-09-09'], createdByAccountId: null });
+  const dateRow = await db.prepare('SELECT id FROM family_school_week_dates WHERE week_id = ? ORDER BY position LIMIT 1').get(weekId);
+  await createWeekAssignment({ weekDateId: dateRow.id, subject: 'Math', title: 'Chapter 4', contentItemId: null });
+  await createWeek({ familyId, ownerType: 'family', studentId: null, title: 'Family Week', dates: ['2026-09-10'], createdByAccountId: null });
 
-  const page = await request(app).get('/student/family-school/weekly-planner?week=2026-09-09').set('Cookie', student.cookie);
+  const listPage = await request(app).get('/student/family-school/weekly-planner').set('Cookie', student.cookie);
+  assert.equal(listPage.status, 200);
+  assert.match(listPage.text, /Week 1/);
+  assert.match(listPage.text, /Family Week/);
+
+  const page = await request(app).get(`/student/family-school/weekly-planner?weekId=${weekId}`).set('Cookie', student.cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /Math/);
   assert.match(page.text, /Chapter 4/);
-  assert.doesNotMatch(page.text, /\+ Row/);
-  assert.doesNotMatch(page.text, /\+ Column/);
-  assert.doesNotMatch(page.text, /icon-btn-danger/, 'no delete-row/column controls on the read-only student view');
+  assert.doesNotMatch(page.text, /\+ Add Week/);
+  assert.doesNotMatch(page.text, /\+ Assignment/);
+  assert.doesNotMatch(page.text, /icon-btn-danger/, 'no delete controls on the read-only student view');
 });
 
 test('a student from a DIFFERENT family never sees another family\'s homeschool data', async () => {

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%# A real request: "the download should be a pdf of exactly how it
+      would also look when printing." utils/pdfRender.js renders this
+      exact view (via req.app.render(), never through a real HTTP
+      request) to build the Download PDF - pdfBaseUrl is only ever set
+      for that internal render, since Chromium otherwise has no "current
+      page URL" of its own to resolve this page's relative asset URLs
+      (/css/styles.css, /img/logo.png) against. A real person visiting
+      this same page in their own browser (the Print button's own
+      target) never sets it, so the page's own URL already does that
+      job and this <base> tag is simply absent. %>
+  <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.5in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <%# A real request: "All print button should show a print preview
+        full real page on a page with a print button. That print button
+        will then send it to the printer." Same print-preview-header/
+        print-action-btn convention every other dedicated *-print.ejs
+        view in this app already uses (see admin-rosters-print.ejs). %>
+    <div class="print-preview-header no-print">
+      <h1>Family Attendance</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Family Attendance &mdash; <%= schoolYearLabel %> School Year</p>
+      </div>
+    </div>
+
+    <%
+      // A real request: "Pdf and print should show all 12 months,
+      // August-July 2026-2027." One calendar grid per month - this
+      // local function renders a single student's own 12 months in
+      // order, reused by both mode='single' (one student/the Whole
+      // Family aggregate) and mode='family' (looped once per student).
+      function renderMonths(months) {
+    %>
+      <% months.forEach(function(m) { %>
+        <div class="fs-attendance-print-month">
+          <h3><%= MONTH_NAMES[m.month - 1] %> <%= m.year %></h3>
+          <table class="fs-attendance-calendar">
+            <thead>
+              <tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr>
+            </thead>
+            <tbody>
+              <% m.weeks.forEach(function(week) { %>
+                <tr>
+                  <% week.forEach(function(d) { %>
+                    <% if (!d) { %>
+                      <td class="fs-attendance-day fs-attendance-day-empty"></td>
+                    <% } else {
+                      var status = m.attendanceByDate[d.date] || '';
+                    %>
+                      <td class="fs-attendance-day fs-attendance-day-<%= status || 'unmarked' %>"><%= d.day %></td>
+                    <% } %>
+                  <% }); %>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% }); %>
+    <%
+      }
+    %>
+
+    <div class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left no-print">
+      <span class="badge-pill fs-attendance-legend-present">Present</span>
+      <span class="badge-pill fs-attendance-legend-absent">Absent</span>
+    </div>
+
+    <% if (mode === 'single') { %>
+      <h2><%= studentLabel %></h2>
+      <% renderMonths(months) %>
+    <% } else { %>
+      <%# Download PDF mode - every family student's own full school
+          year, the same scope family-attendance-all.csv used before
+          this became a PDF (routes/parent-family-school.js's own
+          /attendance/download.pdf). %>
+      <% familyRows.forEach(function(group) { %>
+        <div class="fs-print-family-section">
+          <h2><%= group.student.name %></h2>
+          <% renderMonths(group.months) %>
+        </div>
+      <% }); %>
+    <% } %>
+  </main>
+</body>
+</html>

@@ -21,7 +21,7 @@
 const db = require('../db');
 const fs = require('fs');
 const path = require('path');
-const { todayISO, formatDateLabel, addDays, weekdayOf } = require('./dates');
+const { todayISO, formatDateLabel, formatDateLong } = require('./dates');
 const { byLastName } = require('./members');
 const { createStorageClient, uploadFile, deleteFile, generateKey, publicUrl } = require('./storage');
 const { urlForUpload } = require('./uploadBackend');
@@ -461,6 +461,27 @@ async function allAttendanceForStudent(studentId) {
   return db.prepare('SELECT attendance_date, status FROM family_school_attendance WHERE student_id = ? ORDER BY attendance_date').all(studentId);
 }
 
+// A real request: "Pdf and print should show all 12 months, August-
+// July 2026-2027." One calendar grid per month, August of
+// schoolYearStartYear through July of schoolYearStartYear+1 - the same
+// Aug-Jul school-year convention currentSchoolYear()/schoolYearOptions()
+// already use for Annual Planner. A single query for the whole 12-month
+// span (rather than 12 separate attendanceForStudent calls) since every
+// date in it is unique, so one shared byDate dict serves every month's
+// own grid lookup without ever mixing two months' data together.
+async function attendanceForSchoolYear(studentId, schoolYearStartYear) {
+  const rows = await db
+    .prepare('SELECT attendance_date, status FROM family_school_attendance WHERE student_id = ? AND attendance_date >= ? AND attendance_date <= ?')
+    .all(studentId, `${schoolYearStartYear}-08-01`, `${schoolYearStartYear + 1}-07-31`);
+  const byDate = {};
+  for (const r of rows) byDate[r.attendance_date] = r.status;
+  const SCHOOL_YEAR_MONTHS = [8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7];
+  return SCHOOL_YEAR_MONTHS.map((month, i) => {
+    const year = i < 5 ? schoolYearStartYear : schoolYearStartYear + 1;
+    return { year, month, weeks: monthGridDays(year, month), attendanceByDate: byDate };
+  });
+}
+
 // A plain weeks-of-the-month grid for the Attendance calendar - Sunday-
 // start, padded with null on either end so every week is a real 7-cell
 // row. Nothing event/class-schedule specific about this (unlike utils/
@@ -541,6 +562,21 @@ async function familyAttendanceForMonth(studentIds, year, month) {
     }
   });
   return byDate;
+}
+
+// The "Whole Family" aggregate version of attendanceForSchoolYear above
+// - a real request: "Pdf and print should show all 12 months, August-
+// July 2026-2027," applied to the family-aggregate view the same way it
+// applies to one student's own calendar.
+async function familyAttendanceForSchoolYear(studentIds, schoolYearStartYear) {
+  const SCHOOL_YEAR_MONTHS = [8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7];
+  const months = [];
+  for (let i = 0; i < SCHOOL_YEAR_MONTHS.length; i++) {
+    const month = SCHOOL_YEAR_MONTHS[i];
+    const year = i < 5 ? schoolYearStartYear : schoolYearStartYear + 1;
+    months.push({ year, month, weeks: monthGridDays(year, month), attendanceByDate: await familyAttendanceForMonth(studentIds, year, month) });
+  }
+  return months;
 }
 
 // The same unmarked -> present -> absent -> unmarked cycle
@@ -655,14 +691,48 @@ async function deleteJournalAttachment(id) {
 // it is organized by student and you add curriculum under each
 // student. Pop up asks for curriculum name, brand, level and price.") ---
 
-async function curriculumForStudent(studentId) {
+// A real request: "Add a dropdown menu for selecting a school year.
+// 2026-2027, 2028-2029, 2020-2021 and so on." A school year runs across
+// a calendar-year boundary (fall through spring), so "the current one"
+// depends on which half of the calendar year it is - July or later
+// means the fall term of thisYear-thisYear+1 has already started (or is
+// about to); before that, the school year that's still running started
+// LAST calendar year.
+function currentSchoolYear() {
+  const now = new Date();
+  const startYear = now.getMonth() + 1 >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${startYear}-${startYear + 1}`;
+}
+
+// currentSchoolYear is always included in the range regardless of which
+// one is actually selected, same "the selected value never drops out of
+// its own <select>" rule the Attendance page's own year dropdown already
+// follows (routes/parent-family-school.js's own yearOptions).
+function schoolYearOptions(selected) {
+  const [currentStart] = currentSchoolYear().split('-').map(Number);
+  const [selectedStart] = (selected || currentSchoolYear()).split('-').map(Number);
+  const rangeStart = Math.min(selectedStart, currentStart - 5);
+  const rangeEnd = Math.max(selectedStart, currentStart + 3);
+  const options = [];
+  for (let y = rangeStart; y <= rangeEnd; y++) options.push(`${y}-${y + 1}`);
+  return options;
+}
+
+async function curriculumForStudent(studentId, schoolYear) {
+  if (schoolYear) {
+    return db
+      .prepare('SELECT * FROM family_school_curriculum_items WHERE student_id = ? AND school_year = ? ORDER BY name COLLATE "C"')
+      .all(studentId, schoolYear);
+  }
   return db.prepare('SELECT * FROM family_school_curriculum_items WHERE student_id = ? ORDER BY name COLLATE "C"').all(studentId);
 }
 
-async function createCurriculumItem({ studentId, name, brand, level, price, createdByAccountId }) {
+async function createCurriculumItem({ studentId, name, subject, brand, level, price, schoolYear, createdByAccountId }) {
   const info = await db
-    .prepare('INSERT INTO family_school_curriculum_items (student_id, name, brand, level, price, created_by_account_id) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(studentId, name, brand || null, level || null, price != null && price !== '' ? price : null, createdByAccountId);
+    .prepare(
+      'INSERT INTO family_school_curriculum_items (student_id, name, subject, brand, level, price, school_year, created_by_account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    )
+    .run(studentId, name, subject || null, brand || null, level || null, price != null && price !== '' ? price : null, schoolYear || null, createdByAccountId);
   return info.lastInsertRowid;
 }
 
@@ -674,111 +744,110 @@ async function deleteCurriculumItem(id) {
   await db.prepare('DELETE FROM family_school_curriculum_items WHERE id = ?').run(id);
 }
 
-// --- Weekly Planner (its own subpage - a real request: "The other
-// new planner page under family school management should be called
-// schedule planner" (later renamed again: "Change schedule planner to
-// weekly planner"). Its own per-week spreadsheet grid, with a real
-// decision behind its shape:
-// "View weekly plan grid for each student. Be able to add rows and
-// columns to create plan grid for the week per student," confirmed to
-// mean one independently-editable grid per student PER CALENDAR WEEK,
-// stepped through with Prev/Next the same way family_school_attendance's
-// own calendar already is - not one single reusable template.) ---
+// --- Weekly Planner v2 (its own subpage - originally a per-student,
+// Mon-anchored implicit grid; replaced by a real follow-up request:
+// "Add week button. Popup allows you to choose up to 7 dates. And add
+// a title such as week 1, week 2 etc. Create and cancel buttons. Then
+// it creates a grid with those dates. Add an assignment button. Pop up
+// allows you to write subject, title of assignment or dropdown to
+// choose an assignment from family management assignments from parent
+// created classes. Save, cancel. Buttons... Weekly plan should allow
+// you to make a different weekly plan for each student, parent weekly
+// plan and family weekly plan." See the weekly_planner_v2 migration's
+// own header comment for why the old tables are left in place,
+// unused, rather than migrated or dropped. ---
 
-const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-// Always that week's own Monday, regardless of which day of the week
-// `dateIso` itself falls on - the Weekly Plan page's own Prev/Next
-// buttons step a whole week at a time from here, same as
-// family_school_attendance's own month math.
-function mondayOf(dateIso) {
-  const weekday = weekdayOf(dateIso); // 0=Sun..6=Sat (utils/dates.js's own weekdayOf)
-  return addDays(dateIso, weekday === 0 ? -6 : 1 - weekday);
-}
-
-async function getWeeklyPlan(studentId, weekStartDate) {
-  return db.prepare('SELECT * FROM family_school_weekly_plans WHERE student_id = ? AND week_start_date = ?').get(studentId, weekStartDate);
-}
-
-async function getWeeklyPlanById(id) {
-  return db.prepare('SELECT * FROM family_school_weekly_plans WHERE id = ?').get(id);
-}
-
-async function getWeeklyPlanColumn(id) {
-  return db.prepare('SELECT * FROM family_school_weekly_plan_columns WHERE id = ?').get(id);
-}
-
-async function getWeeklyPlanRow(id) {
-  return db.prepare('SELECT * FROM family_school_weekly_plan_rows WHERE id = ?').get(id);
-}
-
-// Lazily creates the plan row the first time this student's grid for
-// this particular week is ever opened, seeded with one column per
-// actual day of that week (Monday through Sunday, labeled by weekday
-// name) as a sensible starting point - rows start empty (a parent's own
-// subjects/periods, not something to guess), and a parent can still add
-// to or delete from the seeded columns same as any other.
-async function getOrCreateWeeklyPlan(studentId, weekStartDate) {
-  const existing = await getWeeklyPlan(studentId, weekStartDate);
-  if (existing) return existing;
-  const info = await db.prepare('INSERT INTO family_school_weekly_plans (student_id, week_start_date) VALUES (?, ?)').run(studentId, weekStartDate);
-  const planId = info.lastInsertRowid;
-  for (let i = 0; i < 7; i++) {
-    const dayIso = addDays(weekStartDate, i);
-    await db.prepare('INSERT INTO family_school_weekly_plan_columns (plan_id, label, position) VALUES (?, ?, ?)').run(planId, WEEKDAY_NAMES[weekdayOf(dayIso)], i);
+async function weeksForOwner(familyId, ownerType, studentId) {
+  if (ownerType === 'student') {
+    return db
+      .prepare("SELECT * FROM family_school_weeks WHERE family_id = ? AND owner_type = 'student' AND student_id = ? ORDER BY created_at DESC, id DESC")
+      .all(familyId, studentId);
   }
-  return { id: planId, student_id: studentId, week_start_date: weekStartDate };
+  return db.prepare('SELECT * FROM family_school_weeks WHERE family_id = ? AND owner_type = ? ORDER BY created_at DESC, id DESC').all(familyId, ownerType);
 }
 
-// The whole grid, ready to render: columns in order, each row in order
-// carrying its own cells array already lined up one-to-one with
-// `columns` (a cell with no saved content yet is just '').
-async function weeklyPlanGrid(studentId, weekStartDate) {
-  const plan = await getOrCreateWeeklyPlan(studentId, weekStartDate);
-  const columns = await db.prepare('SELECT * FROM family_school_weekly_plan_columns WHERE plan_id = ? ORDER BY position, id').all(plan.id);
-  const rows = await db.prepare('SELECT * FROM family_school_weekly_plan_rows WHERE plan_id = ? ORDER BY position, id').all(plan.id);
-  const cells =
-    rows.length > 0
-      ? await db.prepare(`SELECT * FROM family_school_weekly_plan_cells WHERE row_id IN (${rows.map(() => '?').join(',')})`).all(...rows.map((r) => r.id))
-      : [];
-  const contentByKey = {};
-  for (const c of cells) contentByKey[`${c.row_id}:${c.column_id}`] = c.content;
-  return {
-    planId: plan.id,
-    columns,
-    rows: rows.map((r) => ({ ...r, cells: columns.map((c) => ({ columnId: c.id, content: contentByKey[`${r.id}:${c.id}`] || '' })) })),
-  };
+async function getWeek(id) {
+  return db.prepare('SELECT * FROM family_school_weeks WHERE id = ?').get(id);
 }
 
-async function addWeeklyPlanColumn(planId, label) {
+// dates is an array of 1-7 'YYYY-MM-DD' strings, in the order the
+// parent picked them - not necessarily chronological, and not
+// necessarily a real consecutive calendar week (the whole point of
+// "choose up to 7 dates" over the old implicit Mon-Sun grid).
+async function createWeek({ familyId, ownerType, studentId, title, dates, createdByAccountId }) {
+  const week = await db
+    .prepare('INSERT INTO family_school_weeks (family_id, owner_type, student_id, title, created_by_account_id) VALUES (?, ?, ?, ?, ?) RETURNING id')
+    .get(familyId, ownerType, ownerType === 'student' ? studentId : null, title, createdByAccountId);
+  for (let i = 0; i < dates.length; i++) {
+    await db.prepare('INSERT INTO family_school_week_dates (week_id, date, position) VALUES (?, ?, ?)').run(week.id, dates[i], i);
+  }
+  return week.id;
+}
+
+async function deleteWeek(id) {
+  await db.prepare('DELETE FROM family_school_weeks WHERE id = ?').run(id);
+}
+
+async function getWeekDate(id) {
+  return db.prepare('SELECT * FROM family_school_week_dates WHERE id = ?').get(id);
+}
+
+// The whole grid, ready to render: each chosen date in the order it was
+// picked, carrying its own assignments array.
+async function weekGrid(weekId) {
+  const dates = await db.prepare('SELECT * FROM family_school_week_dates WHERE week_id = ? ORDER BY position, id').all(weekId);
+  for (const d of dates) {
+    d.assignments = await db.prepare('SELECT * FROM family_school_week_assignments WHERE week_date_id = ? ORDER BY position, id').all(d.id);
+  }
+  return dates;
+}
+
+// "Print should show the whole week on one page clean. Title should be
+// the students name and the date range for the week." A single date
+// reads as just that one date; several read as "earliest - latest"
+// regardless of pick order, since a printed title should read
+// chronologically even if the dates weren't picked that way.
+function weekDateRangeLabel(dates) {
+  if (dates.length === 0) return '';
+  const sorted = [...dates].map((d) => d.date).sort();
+  if (sorted.length === 1) return formatDateLong(sorted[0]);
+  return `${formatDateLong(sorted[0])} - ${formatDateLong(sorted[sorted.length - 1])}`;
+}
+
+async function createWeekAssignment({ weekDateId, subject, title, contentItemId }) {
   const { next_position: nextPosition } = await db
-    .prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM family_school_weekly_plan_columns WHERE plan_id = ?')
-    .get(planId);
-  await db.prepare('INSERT INTO family_school_weekly_plan_columns (plan_id, label, position) VALUES (?, ?, ?)').run(planId, label, nextPosition);
+    .prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM family_school_week_assignments WHERE week_date_id = ?')
+    .get(weekDateId);
+  const assignment = await db
+    .prepare('INSERT INTO family_school_week_assignments (week_date_id, subject, title, content_item_id, position) VALUES (?, ?, ?, ?, ?) RETURNING id')
+    .get(weekDateId, subject || null, title, contentItemId || null, nextPosition);
+  return assignment.id;
 }
 
-async function addWeeklyPlanRow(planId, label) {
-  const { next_position: nextPosition } = await db
-    .prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM family_school_weekly_plan_rows WHERE plan_id = ?')
-    .get(planId);
-  await db.prepare('INSERT INTO family_school_weekly_plan_rows (plan_id, label, position) VALUES (?, ?, ?)').run(planId, label, nextPosition);
+async function getWeekAssignment(id) {
+  return db.prepare('SELECT * FROM family_school_week_assignments WHERE id = ?').get(id);
 }
 
-async function deleteWeeklyPlanColumn(id) {
-  await db.prepare('DELETE FROM family_school_weekly_plan_columns WHERE id = ?').run(id);
+async function deleteWeekAssignment(id) {
+  await db.prepare('DELETE FROM family_school_week_assignments WHERE id = ?').run(id);
 }
 
-async function deleteWeeklyPlanRow(id) {
-  await db.prepare('DELETE FROM family_school_weekly_plan_rows WHERE id = ?').run(id);
-}
-
-async function setWeeklyPlanCell(rowId, columnId, content) {
-  await db
+// "Dropdown to choose an assignment from family management assignments
+// from parent created classes" - every assignment-type content item
+// (not video/text/file) across every class this family has ever
+// created, regardless of which student(s) it's assigned to - the
+// planner entry this backs isn't itself student-scoped the way a real
+// assignment submission is.
+async function assignmentOptionsForFamily(familyId) {
+  return db
     .prepare(
-      `INSERT INTO family_school_weekly_plan_cells (row_id, column_id, content, updated_at) VALUES (?, ?, ?, now_text())
-       ON CONFLICT (row_id, column_id) DO UPDATE SET content = excluded.content, updated_at = now_text()`
+      `SELECT ci.id, ci.title, c.class_name FROM family_school_content_items ci
+       JOIN family_school_lessons l ON l.id = ci.lesson_id
+       JOIN family_school_classes c ON c.id = l.class_id
+       WHERE c.family_id = ? AND ci.type IN ('assignment_upload', 'assignment_submission')
+       ORDER BY c.class_name COLLATE "C", ci.title COLLATE "C"`
     )
-    .run(rowId, columnId, content || null);
+    .all(familyId);
 }
 
 module.exports = {
@@ -817,8 +886,10 @@ module.exports = {
   monthGridDays,
   attendanceForStudent,
   allAttendanceForStudent,
+  attendanceForSchoolYear,
   toggleAttendance,
   familyAttendanceForMonth,
+  familyAttendanceForSchoolYear,
   toggleFamilyAttendance,
   journalEntriesForStudent,
   getJournalEntry,
@@ -829,18 +900,21 @@ module.exports = {
   getJournalAttachment,
   addJournalAttachment,
   deleteJournalAttachment,
+  currentSchoolYear,
+  schoolYearOptions,
   curriculumForStudent,
   createCurriculumItem,
   getCurriculumItem,
   deleteCurriculumItem,
-  mondayOf,
-  getWeeklyPlanById,
-  getWeeklyPlanColumn,
-  getWeeklyPlanRow,
-  weeklyPlanGrid,
-  addWeeklyPlanColumn,
-  addWeeklyPlanRow,
-  deleteWeeklyPlanColumn,
-  deleteWeeklyPlanRow,
-  setWeeklyPlanCell,
+  weeksForOwner,
+  getWeek,
+  createWeek,
+  deleteWeek,
+  getWeekDate,
+  weekGrid,
+  weekDateRangeLabel,
+  createWeekAssignment,
+  getWeekAssignment,
+  deleteWeekAssignment,
+  assignmentOptionsForFamily,
 };

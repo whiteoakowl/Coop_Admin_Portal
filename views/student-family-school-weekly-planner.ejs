@@ -9,37 +9,49 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Weekly Planner</h1>
 
+    <%# Read-only - a student's own weeks, plus every Whole Family week
+        (routes/student-family-school.js's own GET /family-school/
+        weekly-planner), never a "Parent" week. %>
     <div class="roster-btn-row roster-btn-row-fit-text">
-      <a class="btn-secondary" href="?week=<%= prevWeek %>">&larr; Prev Week</a>
-      <strong><%= weekStartLabel %></strong>
-      <a class="btn-secondary" href="?week=<%= nextWeek %>">Next Week &rarr;</a>
+      <% weeks.forEach(function(w) { %>
+        <a class="btn-secondary<% if (selectedWeek && selectedWeek.id === w.id) { %> active<% } %>" href="?weekId=<%= w.id %>"><%= w.title %></a>
+      <% }); %>
     </div>
 
-    <div class="roster-scroll">
-      <table class="roster-table condensed-table fs-planner-grid-table">
-        <thead>
-          <tr>
-            <th></th>
-            <% weeklyGrid.columns.forEach(function(c) { %>
-              <th><%= c.label %></th>
-            <% }); %>
-          </tr>
-        </thead>
-        <tbody>
-          <% if (weeklyGrid.rows.length === 0) { %>
-            <tr><td colspan="<%= weeklyGrid.columns.length + 1 %>" class="roster-empty">Nothing planned for this week yet.</td></tr>
-          <% } %>
-          <% weeklyGrid.rows.forEach(function(r) { %>
+    <% if (!selectedWeek) { %>
+      <% if (weeks.length === 0) { %>
+        <p class="roster-empty">No weeks planned yet.</p>
+      <% } else { %>
+        <p class="roster-empty">Pick a week above to see its grid.</p>
+      <% } %>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table fs-weekly-plan-grid">
+          <thead>
             <tr>
-              <th><%= r.label %></th>
-              <% r.cells.forEach(function(cell) { %>
-                <td><%= cell.content %></td>
+              <% grid.forEach(function(d) { %><th><%= d.dateLabel %></th><% }); %>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <% grid.forEach(function(d) { %>
+                <td>
+                  <% if (d.assignments.length === 0) { %>
+                    <p class="roster-empty">Nothing yet.</p>
+                  <% } else { %>
+                    <ul class="fs-weekly-plan-assignment-list">
+                      <% d.assignments.forEach(function(a) { %>
+                        <li><% if (a.subject) { %><strong><%= a.subject %>:</strong> <% } %><%= a.title %></li>
+                      <% }); %>
+                    </ul>
+                  <% } %>
+                </td>
               <% }); %>
             </tr>
-          <% }); %>
-        </tbody>
-      </table>
-    </div>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
   </main>
 </body>
 </html>

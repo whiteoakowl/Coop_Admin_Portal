@@ -12,7 +12,7 @@ const multer = require('multer');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
 const { lessonAttachmentFileFilter } = require('../utils/uploads');
-const { todayISO, isValidISODate, addDays, formatDateLabel } = require('../utils/dates');
+const { formatDateLabel } = require('../utils/dates');
 const {
   classesForStudent,
   lessonsForStudentView,
@@ -24,8 +24,8 @@ const {
   saveAttachment,
   overviewForFamily,
   gradesForStudent,
-  mondayOf,
-  weeklyPlanGrid,
+  weeksForOwner,
+  weekGrid,
 } = require('../utils/familySchool');
 
 router.use(requirePortalAuth, requirePortal('student'));
@@ -57,15 +57,30 @@ router.get('/family-school/grades', async (req, res) => {
   res.render('student-family-school-grades', { title: 'Homeschool Grades', grades: await gradesForStudent(member.id) });
 });
 
+// Read-only, same as every other route in this file - a student sees
+// their own weeks (owner_type='student', this student's own id) and
+// every Whole Family week (owner_type='family'), but never a "Parent"
+// week (routes/parent-family-school.js's own 'parent' owner type) -
+// that's a parent's own personal planning, not something to show a
+// student. Picking a week shows its grid; nothing here can add,
+// delete, or print one of those - only the parent who created it can.
 router.get('/family-school/weekly-planner', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
-  const weekStartDate = mondayOf(isValidISODate(req.query.week) ? req.query.week : todayISO());
+  const ownWeeks = await weeksForOwner(member.family_id, 'student', member.id);
+  const familyWeeks = await weeksForOwner(member.family_id, 'family', null);
+  const weeks = [...ownWeeks, ...familyWeeks];
+  const selectedWeekId = req.query.weekId ? parseInt(req.query.weekId, 10) : null;
+  const selectedWeek = selectedWeekId ? weeks.find((w) => w.id === selectedWeekId) : null;
+  let grid = null;
+  if (selectedWeek) {
+    grid = await weekGrid(selectedWeek.id);
+    grid.forEach((d) => { d.dateLabel = formatDateLabel(d.date); });
+  }
   res.render('student-family-school-weekly-planner', {
     title: 'Weekly Planner',
-    weeklyGrid: await weeklyPlanGrid(member.id, weekStartDate),
-    weekStartLabel: formatDateLabel(weekStartDate),
-    prevWeek: addDays(weekStartDate, -7),
-    nextWeek: addDays(weekStartDate, 7),
+    weeks,
+    selectedWeek,
+    grid,
   });
 });
 
