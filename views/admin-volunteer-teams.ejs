@@ -40,6 +40,7 @@
               print.ejs) with its own Print button, instead of jumping
               straight to the OS print dialog off this live edit page. %>
           <a class="roster-action-btn print-action-btn" href="/admin/volunteers/<%= day %>/teams/print?semesterId=<%= semesterId %>" target="_blank">Print</a>
+          <a class="icon-btn" href="/admin/volunteers/<%= day %>/teams/download.pdf?semesterId=<%= semesterId %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         </div>
       </div>
 

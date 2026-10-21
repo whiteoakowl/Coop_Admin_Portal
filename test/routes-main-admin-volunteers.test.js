@@ -54,6 +54,23 @@ async function loginAsMainAdmin() {
   return { cookie, csrfToken: extractCsrf(page.text) };
 }
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - buffers the binary response so the
+// PDF bytes can actually be checked, the same way test/parent-family-
+// school-print-preview-and-pdf.test.js does for its own download.pdf
+// routes.
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
 let familyCounter = 0;
 async function createFamily() {
   familyCounter += 1;
@@ -519,6 +536,10 @@ test('Committee detail: Print button links to a dedicated preview page showing t
   assert.equal(detail.status, 200);
   assert.match(detail.text, new RegExp(`href="/main-admin/volunteers/committees/${committee.id}/print" target="_blank"`), 'Print button should link to the preview page, not call window.print() on itself');
   assert.doesNotMatch(detail.text, /icon-btn roster-action-btn-fit" onclick="window\.print\(\)"/, 'the old direct-to-print-dialog button should be gone');
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - Download PDF sits right next to
+  // Print.
+  assert.match(detail.text, new RegExp(`href="/main-admin/volunteers/committees/${committee.id}/download\\.pdf" aria-label="Download PDF"`));
 
   const preview = await request(app).get(`/main-admin/volunteers/committees/${committee.id}/print`).set('Cookie', admin.cookie);
   assert.equal(preview.status, 200);
@@ -528,6 +549,12 @@ test('Committee detail: Print button links to a dedicated preview page showing t
   assert.match(preview.text, /Decorations/);
   assert.match(preview.text, new RegExp(`VolParent${family.familyId} Jones${family.familyId}`), 'should show the specific committee\'s own signed-up member');
   assert.doesNotMatch(preview.text, /id="add-member-dialog"/, 'read-only preview should have no Add Member/Add Position dialogs');
+
+  const pdfRes = await getBuffer(`/main-admin/volunteers/committees/${committee.id}/download.pdf`, admin.cookie);
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.match(pdfRes.headers['content-disposition'], /attachment; filename="Print-Preview-Committee-committee\.pdf"/);
+  assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
 });
 
 test('Sign-Up List detail: Print button links to a dedicated preview page showing that list\'s own items, read-only', async () => {
@@ -540,6 +567,10 @@ test('Sign-Up List detail: Print button links to a dedicated preview page showin
   assert.equal(detail.status, 200);
   assert.match(detail.text, new RegExp(`href="/main-admin/volunteers/signup-lists/${list.id}/print" target="_blank"`), 'Print button should link to the preview page, not call window.print() on itself');
   assert.doesNotMatch(detail.text, /icon-btn" onclick="window\.print\(\)"/, 'the old direct-to-print-dialog button should be gone');
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - Download PDF sits right next to
+  // Print.
+  assert.match(detail.text, new RegExp(`href="/main-admin/volunteers/signup-lists/${list.id}/download\\.pdf" aria-label="Download PDF"`));
 
   const preview = await request(app).get(`/main-admin/volunteers/signup-lists/${list.id}/print`).set('Cookie', admin.cookie);
   assert.equal(preview.status, 200);
@@ -548,6 +579,12 @@ test('Sign-Up List detail: Print button links to a dedicated preview page showin
   assert.match(preview.text, /Print Preview Signup List/);
   assert.match(preview.text, /Paper Plates/);
   assert.doesNotMatch(preview.text, /id="add-item-dialog"/, 'read-only preview should have no Add Item dialog');
+
+  const pdfRes = await getBuffer(`/main-admin/volunteers/signup-lists/${list.id}/download.pdf`, admin.cookie);
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.match(pdfRes.headers['content-disposition'], /attachment; filename="Print-Preview-Signup-List-signup-list\.pdf"/);
+  assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
 });
 
 test('Volunteer List detail: Print button links to a dedicated preview page showing that list\'s own shifts, read-only', async () => {
@@ -564,6 +601,10 @@ test('Volunteer List detail: Print button links to a dedicated preview page show
   assert.equal(detail.status, 200);
   assert.match(detail.text, new RegExp(`href="/main-admin/volunteers/volunteer-lists/${list.id}/print" target="_blank"`), 'Print button should link to the preview page, not call window.print() on itself');
   assert.doesNotMatch(detail.text, /icon-btn" onclick="window\.print\(\)"/, 'the old direct-to-print-dialog button should be gone');
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - Download PDF sits right next to
+  // Print.
+  assert.match(detail.text, new RegExp(`href="/main-admin/volunteers/volunteer-lists/${list.id}/download\\.pdf" aria-label="Download PDF"`));
 
   const preview = await request(app).get(`/main-admin/volunteers/volunteer-lists/${list.id}/print`).set('Cookie', admin.cookie);
   assert.equal(preview.status, 200);
@@ -573,6 +614,12 @@ test('Volunteer List detail: Print button links to a dedicated preview page show
   assert.match(preview.text, /Setup Crew/);
   assert.match(preview.text, /2027-11-01/);
   assert.doesNotMatch(preview.text, /id="add-shift-dialog"/, 'read-only preview should have no Add Shift dialog');
+
+  const pdfRes = await getBuffer(`/main-admin/volunteers/volunteer-lists/${list.id}/download.pdf`, admin.cookie);
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.match(pdfRes.headers['content-disposition'], /attachment; filename="Print-Preview-Volunteer-List-volunteer-list\.pdf"/);
+  assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
 });
 
 test('the pre-existing Floater Assignments feature (utils/volunteers.js) is untouched by the new Volunteers section', async () => {
