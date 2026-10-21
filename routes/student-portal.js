@@ -468,6 +468,20 @@ router.get('/diploma', async (req, res) => {
   res.render('student-diploma', { title: 'Diploma', member, diploma });
 });
 
+// A real request: "All print button should show a print preview full
+// real page on a page with a print button." This page's own Print
+// button used to call window.print() directly on itself - lands on a
+// dedicated read-only preview page instead, same pattern as every other
+// print button site-wide, reusing the exact same partials/diploma-
+// certificate.ejs markup Parent Portal's own diploma print page
+// (routes/parent-portal.js's /academics/diplomas/:studentId/print) already
+// renders.
+router.get('/diploma/print', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const diploma = member ? await diplomaForStudent(member.id) : null;
+  res.render('student-diploma-print', { title: 'Diploma', member, diploma });
+});
+
 // Resource Links - a real request: Student Portal should have "resource
 // links". Read-only: reuses utils/resourceLinks.js's role-scoped list
 // exactly as Main/Co-op Admin curate it, no student-side editing.

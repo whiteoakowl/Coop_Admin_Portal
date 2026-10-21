@@ -12,7 +12,7 @@
     <% if (!diploma) { %>
       <p class="roster-empty">No diploma has been issued yet.</p>
     <% } else { %>
-      <button type="button" class="roster-action-btn print-action-btn no-print" onclick="window.print()">Print</button>
+      <a class="roster-action-btn print-action-btn no-print" href="/student/diploma/print" target="_blank">Print</a>
       <%- include('partials/diploma-certificate', { diploma, member }) %>
     <% } %>
   </main>
