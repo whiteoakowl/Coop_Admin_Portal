@@ -30,6 +30,7 @@
           <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
           <a class="icon-btn" href="/admin/setup/<%= day %>/assignments/export.csv?semesterId=<%= semesterId %><%= selectedDate ? '&date=' + selectedDate : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
           <a class="icon-btn" href="/admin/setup/<%= day %>/assignments/print?semesterId=<%= semesterId %><%= selectedDate ? '&date=' + selectedDate : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+          <a class="icon-btn" href="/admin/setup/<%= day %>/assignments/download.pdf?semesterId=<%= semesterId %><%= selectedDate ? '&date=' + selectedDate : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         </div>
       </div>
 

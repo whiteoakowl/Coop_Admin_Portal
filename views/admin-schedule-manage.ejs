@@ -11,6 +11,7 @@
       <div><h1><%= member.name %></h1></div>
       <div class="roster-btn-row no-print">
         <a class="roster-action-btn print-action-btn" href="/admin/schedule/print?memberId=<%= member.id %>" target="_blank">Print Schedule</a>
+        <a class="icon-btn" href="/admin/schedule/download.pdf?memberId=<%= member.id %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
       </div>
     </div>
 

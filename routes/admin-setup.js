@@ -12,6 +12,7 @@ const {
 } = require('../utils/classSchedule');
 const { comboSemesterId, qsSemester, appendSemester, findComboId } = require('../utils/scheduleComboLinks');
 const { isValidISODate, formatDateLabel } = require('../utils/dates');
+const { renderViewToPdf } = require('../utils/pdfRender');
 const {
   teamsForDay,
   setTeamLeader,
@@ -121,6 +122,27 @@ router.get('/setup/:day/teams/print', requireAdmin, requireClassDay, async (req,
     dayLabel: DAY_LABELS[day],
     teams: await teamsWithMembers(day, await resolveSemesterId(comboSemesterId(req))),
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - same data the Print preview above renders,
+// now a PDF built from the exact same -print.ejs view.
+router.get('/setup/:day/teams/download.pdf', requireAdmin, requireClassDay, async (req, res) => {
+  const day = req.params.day;
+  const pdf = await renderViewToPdf(req, 'admin-setup-teams-print', {
+    title: `${DAY_LABELS[day]} Setup/Cleanup Teams`,
+    day,
+    dayLabel: DAY_LABELS[day],
+    teams: await teamsWithMembers(day, await resolveSemesterId(comboSemesterId(req))),
+    // partials/admin-nav reads isFullAdmin straight off res.locals on a
+    // normal res.render() - req.app.render() (what renderViewToPdf uses
+    // under the hood) never sees res.locals at all, so it has to be
+    // passed through explicitly here or the nav partial throws.
+    isFullAdmin: res.locals.isFullAdmin,
+  });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${day}-setup-cleanup-teams.pdf"`);
+  res.send(pdf);
 });
 
 router.post('/setup/:day/teams', requireAdmin, requireClassDay, async (req, res) => {
@@ -301,6 +323,32 @@ router.get('/setup/:day/assignments/print', requireAdmin, requireClassDay, async
     dateLabel: selectedDate ? formatDateLabel(selectedDate) : null,
     cards: selectedDate ? await assignmentCardsForDate(day, selectedDate, semesterId) : [],
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - same data the Print preview above renders,
+// now a PDF built from the exact same -print.ejs view.
+router.get('/setup/:day/assignments/download.pdf', requireAdmin, requireClassDay, async (req, res) => {
+  const day = req.params.day;
+  const semesterId = await resolveSemesterId(comboSemesterId(req));
+  const dates = await datesForDay(day, semesterId);
+  const { upcoming } = splitDatesByToday(dates);
+  const selectedDate = upcoming.includes(req.query.date) ? req.query.date : upcoming[0] || null;
+
+  const pdf = await renderViewToPdf(req, 'admin-setup-assignments-print', {
+    title: `${DAY_LABELS[day]} Setup/Cleanup Assignments`,
+    day,
+    dayLabel: DAY_LABELS[day],
+    selectedDate,
+    dateLabel: selectedDate ? formatDateLabel(selectedDate) : null,
+    cards: selectedDate ? await assignmentCardsForDate(day, selectedDate, semesterId) : [],
+    // See the Teams download.pdf route's own comment above on why
+    // isFullAdmin has to be passed through by hand here.
+    isFullAdmin: res.locals.isFullAdmin,
+  });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${day}-setup-cleanup-assignments.pdf"`);
+  res.send(pdf);
 });
 
 // A real request: "when adding dates to setup/cleanup it should stay on
@@ -661,6 +709,25 @@ router.get('/setup/:day/tasks/print', requireAdmin, requireClassDay, async (req,
     dayLabel: DAY_LABELS[day],
     sections: await taskListSectionsForDay(day, await resolveSemesterId(comboSemesterId(req))),
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - same data the Print preview above renders,
+// now a PDF built from the exact same -print.ejs view.
+router.get('/setup/:day/tasks/download.pdf', requireAdmin, requireClassDay, async (req, res) => {
+  const day = req.params.day;
+  const pdf = await renderViewToPdf(req, 'admin-setup-tasks-print', {
+    title: `${DAY_LABELS[day]} Task List`,
+    day,
+    dayLabel: DAY_LABELS[day],
+    sections: await taskListSectionsForDay(day, await resolveSemesterId(comboSemesterId(req))),
+    // See the Teams download.pdf route's own comment above on why
+    // isFullAdmin has to be passed through by hand here.
+    isFullAdmin: res.locals.isFullAdmin,
+  });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${day}-task-list.pdf"`);
+  res.send(pdf);
 });
 
 module.exports = router;
