@@ -13,6 +13,7 @@
       <p class="roster-empty">No diploma has been issued yet.</p>
     <% } else { %>
       <a class="roster-action-btn print-action-btn no-print" href="/student/diploma/print" target="_blank">Print</a>
+      <a class="icon-btn no-print" href="/student/diploma/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
       <%- include('partials/diploma-certificate', { diploma, member }) %>
     <% } %>
   </main>

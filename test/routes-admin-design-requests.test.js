@@ -35,6 +35,20 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
+// Same buffered-binary-response idiom test/parent-family-school-print-
+// preview-and-pdf.test.js already uses to check a real PDF body.
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
 test('Design/Print hub Requests tab', async (t) => {
   const cookie = await loginAsAdmin();
   const { lastInsertRowid: memberId } = await db
@@ -77,9 +91,10 @@ test('Design/Print hub Requests tab', async (t) => {
     assert.match(res.text, /Jordan Requestor/);
   });
 
-  await t.test('the Print button on the Requests tab is a link to a dedicated print preview page', async () => {
+  await t.test('the Print button on the Requests tab is a link to a dedicated print preview page, and Download PDF sits right next to it', async () => {
     const res = await request(app).get('/admin/design?tab=requests&archived=1').set('Cookie', cookie);
     assert.match(res.text, /<a class="icon-btn" href="\/admin\/design\/requests\/print\?archived=1" target="_blank" aria-label="Print"/);
+    assert.match(res.text, /<a class="icon-btn" href="\/admin\/design\/requests\/download\.pdf\?archived=1" aria-label="Download PDF"/);
   });
 
   await t.test('GET /admin/design/requests/print renders a print preview with the request', async () => {
@@ -88,5 +103,16 @@ test('Design/Print hub Requests tab', async (t) => {
     assert.match(res.text, /print-preview-header/);
     assert.match(res.text, /onclick="window\.print\(\)"/);
     assert.match(res.text, /Jordan Requestor/);
+  });
+
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - same scope (archived=1) and same
+  // request the Print preview above renders, now a real PDF.
+  await t.test('GET /admin/design/requests/download.pdf sends a real PDF of that same preview', async () => {
+    const res = await getBuffer('/admin/design/requests/download.pdf?archived=1', cookie);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers['content-type'], 'application/pdf');
+    assert.match(res.headers['content-disposition'], /attachment; filename="name-tag-archived\.pdf"/);
+    assert.equal(res.body.slice(0, 5).toString(), '%PDF-');
   });
 });

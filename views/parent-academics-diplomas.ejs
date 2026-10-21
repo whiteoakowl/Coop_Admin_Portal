@@ -24,6 +24,7 @@
           <%- include('partials/diploma-certificate', { diploma: rec.diploma, member: rec.child, compact: true }) %>
           <div class="roster-btn-row">
             <a class="roster-action-btn print-action-btn" href="/parent/academics/diplomas/<%= rec.child.id %>/print" target="_blank">Print</a>
+            <a class="icon-btn" href="/parent/academics/diplomas/<%= rec.child.id %>/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
             <button type="button" class="roster-action-btn" onclick="document.getElementById('diploma-dialog-<%= rec.child.id %>').showModal()">Edit Design</button>
           </div>
         <% } else { %>

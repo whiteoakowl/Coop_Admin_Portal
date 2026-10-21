@@ -1,6 +1,17 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <%# A real request: "the download should be a pdf of exactly how it
+      would also look when printing." utils/pdfRender.js renders this
+      exact view (via req.app.render(), never through a real HTTP
+      request) to build the Download PDF - pdfBaseUrl is only ever set
+      for that internal render, since Chromium otherwise has no "current
+      page URL" of its own to resolve this page's relative asset URLs
+      (/css/styles.css, /img/logo.png) against. A real person visiting
+      this same page in their own browser (the Print button's own
+      target) never sets it, so the page's own URL already does that
+      job and this <base> tag is simply absent. %>
+  <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
   <%- include('partials/head', { title }) %>
   <style>@page { size: letter; margin: 0; }</style>
 </head>
