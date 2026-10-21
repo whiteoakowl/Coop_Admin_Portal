@@ -49,6 +49,8 @@ const {
   attendanceForStudent,
   allAttendanceForStudent,
   toggleAttendance,
+  familyAttendanceForMonth,
+  toggleFamilyAttendance,
   monthGridDays,
   journalEntriesForStudent,
   createJournalEntry,
@@ -489,7 +491,21 @@ router.post('/family-school/grades/:contentItemId/:studentId', async (req, res) 
 router.get('/family-school/attendance', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
-  const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
+  // A real request: "attendance drop down to choose one of your
+  // children or family. Can take attendance by individual child or
+  // select family and take attendance that will appear on all
+  // individual attendance calendars for each child/student." The
+  // literal string "family" is checked before the existing parseInt
+  // path below (parseInt('family', 10) is NaN, which would otherwise
+  // silently fall through to "no student selected").
+  const isFamilyMode = req.query.studentId === 'family';
+  const selectedStudentId = isFamilyMode
+    ? null
+    : req.query.studentId
+      ? parseInt(req.query.studentId, 10)
+      : familyStudents[0]
+        ? familyStudents[0].id
+        : null;
   const isOwnStudent = selectedStudentId && familyStudents.some((s) => s.id === selectedStudentId);
   const now = new Date();
   const year = req.query.year ? parseInt(req.query.year, 10) : now.getUTCFullYear();
@@ -504,16 +520,38 @@ router.get('/family-school/attendance', async (req, res) => {
   const yearRangeEnd = Math.max(year, currentYear + 1);
   const yearOptions = [];
   for (let y = yearRangeStart; y <= yearRangeEnd; y++) yearOptions.push(y);
+  let attendanceByDate = {};
+  if (isFamilyMode) {
+    attendanceByDate = await familyAttendanceForMonth(familyStudents.map((s) => s.id), year, month);
+  } else if (isOwnStudent) {
+    attendanceByDate = await attendanceForStudent(selectedStudentId, year, month);
+  }
   res.render('parent-family-school-attendance', {
     title: 'Family Attendance',
     familyStudents,
     selectedStudentId: isOwnStudent ? selectedStudentId : null,
+    isFamilyMode,
     year,
     month,
     yearOptions,
     weeks: monthGridDays(year, month),
-    attendanceByDate: isOwnStudent ? await attendanceForStudent(selectedStudentId, year, month) : {},
+    attendanceByDate,
   });
+});
+
+// A real request: "select family and take attendance that will appear
+// on all individual attendance calendars for each child/student." -
+// registered before the single-student toggle route below, since
+// Express would otherwise match "family" as that route's own
+// :studentId param.
+router.post('/family-school/attendance/family/toggle', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  if (familyStudents.length === 0) return res.status(404).json({ ok: false });
+  const date = (req.body.date || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ ok: false });
+  const status = await toggleFamilyAttendance(familyStudents.map((s) => s.id), date);
+  res.json({ ok: true, status });
 });
 
 // AJAX endpoint (public/js/family-school-attendance.js) - cycles one
@@ -533,6 +571,17 @@ router.post('/family-school/attendance/:studentId/toggle', async (req, res) => {
 router.get('/family-school/attendance/export.csv', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
+  // "Whole Family" has no single student to export, so Export CSV
+  // falls back to the same every-student rows Download CSV already
+  // sends (below) rather than exporting nothing.
+  if (req.query.studentId === 'family') {
+    const lines = [toCsvRow(['Student', 'Date', 'Status'])];
+    for (const student of familyStudents) {
+      const rows = await allAttendanceForStudent(student.id);
+      for (const r of rows) lines.push(toCsvRow([student.name, r.attendance_date, r.status]));
+    }
+    return sendCsv(res, 'family-attendance.csv', lines);
+  }
   const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
   const student = familyStudents.find((s) => s.id === selectedStudentId);
   const rows = student ? await allAttendanceForStudent(student.id) : [];

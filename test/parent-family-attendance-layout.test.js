@@ -5,6 +5,15 @@
 // should be a drop down choice of months/years. Move this row to the
 // left. Mobile." (views/parent-family-school-attendance.ejs,
 // routes/parent-family-school.js's own month/year <select> options).
+//
+// A later real request reordered this again: "Click a date description
+// should be under title. Green and red bubble key under the description
+// on the next row. Next row prev arrow button, month, year, and next
+// button, all on the same row. Export, download and print icons on the
+// last row." - description, then legend, then the month nav row, then
+// the orange Export/Print/Download/Filter row right before the
+// calendar (the opposite order of the request just above - see that
+// section's own comment in the view for why).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -57,7 +66,7 @@ async function createPortalMember({ name, familyId, memberType, roleKey }) {
   return { memberId, accountId, cookie: loginRes.headers['set-cookie'] };
 }
 
-test('the legend row, description, orange buttons, and month navigation render in the requested order, each left-aligned', async () => {
+test('the description, legend row, month navigation, and orange buttons render in the requested order, each left-aligned', async () => {
   const familyId = await createFamily('Attendance Layout Family');
   const parent = await createPortalMember({ name: 'Layout Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const student = await createPortalMember({ name: 'Layout Student', familyId, memberType: 'student', roleKey: 'student' });
@@ -72,10 +81,10 @@ test('the legend row, description, orange buttons, and month navigation render i
   const calendarIdx = res.text.indexOf('fs-attendance-calendar');
 
   assert.ok(legendIdx > -1 && descriptionIdx > -1 && exportIdx > -1 && navRowIdx > -1 && calendarIdx > -1, 'every section should be present');
-  assert.ok(legendIdx < descriptionIdx, 'the Present/Absent legend should come before its own description');
-  assert.ok(descriptionIdx < exportIdx, 'the description should come before the orange Export/Print/Download/Filter row');
-  assert.ok(exportIdx < navRowIdx, 'the orange buttons should come before the month navigation row');
-  assert.ok(navRowIdx < calendarIdx, 'the month navigation row should come right before the calendar itself');
+  assert.ok(descriptionIdx < legendIdx, 'the description should come before the Present/Absent legend');
+  assert.ok(legendIdx < navRowIdx, 'the legend should come before the month navigation row');
+  assert.ok(navRowIdx < exportIdx, 'the month navigation row should come before the orange Export/Print/Download/Filter row');
+  assert.ok(exportIdx < calendarIdx, 'the orange buttons should come right before the calendar itself');
 
   // Both the legend row and the nav row opt out of the mobile-centering
   // .roster-btn-row-fit-text normally applies (public/css/styles.css's
@@ -92,6 +101,13 @@ test('the legend row, description, orange buttons, and month navigation render i
   assert.match(res.text, /<option value="3" selected>March<\/option>/);
   assert.match(res.text, /<select name="year" aria-label="Year" onchange="this\.form\.submit\(\)">/);
   assert.match(res.text, /<option value="2026" selected>2026<\/option>/);
+
+  // A real request, later corrected to a PDF icon: "all down[load]
+  // icons across the app should be a puff [cloud] icon... it looks the
+  // same as export" / "Should be a pdf. Pdf icon." - Export keeps
+  // icon-download, Download gets its own distinct icon-pdf.
+  assert.match(res.text, /aria-label="Export CSV"[^>]*><svg class="icon"><use href="#icon-download"\/>/);
+  assert.match(res.text, /aria-label="Download CSV"[^>]*><svg class="icon"><use href="#icon-pdf"\/>/);
 });
 
 test('the year dropdown always includes the currently selected year, even an old one outside the default window', async () => {

@@ -504,6 +504,78 @@ async function toggleAttendance(studentId, date) {
   return null;
 }
 
+// A real request: "Can take attendance by individual child or select
+// family and take attendance that will appear on all individual
+// attendance calendars for each child/student." A date only reads as
+// present/absent in this aggregate view when EVERY one of the family's
+// students shares that exact status for the date - a date where the
+// family's own students disagree (or aren't all marked yet) shows
+// unmarked here instead of picking one child's status to speak for
+// everyone, the same "don't guess, show it plainly" reasoning
+// missingMemberIdsForDate's own mixed-status handling uses elsewhere in
+// this app. studentIds.length === 0 (no students at all) returns {}
+// immediately - nothing to ever fetch.
+async function familyAttendanceForMonth(studentIds, year, month) {
+  if (studentIds.length === 0) return {};
+  const monthStr = String(month).padStart(2, '0');
+  const prefix = `${year}-${monthStr}`;
+  const placeholders = studentIds.map(() => '?').join(',');
+  const rows = await db
+    .prepare(`SELECT student_id, attendance_date, status FROM family_school_attendance WHERE attendance_date LIKE ? AND student_id IN (${placeholders})`)
+    .all(`${prefix}-%`, ...studentIds);
+  const statusesByDate = {};
+  rows.forEach((r) => {
+    if (!statusesByDate[r.attendance_date]) statusesByDate[r.attendance_date] = new Set();
+    statusesByDate[r.attendance_date].add(r.status);
+  });
+  const byDate = {};
+  const studentCount = new Set(studentIds).size;
+  const countByDate = {};
+  rows.forEach((r) => {
+    countByDate[r.attendance_date] = (countByDate[r.attendance_date] || 0) + 1;
+  });
+  Object.keys(statusesByDate).forEach((date) => {
+    const statuses = statusesByDate[date];
+    if (countByDate[date] === studentCount && statuses.size === 1) {
+      byDate[date] = [...statuses][0];
+    }
+  });
+  return byDate;
+}
+
+// The same unmarked -> present -> absent -> unmarked cycle
+// toggleAttendance uses, applied to every one of the family's students
+// at once for the same date - the SAME next status for everyone,
+// computed from the family's own current aggregate status for that date
+// (familyAttendanceForMonth's own "every student agrees, or it reads as
+// unmarked" rule), not each child's own possibly-different status.
+async function toggleFamilyAttendance(studentIds, date) {
+  if (studentIds.length === 0) return null;
+  const placeholders = studentIds.map(() => '?').join(',');
+  const rows = await db
+    .prepare(`SELECT student_id, status FROM family_school_attendance WHERE attendance_date = ? AND student_id IN (${placeholders})`)
+    .all(date, ...studentIds);
+  const statuses = new Set(rows.map((r) => r.status));
+  const current = rows.length === studentIds.length && statuses.size === 1 ? [...statuses][0] : null;
+  const next = current === 'present' ? 'absent' : current === 'absent' ? null : 'present';
+
+  for (const studentId of studentIds) {
+    if (next === null) {
+      await db.prepare('DELETE FROM family_school_attendance WHERE student_id = ? AND attendance_date = ?').run(studentId, date);
+      continue;
+    }
+    const existing = await db.prepare('SELECT 1 FROM family_school_attendance WHERE student_id = ? AND attendance_date = ?').get(studentId, date);
+    if (existing) {
+      await db
+        .prepare('UPDATE family_school_attendance SET status = ?, updated_at = now_text() WHERE student_id = ? AND attendance_date = ?')
+        .run(next, studentId, date);
+    } else {
+      await db.prepare('INSERT INTO family_school_attendance (student_id, attendance_date, status) VALUES (?, ?, ?)').run(studentId, date, next);
+    }
+  }
+  return next;
+}
+
 // --- Teacher Journal (the Teacher Journal subpage - a real request:
 // "Add journal/notes entry by date and by student in the family. Full
 // edit description typing box. Then a log below showing all entries.") ---
@@ -746,6 +818,8 @@ module.exports = {
   attendanceForStudent,
   allAttendanceForStudent,
   toggleAttendance,
+  familyAttendanceForMonth,
+  toggleFamilyAttendance,
   journalEntriesForStudent,
   getJournalEntry,
   createJournalEntry,

@@ -21,46 +21,29 @@
         var nextMonth = month === 12 ? 1 : month + 1;
         var nextYear = month === 12 ? year + 1 : year;
         var MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        // A real request: "attendance drop down to choose one of your
+        // children or family." studentIdParam carries the literal
+        // "family" string through every link/form below instead of
+        // selectedStudentId (which is null in family mode).
+        var studentIdParam = isFamilyMode ? 'family' : selectedStudentId;
       %>
-      <%# A real request: "Present and absent keys should be to the left,
-          not centered and just under the title. The description goes
-          under the key bubbles." roster-btn-row-fit-text's own mobile
-          rule centers a row's contents (public/css/styles.css's own
-          comment on that class) - fs-attendance-row-left (two classes,
-          so it wins over that single-class mobile rule regardless of
-          source order) overrides it back to left-aligned, the same
-          left-start default this row already has at desktop widths. %>
+      <%# A real request: "Click a date description should be under
+          title. Green and red bubble key under the description on the
+          next row. Next row prev arrow button, month, year, and next
+          button, all on the same row. Export, download and print icons
+          on the last row." Reordered from the old description-last
+          layout to: description, legend, month nav, then the toolbar
+          icons right before the calendar. %>
+      <p class="hint">Click a date to mark present, click again for absent, a third time to clear it.</p>
+
+      <%# fs-attendance-row-left overrides roster-btn-row-fit-text's own
+          mobile rule (which centers a row's contents, see public/css/
+          styles.css's own comment on that class) back to left-aligned,
+          the same left-start default this row already has at desktop
+          widths. %>
       <div class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left">
         <span class="badge-pill fs-attendance-legend-present">Present</span>
         <span class="badge-pill fs-attendance-legend-absent">Absent</span>
-      </div>
-      <p class="hint">Click a date to mark present, click again for absent, a third time to clear it.</p>
-
-      <%# "Add the following buttons to each page. Export, print,
-          download, filter. Make sure they are the similar size, same
-          height, fit to text." The old bare Student <select> moved into
-          the Filter popover below (the same <details>/<summary> idiom
-          admin-rosters.ejs's own Filter button already uses) so all four
-          buttons sit in one same-height, fit-to-text row instead of a
-          differently-shaped dropdown sitting apart from them. Export is
-          this one selected student's attendance; Download is every
-          family student's - see routes/parent-family-school.js's own
-          /attendance/export.csv and /attendance/download.csv. %>
-      <div class="roster-btn-row roster-btn-row-fit-text no-print">
-        <a class="icon-btn" href="/parent/family-school/attendance/export.csv?studentId=<%= selectedStudentId %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-        <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
-        <a class="icon-btn" href="/parent/family-school/attendance/download.csv" aria-label="Download CSV" title="Download CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-        <details class="filter-details">
-          <summary class="roster-action-btn">Filter</summary>
-          <form method="GET" action="/parent/family-school/attendance" class="filter-panel">
-            <label for="attendance-student-select">Student</label>
-            <select id="attendance-student-select" name="studentId" onchange="this.form.submit()">
-              <% familyStudents.forEach(function(s) { %>
-                <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
-              <% }); %>
-            </select>
-          </form>
-        </details>
       </div>
 
       <%# "View a calendar and mark days student is present for school by
@@ -79,8 +62,8 @@
           time. fs-attendance-row-left is the same left-alignment
           override the Present/Absent row above uses. %>
       <form method="GET" action="/parent/family-school/attendance" class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left fs-attendance-nav-row">
-        <input type="hidden" name="studentId" value="<%= selectedStudentId %>" />
-        <a class="btn-secondary fs-attendance-nav-btn" href="?studentId=<%= selectedStudentId %>&year=<%= prevYear %>&month=<%= prevMonth %>" aria-label="Previous month">&larr; Prev</a>
+        <input type="hidden" name="studentId" value="<%= studentIdParam %>" />
+        <a class="btn-secondary fs-attendance-nav-btn" href="?studentId=<%= studentIdParam %>&year=<%= prevYear %>&month=<%= prevMonth %>" aria-label="Previous month">&larr; Prev</a>
         <select name="month" aria-label="Month" onchange="this.form.submit()">
           <% MONTH_NAMES.forEach(function(name, i) { %>
             <option value="<%= i + 1 %>" <%= month === i + 1 ? 'selected' : '' %>><%= name %></option>
@@ -91,10 +74,48 @@
             <option value="<%= y %>" <%= year === y ? 'selected' : '' %>><%= y %></option>
           <% }); %>
         </select>
-        <a class="btn-secondary fs-attendance-nav-btn" href="?studentId=<%= selectedStudentId %>&year=<%= nextYear %>&month=<%= nextMonth %>" aria-label="Next month">Next &rarr;</a>
+        <a class="btn-secondary fs-attendance-nav-btn" href="?studentId=<%= studentIdParam %>&year=<%= nextYear %>&month=<%= nextMonth %>" aria-label="Next month">Next &rarr;</a>
       </form>
 
-      <table class="fs-attendance-calendar" data-fs-attendance-calendar data-student-id="<%= selectedStudentId %>" data-toggle-url="/parent/family-school/attendance/<%= selectedStudentId %>/toggle">
+      <%# "Add the following buttons to each page. Export, print,
+          download, filter. Make sure they are the similar size, same
+          height, fit to text." The old bare Student <select> moved into
+          the Filter popover below (the same <details>/<summary> idiom
+          admin-rosters.ejs's own Filter button already uses) so all four
+          buttons sit in one same-height, fit-to-text row instead of a
+          differently-shaped dropdown sitting apart from them. Export is
+          this one selected student's attendance; Download is every
+          family student's - see routes/parent-family-school.js's own
+          /attendance/export.csv and /attendance/download.csv. A real
+          follow-up request, later corrected to a PDF icon: "all
+          down[load] icons across the app should be a puff [cloud]
+          icon... it looks the same as export" / "Should be a pdf. Pdf
+          icon." - Export keeps icon-download (tray + arrow), Download
+          now uses the distinct icon-pdf. %>
+      <div class="roster-btn-row roster-btn-row-fit-text no-print">
+        <a class="icon-btn" href="/parent/family-school/attendance/export.csv?studentId=<%= studentIdParam %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+        <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
+        <a class="icon-btn" href="/parent/family-school/attendance/download.csv" aria-label="Download CSV" title="Download CSV"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+        <details class="filter-details">
+          <summary class="roster-action-btn">Filter</summary>
+          <form method="GET" action="/parent/family-school/attendance" class="filter-panel">
+            <label for="attendance-student-select">Student</label>
+            <%# A real request: "attendance drop down to choose one of
+                your children or family. Can take attendance by
+                individual child or select family and take attendance
+                that will appear on all individual attendance calendars
+                for each child/student." %>
+            <select id="attendance-student-select" name="studentId" onchange="this.form.submit()">
+              <% familyStudents.forEach(function(s) { %>
+                <option value="<%= s.id %>" <%= !isFamilyMode && selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
+              <% }); %>
+              <option value="family" <%= isFamilyMode ? 'selected' : '' %>>Whole Family</option>
+            </select>
+          </form>
+        </details>
+      </div>
+
+      <table class="fs-attendance-calendar" data-fs-attendance-calendar data-student-id="<%= studentIdParam %>" data-toggle-url="<%= isFamilyMode ? '/parent/family-school/attendance/family/toggle' : '/parent/family-school/attendance/' + selectedStudentId + '/toggle' %>">
         <thead>
           <tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr>
         </thead>
