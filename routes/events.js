@@ -16,6 +16,16 @@ const signupLists = require('../utils/committeesAndSignupLists');
 const notifications = require('../utils/notifications');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const { sendCsv } = require('../utils/spreadsheet');
+const { renderViewToPdf } = require('../utils/pdfRender');
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - sends a headless-Chromium-rendered
+// PDF of viewName (one of this router's own *-print.ejs views).
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
 
 // A real request: "Teacher portal... remove ... events" - see
 // blockTeacherOnlyAccounts' own comment. Public/logged-out browsing of
@@ -145,6 +155,25 @@ router.get('/print', async (req, res) => {
     title: 'Events Calendar',
     events: visible.map((e) => ({ ...e, startsLabel: formatFriendlyTimestamp(e.starts_at) })),
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - same visibility-filtered upcoming
+// list the Print preview above renders, now a PDF built from that
+// exact same -print.ejs view.
+router.get('/download.pdf', async (req, res) => {
+  const upcoming = await events.listEvents({ status: 'published', upcomingOnly: true, approvalStatus: 'approved' });
+  let visible = req.portalAccount ? upcoming : upcoming.filter((e) => e.visibility === 'public');
+  if (req.portalAccount) {
+    const family = await familyForAccount(req.portalAccount.id);
+    const flags = await Promise.all(visible.map((e) => events.eventVisibleToFamily(e.id, family)));
+    visible = visible.filter((e, i) => flags[i]);
+  }
+  const pdf = await renderViewToPdf(req, 'events-print', {
+    title: 'Events Calendar',
+    events: visible.map((e) => ({ ...e, startsLabel: formatFriendlyTimestamp(e.starts_at) })),
+  });
+  sendPdf(res, 'events.pdf', pdf);
 });
 
 // GET/POST /events/submit - "members should be able to add events for
@@ -431,6 +460,26 @@ router.get('/:id/ticket', requirePortalAuth, async (req, res) => {
     ticket,
     startsLabel: formatFriendlyTimestamp(ticket.starts_at),
   });
+});
+
+// Same family/registration scoping as /:id/ticket above - the download
+// is a PDF of that exact same ticket, never an unscoped lookup by id
+// alone.
+router.get('/:id/ticket/download.pdf', requirePortalAuth, async (req, res) => {
+  const eventId = req.params.id;
+  const memberId = parseInt(req.query.memberId, 10);
+  const family = await familyForAccount(req.portalAccount.id);
+  if (!family.some((m) => m.id === memberId)) {
+    return res.status(404).render('404', { title: 'Not Found' });
+  }
+  const ticket = await events.eventTicketDetailsForMember(eventId, memberId);
+  if (!ticket) return res.status(404).render('404', { title: 'Not Found' });
+  const pdf = await renderViewToPdf(req, 'events-ticket-print', {
+    title: `Ticket - ${ticket.title}`,
+    ticket,
+    startsLabel: formatFriendlyTimestamp(ticket.starts_at),
+  });
+  sendPdf(res, 'event-ticket.pdf', pdf);
 });
 
 // A real request built a "my registrations" log page on both portals

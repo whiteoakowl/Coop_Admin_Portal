@@ -41,6 +41,18 @@ async function loginAsMainAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
 let eventId;
 let familyAnderson;
 let familyBaker;
@@ -151,6 +163,17 @@ test('Main Admin Events > Event Registration Log (tab=registrationlog)', async (
     assert.match(res.text, /Alice Anderson/);
     assert.doesNotMatch(res.text, /Bob Baker/);
   });
+
+  await t.test('the live log also links a Download PDF icon next to Print, and it is a real PDF', async () => {
+    const res = await request(app).get('/main-admin/events?tab=registrationlog').set('Cookie', cookie);
+    assert.match(res.text, /<a class="icon-btn" href="\/main-admin\/events\/registrationlog\/download\.pdf" aria-label="Download PDF"/);
+
+    const pdfRes = await getBuffer('/main-admin/events/registrationlog/download.pdf', cookie);
+    assert.equal(pdfRes.status, 200);
+    assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+    assert.match(pdfRes.headers['content-disposition'], /attachment; filename="event-registration-log\.pdf"/);
+    assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
+  });
 });
 
 test('Main Admin Events > Calendar tab print preview', async (t) => {
@@ -173,5 +196,16 @@ test('Main Admin Events > Calendar tab print preview', async (t) => {
     const res = await request(app).get('/main-admin/events/print?view=list&month=2024-03').set('Cookie', cookie);
     assert.equal(res.status, 200);
     assert.match(res.text, /Fall Festival/);
+  });
+
+  await t.test('the live Calendar tab also links a Download PDF icon next to Print, and it is a real PDF', async () => {
+    const res = await request(app).get('/main-admin/events?tab=calendar').set('Cookie', cookie);
+    assert.match(res.text, /<a class="icon-btn" href="\/main-admin\/events\/download\.pdf\?view=calendar&month=" aria-label="Download PDF"/);
+
+    const pdfRes = await getBuffer('/main-admin/events/download.pdf?month=2024-03', cookie);
+    assert.equal(pdfRes.status, 200);
+    assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+    assert.match(pdfRes.headers['content-disposition'], /attachment; filename="events-calendar\.pdf"/);
+    assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
   });
 });

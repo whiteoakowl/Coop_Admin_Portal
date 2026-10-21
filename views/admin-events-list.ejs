@@ -17,6 +17,7 @@
         <% } %>
         <% if (activeTab === 'calendar') { %>
           <a class="icon-btn" href="/main-admin/events/print?view=<%= calendarView %>&month=<%= monthParam %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+          <a class="icon-btn" href="/main-admin/events/download.pdf?view=<%= calendarView %>&month=<%= monthParam %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         <% } %>
         <%# A real request: "remove export and import buttons from the
             event settings page" - still shown on Calendar/Drafts/
@@ -190,6 +191,7 @@
         <div class="roster-btn-row">
           <a class="icon-btn" href="/main-admin/events/registrationlog/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
           <a class="icon-btn" href="/main-admin/events/registrationlog/print<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+          <a class="icon-btn" href="/main-admin/events/registrationlog/download.pdf<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         </div>
       </div>
 

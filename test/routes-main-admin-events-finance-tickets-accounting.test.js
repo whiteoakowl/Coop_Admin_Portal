@@ -358,10 +358,25 @@ test('Print Ticket: shown and printable for a confirmed registration under a phy
 
   const myEventsPage = await request(app).get('/parent/events').set('Cookie', parent.cookie);
   assert.match(myEventsPage.text, new RegExp(`href="/events/${eventId}/ticket\\?memberId=${parent.childId}"[^>]*>Print Ticket<`));
+  assert.match(myEventsPage.text, new RegExp(`href="/events/${eventId}/ticket/download\\.pdf\\?memberId=${parent.childId}" aria-label="Download PDF"`));
 
   const ticketPage = await request(app).get(`/events/${eventId}/ticket?memberId=${parent.childId}`).set('Cookie', parent.cookie);
   assert.equal(ticketPage.status, 200);
   assert.match(ticketPage.text, new RegExp(`data-barcode-value="${parent.childBarcode}"`));
+
+  const pdfRes = await request(app)
+    .get(`/events/${eventId}/ticket/download.pdf?memberId=${parent.childId}`)
+    .set('Cookie', parent.cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.match(pdfRes.headers['content-disposition'], /attachment; filename="event-ticket\.pdf"/);
+  assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
 });
 
 test('Print Ticket: no button and 404 when the registration\'s ticket type has no physical ticket', async () => {
@@ -379,6 +394,9 @@ test('Print Ticket: no button and 404 when the registration\'s ticket type has n
 
   const ticketPage = await request(app).get(`/events/${eventId}/ticket?memberId=${parent.childId}`).set('Cookie', parent.cookie);
   assert.equal(ticketPage.status, 404);
+
+  const pdfPage = await request(app).get(`/events/${eventId}/ticket/download.pdf?memberId=${parent.childId}`).set('Cookie', parent.cookie);
+  assert.equal(pdfPage.status, 404);
 });
 
 test('Print Ticket: a signed-in account can never print a ticket for a member outside its own family', async () => {
@@ -407,6 +425,9 @@ test('Print Ticket: a signed-in account can never print a ticket for a member ou
   const intruder = await createParentWithChildForTicketPrint();
   const ticketPage = await request(app).get(`/events/${eventId}/ticket?memberId=${owner.childId}`).set('Cookie', intruder.cookie);
   assert.equal(ticketPage.status, 404);
+
+  const pdfPage = await request(app).get(`/events/${eventId}/ticket/download.pdf?memberId=${owner.childId}`).set('Cookie', intruder.cookie);
+  assert.equal(pdfPage.status, 404);
 });
 
 let paymentInstructionsFamilyCounter = 0;
