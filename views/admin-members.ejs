@@ -29,6 +29,9 @@
       // Members page (views/partials/members-type-filter.ejs), with Roster
       // Day and Role folded in as two more dropdowns alongside Type/Family
       // since this page (unlike Main Admin's) filters by those too.
+      // Print preview (below) carries every filter dimension this page
+      // has, same shape as Export CSV's own inline querystring above.
+      var printQs = [typeFilter ? 'type=' + typeFilter : '', familyFilter ? 'family=' + familyFilter : '', dayFilter ? 'day=' + dayFilter : '', roleFilter ? 'role=' + roleFilter : '', q ? 'q=' + encodeURIComponent(q) : ''].filter(Boolean).join('&');
       const selectedFamily = families.find(function (f) { return f.id === familyFilter; });
       const filterLabelParts = [];
       if (typeFilter === 'parent') filterLabelParts.push('Parent');
@@ -126,7 +129,13 @@
             used elsewhere (e.g. views/admin-accounting-list.ejs's own
             toolbar). %>
         <a class="icon-btn" href="/admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-        <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
+        <%# A real request: "all print button should show a print preview
+            full real page on a page with a print button" - opens the
+            dedicated admin-members-print.ejs view in a new tab instead of
+            printing this interactive card list in place (see routes/
+            admin-members.js's own GET /members/print). Carries every
+            filter dimension this page has, same as Export CSV above. %>
+        <a class="icon-btn" href="/admin/members/print<%= printQs ? '?' + printQs : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
         <a class="roster-action-btn" href="/admin/members/grade-level-report">Grade Level Report</a>
       </div>
 

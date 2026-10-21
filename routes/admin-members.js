@@ -94,7 +94,11 @@ function groupAttendanceByRoster(history) {
 
 // --- Members page (the full member list) ---
 
-router.get('/members', async (req, res) => {
+// Shared by the Members page and its print-preview route below - both need
+// the exact same filtered, unpaginated member list (the live page's own
+// pagination only ever slices THIS for on-screen display, same as the
+// print table always has).
+async function filteredMembersForPrint(req) {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   const familyFilter = parseInt(req.query.family, 10) || null;
   const dayFilter = isValidClassDay(req.query.day) ? req.query.day : '';
@@ -174,10 +178,15 @@ router.get('/members', async (req, res) => {
   if (teacherIds) withRosters = withRosters.filter((m) => teacherIds.has(m.id));
   if (assistantIds) withRosters = withRosters.filter((m) => assistantIds.has(m.id));
   if (q) withRosters = withRosters.filter((m) => m.name.toLowerCase().includes(q));
+  return { typeFilter, familyFilter, dayFilter, roleFilter, q, withRosters };
+}
+
+router.get('/members', async (req, res) => {
+  const { typeFilter, familyFilter, dayFilter, roleFilter, q, withRosters } = await filteredMembersForPrint(req);
   // The on-screen table only gets the current page's slice - the print
-  // table (admin-members.ejs's separate .members-print-table) still gets
-  // every filtered member, since a printed roster is meant to show the
-  // whole list regardless of which page happened to be open on screen.
+  // table (admin-members-print.ejs) still gets every filtered member,
+  // since a printed roster is meant to show the whole list regardless of
+  // which page happened to be open on screen.
   // The Members page's own "Select All" (public/js/archive-select-toggle.js)
   // also reaches into this same full list for its off-page checkboxes -
   // see admin-members.ejs's own comment, mirroring admin-schedule.ejs's.
@@ -221,6 +230,27 @@ router.get('/members', async (req, res) => {
     notice: req.query.notice || null,
     pendingNameTagMemberIds,
     avatarColorFor,
+  });
+});
+
+// A real request: "all print button should show a print preview full
+// real page on a page with a print button" - same dedicated <name>-print
+// view + GET .../print route convention as views/admin-rosters-print.ejs,
+// in place of the old onclick="window.print()" that just printed this
+// page's own interactive card list as-is. Reuses filteredMembersForPrint
+// so the preview always shows the exact same filtered list the Members
+// page itself is looking at, whichever page of it happened to be open.
+router.get('/members/print', async (req, res) => {
+  const { typeFilter, familyFilter, dayFilter, roleFilter, withRosters } = await filteredMembersForPrint(req);
+  res.render('admin-members-print', {
+    title: 'Members Print Preview',
+    members: withRosters,
+    typeFilter,
+    familyFilter,
+    dayFilter,
+    roleFilter,
+    dayLabels: CLASS_DAY_LABELS_FULL,
+    families: await allFamilies(),
   });
 });
 
@@ -396,7 +426,9 @@ router.get('/members/grade-level-report/export.csv', async (req, res) => {
   sendCsv(res, 'grade-level-report.csv', lines);
 });
 
-router.get('/members/grade-level-report', async (req, res) => {
+// Shared by the Grade Level Report page and its print-preview route below
+// - both need the exact same filtered columns/maxCount/filterLabelParts.
+async function gradeLevelReportData(req) {
   const sectionId = req.query.sectionId ? parseInt(req.query.sectionId, 10) : null;
   const signup = ['signedUp', 'notSignedUp'].includes(req.query.signup) ? req.query.signup : '';
   const familyId = req.query.familyId ? parseInt(req.query.familyId, 10) : null;
@@ -420,15 +452,36 @@ router.get('/members/grade-level-report', async (req, res) => {
     if (family) filterLabelParts.push(`${family.name} Family`);
   }
 
+  return { sectionId, signup, familyId, columns, maxCount: Math.max(1, ...columns.map((c) => c.students.length)), filterLabelParts };
+}
+
+router.get('/members/grade-level-report', async (req, res) => {
+  const { sectionId, signup, familyId, columns, maxCount, filterLabelParts } = await gradeLevelReportData(req);
+
   res.render('admin-members-grade-level-report', {
     title: 'Grade Level Report',
     columns,
-    maxCount: Math.max(1, ...columns.map((c) => c.students.length)),
+    maxCount,
     sections: await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all(),
     families: await db.prepare('SELECT * FROM families ORDER BY LOWER(name)').all(),
     selectedSectionId: sectionId,
     selectedSignup: signup,
     selectedFamilyId: familyId,
+    filterLabelParts,
+  });
+});
+
+// A real request: "all print button should show a print preview full
+// real page on a page with a print button" - same dedicated <name>-print
+// view + GET .../print route convention as views/admin-rosters-print.ejs,
+// in place of the old onclick="window.print()".
+router.get('/members/grade-level-report/print', async (req, res) => {
+  const { columns, maxCount, filterLabelParts } = await gradeLevelReportData(req);
+
+  res.render('admin-members-grade-level-report-print', {
+    title: 'Grade Level Report Print Preview',
+    columns,
+    maxCount,
     filterLabelParts,
   });
 });

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="grade-level-report-print-page">
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Grade Level Report<% if (filterLabelParts.length > 0) { %> &mdash; <%= filterLabelParts.join(', ') %><% } %></h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Grade Level Report</p>
+      </div>
+    </div>
+
+    <%
+      var nonEmptyColumns = columns.filter(function (c) { return c.students.length > 0; });
+    %>
+    <% if (nonEmptyColumns.length === 0) { %>
+      <p class="roster-empty"><%= filterLabelParts.length > 0 ? 'No active students match this filter.' : 'No active students have a grade level on file yet.' %></p>
+    <% } else { %>
+      <%
+        var GRADE_LEVEL_NAMES_ROWS = 4;
+        var gradeLevelNamesCols = Math.max(1, Math.ceil(nonEmptyColumns.length / GRADE_LEVEL_NAMES_ROWS));
+        var gradeLevelNamesColsMobile = Math.max(1, Math.ceil(nonEmptyColumns.length / (GRADE_LEVEL_NAMES_ROWS * 2)));
+      %>
+      <div class="grade-level-report-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="9.4in">
+        <div class="grade-level-report-fit-inner" style="--grade-level-cols: <%= nonEmptyColumns.length %>; --grade-level-cols-mobile: <%= Math.ceil(nonEmptyColumns.length / 2) %>; --grade-level-names-cols: <%= gradeLevelNamesCols %>; --grade-level-names-cols-mobile: <%= gradeLevelNamesColsMobile %>;">
+          <h2>Students per Grade Level</h2>
+          <div class="grade-level-bar-chart">
+            <% nonEmptyColumns.forEach(function(col) { %>
+              <div class="grade-level-bar-col">
+                <span class="grade-level-bar-count"><%= col.students.length %></span>
+                <div class="grade-level-bar-track">
+                  <div class="grade-level-bar" style="height: <%= Math.round((col.students.length / maxCount) * 100) %>%;"></div>
+                </div>
+                <span class="grade-level-bar-label" title="<%= col.gradeLevel %>"><%= col.gradeLevel %></span>
+              </div>
+            <% }); %>
+          </div>
+
+          <h2>Names by Grade Level</h2>
+          <div class="grade-level-report-grid">
+            <% nonEmptyColumns.forEach(function(col) { %>
+              <div class="grade-level-report-col">
+                <div class="grade-level-report-col-title" title="<%= col.gradeLevel %>"><%= col.gradeLevel %></div>
+                <% col.students.forEach(function(s) { %>
+                  <p class="grade-level-report-name"><%= s.name %><%= s.age != null ? ` (${s.age})` : '' %></p>
+                <% }); %>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+    <% } %>
+  </main>
+
+  <script src="/js/shrink-title-to-fit.js"></script>
+  <script src="/js/print-shrink-to-fit.js"></script>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

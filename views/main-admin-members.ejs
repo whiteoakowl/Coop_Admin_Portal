@@ -103,7 +103,14 @@
               used elsewhere (e.g. views/admin-accounting-list.ejs's own
               toolbar). %>
           <a class="icon-btn" href="/main-admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-          <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
+          <%# A real request: "all print button should show a print
+              preview full real page on a page with a print button" -
+              opens the dedicated main-admin-members-print.ejs view in a
+              new tab instead of printing this interactive card list in
+              place (see routes/main-admin-members.js's own GET /print).
+              Carries the same Type/Family/search filters as Export CSV
+              above, plus the search box's own q. %>
+          <a class="icon-btn" href="/main-admin/members/print<%= (typeFilter || familyFilter || q) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %><%= ((typeFilter || familyFilter) && q) ? '&' : '' %><%= q ? 'q=' + encodeURIComponent(q) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
         </div>
 
         <dialog id="main-admin-import-dialog" class="member-picker-dialog">

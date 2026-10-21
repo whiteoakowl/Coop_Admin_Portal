@@ -39,7 +39,12 @@
             import, or download buttons should be changed to icons... and
             have all four" - this page only had Print. %>
         <a class="icon-btn" href="/main-admin/members/grade-level-report/export.csv<%= hasActiveFilter ? '?' + ['sectionId=' + (selectedSectionId || ''), 'signup=' + (selectedSignup || ''), 'familyId=' + (selectedFamilyId || '')].join('&') : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-        <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
+        <%# A real request: "all print button should show a print preview
+            full real page on a page with a print button" - opens the
+            dedicated main-admin-members-grade-level-report-print.ejs view
+            in a new tab instead of printing this page in place (see
+            routes/main-admin-members.js's own GET /grade-level-report/print). %>
+        <a class="icon-btn" href="/main-admin/members/grade-level-report/print<%= hasActiveFilter ? '?' + ['sectionId=' + (selectedSectionId || ''), 'signup=' + (selectedSignup || ''), 'familyId=' + (selectedFamilyId || '')].join('&') : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
       </div>
     </div>
 

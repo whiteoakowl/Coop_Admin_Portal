@@ -79,7 +79,12 @@ test('Co-op Admin Grade Level Report: groups students by grade level with ages, 
   // all four" - this page only had Print; Export and Print are icon
   // buttons now, and Export downloads a CSV of the same students.
   assert.match(res.text, /<a class="icon-btn" href="\/admin\/members\/grade-level-report\/export\.csv[^"]*" aria-label="Export CSV"/);
-  assert.match(res.text, /<button type="button" class="icon-btn" onclick="window\.print\(\)" aria-label="Print"/);
+  // A real request: "all print button should show a print preview full
+  // real page on a page with a print button" - Print now links to a
+  // dedicated preview route in a new tab instead of calling window.print()
+  // on this live, editable page directly.
+  assert.match(res.text, /<a class="icon-btn" href="\/admin\/members\/grade-level-report\/print[^"]*" target="_blank" aria-label="Print"/);
+  assert.doesNotMatch(res.text, /onclick="window\.print\(\)" aria-label="Print"/);
 
   const csv = await request(app).get('/admin/members/grade-level-report/export.csv').set('Cookie', cookie);
   assert.equal(csv.status, 200);
@@ -87,4 +92,18 @@ test('Co-op Admin Grade Level Report: groups students by grade level with ages, 
   assert.match(csv.text, /Grade Level.*Name.*Age/);
   assert.match(csv.text, /Kindergarten.*Coop Kinder/);
   assert.match(csv.text, /Ungraded.*Coop No Grade/);
+});
+
+test('GET /admin/members/grade-level-report/print renders a read-only preview with a Print button, respecting the same filters', async () => {
+  const cookie = await loginAsAdmin();
+  const kBirthday = '2020-01-01';
+  await createStudent({ name: 'Coop Preview Kinder', gradeLevel: 'Kindergarten', birthday: kBirthday });
+  await createStudent({ name: 'Coop Preview Third', gradeLevel: '3rd', birthday: '2016-01-01' });
+
+  const res = await request(app).get('/admin/members/grade-level-report/print').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /print-preview-header/);
+  assert.match(res.text, /onclick="window\.print\(\)"/);
+  assert.match(res.text, /Coop Preview Kinder/);
+  assert.match(res.text, /Coop Preview Third/);
 });
