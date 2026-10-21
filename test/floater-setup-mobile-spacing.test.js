@@ -72,3 +72,20 @@ test('.setup-assignment-table td width is reset to 100% for all 4 columns, overr
     assert.match(css, new RegExp(`\\.setup-assignment-table td:nth-child\\(${n}\\)[^{]*\\{[^}]*width:\\s*100%`), `expected .setup-assignment-table td:nth-child(${n}) to reset width: 100%`);
   });
 });
+
+// A real request: "floater assignments you can't see the names in the
+// dropdown its so tiny now." The Text Notification column added later
+// (test/routes-admin-volunteers-floater-text-notify.test.js) left the
+// old 2-up grid's fixed 1050px breakpoint too tight for the Floater
+// select at some real window widths just above it (live-measured: ~105px
+// wide at 1060px, still only ~157px at 1350px) - replaced with a self-
+// adjusting auto-fit/minmax grid instead of hand-tuning a new pixel
+// number for a table shape that keeps changing.
+test('.floater-chart-cards-grid uses auto-fit/minmax instead of a fixed-breakpoint 2-column grid', () => {
+  assert.match(
+    css,
+    /\.floater-chart-cards-grid\s*\{\s*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(480px,\s*100%\),\s*1fr\)\);\s*\}/,
+    'expected an auto-fit/minmax grid (never fewer than 480px per card, falling back below the viewport width on a narrow phone) instead of a fixed max-width breakpoint'
+  );
+  assert.doesNotMatch(css, /@media \(max-width: 1050px\) \{\s*\.floater-chart-cards-grid/, 'the old fixed 1050px breakpoint override should be gone, not left alongside the new rule');
+});

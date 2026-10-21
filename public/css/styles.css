@@ -6528,16 +6528,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    unassigned button trails off the page and you can't click it." 0
    overrides that automatic minimum so the track (and everything in it)
    is free to shrink all the way down to the actual available width. */
-.floater-chart-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-/* 1050px, not 800px - below that, a 2-up card (minus the fixed 260px
-   sidebar and page padding) is too narrow for its own Position/Room/
-   Floater table: "Classroom Hallway Supervisor" and "Room 12" were
-   wrapping mid-word at ~900px viewports even after widening those
-   columns, because there just wasn't enough card width to give. One
-   column at that size gives each card the room the table actually needs. */
-@media (max-width: 1050px) {
-  .floater-chart-cards-grid { grid-template-columns: minmax(0, 1fr); }
-}
+/* A real request: "floater assignments you can't see the names in the
+   dropdown its so tiny now" - a fixed 1050px breakpoint (below, this
+   grid switches to one column) was tuned for the table's original 3
+   columns; the Text Notification column added later (still counted by
+   table-layout:fixed even hidden) left the 2-up zone just above that
+   breakpoint too tight for the Floater select to stay readable -
+   confirmed live: a 1060px window measured the select at just ~105px
+   wide, and even 1350px only reached ~157px, nowhere near enough for a
+   member's name. auto-fit + minmax replaces the fixed breakpoint with a
+   self-adjusting one: it only ever gives 2 columns once there's
+   comfortably 480px to spare for each (the width a card measured fine
+   at), collapsing to 1 full-width column below that - correct at any
+   viewport/sidebar/zoom combination instead of one pixel number tuned
+   for a table shape that keeps changing. min(480px, 100%) as the floor
+   (not a bare 480px) keeps a single column free to shrink below 480px
+   on an actual phone, where minmax(0, 1fr)'s comment below still
+   applies - a card can never demand more width than the viewport has. */
+.floater-chart-cards-grid { grid-template-columns: repeat(auto-fit, minmax(min(480px, 100%), 1fr)); }
 
 /* 36/16/48, not the base .floater-card-table's 40/24/36 - a real bug at
    desktop widths: table-layout:fixed locks each column to its header's
