@@ -22,7 +22,9 @@
         <form method="POST" action="/main-admin/volunteers/signup-lists/<%= list.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= list.title %>&quot;? This removes every item and claim on it. This cannot be undone.">
           <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
         </form>
-        <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
+        <%# A real request: "All print button should show a print preview
+            full real page on a page with a print button." %>
+        <a class="icon-btn" href="/main-admin/volunteers/signup-lists/<%= list.id %>/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
         <a class="icon-btn" href="/main-admin/volunteers/signup-lists/<%= list.id %>/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
       </div>
     </div>

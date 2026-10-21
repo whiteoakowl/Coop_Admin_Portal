@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1><%= committee.name %></h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub"><%= committee.name %> Committee</p>
+      </div>
+    </div>
+
+    <% if (committee.description) { %><p><%= committee.description %></p><% } %>
+    <% if (committee.leaderName || committee.leaderEmail) { %>
+      <p class="hint">
+        <% if (committee.leaderName) { %>Leader: <%= committee.leaderName %><% } %>
+        <% if (committee.leaderEmail) { %> &middot; <%= committee.leaderEmail %><% } %>
+      </p>
+    <% } %>
+
+    <h2>Members</h2>
+    <% if (members.length === 0) { %>
+      <p class="roster-empty">No members yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table committee-members-table table-stack-mobile">
+          <thead><tr><th>Name</th><th>Email</th></tr></thead>
+          <tbody>
+            <% members.forEach(function(m) { %>
+              <tr>
+                <td class="roster-name-col table-stack-heading"><%= m.name %></td>
+                <td data-label="Email"><%= m.email || '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <%# Read-only counterpart to the live page's own per-position table -
+        no Select All checkbox/Email Selected button (nothing to email
+        from a print preview), just who's signed up. %>
+    <% if (positions.length > 0) { %>
+      <% positions.forEach(function(position) { %>
+        <div class="manage-section">
+          <h3><%= position.position_name %><% if (position.slots_needed) { %> <span class="hint">(<%= position.signups.length %>/<%= position.slots_needed %>)</span><% } %></h3>
+          <% if (position.signups.length === 0) { %>
+            <p class="roster-empty">No one has signed up yet.</p>
+          <% } else { %>
+            <div class="roster-scroll">
+              <table class="roster-table condensed-table committee-position-table table-stack-mobile">
+                <thead><tr><th>Name</th><th>Email</th></tr></thead>
+                <tbody>
+                  <% position.signups.forEach(function(s) { %>
+                    <tr>
+                      <td class="roster-name-col table-stack-heading"><%= s.memberName %></td>
+                      <td data-label="Email"><%= s.memberEmail || '—' %></td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+      <% }); %>
+    <% } %>
+  </main>
+</body>
+</html>

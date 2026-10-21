@@ -23,7 +23,9 @@
         <%- include('partials/schedule-combo-picker', { combos, basePrefix: '/admin/volunteers', pathSuffix: '/risk', selectedComboId }) %>
         <div class="roster-btn-row">
           <a class="icon-btn" href="/admin/volunteers/<%= day %>/risk/export.csv?semesterId=<%= semesterId %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-          <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
+          <%# A real request: "All print button should show a print preview
+              full real page on a page with a print button." %>
+          <a class="icon-btn" href="/admin/volunteers/<%= day %>/risk/print?semesterId=<%= semesterId %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
         </div>
       </div>
 

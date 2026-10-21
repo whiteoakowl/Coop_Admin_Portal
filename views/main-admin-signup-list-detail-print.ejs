@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1><%= list.title %></h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub"><%= list.title %><% if (!list.is_open) { %> &mdash; Signups Closed<% } %></p>
+      </div>
+    </div>
+
+    <% if (list.description) { %><p><%= list.description %></p><% } %>
+    <p class="hint">Attached event: <%= list.eventTitle || 'None' %></p>
+    <p class="hint">Attached member: <%= list.memberName || 'None' %></p>
+
+    <h2>Items</h2>
+    <% if (items.length === 0) { %>
+      <p class="roster-empty">No items yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table accounting-table-mobile-fit signup-list-items-table">
+          <thead><tr><th>Item</th><th>Needed</th><th>Claimed</th><th>Claimed By</th></tr></thead>
+          <tbody>
+            <% items.forEach(function(item) { %>
+              <tr>
+                <td class="roster-name-col"><%= item.item_name %><% if (item.notes) { %> <span class="hint"><%= item.notes %></span><% } %></td>
+                <td><%= item.quantity_needed %></td>
+                <td><%= item.quantityClaimed %></td>
+                <td><%= item.claims.map(function(c) { return c.memberName + (c.quantity_claimed > 1 ? ' (' + c.quantity_claimed + ')' : ''); }).join(', ') || '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

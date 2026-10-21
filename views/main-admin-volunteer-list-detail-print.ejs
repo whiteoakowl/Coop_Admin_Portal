@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1><%= list.title %></h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub"><%= list.title %><% if (!list.is_open) { %> &mdash; Signups Closed<% } %></p>
+      </div>
+    </div>
+
+    <% if (list.description) { %><p><%= list.description %></p><% } %>
+    <p class="hint">Attached event: <%= list.eventTitle || 'None' %></p>
+    <p class="hint">Attached member: <%= list.memberName || 'None' %></p>
+
+    <h2>Shifts</h2>
+    <% if (shifts.length === 0) { %>
+      <p class="roster-empty">No shifts yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table">
+          <thead><tr><th>Job</th><th>Date</th><th>Time</th><th>Signed Up</th></tr></thead>
+          <tbody>
+            <% shifts.forEach(function(shift) { %>
+              <tr>
+                <td class="roster-name-col"><%= shift.job_name %></td>
+                <td><%= shift.shift_date || '—' %></td>
+                <td><%= (shift.start_time || shift.end_time) ? (shift.start_time || '') + (shift.end_time ? ' - ' + shift.end_time : '') : '—' %></td>
+                <td><%= shift.signups.map(function(s) { return s.memberName; }).join(', ') || '—' %> <span class="hint">(<%= shift.signups.length %>/<%= shift.slots_needed %>)</span></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>
