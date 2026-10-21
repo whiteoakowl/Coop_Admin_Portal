@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.4in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1><%= title %><%= dateFilter ? ` — ${dateFilterLabel}` : '' %></h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-page">
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub"><%= title %> &mdash; <%= dateFilterLabel %></p>
+        </div>
+      </div>
+
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr><th>Name</th><th>Description</th><th>Date</th><th>Time</th><th>Day</th><th>Request</th></tr>
+        </thead>
+        <tbody>
+          <% if (allSubmissions.length === 0) { %>
+            <tr><td colspan="6" class="roster-empty">No <%= showArchived ? 'archived' : '' %> name tag requests yet.</td></tr>
+          <% } %>
+          <% allSubmissions.forEach(function(s) { %>
+            <tr>
+              <td><%= s.memberName %></td>
+              <td><%= s.description %></td>
+              <td><%= s.dateLabel %></td>
+              <td><%= s.timeLabel %></td>
+              <td><%= s.dayLabel %></td>
+              <td><%= s.requestTypeLabel %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

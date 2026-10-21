@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.4in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Absence/Late Log<%= dateFilter ? ` — ${dateFilterLabel}` : '' %></h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-page">
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub">Absence/Late Log &mdash; <%= dateFilterLabel %></p>
+        </div>
+      </div>
+
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr><th>Name</th><th>Roster</th><th>Date</th><th>Status</th><th>Reason</th><th>Description</th><th>Submitted</th></tr>
+        </thead>
+        <tbody>
+          <% if (allSubmissions.length === 0) { %>
+            <tr><td colspan="7" class="roster-empty">No absence or late submissions<%= dateFilter ? ' for this date' : ' yet' %>.</td></tr>
+          <% } %>
+          <% allSubmissions.forEach(function(s) { %>
+            <tr>
+              <td><%= s.memberName %></td>
+              <td><%= s.rosterName %></td>
+              <td><%= s.dateLabel %></td>
+              <td><%= s.statusLabel %></td>
+              <td><%= s.reasonLabel %></td>
+              <td><%= s.description %></td>
+              <td><%= s.submittedDateLabel %> <%= s.submittedTimeLabel %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>
