@@ -234,6 +234,11 @@ router.get('/admins/export.csv', requirePortalPermission('manage_users'), async 
   sendCsv(res, 'admins.csv', lines);
 });
 
+router.get('/admins/print', requirePortalPermission('manage_users'), async (req, res) => {
+  const { rows } = await buildAdminRows();
+  res.render('main-admin-admins-print', { title: 'Admins', rows });
+});
+
 // "Add/Edit Admin Position" button - one popup listing every existing
 // position with its own rename input + delete, plus a "new position"
 // field at the bottom, one Save for all of it - same shape Shop's own

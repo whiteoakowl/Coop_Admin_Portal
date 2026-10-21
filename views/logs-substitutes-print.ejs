@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.4in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Substitutes Needed<%= dateFilter ? ` — ${dayLabel}, ${dateFilter}` : '' %></h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-page">
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub">Substitutes Needed &mdash; <%= dayLabel %><%= dateFilter ? `, ${dateFilter}` : '' %></p>
+        </div>
+      </div>
+
+      <% var anySlots = board.some(function(h) { return h.slots.length > 0; }); %>
+      <% if (!dateFilter) { %>
+        <p class="roster-empty">Pick a date to see who needs a substitute.</p>
+      <% } else if (!anySlots) { %>
+        <p class="roster-empty">Nobody needed a substitute on <%= dayLabel %>, <%= dateFilter %>.</p>
+      <% } %>
+      <% board.forEach(function(hour) { %>
+        <% if (hour.slots.length === 0) return; %>
+        <h3 class="class-schedule-hour-label"><%= hour.label %></h3>
+        <table class="roster-table members-table condensed-table">
+          <thead><tr><th>Position</th><th>Reason</th><th>Status</th><th>Assigned</th></tr></thead>
+          <tbody>
+            <% hour.slots.forEach(function(slot) { %>
+              <tr>
+                <td><%= slot.label %><% if (slot.detail) { %> (<%= slot.detail %>)<% } %></td>
+                <td><%= slot.reason %></td>
+                <td>
+                  <% if (!slot.assigned) { %>Needs Substitute
+                  <% } else if (slot.overdue) { %>No-show &mdash; Needs Sub Again
+                  <% } else if (slot.assigned.status === 'pending') { %>Awaiting Approval
+                  <% } else { %>Filled
+                  <% } %>
+                </td>
+                <td><%= slot.assigned ? slot.assigned.name + (slot.assigned.infant ? ' (infant)' : '') : '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% }); %>
+    </div>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

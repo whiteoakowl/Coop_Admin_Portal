@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.4in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Class Cancellation Risk<%= classNameFilter ? ` — ${classNameFilter}` : dateFilter ? ` — ${dateFilterLabel}` : '' %></h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-page">
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub">Class Cancellation Risk</p>
+        </div>
+      </div>
+
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr><th>Date</th><th>Hour</th><th>Class</th><th>Room</th><th>Expected</th><th>Enrolled</th><th>Times At Risk</th></tr>
+        </thead>
+        <tbody>
+          <% if (allSubmissions.length === 0) { %>
+            <tr><td colspan="7" class="roster-empty">No classes have been at risk of low attendance<%= classNameFilter ? ` for ${classNameFilter}` : dateFilter ? ' on this date' : '' %>.</td></tr>
+          <% } %>
+          <% allSubmissions.forEach(function(c) { %>
+            <tr>
+              <td><%= c.dateLabel %></td>
+              <td><%= c.hourLabel %></td>
+              <td><%= c.className %></td>
+              <td><%= c.room || '—' %></td>
+              <td><%= c.expectedCount %></td>
+              <td><%= c.enrolledCount %></td>
+              <td><%= c.riskTally %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

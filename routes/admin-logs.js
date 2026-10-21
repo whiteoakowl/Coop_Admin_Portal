@@ -749,6 +749,16 @@ router.get('/logs/absence/export.csv', requireAdmin, async (req, res) => {
   sendCsv(res, 'absence-late-log.csv', lines);
 });
 
+router.get('/logs/absence/print', requireAdmin, async (req, res) => {
+  const dateFilter = req.query.date || '';
+  res.render('logs-absence-print', {
+    title: 'Absence/Late Log',
+    dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
+    allSubmissions: await allAbsenceSubmissions(dateFilter),
+  });
+});
+
 router.get('/logs/classrisk/export.csv', requireAdmin, async (req, res) => {
   const filterBy = req.query.filterBy === 'class' ? 'class' : 'date';
   const classIdFilter = req.query.classId ? parseInt(req.query.classId, 10) : null;
@@ -765,6 +775,26 @@ router.get('/logs/classrisk/export.csv', requireAdmin, async (req, res) => {
     ...rows.map((r) => toCsvRow([r.dateLabel, r.hourLabel, r.className, r.room || '', String(r.expectedCount), String(r.enrolledCount), String(r.riskTally)])),
   ];
   sendCsv(res, 'class-cancellation-risk-log.csv', lines);
+});
+
+router.get('/logs/classrisk/print', requireAdmin, async (req, res) => {
+  const filterBy = req.query.filterBy === 'class' ? 'class' : 'date';
+  const classIdFilter = req.query.classId ? parseInt(req.query.classId, 10) : null;
+  const dateFilter = filterBy === 'date' ? req.query.date || '' : '';
+  const allRows = await classCancellationRiskRows();
+  const rows =
+    filterBy === 'class' && classIdFilter != null
+      ? allRows.filter((r) => r.classId === classIdFilter)
+      : dateFilter
+        ? allRows.filter((r) => r.date === dateFilter)
+        : allRows;
+  res.render('logs-classrisk-print', {
+    title: 'Class Cancellation Risk',
+    dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
+    classNameFilter: classIdFilter != null ? (allRows.find((r) => r.classId === classIdFilter) || {}).className || null : null,
+    allSubmissions: rows,
+  });
 });
 
 router.get('/logs/missedduty/export.csv', requireAdmin, async (req, res) => {
@@ -788,6 +818,17 @@ router.get('/logs/missedduty/export.csv', requireAdmin, async (req, res) => {
   sendCsv(res, 'missed-duty-no-show-log.csv', lines);
 });
 
+router.get('/logs/missedduty/print', requireAdmin, async (req, res) => {
+  const dateFilter = req.query.date || '';
+  const allRows = await missedDutyRows();
+  res.render('logs-missedduty-print', {
+    title: 'Missed Duty / No-Show Log',
+    dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
+    allSubmissions: dateFilter ? allRows.filter((r) => r.date === dateFilter) : allRows,
+  });
+});
+
 router.get('/logs/classregistration/export.csv', requireAdmin, async (req, res) => {
   const dateFilter = req.query.date || '';
   const registrations = await allClassRegistrations(dateFilter);
@@ -796,6 +837,16 @@ router.get('/logs/classregistration/export.csv', requireAdmin, async (req, res) 
     ...registrations.map((r) => toCsvRow([r.memberName, r.className, r.classDayLabel, r.dateLabel, r.statusLabel])),
   ];
   sendCsv(res, 'class-registration-log.csv', lines);
+});
+
+router.get('/logs/classregistration/print', requireAdmin, async (req, res) => {
+  const dateFilter = req.query.date || '';
+  res.render('logs-classregistration-print', {
+    title: 'Class Registration Log',
+    dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
+    allSubmissions: await allClassRegistrations(dateFilter),
+  });
 });
 
 router.get('/logs/checkinout/export.csv', requireAdmin, async (req, res) => {
@@ -817,6 +868,24 @@ router.get('/logs/checkinout/export.csv', requireAdmin, async (req, res) => {
   sendCsv(res, 'co-op-check-in-out-log.csv', lines);
 });
 
+router.get('/logs/checkinout/print', requireAdmin, async (req, res) => {
+  const dateFilter = req.query.date || '';
+  const allRows = (await checkinoutLogRows(dateFilter, 'coop')).map((r) => ({
+    memberName: r.memberName,
+    rosterName: r.rosterName,
+    dateLabel: formatDateLabel(r.date),
+    checkInTime: formatTime(r.checkInTime) || '—',
+    checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : '—',
+    number: r.number ?? '—',
+  }));
+  res.render('logs-checkinout-print', {
+    title: 'Co-op Check-In/Out Log',
+    dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
+    allRows,
+  });
+});
+
 router.get('/logs/classcheckinout/export.csv', requireAdmin, async (req, res) => {
   const dateFilter = req.query.date || '';
   const rows = await checkinoutLogRows(dateFilter, 'class');
@@ -834,6 +903,24 @@ router.get('/logs/classcheckinout/export.csv', requireAdmin, async (req, res) =>
     ),
   ];
   sendCsv(res, 'class-check-in-out-log.csv', lines);
+});
+
+router.get('/logs/classcheckinout/print', requireAdmin, async (req, res) => {
+  const dateFilter = req.query.date || '';
+  const allRows = (await checkinoutLogRows(dateFilter, 'class')).map((r) => ({
+    memberName: r.memberName,
+    rosterName: r.rosterName,
+    dateLabel: formatDateLabel(r.date),
+    checkInTime: formatTime(r.checkInTime) || '—',
+    checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : '—',
+    number: r.number ?? '—',
+  }));
+  res.render('logs-classcheckinout-print', {
+    title: 'Class Check-In/Out Log',
+    dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
+    allRows,
+  });
 });
 
 router.get('/logs/nametag/export.csv', requireAdmin, async (req, res) => {
@@ -857,6 +944,25 @@ router.get('/logs/nametag/export.csv', requireAdmin, async (req, res) => {
   sendCsv(res, `name-tag-${showArchived ? 'archived' : 'requests'}.csv`, lines);
 });
 
+router.get('/logs/nametag/print', requireAdmin, async (req, res) => {
+  const showArchived = req.query.archived === '1';
+  const dateFilter = req.query.date || '';
+  const allSubmissions = (await nameTagSubmissions(showArchived, dateFilter)).map((r) => ({
+    ...formatDateAndTime(r.createdAt),
+    memberName: r.memberName,
+    requestTypeLabel: REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
+    dayLabel: NAME_TAG_DAY_LABELS[r.day] || r.day,
+    description: r.description || '—',
+  }));
+  res.render('logs-nametag-print', {
+    title: showArchived ? 'Archived Name Tag Requests' : 'Name Tag Requests',
+    showArchived,
+    dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
+    allSubmissions,
+  });
+});
+
 router.post('/logs/nametag/:id/archive', requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   await db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(id);
@@ -867,6 +973,21 @@ router.post('/logs/nametag/:id/unarchive', requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   await db.prepare('UPDATE name_tag_requests SET archived = 0 WHERE id = ?').run(id);
   res.redirect('/admin/logs?tab=nametag&archived=1');
+});
+
+router.get('/logs/substitutes/print', requireAdmin, async (req, res) => {
+  const activeDays = await listActiveClassDays();
+  const day = isValidClassDay(req.query.day) ? req.query.day : (activeDays[0] || 'monday');
+  const dateFilter = req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : todayIfSessionDay(day) || '';
+  const fullBoard = await substituteBoard(day, dateFilter || null);
+  const board = fullBoard.map((hour) => ({ ...hour, slots: hour.slots.filter((s) => s.slotType === 'class') }));
+  res.render('logs-substitutes-print', {
+    title: 'Substitutes Needed',
+    day,
+    dayLabel: CLASS_DAY_LABELS_FULL[day],
+    dateFilter,
+    board,
+  });
 });
 
 // Old standalone URLs now live under the unified Logs tab.

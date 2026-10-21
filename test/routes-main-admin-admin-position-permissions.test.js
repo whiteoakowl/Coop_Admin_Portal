@@ -86,8 +86,13 @@ test('Admins page: Add/Edit Admin Position button, Print button, and the merged 
   // A later real request: "all pages/subpages with print, export, import,
   // or download buttons should be changed to icons" - Print (and a new
   // Export, added at the same time) are icon-only buttons now.
-  assert.match(page.text, /onclick="window\.print\(\)" aria-label="Print"/);
   assert.match(page.text, /aria-label="Export CSV"/);
+  // A later real request: "all print button should show a print preview...
+  // on a page with a print button. That print button will then send it to
+  // the printer." - Print now links to a dedicated preview page instead of
+  // calling window.print() directly on the live, editable page.
+  assert.match(page.text, /href="\/main-admin\/admins\/print" target="_blank" aria-label="Print"/);
+  assert.doesNotMatch(page.text, /onclick="window\.print\(\)"/);
   assert.match(page.text, /<th>Admin Position<\/th><th>Admin Name<\/th><th>Phone<\/th><th>Email<\/th>/);
   assert.doesNotMatch(page.text, /href="\/main-admin\/roles">Roles &amp; Permissions</, 'the standalone Roles & Permissions tab link should be gone from the Settings tab strip');
 });
@@ -183,6 +188,21 @@ test('a real request: assigning a member to a position grants them that position
   const afterRemovalCookie = afterRemovalLogin.headers['set-cookie'];
   const afterRemovalRes = await request(app).get('/main-admin/store').set('Cookie', afterRemovalCookie);
   assert.equal(afterRemovalRes.status, 403, 'losing their only position should revoke the main_admin role, not leave it granted forever');
+});
+
+test('GET /main-admin/admins/print renders a read-only preview with the same rows as the page', async () => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+  await request(app)
+    .post('/main-admin/admins/positions/bulk-save')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ newPositionTitle: 'Print Preview Position', _csrf: csrfToken });
+
+  const res = await request(app).get('/main-admin/admins/print').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /print-preview-header/);
+  assert.match(res.text, /onclick="window\.print\(\)"/);
+  assert.match(res.text, /Print Preview Position/);
 });
 
 test('a position with no one assigned yet still shows its own row, and permissions are shared by every current holder', async () => {
