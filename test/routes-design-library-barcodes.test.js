@@ -39,6 +39,18 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
 test('Design/Print: Library Barcodes panel + print', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
 
@@ -61,6 +73,11 @@ test('Design/Print: Library Barcodes panel + print', async (t) => {
     assert.match(res.text, /Charlotte&#39;s Web/);
     assert.match(res.text, /Rocks and Minerals/);
     assert.match(res.text, /class="library-picker-row" data-type="Fiction"/);
+    // A real request: "the download should be a pdf of exactly how it
+    // would also look when printing" - a second submit button right
+    // next to Print, posting the exact same checked itemIds but as a
+    // GET to routes/admin-design.js's download.pdf route.
+    assert.match(res.text, /formaction="\/admin\/design\/print-library-barcodes\/download\.pdf" formmethod="GET"[^>]*aria-label="Download PDF"/);
   });
 
   await t.test('printing selected items renders the same Avery label template as member barcode labels', async () => {
@@ -93,5 +110,24 @@ test('Design/Print: Library Barcodes panel + print', async (t) => {
       .send({ _csrf: csrfToken });
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /error=/);
+  });
+
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - routes/admin-design.js's new GET
+  // /design/print-library-barcodes/download.pdf route renders the exact
+  // same admin-library-barcodes-print.ejs view through headless Chromium
+  // (see utils/pdfRender.js), with the selected itemIds carried as a
+  // query string instead of a POST body. PDF generation via real
+  // headless Chromium is slow (~1-2s) - expected, not a bug.
+  await t.test('downloading the selected barcodes as a PDF renders a real, non-trivial PDF', async () => {
+    const res = await getBuffer(`/admin/design/print-library-barcodes/download.pdf?itemIds=${fictionId}&itemIds=${scienceId}`, cookie);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers['content-type'], 'application/pdf');
+    assert.match(res.headers['content-disposition'], /attachment; filename="library-barcodes\.pdf"/);
+    assert.equal(res.body.slice(0, 5).toString(), '%PDF-');
+    // A broken barcode render would still return 200 with a near-blank
+    // page - a real label sheet with 2 rendered barcodes comes back well
+    // into the tens of KB, not a trivial handful of bytes.
+    assert.ok(res.body.length > 5000, `expected a non-trivial PDF, got ${res.body.length} bytes`);
   });
 });

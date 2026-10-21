@@ -84,8 +84,19 @@ const { playgroundHourLabel } = require('../utils/playground');
 const { allItems: allLibraryItems, allLibraryTypes } = require('../utils/library');
 const { schedulesForMembers } = require('../utils/schedule');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
+const { renderViewToPdf } = require('../utils/pdfRender');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_name_tags'));
+
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - sends a headless-Chromium-rendered PDF of
+// viewName (one of this router's own *-print.ejs views), same helper
+// shape as routes/parent-family-school.js's own sendPdf.
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
 
 const NAME_TAG_TYPES = ['student', 'parent', 'admin'];
 const DESIGN_TYPES = ['student', 'parent', 'admin', 'scheduleCard', 'setupCleanup', 'custom'];
@@ -713,6 +724,56 @@ router.post('/print-classcheckin-qr', async (req, res) => {
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - the same selection/grouping the Print route
+// above builds, now rendered through headless Chromium instead of the
+// browser's own print preview. classIds travels as a GET query string
+// here (the live picker's Download button submits this same form with
+// formmethod="GET" instead of POST) since a PDF download has to be a
+// plain navigable URL, not a form-only POST. isFullAdmin is passed
+// explicitly since renderViewToPdf renders through req.app.render(),
+// which never sees this request's own res.locals (where partials/admin-
+// nav normally finds it) - always false here, same as a normal Main
+// Admin request (res.locals.isFullAdmin is only ever true for Co-op
+// Admin's own separate adminId session - see server.js).
+router.get('/print-classcheckin-qr/download.pdf', async (req, res) => {
+  const classIds = [].concat(req.query.classIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const allClasses = await allClassesList();
+  const idSet = new Set(classIds);
+  const classes = allClasses.filter((c) => idSet.has(c.id));
+
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const groups = new Map();
+  for (const c of classes) {
+    const room = c.room && c.room.trim() ? c.room.trim() : UNASSIGNED_ROOM;
+    const key = `${c.day}|${room}`;
+    if (!groups.has(key)) groups.set(key, { day: c.day, dayLabel: c.dayLabel, room, classes: [] });
+    groups.get(key).classes.push(c);
+  }
+
+  const pages = Array.from(groups.values())
+    .sort((a, b) => a.day.localeCompare(b.day) || a.room.localeCompare(b.room))
+    .map((g) => ({
+      dayLabel: g.dayLabel,
+      room: g.room,
+      classes: g.classes
+        .sort((a, b) => a.hour_position - b.hour_position)
+        .map((c) => ({
+          className: c.class_name,
+          dayLabel: c.dayLabel,
+          timeLabel: c.timeLabel,
+          checkInUrl: `${origin}/kiosk/class-checkin/classes/${c.id}/attendance`,
+        })),
+    }));
+
+  const pdf = await renderViewToPdf(req, 'main-admin-classcheckin-qr-print', {
+    title: 'Print Class Check-In QR Codes',
+    pages,
+    isFullAdmin: false,
+  });
+  sendPdf(res, 'class-checkin-qr-codes.pdf', pdf);
+});
+
 router.get('/print-playground-qr', async (req, res) => {
   const origin = `${req.protocol}://${req.get('host')}`;
   const pages = [];
@@ -733,6 +794,33 @@ router.get('/print-playground-qr', async (req, res) => {
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - same always-every-slot data as the Print
+// route above, rendered through headless Chromium instead. isFullAdmin
+// is passed explicitly - see the download.pdf route above this one for
+// why.
+router.get('/print-playground-qr/download.pdf', async (req, res) => {
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const pages = [];
+  for (const day of await listActiveClassDays()) {
+    const hours = [];
+    for (const hour of HOUR_POSITIONS) {
+      hours.push({
+        hourLabel: await playgroundHourLabel(day, hour),
+        checkInUrl: `${origin}/kiosk/class-checkin/playground/${day}/${hour}/attendance`,
+      });
+    }
+    pages.push({ dayLabel: CLASS_DAY_LABELS_FULL[day], hours });
+  }
+
+  const pdf = await renderViewToPdf(req, 'main-admin-playground-qr-print', {
+    title: 'Print Playground Check-In QR Codes',
+    pages,
+    isFullAdmin: false,
+  });
+  sendPdf(res, 'playground-qr-codes.pdf', pdf);
+});
+
 router.post('/print-library-barcodes', async (req, res) => {
   const itemIds = [].concat(req.body.itemIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (itemIds.length === 0) {
@@ -748,6 +836,30 @@ router.post('/print-library-barcodes', async (req, res) => {
     title: 'Print Library Barcodes',
     items,
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - same selection the Print route above
+// renders, now through headless Chromium. itemIds travels as a GET query
+// string here (the live picker's Download button submits this same form
+// with formmethod="GET" instead of POST) since a PDF download has to be
+// a plain navigable URL, not a form-only POST. isFullAdmin is passed
+// explicitly - see the first download.pdf route in this file for why.
+router.get('/print-library-barcodes/download.pdf', async (req, res) => {
+  const itemIds = [].concat(req.query.itemIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const placeholders = itemIds.map(() => '?').join(',');
+  const items = itemIds.length
+    ? (await db.prepare(`SELECT * FROM library_items WHERE id IN (${placeholders})`).all(...itemIds)).sort((a, b) =>
+        a.title.toLowerCase().localeCompare(b.title.toLowerCase())
+      )
+    : [];
+
+  const pdf = await renderViewToPdf(req, 'main-admin-library-barcodes-print', {
+    title: 'Print Library Barcodes',
+    items,
+    isFullAdmin: false,
+  });
+  sendPdf(res, 'library-barcodes.pdf', pdf);
 });
 
 module.exports = router;

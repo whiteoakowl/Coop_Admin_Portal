@@ -409,6 +409,13 @@
               <button type="button" class="roster-action-btn" id="classcheckin-qr-filter-btn">Filter</button>
               <% if (classesForQr.length > 0) { %>
                 <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+                <%# A real request: "the download should be a pdf of exactly
+                    how it would also look when printing" - this button
+                    submits the exact same checked classIds, as a GET so
+                    the browser can navigate straight to the PDF instead of
+                    just posting a form (routes/main-admin-name-tags.js's
+                    download.pdf route). %>
+                <button type="submit" class="icon-btn" formaction="/main-admin/name-tags/print-classcheckin-qr/download.pdf" formmethod="GET" formtarget="_self" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
               <% } %>
             </div>
             <% if (classesForQr.length === 0) { %>
@@ -462,6 +469,7 @@
         <div id="print-playgroundQr-section" hidden>
           <p class="hint">Prints one QR code per playground hour, 4 to a page (one page per day) - anybody can scan one to check in or out, no roster required.</p>
           <a class="primary-btn" href="/main-admin/name-tags/print-playground-qr" target="_blank">Print Playground Check-In QR Codes</a>
+          <a class="icon-btn" href="/main-admin/name-tags/print-playground-qr/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         </div>
 
         <div id="print-libraryBarcodes-section" hidden>
@@ -483,6 +491,13 @@
               </label>
               <% if (libraryItems.length > 0) { %>
                 <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+                <%# A real request: "the download should be a pdf of exactly
+                    how it would also look when printing" - this button
+                    submits the exact same checked itemIds, as a GET so the
+                    browser can navigate straight to the PDF instead of just
+                    posting a form (routes/main-admin-name-tags.js's
+                    download.pdf route). %>
+                <button type="submit" class="icon-btn" formaction="/main-admin/name-tags/print-library-barcodes/download.pdf" formmethod="GET" formtarget="_self" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
               <% } %>
             </div>
             <% if (libraryItems.length === 0) { %>
