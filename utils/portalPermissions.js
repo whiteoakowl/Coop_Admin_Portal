@@ -99,4 +99,28 @@ async function setMemberRoles(memberId, roleIds, grantedByAccountId) {
   return true;
 }
 
-module.exports = { portalStatusForMember, portalStatusForMembers, sectionIdsForMembers, setMemberSections, setMemberRoles };
+// Main Admin Members' own "Bulk Edit > Add to Section(s)/Portal(s)" - a
+// real request: "bulk edit button allows you to select 1 or multiple
+// members and add them to a section, portal, family..." Deliberately
+// additive (unlike setMemberSections/setMemberRoles above, which
+// reconcile a single member's COMPLETE set) - several members share one
+// chosen set of sections/roles to be added on top of whatever each
+// already has, not replaced.
+async function addMemberSections(memberId, sectionIds) {
+  for (const sectionId of sectionIds) {
+    await db.prepare('INSERT INTO member_sections (member_id, section_id) VALUES (?, ?) ON CONFLICT DO NOTHING').run(memberId, sectionId);
+  }
+}
+
+// Same "no account yet, nothing to attach a role to" no-op as
+// setMemberRoles above.
+async function addMemberRoles(memberId, roleIds, grantedByAccountId) {
+  const account = await db.prepare('SELECT id FROM member_accounts WHERE member_id = ?').get(memberId);
+  if (!account) return false;
+  for (const roleId of roleIds) {
+    await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id, granted_by_account_id) VALUES (?, ?, ?) ON CONFLICT DO NOTHING').run(account.id, roleId, grantedByAccountId || null);
+  }
+  return true;
+}
+
+module.exports = { portalStatusForMember, portalStatusForMembers, sectionIdsForMembers, setMemberSections, setMemberRoles, addMemberSections, addMemberRoles };

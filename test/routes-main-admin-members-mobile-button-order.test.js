@@ -1,7 +1,12 @@
 // A real request: "main admin portal, member page button order on
 // mobile. Add member, edit member list, add/edit family. 2nd row
 // underneath, edit permissions, add/edit sections. 3rd row underneath
-// filter, import, export, print."
+// filter, import, export, print." A later real request removed the
+// "Edit Member List" toggle entirely (see test/routes-main-admin-
+// members-edit-mode-actions.test.js), so row 1 is just Add Member,
+// Add/Edit Family now. A further real request removed Edit Permissions
+// and Add/Edit Sections from this toolbar too (see test/routes-main-
+// admin-members-cleanup.test.js) - row 2 is just Grade Level Report now.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -41,26 +46,27 @@ test('Members tab toolbar: buttons/filter appear in the exact requested 3/2/4 ro
   assert.ok(toolbarMatch, 'expected the Members tab button toolbar');
   const toolbar = toolbarMatch[1];
 
-  // Row 1: Add Member, Edit Member List, Add/Edit Family.
+  // Row 1: Add Member, Add/Edit Family (Edit Member List removed).
   const addMemberIdx = toolbar.indexOf('+ Add Member');
-  const editListIdx = toolbar.indexOf('Edit Member List');
   const addFamilyIdx = toolbar.indexOf('Add/Edit Family');
   const break1Idx = toolbar.indexOf('roster-btn-row-break');
-  // Row 2: Edit Permissions, Add/Edit Sections.
-  const editPermissionsIdx = toolbar.indexOf('Edit Permissions');
-  const addSectionsIdx = toolbar.indexOf('Add/Edit Sections');
+  // Row 2: Grade Level Report (Edit Permissions/Add/Edit Sections removed).
+  const gradeLevelReportIdx = toolbar.indexOf('Grade Level Report');
   const break2Idx = toolbar.indexOf('roster-btn-row-break', break1Idx + 1);
   // Row 3: Filter, Import, Export, Print. Filter is a button+popup now
   // (a real request: "filter dropdown should change to an orange button
-  // with a popup"), not a <select>.
+  // with a popup"), not a <select>. Export/Print are icon-only buttons
+  // now ("change export and print buttons to icons") - located by their
+  // aria-label instead of visible text.
   const filterIdx = toolbar.indexOf("document.getElementById('members-filter-dialog')");
   const importIdx = toolbar.indexOf('>Import<');
-  const exportIdx = toolbar.indexOf('>Export<');
-  const printIdx = toolbar.indexOf('>Print<');
+  const exportIdx = toolbar.indexOf('aria-label="Export CSV"');
+  const printIdx = toolbar.indexOf('aria-label="Print"');
 
-  assert.ok(addMemberIdx < editListIdx && editListIdx < addFamilyIdx && addFamilyIdx < break1Idx, 'row 1 order: Add Member, Edit Member List, Add/Edit Family, then a break');
-  assert.ok(break1Idx < editPermissionsIdx && editPermissionsIdx < addSectionsIdx && addSectionsIdx < break2Idx, 'row 2 order: Edit Permissions, Add/Edit Sections, then a break');
+  assert.ok(addMemberIdx < addFamilyIdx && addFamilyIdx < break1Idx, 'row 1 order: Add Member, Add/Edit Family, then a break');
+  assert.ok(break1Idx < gradeLevelReportIdx && gradeLevelReportIdx < break2Idx, 'row 2: Grade Level Report, then a break');
   assert.ok(break2Idx < filterIdx && filterIdx < importIdx && importIdx < exportIdx && exportIdx < printIdx, 'row 3 order: Filter, Import, Export, Print');
+  assert.doesNotMatch(toolbar, /Edit Permissions|Add\/Edit Sections/);
 });
 
 test('Archive tab still has its own Filter dropdown, with no button toolbar to join', async () => {

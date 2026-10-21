@@ -39,15 +39,10 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <% if (activeTab === 'members' || activeTab === 'archive') { %>
-      <%# Same shape as routes/admin-members.js's own bulk-permissions form -
-          see that file's own comment. %>
-      <form id="permissions-bulk-form" method="POST" action="/main-admin/members/bulk-permissions"></form>
       <%# Default action is the safe one (Archive) rather than Delete -
-          public/js/members-bulk-actions.js always overwrites this with
-          whichever dropdown option was actually picked before submitting,
-          but a bare fallback submit (see that file's own comment on
-          submitter-less requestSubmit()) should never land on the
-          destructive route now that Delete isn't even offered here. %>
+          public/js/members-bulk-edit.js always overwrites this with
+          whichever Bulk Edit action was actually chosen before the
+          dialog's own Apply submits. %>
       <form id="members-select-form" method="POST" action="/main-admin/members/bulk-archive"></form>
 
       <%# A real request: "add member button, edit permissions button,
@@ -74,14 +69,6 @@
             + Add Member already opens the full membership form
             (member-intake-form.ejs) to manually add a family and its
             members, which is what "instead" asked for. %>
-        <%# A real request: "edit button should say edit member list. when
-            you click the edit member list button... all other buttons
-            disappear and you only see cancel button and save button" -
-            every other button here is flagged data-archive-hide-while so
-            public/js/archive-select-toggle.js's own toggle handler hides
-            them for as long as edit mode is on, leaving just this row's
-            own Cancel (the toggle itself, relabeled) and the Save button
-            down in the Select All/Actions row below. %>
         <%# A real request: "member page button order on mobile. Add
             member, edit member list, add/edit family. 2nd row
             underneath, edit permissions, add/edit sections. 3rd row
@@ -96,27 +83,27 @@
             shared with the Archive tab's own copy further down, which
             has no button toolbar of its own to join). %>
         <div class="roster-btn-row roster-btn-row-fit-text no-print">
-          <a class="roster-action-btn" href="/main-admin/members/new" data-archive-hide-while="members-select-form">+ Add Member</a>
-          <button type="button" class="roster-action-btn" data-archive-toggle="members-select-form" data-archive-toggle-label="Edit Member List" aria-pressed="false">Edit Member List</button>
+          <a class="roster-action-btn" href="/main-admin/members/new">+ Add Member</a>
           <%# A real request: "remove manage family blue bar and make it
               an orange button with the rest of the orange buttons that
               says add/edit family" - replaces the old standalone
               .members-add-family-card that used to sit further down this
               page; same #manage-families-dialog, just opened from here
               now. %>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-families-dialog').showModal()" data-archive-hide-while="members-select-form">Add/Edit Family</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-families-dialog').showModal()">Add/Edit Family</button>
           <span class="roster-btn-row-break" aria-hidden="true"></span>
-          <button type="button" class="roster-action-btn" data-permissions-toggle="members-table" aria-pressed="false" data-archive-hide-while="members-select-form">Edit Permissions</button>
-          <button type="submit" form="permissions-bulk-form" class="roster-action-btn" data-permissions-save="members-table" hidden>Save Permissions</button>
-          <a class="roster-action-btn" href="/main-admin/sections" data-archive-hide-while="members-select-form">Add/Edit Sections</a>
           <%# A real request: "Add a button that's says grade level
               report." %>
-          <a class="roster-action-btn" href="/main-admin/members/grade-level-report" data-archive-hide-while="members-select-form">Grade Level Report</a>
+          <a class="roster-action-btn" href="/main-admin/members/grade-level-report">Grade Level Report</a>
           <span class="roster-btn-row-break" aria-hidden="true"></span>
           <%- include('partials/members-type-filter', { activeTab, typeFilter, familyFilter, families }) %>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('main-admin-import-dialog').showModal()" data-archive-hide-while="members-select-form">Import</button>
-          <a class="roster-action-btn file-action-btn" href="/main-admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>" data-archive-hide-while="members-select-form">Export</a>
-          <button type="button" class="roster-action-btn" onclick="window.print()" data-archive-hide-while="members-select-form">Print</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('main-admin-import-dialog').showModal()">Import</button>
+          <%# A real request: "change export and print buttons to icons" -
+              same icon-btn + icon-download/icon-printer pattern already
+              used elsewhere (e.g. views/admin-accounting-list.ejs's own
+              toolbar). %>
+          <a class="icon-btn" href="/main-admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+          <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
         </div>
 
         <dialog id="main-admin-import-dialog" class="member-picker-dialog">
@@ -152,68 +139,88 @@
         </form>
       </div>
 
-      <%# Edit mode's Select All/None + Actions dropdown - hidden until the
-          "Edit" toggle button above is clicked. A real request: "there
-          should be an edit button on member page that says edit. when
-          you click it it will show check boxes next to every member.
-          you can select individusl, all or none, a dropdown also
-          appears and says actions, delete or archive are the options."
-          Members tab only - Archive already has its own per-row
-          Reactivate button below.
-          A later real request removed Delete from here ("remove trash
-          button from each member. you must archive the member and then
-          they can be deleted while archived"), then a later one still
-          asked for it back ("actions drop down should also have
-          delete"), so it's back - same bulk-delete route (routes/main-
-          admin-members.js's own POST /bulk-delete) the per-row Archive-
-          tab Delete button already uses.
-          A real request: "add select none and check box next to select
-          all" - data-select-none-for is public/js/archive-select-
-          toggle.js's own generic mirror of data-select-all-for, a
-          momentary action that clears every checkbox then un-checks
-          itself, same as every other Select None checkbox in this app.
-          Only rendered on the Members tab, unlike the shared
-          .roster-toolbar wrapper this used to always sit inside (now
-          removed) - .category-filter moved out into its own
-          .members-search-filter-row above, so there's nothing left
-          needing that wrapper on the Archive tab. %>
+      <%# A real request: "Add a column of check boxes in the first
+          column of every member. In the title row of this column is a
+          single check box, selecting the box will select all and
+          deselecting the box will uncheck all." The checkbox column and
+          this row are permanently visible now (no more "Edit Member
+          List" toggle hiding them).
+          A later real request replaced the simple Bulk Action dropdown
+          this used to be with a real "Bulk Edit button allows you to
+          select 1 or multiple members and add them to a section,
+          portal, family, delete, archive, text or email" - one button
+          opens #bulk-edit-dialog (public/js/members-bulk-edit.js), which
+          picks an action and (for Section/Portal/Family) a contextual
+          sub-picker before Apply actually submits #members-select-form.
+          Archive already has its own per-row Reactivate button below;
+          Members tab only. %>
       <% if (activeTab === 'members') { %>
         <div class="roster-toolbar no-print">
-          <div class="class-schedule-archive-controls" data-archive-controls="members-select-form" hidden>
+          <div class="class-schedule-archive-controls">
             <label class="checkbox-option class-schedule-select-all">
               <input type="checkbox" data-select-all-for="members-select-form" />
               Select All
             </label>
-            <label class="checkbox-option class-schedule-select-all">
-              <input type="checkbox" data-select-none-for="members-select-form" />
-              Select None
-            </label>
-            <select data-bulk-action-select form="members-select-form" aria-label="Actions">
-              <option value="">Actions</option>
-              <option
-                value="archive"
-                data-bulk-action="/main-admin/members/bulk-archive"
-                data-bulk-confirm="Archive the selected member(s)? They'll move to the Archive tab, but nothing is deleted."
-                data-bulk-confirm-yes-label="Yes, Archive"
-                data-bulk-confirm-safe="1"
-              >Archive</option>
-              <option
-                value="delete"
-                data-bulk-action="/main-admin/members/bulk-delete"
-                data-bulk-confirm="Permanently delete the selected member(s)? This removes them from all rosters and attendance history. This cannot be undone."
-                data-bulk-confirm-yes-label="Yes, Delete"
-              >Delete</option>
-            </select>
-            <%# A real request: "all other buttons disappear and you only
-                see cancel button and save button" - picking Archive/
-                Delete above no longer submits by itself (public/js/
-                members-bulk-actions.js's own comment); this Save button
-                does, once an action is actually chosen (disabled until
-                then, same as the confirm-dialog.js flow every other
-                data-confirm form already goes through on submit). %>
-            <button type="submit" form="members-select-form" class="roster-action-btn" data-bulk-action-save disabled>Save</button>
+            <button type="button" class="roster-action-btn" id="bulk-edit-btn">Bulk Edit</button>
           </div>
         </div>
+
+        <dialog id="bulk-edit-dialog" class="member-picker-dialog">
+          <h3>Bulk Edit</h3>
+          <p class="hint">Applies to every member currently checked in the list below.</p>
+          <div class="stack-form">
+            <label>Action
+              <select id="bulk-edit-action">
+                <option value="">Choose an action&hellip;</option>
+                <option value="sections">Add to Section(s)</option>
+                <option value="roles">Add to Portal(s)</option>
+                <option value="family">Add to Family</option>
+                <option value="archive">Archive</option>
+                <option value="delete">Delete</option>
+                <option value="email">Email</option>
+                <option value="text">Text</option>
+              </select>
+            </label>
+
+            <div class="bulk-edit-subfields" id="bulk-edit-sections-fields" hidden>
+              <p class="hint">Add every checked member to:</p>
+              <% if (sections.length === 0) { %>
+                <p class="hint">No sections yet - add one from Settings &gt; Sections.</p>
+              <% } else { %>
+                <% sections.forEach(function(s) { %>
+                  <label class="checkbox-option">
+                    <input type="checkbox" name="sectionIds" value="<%= s.id %>" form="members-select-form" />
+                    <%= s.name %>
+                  </label>
+                <% }); %>
+              <% } %>
+            </div>
+
+            <div class="bulk-edit-subfields" id="bulk-edit-roles-fields" hidden>
+              <p class="hint">Grant every checked member (with a portal account) these portal(s):</p>
+              <% roles.forEach(function(r) { %>
+                <label class="checkbox-option">
+                  <input type="checkbox" name="roleIds" value="<%= r.id %>" form="members-select-form" />
+                  <%= r.label %>
+                </label>
+              <% }); %>
+              <p class="hint">A member with no portal account yet is skipped - add one from their own Edit page first.</p>
+            </div>
+
+            <div class="bulk-edit-subfields" id="bulk-edit-family-fields" hidden>
+              <label>Family
+                <select name="familyId" form="members-select-form">
+                  <option value="">Choose a family&hellip;</option>
+                  <% families.forEach(function(f) { %><option value="<%= f.id %>"><%= f.name %></option><% }); %>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" form="members-select-form" class="primary-btn" id="bulk-edit-apply-btn" disabled>Apply</button>
+          </div>
+        </dialog>
       <% } %>
 
       <% if (activeTab === 'members') { %>
@@ -293,7 +300,7 @@
                 <span class="member-row-chevron-spacer"></span>
               <% } %>
               <% if (activeTab === 'members') { %>
-                <input type="checkbox" name="memberIds" value="<%= m.id %>" form="members-select-form" class="archive-select-checkbox no-print" aria-label="Select <%= m.name %>" hidden />
+                <input type="checkbox" name="memberIds" value="<%= m.id %>" form="members-select-form" class="archive-select-checkbox no-print" aria-label="Select <%= m.name %>" />
               <% } %>
               <span class="member-avatar member-avatar-<%= avatarColorFor(m.family_id != null ? m.family_id : m.id) %>">
                 <% if (m.photo_path) { %>
@@ -350,40 +357,6 @@
                     <% } %>
                   </div>
                 <% } %>
-                <%# Main Admin's own Sections/Portal Permissions editor -
-                    only shown in Edit Permissions mode (public/js/
-                    permissions-edit-toggle.js toggles .permissions-mode-on
-                    on #members-table above, same as the old table cell
-                    this replaces). %>
-                <div class="member-row-permissions">
-                  <input type="hidden" name="memberIds[]" value="<%= m.id %>" form="permissions-bulk-form" />
-                  <details class="permissions-cell-group">
-                    <summary>Sections</summary>
-                    <% if (sections.length === 0) { %>
-                      <p class="hint">No sections yet.</p>
-                    <% } else { %>
-                      <% sections.forEach(function(s) { %>
-                        <label class="checkbox-option">
-                          <input type="checkbox" name="sections_<%= m.id %>[]" value="<%= s.id %>" form="permissions-bulk-form" <%= sectionIdsByMember[m.id] && sectionIdsByMember[m.id].has(s.id) ? 'checked' : '' %> />
-                          <%= s.name %>
-                        </label>
-                      <% }); %>
-                    <% } %>
-                  </details>
-                  <details class="permissions-cell-group">
-                    <summary>Portal Permissions</summary>
-                    <% if (portalStatusByMember[m.id] && portalStatusByMember[m.id].account) { %>
-                      <% roles.forEach(function(r) { %>
-                        <label class="checkbox-option">
-                          <input type="checkbox" name="roles_<%= m.id %>[]" value="<%= r.id %>" form="permissions-bulk-form" <%= portalStatusByMember[m.id].roleIds.has(r.id) ? 'checked' : '' %> />
-                          <%= r.label %>
-                        </label>
-                      <% }); %>
-                    <% } else { %>
-                      <p class="hint">No portal account &mdash; add a password on this member's own <a href="/main-admin/members/<%= m.id %>/edit">Edit</a> page.</p>
-                    <% } %>
-                  </details>
-                </div>
               </div>
               <div class="member-row-actions no-print">
                 <% if (m.email) { %>
@@ -489,21 +462,67 @@
         </div>
       <% } %>
     <% } else if (activeTab === 'settings') { %>
-      <%# A real request: "All of these member settings are currently on
-          one page. They should be moved to their own tabs under member
-          settings for better viewing." Same in-page tab pattern views/
-          portal-profile.ejs already uses for its own Profile/Schedules/
-          Event Signups tabs - everything below was already fetched
-          together up front either way (routes/main-admin-members.js), so
-          switching sub-tabs is just which section is visible, no reload. %>
-      <div class="view-tabs no-print">
-        <a class="view-tab<%= settingsTab === 'grade-levels' ? ' active' : '' %>" href="/main-admin/members?tab=settings&settingsTab=grade-levels">Grade Level Settings</a>
-        <a class="view-tab<%= settingsTab === 'fee-payment' ? ' active' : '' %>" href="/main-admin/members?tab=settings&settingsTab=fee-payment">Membership Fee &amp; Payment</a>
-        <a class="view-tab<%= settingsTab === 'form-fields' ? ' active' : '' %>" href="/main-admin/members?tab=settings&settingsTab=form-fields">Membership Form Fields</a>
-        <a class="view-tab<%= settingsTab === 'approval-denial' ? ' active' : '' %>" href="/main-admin/members?tab=settings&settingsTab=approval-denial">Approval/Denial Messages</a>
-        <a class="view-tab<%= settingsTab === 'handbook' ? ' active' : '' %>" href="/main-admin/members?tab=settings&settingsTab=handbook">Policy Handbook</a>
-      </div>
+      <%# A real request: "Change settings to card style like the gear
+          icon settings. Move sections buttons to settings subpage as a
+          card." Replaces the old in-page tab strip (views/portal-
+          profile.ejs's own Profile/Schedules/Event Signups pattern) with
+          the same landing-grid-of-cards shape /main-admin/settings
+          itself uses (views/main-admin-settings-hub.ejs) - no
+          settingsTab in the URL shows this grid; picking a card still
+          just navigates to that same settingsTab query param as before,
+          each one's own content unchanged below. Sections isn't a
+          settingsTab at all (it's always been its own full page at
+          /main-admin/sections) - its card just links straight there. %>
+      <% if (!settingsTab) { %>
+        <div class="team-card-grid">
+          <div class="team-col">
+            <a class="team-info-card" href="/main-admin/members?tab=settings&settingsTab=grade-levels">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
+              <h3 class="team-info-title">Grade Level Settings</h3>
+              <p class="hint">Age/date rules for assigning a student's grade level.</p>
+            </a>
+          </div>
+          <div class="team-col">
+            <a class="team-info-card" href="/main-admin/members?tab=settings&settingsTab=fee-payment">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-coin"/></svg></span>
+              <h3 class="team-info-title">Membership Fee &amp; Payment</h3>
+              <p class="hint">The fee amount and payment instructions shown on the application.</p>
+            </a>
+          </div>
+          <div class="team-col">
+            <a class="team-info-card" href="/main-admin/members?tab=settings&settingsTab=form-fields">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-edit"/></svg></span>
+              <h3 class="team-info-title">Membership Form Fields</h3>
+              <p class="hint">Extra questions on the Membership Form and public application.</p>
+            </a>
+          </div>
+          <div class="team-col">
+            <a class="team-info-card" href="/main-admin/members?tab=settings&settingsTab=approval-denial">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-mail"/></svg></span>
+              <h3 class="team-info-title">Approval/Denial Messages</h3>
+              <p class="hint">The letters sent when a registration is approved or denied.</p>
+            </a>
+          </div>
+          <div class="team-col">
+            <a class="team-info-card" href="/main-admin/members?tab=settings&settingsTab=handbook">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-file-text"/></svg></span>
+              <h3 class="team-info-title">Policy Handbook</h3>
+              <p class="hint">What families must scroll through and accept to register.</p>
+            </a>
+          </div>
+          <div class="team-col">
+            <a class="team-info-card" href="/main-admin/sections">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-clipboard-list"/></svg></span>
+              <h3 class="team-info-title">Sections</h3>
+              <p class="hint">Add, rename, or remove the sections members can belong to.</p>
+            </a>
+          </div>
+        </div>
+      <% } else { %>
+        <p class="subtitle no-print"><a href="/main-admin/members?tab=settings">&larr; Settings</a></p>
+      <% } %>
 
+      <% if (settingsTab) { %>
       <% if (settingsTab === 'grade-levels') { %>
         <%# A real request: "Under member settings add a tab called grade
             level settings. Here is a list of graded levels. Next to each
@@ -677,14 +696,14 @@
           </form>
         </div>
       <% } %>
+      <% } %>
     <% } %>
   </main>
-  <script src="/js/permissions-edit-toggle.js"></script>
   <script src="/js/member-name-tag-request.js"></script>
   <script src="/js/members-family-accordion.js"></script>
   <script src="/js/edit-families.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
-  <script src="/js/members-bulk-actions.js"></script>
+  <script src="/js/members-bulk-edit.js"></script>
   <script src="/js/member-row-actions.js"></script>
   <% if (activeTab === 'settings') { %>
     <script src="/js/forum-editor.js"></script>

@@ -50,7 +50,7 @@ const {
   avatarColorFor,
 } = require('../utils/members');
 const { getMemberSchedule, scheduleList } = require('../utils/schedule');
-const { portalStatusForMembers, sectionIdsForMembers, setMemberSections, setMemberRoles } = require('../utils/portalPermissions');
+const { portalStatusForMembers, sectionIdsForMembers, setMemberSections, setMemberRoles, addMemberSections, addMemberRoles } = require('../utils/portalPermissions');
 const { clearVolunteerMembershipIfNotParent } = require('../utils/volunteers');
 const { hashPassword, findAccountByEmail, ensurePortalAccountForMember } = require('../utils/portalAuth');
 const {
@@ -173,7 +173,11 @@ router.get('/', async (req, res) => {
     // Schedules/Event Signups tabs. Everything's still fetched together
     // either way (each one's its own small, cheap read) rather than
     // re-querying per sub-tab switch.
-    const settingsTab = SETTINGS_SUBTABS.includes(req.query.settingsTab) ? req.query.settingsTab : SETTINGS_SUBTABS[0];
+    // A real request: "Change settings to card style like the gear icon
+    // settings" - null (not a default sub-tab) means "show the card
+    // grid landing page," same as /main-admin/settings itself (views/
+    // main-admin-settings-hub.ejs) has no sub-tab of its own either.
+    const settingsTab = SETTINGS_SUBTABS.includes(req.query.settingsTab) ? req.query.settingsTab : null;
     return res.render('main-admin-members', {
       title: 'Members',
       activeTab,
@@ -214,13 +218,14 @@ router.get('/', async (req, res) => {
   // exact number of members" - see utils/pagination.js's own comment.
   const pagination = paginate(withRosters, parsePage(req.query.page), pageSize, memberFamilyGroupKey);
 
-  // "Edit Permissions" bulk mode - same "current page only" scope as
-  // routes/admin-members.js's own version, see that file's own comment.
+  // sections/roles also back the "Bulk Edit" dialog's own Add to
+  // Section(s)/Portal(s) checkboxes (public/js/members-bulk-edit.js) -
+  // sectionIdsByMember is still shown read-only on each row's own
+  // subline below.
   const pageMemberIds = pagination.items.map((m) => m.id);
   const sections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
   const roles = await db.prepare('SELECT * FROM roles ORDER BY label').all();
   const sectionIdsByMember = await sectionIdsForMembers(pageMemberIds);
-  const portalStatusByMember = await portalStatusForMembers(pageMemberIds);
 
   res.render('main-admin-members', {
     title: 'Members',
@@ -241,7 +246,6 @@ router.get('/', async (req, res) => {
     sections,
     roles,
     sectionIdsByMember,
-    portalStatusByMember,
     avatarColorFor,
     error: req.query.error || null,
     notice: req.query.notice || null,
@@ -314,26 +318,6 @@ router.post('/import/confirm', async (req, res) => {
   const merged = await memberImport.applyImportMerges(memberIds, payloads, allMemberIds);
 
   res.redirect('/main-admin/members?notice=' + encodeURIComponent(`Merged new profile details into ${merged} existing member(s).`));
-});
-
-// "Edit Permissions" bulk save - see routes/admin-members.js's own
-// identical route for the full comment on what this reconciles.
-// req.portalAccount DOES exist on this session (a real member_accounts-
-// backed Main Admin login), so grants are attributed here, unlike the
-// Co-op Admin version.
-router.post('/bulk-permissions', async (req, res) => {
-  // Field names are `sections_<memberId>[]`/`roles_<memberId>[]` - see
-  // routes/admin-members.js's own identical route for why (qs's
-  // small-integer-bracket-as-array-index behavior would otherwise
-  // silently mangle this).
-  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
-  for (const memberId of memberIds) {
-    const sectionIds = [].concat(req.body[`sections_${memberId}`] || []).map((id) => parseInt(id, 10)).filter(Boolean);
-    const roleIds = [].concat(req.body[`roles_${memberId}`] || []).map((id) => parseInt(id, 10)).filter(Boolean);
-    await setMemberSections(memberId, sectionIds);
-    await setMemberRoles(memberId, roleIds, req.portalAccount.id);
-  }
-  res.redirect('/main-admin/members?notice=' + encodeURIComponent(`Permissions updated for ${memberIds.length} member(s).`));
 });
 
 // A real request: "make every member a user... give everyone the
@@ -572,6 +556,48 @@ router.post('/bulk-archive', async (req, res) => {
     await db.prepare(`UPDATE members SET active = 0, archived_at = now_text() WHERE id IN (${placeholders})`).run(...memberIds);
   }
   res.redirect(membersRedirectUrl(req, { notice: `Archived ${memberIds.length} member(s).` }));
+});
+
+// --- Bulk Edit (public/js/members-bulk-edit.js's own dialog) - "Main
+// admin portal members bulk edit button allows you to select 1 or
+// multiple members and add them to a section, portal, family, delete.
+// Archive, text or email." Delete/Archive/Email/Text reuse what already
+// existed (bulk-delete/bulk-archive above, and routes/main-admin-
+// announcements.js's own /email/compose, /text/compose via
+// utils/emailComposer.js's own resolveRecipients()) - these three are
+// the new ones: add (never replace) the selected members to whichever
+// section(s)/portal(s) were checked, or to one chosen family. ---
+
+router.post('/bulk-add-sections', async (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const sectionIds = [].concat(req.body.sectionIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  for (const memberId of memberIds) await addMemberSections(memberId, sectionIds);
+  res.redirect(membersRedirectUrl(req, { notice: `Added ${memberIds.length} member(s) to ${sectionIds.length} section(s).` }));
+});
+
+router.post('/bulk-add-roles', async (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const roleIds = [].concat(req.body.roleIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  let granted = 0;
+  for (const memberId of memberIds) {
+    if (await addMemberRoles(memberId, roleIds, req.portalAccount.id)) granted++;
+  }
+  const skipped = memberIds.length - granted;
+  res.redirect(
+    membersRedirectUrl(req, {
+      notice: `Added ${roleIds.length} portal(s) to ${granted} member(s).${skipped > 0 ? ` ${skipped} skipped - no portal account.` : ''}`,
+    })
+  );
+});
+
+router.post('/bulk-add-family', async (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const familyId = parseInt(req.body.familyId, 10) || null;
+  if (familyId && memberIds.length > 0) {
+    const placeholders = memberIds.map(() => '?').join(',');
+    await db.prepare(`UPDATE members SET family_id = ? WHERE id IN (${placeholders})`).run(familyId, ...memberIds);
+  }
+  res.redirect(membersRedirectUrl(req, { notice: `Added ${memberIds.length} member(s) to that family.` }));
 });
 
 // --- Families (add/rename/delete the family "name" itself - see

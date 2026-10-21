@@ -52,20 +52,49 @@ test('no description text on Members, Archive, Approvals, or Settings tabs', asy
   assert.doesNotMatch(settingsPage.text, /Extra questions shown on the Parent\/Guardian and Student sections/);
 });
 
-test('the Members toolbar carries a single .roster-btn-row with the Edit Permissions and Save Permissions buttons as siblings', async () => {
+// A real request: "Remove from members page the following buttons, edit
+// member list, edit permissions, add/edit sections. Change to bulk edit
+// button." Edit Permissions/Save Permissions and Add/Edit Sections are
+// gone from this toolbar - Sections management moved to a card on the
+// Settings tab, and section/portal assignment moved into the Bulk Edit
+// dialog (see test/routes-main-admin-members-edit-mode-actions.test.js).
+test('the Members toolbar carries a single .roster-btn-row, with Edit Permissions/Add-Edit Sections gone', async () => {
   const cookie = await loginAsMainAdmin();
   const res = await request(app).get('/main-admin/members?tab=members').set('Cookie', cookie);
   const rowMatch = /<div class="roster-btn-row roster-btn-row-fit-text no-print">([\s\S]*?)<\/div>\s*<dialog/.exec(res.text);
   assert.ok(rowMatch, 'expected the members toolbar row');
   const rowHtml = rowMatch[1];
-  assert.match(rowHtml, /data-permissions-toggle="members-table"/);
-  assert.match(rowHtml, /data-permissions-save="members-table" hidden/, 'Save Permissions starts hidden - JS reveals it and hides everything else when Edit Permissions is clicked');
+  assert.doesNotMatch(rowHtml, /data-permissions-toggle/);
+  assert.doesNotMatch(rowHtml, /data-permissions-save/);
+  assert.doesNotMatch(rowHtml, />Edit Permissions</);
+  assert.doesNotMatch(rowHtml, />Add\/Edit Sections</);
   assert.match(rowHtml, /\+ Add Member/);
   assert.match(rowHtml, />Import</);
-  assert.match(rowHtml, />Export</);
+  // A later real request: "change export and print buttons to icons" -
+  // Export is now an icon-only link (aria-label, no visible text).
+  assert.match(rowHtml, /aria-label="Export CSV"/);
   // A later real request: "delete create account button. every member
   // already automatically has an account. instead there can be an add
   // member button" - + Add Member (already present above) replaces it.
   assert.doesNotMatch(rowHtml, />Create Accounts</);
-  assert.match(rowHtml, />Add\/Edit Sections</);
+});
+
+test('Settings tab is a card grid, with a Sections card linking to /main-admin/sections', async () => {
+  const cookie = await loginAsMainAdmin();
+  const res = await request(app).get('/main-admin/members?tab=settings').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /<div class="team-card-grid">/);
+  assert.match(res.text, /href="\/main-admin\/sections"[\s\S]*?Sections/);
+  assert.match(res.text, /href="\/main-admin\/members\?tab=settings&settingsTab=grade-levels"/);
+  // The old in-page tab strip (a <div class="view-tabs"> of <a
+  // class="view-tab"> links) is gone - note .view-tabs/.view-tab are
+  // also reused, unrelatedly, by this page's own mobile subpages popup
+  // dialog, so this checks for the specific old tab-strip div rather
+  // than asserting the class is absent sitewide.
+  assert.doesNotMatch(res.text, /<div class="view-tabs no-print">/);
+
+  const gradeLevelsPage = await request(app).get('/main-admin/members?tab=settings&settingsTab=grade-levels').set('Cookie', cookie);
+  assert.match(gradeLevelsPage.text, /Grade Level Settings/);
+  assert.doesNotMatch(gradeLevelsPage.text, /<div class="team-card-grid">/, 'a specific settings sub-page shows its own content, not the card grid');
+  assert.match(gradeLevelsPage.text, /href="\/main-admin\/members\?tab=settings">&larr; Settings</);
 });

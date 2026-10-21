@@ -8,6 +8,14 @@
 // level)." Also covers the surrounding "All of these member settings
 // are currently on one page. They should be moved to their own tabs" -
 // the Settings tab's own nested settingsTab sub-tabs.
+//
+// A later real request ("Change settings to card style like the gear
+// icon settings") replaced the in-page .view-tabs strip (and its
+// "Grade Level Settings is the default" behavior) with a landing grid
+// of cards - no settingsTab in the URL now shows that grid, not any one
+// sub-tab's content, so every fetch below that needs a specific sub-
+// tab's content asks for it explicitly via &settingsTab=... instead of
+// relying on a default.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -43,20 +51,30 @@ function extractCsrf(html) {
 async function loginAsMainAdmin() {
   const loginRes = await request(app).post('/login').type('form').send({ email: process.env.MAIN_ADMIN_EMAIL, password: process.env.MAIN_ADMIN_PASSWORD, next: '/main-admin' });
   const cookie = loginRes.headers['set-cookie'];
-  const page = await request(app).get('/main-admin/members?tab=settings').set('Cookie', cookie);
+  const page = await request(app).get('/main-admin/members?tab=settings&settingsTab=grade-levels').set('Cookie', cookie);
   return { cookie, csrfToken: extractCsrf(page.text) };
 }
 
-test('Settings tab shows the 5 nested sub-tabs, Grade Level Settings default/active, one row per grade level', async () => {
+test('Settings tab (no settingsTab) shows a card grid naming all 6 settings areas, no sub-tab content', async () => {
   const { cookie } = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/members?tab=settings').set('Cookie', cookie);
+  assert.match(page.text, /<div class="team-card-grid">/);
   assert.match(page.text, /Grade Level Settings/);
   assert.match(page.text, /Membership Fee &amp; Payment/);
   assert.match(page.text, /Membership Form Fields/);
-  assert.match(page.text, /Approval\/Denial/);
+  assert.match(page.text, /Approval\/Denial Messages/);
   assert.match(page.text, /Policy Handbook/);
-  // Grade Level Settings is the default sub-tab and its own rows render.
-  assert.match(page.text, /class="view-tab active" href="\/main-admin\/members\?tab=settings&settingsTab=grade-levels">Grade Level Settings/);
+  assert.match(page.text, /href="\/main-admin\/sections"[\s\S]*?Sections/);
+  // No sub-tab's own content renders on the landing grid itself.
+  assert.doesNotMatch(page.text, /name="gradeLevel"/);
+  assert.doesNotMatch(page.text, /Approval Letter/);
+});
+
+test('settingsTab=grade-levels shows just that section, one row per grade level', async () => {
+  const { cookie } = await loginAsMainAdmin();
+  const page = await request(app).get('/main-admin/members?tab=settings&settingsTab=grade-levels').set('Cookie', cookie);
+  assert.doesNotMatch(page.text, /<div class="team-card-grid">/);
+  assert.match(page.text, /href="\/main-admin\/members\?tab=settings">&larr; Settings</);
   assert.match(page.text, /name="gradeLevel" value="Kindergarten"/);
   assert.match(page.text, /name="gradeLevel" value="1st"/);
   // The other sub-tabs' content isn't rendered until selected.
@@ -66,7 +84,7 @@ test('Settings tab shows the 5 nested sub-tabs, Grade Level Settings default/act
 test('Switching settingsTab shows only that section', async () => {
   const { cookie } = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/members?tab=settings&settingsTab=approval-denial').set('Cookie', cookie);
-  assert.match(page.text, /class="view-tab active" href="\/main-admin\/members\?tab=settings&settingsTab=approval-denial">Approval\/Denial/);
+  assert.doesNotMatch(page.text, /<div class="team-card-grid">/);
   assert.match(page.text, /Approval Letter/);
   assert.match(page.text, /Denial Letter/);
   assert.doesNotMatch(page.text, /name="gradeLevel"/);
@@ -74,7 +92,7 @@ test('Switching settingsTab shows only that section', async () => {
 
 test('POST /main-admin/members/settings/grade-levels saves every row and redirects back to that sub-tab', async () => {
   const { cookie, csrfToken } = await loginAsMainAdmin();
-  const page = await request(app).get('/main-admin/members?tab=settings').set('Cookie', cookie);
+  const page = await request(app).get('/main-admin/members?tab=settings&settingsTab=grade-levels').set('Cookie', cookie);
   const gradeLevels = [...page.text.matchAll(/name="gradeLevel" value="([^"]*)"/g)].map((m) => m[1]);
   assert.ok(gradeLevels.includes('Kindergarten'));
   assert.ok(gradeLevels.includes('12th'));
@@ -112,7 +130,7 @@ test('POST /settings/grade-levels/apply sets each matching student\'s grade leve
   const { cookie, csrfToken } = await loginAsMainAdmin();
 
   // Kindergarten: age 5 by 2026-09-01. 1st: age 6 by 2026-09-01.
-  const page = await request(app).get('/main-admin/members?tab=settings').set('Cookie', cookie);
+  const page = await request(app).get('/main-admin/members?tab=settings&settingsTab=grade-levels').set('Cookie', cookie);
   const gradeLevels = [...page.text.matchAll(/name="gradeLevel" value="([^"]*)"/g)].map((m) => m[1]);
   const age = gradeLevels.map((g) => (g === 'Kindergarten' ? '5' : g === '1st' ? '6' : ''));
   const cutoffDate = gradeLevels.map((g) => (g === 'Kindergarten' || g === '1st' ? '2026-09-01' : ''));

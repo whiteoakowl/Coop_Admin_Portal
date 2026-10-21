@@ -45,7 +45,9 @@ async function loginAsMainAdmin() {
   return { cookie, csrfToken };
 }
 
-test('Members page toolbar: Add Member/Edit Permissions/Edit Member List/Import/Export sit above a "Filter" (not "type or family") control', async () => {
+// A later real request removed "Edit Permissions" from this toolbar
+// entirely (see test/routes-main-admin-members-cleanup.test.js).
+test('Members page toolbar: Add Member/Import/Export sit above a "Filter" (not "type or family") control', async () => {
   const { cookie } = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/members').set('Cookie', cookie);
   assert.equal(page.status, 200);
@@ -54,10 +56,10 @@ test('Members page toolbar: Add Member/Edit Permissions/Edit Member List/Import/
   const filterIndex = page.text.indexOf('members-filter-dialog');
   assert.ok(buttonRowIndex > -1 && filterIndex > -1 && buttonRowIndex < filterIndex, 'the button row must come before the filter control');
 
-  assert.match(page.text, />Edit Permissions</);
-  assert.match(page.text, />Edit Member List</);
   assert.match(page.text, />Import</);
-  assert.match(page.text, />Export</);
+  // A real request: "change export and print buttons to icons" - Export
+  // is icon-only now (aria-label, no visible text).
+  assert.match(page.text, /aria-label="Export CSV"/);
   // A real request: "filter dropdown should change to an orange button
   // with a popup" - same Filter-button-opens-a-dialog shape as the
   // Member Schedules page's own Filter.
@@ -73,7 +75,7 @@ test('Members page toolbar has a Print button and a branded print-only header', 
   const page = await request(app).get('/main-admin/members').set('Cookie', cookie);
   assert.equal(page.status, 200);
 
-  assert.match(page.text, /onclick="window\.print\(\)"[^>]*>Print</);
+  assert.match(page.text, /onclick="window\.print\(\)"[^>]*aria-label="Print"/);
   assert.match(page.text, /<div class="print-header">[\s\S]*?<p class="print-header-sub">Members<\/p>/);
 });
 
