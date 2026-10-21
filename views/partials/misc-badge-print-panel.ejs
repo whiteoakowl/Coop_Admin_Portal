@@ -6,6 +6,12 @@
 // Admin's own Design/Print page passes '/main-admin/name-tags' so this
 // exact partial can be reused unmodified there too, same basePath
 // parameterization pattern as name-tag-editor.js's own BASE_PATH).
+// downloadPdf (optional, default false) - Main Admin's own routes/
+// main-admin-name-tags.js grew a matching POST .../badges/:type/
+// download.pdf sibling for every badges/:type/print route; Co-op
+// Admin's own routes/admin-misc-badges.js hasn't (yet), so this stays
+// off by default rather than this one shared partial silently pointing
+// Co-op Admin's page at a route that 404s.
 // Import always replaces the whole list for this type; Print with
 // nothing checked prints every badge, checking rows prints just those
 // (see routes/admin-misc-badges.js). Setup/Cleanup badges are no longer
@@ -40,6 +46,9 @@ const DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday' };
         <button type="button" class="roster-action-btn" onclick="document.getElementById('<%= type %>-badge-filter-dialog').showModal()">Filter</button>
       <% } %>
       <button type="submit" class="primary-btn">Print</button>
+      <% if (typeof downloadPdf !== 'undefined' && downloadPdf) { %>
+        <button type="submit" formaction="<%= badgeBasePath %>/badges/<%= type %>/download.pdf" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
+      <% } %>
     </div>
   </div>
 

@@ -41,6 +41,7 @@
             >Archived</a>
             <a class="icon-btn" href="/main-admin/name-tags/requests/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
             <a class="icon-btn" href="/main-admin/name-tags/requests/print?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+            <a class="icon-btn" href="/main-admin/name-tags/requests/download.pdf?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
           </div>
         </div>
 
@@ -285,7 +286,9 @@
                 Select None
               </label>
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+              <button type="submit" formaction="/main-admin/name-tags/print/download.pdf" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
               <button type="submit" formaction="/main-admin/name-tags/print-plain-parent" class="btn-secondary name-tag-bulk-submit" title="Selected parents only, no schedule or setup/cleanup team">Print Plain Parent Tags</button>
+              <button type="submit" formaction="/main-admin/name-tags/print-plain-parent/download.pdf" class="icon-btn" aria-label="Download PDF" title="Download Plain Parent Tags PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
             </div>
             <div class="roster-scroll print-picker-scroll">
               <%- include('partials/print-picker-table', { members: members, listId: 'name-tag-bulk-list', skipRows: true }) %>
@@ -307,6 +310,7 @@
                 Select None
               </label>
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+              <button type="submit" formaction="/main-admin/name-tags/print-duplex/download.pdf" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
             </div>
             <div class="roster-scroll print-picker-scroll">
               <%- include('partials/print-picker-table', { members: members, listId: 'cards-duplex-bulk-list', skipRows: true }) %>
@@ -327,6 +331,7 @@
                 Select None
               </label>
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+              <button type="submit" formaction="/main-admin/name-tags/print-barcodes/download.pdf" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
             </div>
             <div class="roster-scroll print-picker-scroll">
               <%- include('partials/print-picker-table', { members: members, listId: 'barcodes-bulk-list', skipRows: true }) %>
@@ -348,6 +353,7 @@
                 Select None
               </label>
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+              <button type="submit" formaction="/main-admin/name-tags/print-barcode-labels/download.pdf" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
             </div>
             <div class="roster-scroll print-picker-scroll">
               <%- include('partials/print-picker-table', { members: members, listId: 'barcode-labels-bulk-list', skipRows: true }) %>
@@ -356,7 +362,7 @@
         </div>
 
         <div id="print-setupCleanupBadges-section" hidden>
-          <%- include('partials/misc-badge-print-panel', { type: 'setupCleanup', label: 'Setup/Cleanup', badges: setupCleanupBadges, setupTeams, semesters, basePath: '/main-admin/name-tags' }) %>
+          <%- include('partials/misc-badge-print-panel', { type: 'setupCleanup', label: 'Setup/Cleanup', badges: setupCleanupBadges, setupTeams, semesters, basePath: '/main-admin/name-tags', downloadPdf: true }) %>
         </div>
 
         <%
@@ -386,13 +392,14 @@
               </label>
               <div class="roster-btn-row">
                 <button type="submit" class="primary-btn">Print</button>
+                <button type="submit" formaction="/main-admin/name-tags/badges/bypass/download.pdf" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
               </div>
             </form>
           <% } %>
         </div>
 
         <div id="print-customBadges-section" hidden>
-          <%- include('partials/misc-badge-print-panel', { type: 'custom', label: 'Custom', badges: customBadges, basePath: '/main-admin/name-tags' }) %>
+          <%- include('partials/misc-badge-print-panel', { type: 'custom', label: 'Custom', badges: customBadges, basePath: '/main-admin/name-tags', downloadPdf: true }) %>
         </div>
 
         <div id="print-classCheckinQr-section" hidden>
