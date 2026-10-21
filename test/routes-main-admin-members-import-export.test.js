@@ -72,13 +72,34 @@ test('Members page toolbar: Add Member/Import/Export sit above a "Filter" (not "
 
 // Coverage for a real request: "add a print button to member list. make
 // sure the printing is clean and fits nicely on pages with borders."
-test('Members page toolbar has a Print button and a branded print-only header', async () => {
+// A later real request: "all print button should show a print preview
+// full real page on a page with a print button" - Print now opens a
+// dedicated preview route in a new tab instead of calling window.print()
+// on this live, editable page directly.
+test('Members page toolbar has a Print button linking to a dedicated preview page, and a branded print-only header', async () => {
   const { cookie } = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/members').set('Cookie', cookie);
   assert.equal(page.status, 200);
 
-  assert.match(page.text, /onclick="window\.print\(\)"[^>]*aria-label="Print"/);
+  assert.match(page.text, /<a class="icon-btn" href="\/main-admin\/members\/print"[^>]*target="_blank"[^>]*aria-label="Print"/);
+  assert.doesNotMatch(page.text, /onclick="window\.print\(\)"[^>]*aria-label="Print"/);
   assert.match(page.text, /<div class="print-header">[\s\S]*?<p class="print-header-sub">Members<\/p>/);
+});
+
+test('GET /main-admin/members/print renders a read-only preview with a Print button and the same filtered members', async () => {
+  const { cookie } = await loginAsMainAdmin();
+  const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('PrintPreviewFamily') RETURNING id").get()).id;
+  await db.prepare("INSERT INTO members (name, barcode, member_type, family_id, active) VALUES ('Print Preview Member', 'print-preview-member-1', 'parent', ?, 1)").run(familyId);
+
+  const res = await request(app).get('/main-admin/members/print').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /print-preview-header/);
+  assert.match(res.text, /onclick="window\.print\(\)"/);
+  assert.match(res.text, /Print Preview Member/);
+
+  const filteredRes = await request(app).get(`/main-admin/members/print?family=${familyId}`).set('Cookie', cookie);
+  assert.equal(filteredRes.status, 200);
+  assert.match(filteredRes.text, /Print Preview Member/);
 });
 
 test('GET /main-admin/members/export.csv exports the roster as CSV', async () => {

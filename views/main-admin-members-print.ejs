@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <%
+      // Same Type/Family filter-label shape as the live page's own Filter
+      // dropdown (partials/members-type-filter.ejs), so this preview's
+      // heading reads the same way.
+      const selectedFamily = families.find(function (f) { return f.id === familyFilter; });
+      const filterLabelParts = [];
+      if (typeFilter === 'parent') filterLabelParts.push('Parent');
+      else if (typeFilter === 'student') filterLabelParts.push('Student');
+      else if (typeFilter === 'admin') filterLabelParts.push('Admin');
+      if (selectedFamily) filterLabelParts.push(selectedFamily.name + ' Family');
+    %>
+    <div class="print-preview-header no-print">
+      <h1>Members<% if (filterLabelParts.length > 0) { %> &mdash; <%= filterLabelParts.join(', ') %><% } %></h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Members</p>
+      </div>
+    </div>
+
+    <div class="members-section-label-row">
+      <span class="members-section-label">MEMBERS</span>
+      <span class="members-count-pill"><%= members.length %> member<%= members.length === 1 ? '' : 's' %></span>
+    </div>
+
+    <% if (members.length === 0) { %>
+      <p class="roster-empty">No members match this filter yet.</p>
+    <% } else { %>
+      <%# Same member-row-card markup as main-admin-members.ejs's own live
+          list (minus the checkbox/email/phone/send/archive actions - all
+          already .no-print there, i.e. never part of an actual printout
+          to begin with) - a printed roster has nothing to check off or
+          click, just the roster itself. %>
+      <div id="members-table">
+        <% members.forEach(function(m) { %>
+          <% var familySize = members.filter(function(x) { return x.family_id != null && x.family_id === m.family_id; }).length; %>
+          <% var isFamilyHead = m.is_primary_parent || m.family_id == null || familySize < 2; %>
+          <div
+            class="member-row-card"
+            data-family-key="<%= m.family_id != null ? 'f' + m.family_id : 'solo' + m.id %>"
+            data-family-member="<%= isFamilyHead ? '' : '1' %>"
+          >
+            <% if (isFamilyHead && familySize > 1) { %>
+              <button type="button" class="family-accordion-toggle" aria-expanded="false" aria-label="Show <%= familySize - 1 %> more family member<%= familySize - 1 === 1 ? '' : 's' %>">
+                <svg class="icon"><use href="#icon-chevron-down"/></svg>
+              </button>
+            <% } else { %>
+              <span class="member-row-chevron-spacer"></span>
+            <% } %>
+            <span class="member-avatar member-avatar-<%= avatarColorFor(m.family_id != null ? m.family_id : m.id) %>">
+              <% if (m.photo_path) { %>
+                <img src="<%= photoUrl(m.photo_path) %>" alt="" />
+              <% } else { %>
+                <%= m.name.charAt(0).toUpperCase() %>
+              <% } %>
+            </span>
+            <div class="member-row-body">
+              <div class="member-row-topline">
+                <span class="member-row-name-link"><%= m.name %></span>
+                <% if (m.member_type === 'admin') { %>
+                  <span class="member-admin-star" title="Admin"><svg class="icon"><use href="#icon-star"/></svg></span>
+                <% } %>
+                <span class="badge-pill badge-pill-<%= avatarColorFor(m.family_id != null ? m.family_id : m.id) %> member-role-badge"><svg class="icon"><use href="#icon-star"/></svg> <%= m.member_type === 'admin' ? 'Admin' : m.member_type === 'parent' ? 'Parent' : 'Student' %></span>
+              </div>
+              <% var memberSectionIds = sectionIdsByMember[m.id]; %>
+              <% var memberSections = memberSectionIds ? sections.filter(function(s) { return memberSectionIds.has(s.id); }) : []; %>
+              <% if (m.member_type === 'student' || memberSections.length > 0) { %>
+                <div class="member-row-icon-row">
+                  <% if (m.member_type === 'student') { %>
+                    <span class="member-row-subline"><svg class="icon"><use href="#icon-graduation-cap"/></svg> <%= m.grade_level || '—' %><% if (m.age != null) { %> &middot; age <%= m.age %><% } %></span>
+                  <% } %>
+                  <% if (memberSections.length > 0) { %>
+                    <span class="member-row-subline"><svg class="icon"><use href="#icon-clipboard-list"/></svg> <%= memberSections.map(function(s) { return s.name; }).join(', ') %></span>
+                  <% } %>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+  <script src="/js/members-family-accordion.js"></script>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

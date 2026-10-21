@@ -131,7 +131,12 @@ test('Grade Level Report: grouping, ages, bar graph, Ungraded, Print button, non
     // A later real request: "all pages/subpages with print, export,
     // import, or download buttons should be changed to icons" - both are
     // icon-only buttons now (this page only had Print before).
-    assert.match(res.text, /<button type="button" class="icon-btn" onclick="window\.print\(\)" aria-label="Print"/);
+    // A further real request: "all print button should show a print
+    // preview full real page on a page with a print button" - Print now
+    // links to a dedicated preview route in a new tab instead of calling
+    // window.print() on this live, editable page directly.
+    assert.match(res.text, /<a class="icon-btn" href="\/main-admin\/members\/grade-level-report\/print[^"]*" target="_blank" aria-label="Print"/);
+    assert.doesNotMatch(res.text, /onclick="window\.print\(\)" aria-label="Print"/);
     assert.match(res.text, /aria-label="Export CSV"/);
     assert.match(res.text, /<script src="\/js\/shrink-title-to-fit\.js"><\/script>/);
     assert.match(res.text, /data-shrink-to-fit-on-print/);
@@ -146,6 +151,16 @@ test('Grade Level Report: grouping, ages, bar graph, Ungraded, Print button, non
     assert.match(csv.text, /Ungraded.*No Grade Student/);
     assert.doesNotMatch(csv.text, /Inactive Kinder/);
     assert.doesNotMatch(csv.text, /Some Parent/);
+  });
+
+  await t.test('GET /grade-level-report/print renders a read-only preview with a Print button, same grouping as the live page', async () => {
+    const previewRes = await request(app).get('/main-admin/members/grade-level-report/print').set('Cookie', cookie);
+    assert.equal(previewRes.status, 200);
+    assert.match(previewRes.text, /print-preview-header/);
+    assert.match(previewRes.text, /onclick="window\.print\(\)"/);
+    assert.match(previewRes.text, /Amy Kinder/);
+    assert.match(previewRes.text, /Third Grader/);
+    assert.doesNotMatch(previewRes.text, /Inactive Kinder/);
   });
 
   await t.test('a Filter button opens a dialog offering Section/Signup/Family dropdowns', () => {

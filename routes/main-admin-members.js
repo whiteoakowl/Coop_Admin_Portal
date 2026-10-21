@@ -252,6 +252,41 @@ router.get('/', async (req, res) => {
   });
 });
 
+// A real request: "all print button should show a print preview full
+// real page on a page with a print button" - same dedicated <name>-print
+// view + GET .../print route convention as views/admin-rosters-print.ejs,
+// in place of the old onclick="window.print()" that just printed this
+// page's own interactive card list as-is. Print only ever shows on the
+// Members tab itself (see main-admin-members.ejs's own toolbar), so this
+// always renders that tab's own filtered, unpaginated list - same
+// Type/Family/search filters as the live page, never Archive/Approvals/
+// Settings.
+router.get('/print', async (req, res) => {
+  const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
+  const familyFilter = parseInt(req.query.family, 10) || null;
+  const q = (req.query.q || '').trim().toLowerCase();
+
+  let withRosters = (await membersWithDetails(typeFilter, familyFilter))
+    .filter((m) => Number(m.active) === 1)
+    .map((m) => ({ ...m, age: ageFromBirthday(m.birthday), birthdayLabel: m.birthday ? formatDateNumeric(m.birthday) : null }));
+  if (q) withRosters = withRosters.filter((m) => m.name.toLowerCase().includes(q));
+
+  const sections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
+  const sectionIdsByMember = await sectionIdsForMembers(withRosters.map((m) => m.id));
+
+  res.render('main-admin-members-print', {
+    title: 'Members Print Preview',
+    members: withRosters,
+    typeFilter,
+    familyFilter,
+    q,
+    families: await allFamilies(),
+    sections,
+    sectionIdsByMember,
+    avatarColorFor,
+  });
+});
+
 // A real request: "add member button, edit permissions button, edit,
 // import, export buttons should be under the member tab above filter."
 // Same export shape as routes/admin-members.js's own /members/export.csv,
@@ -882,7 +917,9 @@ router.get('/grade-level-report/export.csv', async (req, res) => {
   sendCsv(res, 'grade-level-report.csv', lines);
 });
 
-router.get('/grade-level-report', async (req, res) => {
+// Shared by the Grade Level Report page and its print-preview route below
+// - both need the exact same filtered columns/maxCount/filterLabelParts.
+async function gradeLevelReportData(req) {
   const sectionId = req.query.sectionId ? parseInt(req.query.sectionId, 10) : null;
   const signup = ['signedUp', 'notSignedUp'].includes(req.query.signup) ? req.query.signup : '';
   const familyId = req.query.familyId ? parseInt(req.query.familyId, 10) : null;
@@ -906,15 +943,36 @@ router.get('/grade-level-report', async (req, res) => {
     if (family) filterLabelParts.push(`${family.name} Family`);
   }
 
+  return { sectionId, signup, familyId, columns, maxCount: Math.max(1, ...columns.map((c) => c.students.length)), filterLabelParts };
+}
+
+router.get('/grade-level-report', async (req, res) => {
+  const { sectionId, signup, familyId, columns, maxCount, filterLabelParts } = await gradeLevelReportData(req);
+
   res.render('main-admin-members-grade-level-report', {
     title: 'Grade Level Report',
     columns,
-    maxCount: Math.max(1, ...columns.map((c) => c.students.length)),
+    maxCount,
     sections: await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all(),
     families: await db.prepare('SELECT * FROM families ORDER BY LOWER(name)').all(),
     selectedSectionId: sectionId,
     selectedSignup: signup,
     selectedFamilyId: familyId,
+    filterLabelParts,
+  });
+});
+
+// A real request: "all print button should show a print preview full
+// real page on a page with a print button" - same dedicated <name>-print
+// view + GET .../print route convention as views/admin-rosters-print.ejs,
+// in place of the old onclick="window.print()".
+router.get('/grade-level-report/print', async (req, res) => {
+  const { columns, maxCount, filterLabelParts } = await gradeLevelReportData(req);
+
+  res.render('main-admin-members-grade-level-report-print', {
+    title: 'Grade Level Report Print Preview',
+    columns,
+    maxCount,
     filterLabelParts,
   });
 });
