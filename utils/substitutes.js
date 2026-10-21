@@ -41,8 +41,18 @@ async function assignedIsOverdue(existing, date, hourStartTime) {
   const startMin = parseClockMinutes(hourStartTime);
   if (startMin === null) return false;
   if (nowEasternMinutes() < startMin + 5) return false;
+  // check_in_time IS NOT NULL OR status = 'present' - a real request:
+  // "members running late on the floater list even though they have
+  // been manually checked in by clicking marking a P." A kiosk check-in
+  // always sets both columns together (routes/kiosk.js), but a manual
+  // "P" mark on the roster grid (routes/admin-rosters.js's own POST
+  // /rosters/:tab/attendance) only ever sets status - it never writes a
+  // check_in_time. Checking check_in_time alone meant that exact manual
+  // mark could never clear this "still hasn't checked in" re-flag, even
+  // though missingMemberIdsForDate's own, separately-fixed 'present'-
+  // wins precedence already agrees they're here today.
   const checkedIn = await db
-    .prepare(`SELECT 1 FROM attendance WHERE member_id = ? AND session_date = ? AND check_in_time IS NOT NULL LIMIT 1`)
+    .prepare(`SELECT 1 FROM attendance WHERE member_id = ? AND session_date = ? AND (check_in_time IS NOT NULL OR status = 'present') LIMIT 1`)
     .get(existing.member_id, date);
   return !checkedIn;
 }
@@ -66,8 +76,11 @@ async function isAutoLateForClass(memberId, date, hourStartTime) {
   const startMin = parseClockMinutes(hourStartTime);
   if (startMin === null) return false;
   if (nowEasternMinutes() < startMin + 5) return false;
+  // check_in_time IS NOT NULL OR status = 'present' - see
+  // assignedIsOverdue's own comment just above on why: a manual "P"
+  // mark on the roster grid never writes a check_in_time, only status.
   const checkedIn = await db
-    .prepare(`SELECT 1 FROM attendance WHERE member_id = ? AND session_date = ? AND check_in_time IS NOT NULL LIMIT 1`)
+    .prepare(`SELECT 1 FROM attendance WHERE member_id = ? AND session_date = ? AND (check_in_time IS NOT NULL OR status = 'present') LIMIT 1`)
     .get(memberId, date);
   return !checkedIn;
 }

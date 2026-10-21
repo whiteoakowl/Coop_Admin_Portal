@@ -95,3 +95,35 @@ test('the same teacher IS auto-flagged as late once it is genuinely 5+ minutes p
     t.mock.timers.reset();
   }
 });
+
+// A real follow-up request: "Its still showing members running late on
+// the floater list even though they have been manually checked in by
+// clicking marking a p next to a member." A kiosk check-in always writes
+// both check_in_time and status='present' together, but a manual "P"
+// mark on the roster grid (routes/admin-rosters.js's own POST
+// /rosters/:tab/attendance) only ever writes status - isAutoLateForClass
+// used to look at check_in_time alone, so that exact manual mark could
+// never clear the auto-late re-flag.
+test('a teacher manually marked present (status only, no check_in_time) is NOT auto-flagged as late', async (t) => {
+  const day = 'monday';
+  await saveHourLabels(day, ['Hour 1', 'Hour 2', 'Hour 3', 'Hour 4'], ['9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM']);
+  const classId = await createClass({ day, hourPosition: 1, className: 'Manually Checked Art' });
+  const teacher = await makeMember('Manually Checked Teacher', 'manually-checked-teacher');
+  await addStaff(classId, teacher, 'teacher');
+
+  // 1:10 PM UTC = 9:10 AM Eastern - same "genuinely late" window as the
+  // test above, except this teacher has a manual present mark on file.
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2024-07-08T13:10:00Z').getTime() });
+  try {
+    const monday = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+    const rosterId = (await db.prepare("INSERT INTO rosters (name, category) VALUES ('Manual Mark Roster', 'Monday/Wednesday') RETURNING id").get()).id;
+    await db
+      .prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, ?, 'present', 'manual')")
+      .run(teacher, rosterId, monday);
+
+    const slot = await slotForTeacher(day, monday, 'Manually Checked Teacher');
+    assert.equal(slot, null, 'a manual present mark (status only) must count the same as a real check-in');
+  } finally {
+    t.mock.timers.reset();
+  }
+});
