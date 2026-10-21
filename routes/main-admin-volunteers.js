@@ -97,6 +97,22 @@ router.get('/committees/:id', async (req, res) => {
   });
 });
 
+// A real request: "All print button should show a print preview full
+// real page on a page with a print button." Same committee/members/
+// positions data the detail page above shows, read-only (no Add Member/
+// Add Position/delete buttons, no Select All/Email Selected bulk-email
+// controls - nothing a print preview has any business offering).
+router.get('/committees/:id/print', async (req, res) => {
+  const committee = await volunteers.getCommittee(req.params.id);
+  if (!committee) return res.status(404).render('404', { title: 'Not Found' });
+  res.render('main-admin-committee-detail-print', {
+    title: `${committee.name} Print Preview`,
+    committee,
+    positions: await volunteers.positionsForCommittee(committee.id),
+    members: await volunteers.membersForCommittee(committee.id),
+  });
+});
+
 router.post('/committees/:id/members', async (req, res) => {
   const memberId = parseInt(req.body.memberId, 10);
   if (!memberId) return res.redirect(`/main-admin/volunteers/committees/${req.params.id}?error=` + encodeURIComponent('Select a member to add.'));
@@ -211,6 +227,19 @@ router.get('/signup-lists/:id', async (req, res) => {
   });
 });
 
+// A real request: "All print button should show a print preview full
+// real page on a page with a print button." Same list/items data the
+// detail page above shows, read-only (no Add Item/delete buttons).
+router.get('/signup-lists/:id/print', async (req, res) => {
+  const list = await volunteers.getSignUpList(req.params.id);
+  if (!list) return res.status(404).render('404', { title: 'Not Found' });
+  res.render('main-admin-signup-list-detail-print', {
+    title: `${list.title} Print Preview`,
+    list,
+    items: await volunteers.itemsForSignUpList(list.id),
+  });
+});
+
 // A real request: "signup lists be able to add multiple items to a list
 // in the popup before. Page only refreshes after adding however many
 // needed" - the Add Item dialog (main-admin-signup-list-detail.ejs) now
@@ -300,6 +329,19 @@ router.get('/volunteer-lists/:id', async (req, res) => {
     memberLink: `${req.protocol}://${req.get('host')}/volunteer-lists/${list.id}`,
     error: req.query.error || null,
     notice: req.query.notice || null,
+  });
+});
+
+// A real request: "All print button should show a print preview full
+// real page on a page with a print button." Same list/shifts data the
+// detail page above shows, read-only (no Add Shift/delete buttons).
+router.get('/volunteer-lists/:id/print', async (req, res) => {
+  const list = await volunteers.getVolunteerList(req.params.id);
+  if (!list) return res.status(404).render('404', { title: 'Not Found' });
+  res.render('main-admin-volunteer-list-detail-print', {
+    title: `${list.title} Print Preview`,
+    list,
+    shifts: await volunteers.shiftsForVolunteerList(list.id),
   });
 });
 

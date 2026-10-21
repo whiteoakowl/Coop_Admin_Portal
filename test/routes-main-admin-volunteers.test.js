@@ -494,6 +494,87 @@ test('Volunteer Lists: create a list of shifts by date/hour, attach to an event,
   assert.equal(await db.prepare('SELECT 1 FROM volunteer_signup_list_signups WHERE shift_id = ? AND member_id = ?').get(shift.id, family.parentId), undefined);
 });
 
+// A real request: "All print button should show a print preview full
+// real page on a page with a print button. That print button will then
+// send it to the printer." Covers the three detail pages' own Print
+// buttons (Committee/Sign-Up List/Volunteer List): each now links to a
+// dedicated preview page instead of calling window.print() on the live,
+// editable page, same convention as every other print button site-wide.
+test('Committee detail: Print button links to a dedicated preview page showing that committee\'s own members/positions, read-only', async () => {
+  const admin = await loginAsMainAdmin();
+  await request(app).post('/main-admin/volunteers/committees').set('Cookie', admin.cookie).type('form').send({ name: 'Print Preview Committee', description: 'Covers the gala', _csrf: admin.csrfToken });
+  const committee = await db.prepare("SELECT * FROM committees WHERE name = 'Print Preview Committee'").get();
+
+  await request(app)
+    .post(`/main-admin/volunteers/committees/${committee.id}/positions`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ positionName: 'Decorations', slotsNeeded: '2', _csrf: admin.csrfToken });
+  const position = await db.prepare('SELECT * FROM committee_positions WHERE committee_id = ?').get(committee.id);
+
+  const family = await createFamily();
+  await db.prepare('INSERT INTO committee_signups (position_id, member_id, signed_up_by_account_id) VALUES (?, ?, ?)').run(position.id, family.parentId, family.accountId);
+
+  const detail = await request(app).get(`/main-admin/volunteers/committees/${committee.id}`).set('Cookie', admin.cookie);
+  assert.equal(detail.status, 200);
+  assert.match(detail.text, new RegExp(`href="/main-admin/volunteers/committees/${committee.id}/print" target="_blank"`), 'Print button should link to the preview page, not call window.print() on itself');
+  assert.doesNotMatch(detail.text, /icon-btn roster-action-btn-fit" onclick="window\.print\(\)"/, 'the old direct-to-print-dialog button should be gone');
+
+  const preview = await request(app).get(`/main-admin/volunteers/committees/${committee.id}/print`).set('Cookie', admin.cookie);
+  assert.equal(preview.status, 200);
+  assert.match(preview.text, /class="print-preview-header no-print"/, 'the preview page should have its own no-print header');
+  assert.match(preview.text, /roster-action-btn print-action-btn" onclick="window\.print\(\)"/, 'the preview page itself should have the real Print button');
+  assert.match(preview.text, /Print Preview Committee/);
+  assert.match(preview.text, /Decorations/);
+  assert.match(preview.text, new RegExp(`VolParent${family.familyId} Jones${family.familyId}`), 'should show the specific committee\'s own signed-up member');
+  assert.doesNotMatch(preview.text, /id="add-member-dialog"/, 'read-only preview should have no Add Member/Add Position dialogs');
+});
+
+test('Sign-Up List detail: Print button links to a dedicated preview page showing that list\'s own items, read-only', async () => {
+  const admin = await loginAsMainAdmin();
+  await request(app).post('/main-admin/volunteers/signup-lists').set('Cookie', admin.cookie).type('form').send({ title: 'Print Preview Signup List', _csrf: admin.csrfToken });
+  const list = await db.prepare("SELECT * FROM sign_up_lists WHERE title = 'Print Preview Signup List'").get();
+  await request(app).post(`/main-admin/volunteers/signup-lists/${list.id}/items`).set('Cookie', admin.cookie).type('form').send({ itemName: 'Paper Plates', quantityNeeded: '5', _csrf: admin.csrfToken });
+
+  const detail = await request(app).get(`/main-admin/volunteers/signup-lists/${list.id}`).set('Cookie', admin.cookie);
+  assert.equal(detail.status, 200);
+  assert.match(detail.text, new RegExp(`href="/main-admin/volunteers/signup-lists/${list.id}/print" target="_blank"`), 'Print button should link to the preview page, not call window.print() on itself');
+  assert.doesNotMatch(detail.text, /icon-btn" onclick="window\.print\(\)"/, 'the old direct-to-print-dialog button should be gone');
+
+  const preview = await request(app).get(`/main-admin/volunteers/signup-lists/${list.id}/print`).set('Cookie', admin.cookie);
+  assert.equal(preview.status, 200);
+  assert.match(preview.text, /class="print-preview-header no-print"/);
+  assert.match(preview.text, /roster-action-btn print-action-btn" onclick="window\.print\(\)"/);
+  assert.match(preview.text, /Print Preview Signup List/);
+  assert.match(preview.text, /Paper Plates/);
+  assert.doesNotMatch(preview.text, /id="add-item-dialog"/, 'read-only preview should have no Add Item dialog');
+});
+
+test('Volunteer List detail: Print button links to a dedicated preview page showing that list\'s own shifts, read-only', async () => {
+  const admin = await loginAsMainAdmin();
+  await request(app).post('/main-admin/volunteers/volunteer-lists').set('Cookie', admin.cookie).type('form').send({ title: 'Print Preview Volunteer List', _csrf: admin.csrfToken });
+  const list = await db.prepare("SELECT * FROM volunteer_signup_lists WHERE title = 'Print Preview Volunteer List'").get();
+  await request(app)
+    .post(`/main-admin/volunteers/volunteer-lists/${list.id}/shifts`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ jobName: 'Setup Crew', shiftDate: '2027-11-01', slotsNeeded: '1', _csrf: admin.csrfToken });
+
+  const detail = await request(app).get(`/main-admin/volunteers/volunteer-lists/${list.id}`).set('Cookie', admin.cookie);
+  assert.equal(detail.status, 200);
+  assert.match(detail.text, new RegExp(`href="/main-admin/volunteers/volunteer-lists/${list.id}/print" target="_blank"`), 'Print button should link to the preview page, not call window.print() on itself');
+  assert.doesNotMatch(detail.text, /icon-btn" onclick="window\.print\(\)"/, 'the old direct-to-print-dialog button should be gone');
+
+  const preview = await request(app).get(`/main-admin/volunteers/volunteer-lists/${list.id}/print`).set('Cookie', admin.cookie);
+  assert.equal(preview.status, 200);
+  assert.match(preview.text, /class="print-preview-header no-print"/);
+  assert.match(preview.text, /roster-action-btn print-action-btn" onclick="window\.print\(\)"/);
+  assert.match(preview.text, /Print Preview Volunteer List/);
+  assert.match(preview.text, /Setup Crew/);
+  assert.match(preview.text, /2027-11-01/);
+  assert.doesNotMatch(preview.text, /id="add-shift-dialog"/, 'read-only preview should have no Add Shift dialog');
+});
+
 test('the pre-existing Floater Assignments feature (utils/volunteers.js) is untouched by the new Volunteers section', async () => {
   // Floater Assignments is a Co-op Admin feature at /admin/volunteers,
   // a completely different URL prefix from the new Main Admin section's

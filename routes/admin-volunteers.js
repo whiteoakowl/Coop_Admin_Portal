@@ -253,6 +253,39 @@ router.get('/volunteers/:day/manage', requireAdmin, requireClassDay, async (req,
   });
 });
 
+// A real request: "All print button should show a print preview full
+// real page on a page with a print button. That print button will then
+// send it to the printer." Same selected-date floater chart the manage
+// page above shows, read-only (no Assign/Unassign forms, no text-notify
+// checkboxes) - matches every other print preview page's own "nothing
+// editable, nothing to hide" convention. selectedDate resolves the exact
+// same way the manage route above does when the query param is left off,
+// so opening this from the manage page's own Print button always shows
+// whatever date is actually on screen there.
+router.get('/volunteers/:day/manage/print', requireAdmin, requireClassDay, async (req, res) => {
+  const day = req.params.day;
+  const semesterId = comboSemesterId(req);
+  const list = await getListByDay(day, semesterId);
+  if (!list) return res.status(404).render('404', { title: 'Not Found' });
+  const dates = await datesForList(list.id);
+  const archivedSet = new Set(await archivedDatesForList(list.id));
+  const today = todayISO();
+  const activeDates = dates.filter((d) => !archivedSet.has(d));
+  const upcomingActiveDates = activeDates.filter((d) => d >= today);
+  const defaultDate = upcomingActiveDates[0] || activeDates[activeDates.length - 1] || null;
+  const selectedDate = activeDates.includes(req.query.date) ? req.query.date : defaultDate;
+  const hourSections = selectedDate ? await buildHourSections(day, selectedDate, list.semester_id) : [];
+
+  res.render('admin-volunteers-print', {
+    title: `${DAY_LABELS[day]} Floater Assignments Print Preview`,
+    day,
+    dayLabel: DAY_LABELS[day],
+    selectedDate,
+    selectedDateLabel: selectedDate ? formatDateLabel(selectedDate) : null,
+    hourSections,
+  });
+});
+
 // A real request: "make it to where the page doesn't refresh every time
 // you click assign or unassigned - it should simply assign and allow you
 // to continue clicking assignment until you're done." routes/admin-
@@ -388,6 +421,25 @@ router.get('/volunteers/:day/risk', requireAdmin, requireClassDay, async (req, r
     combos,
     semesterId: qsSemester(resolvedSemesterId),
     selectedComboId: findComboId(combos, day, resolvedSemesterId),
+    classesAtRisk: await classesAtRiskForDay(day, alertDate, undefined, resolvedSemesterId),
+  });
+});
+
+// A real request: "All print button should show a print preview full
+// real page on a page with a print button." Same classesAtRiskForDay
+// data the page above shows - this tab already has no editable controls
+// of its own (just the table), so the preview reuses partials/class-
+// risk-table.ejs directly rather than redesigning it.
+router.get('/volunteers/:day/risk/print', requireAdmin, requireClassDay, async (req, res) => {
+  const day = req.params.day;
+  const today = todayISO();
+  const alertDate = weekdayOf(today) === CLASS_DAY_WEEKDAY_FULL[day] ? today : null;
+  const resolvedSemesterId = await resolveSemesterId(comboSemesterId(req));
+
+  res.render('admin-volunteer-risk-print', {
+    title: `${DAY_LABELS[day]} Class Cancellation Risk Print Preview`,
+    day,
+    dayLabel: DAY_LABELS[day],
     classesAtRisk: await classesAtRiskForDay(day, alertDate, undefined, resolvedSemesterId),
   });
 });
