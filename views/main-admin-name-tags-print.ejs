@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.5in; }</style>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Name Tag <%= showArchived ? 'Archived Requests' : 'Requests' %></h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Name Tag <%= showArchived ? 'Archived Requests' : 'Requests' %></p>
+      </div>
+    </div>
+
+    <table class="roster-table members-table condensed-table">
+      <thead>
+        <tr><th>Submitted</th><th>Name</th><th>Request</th><th>Day</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <% if (submissions.length === 0) { %>
+          <tr><td colspan="5" class="roster-empty">No <%= showArchived ? 'archived' : '' %> name tag requests yet.</td></tr>
+        <% } %>
+        <% submissions.forEach(function(s) { %>
+          <tr>
+            <td><%= s.timestamp %></td>
+            <td><%= s.memberName %></td>
+            <td><%= s.requestTypeLabel %></td>
+            <td><%= s.dayLabel %></td>
+            <td><%= s.description %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Diploma</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <% if (!diploma) { %>
+      <p class="roster-empty">No diploma has been issued yet.</p>
+    <% } else { %>
+      <%- include('partials/diploma-certificate', { diploma, member }) %>
+    <% } %>
+  </main>
+</body>
+</html>

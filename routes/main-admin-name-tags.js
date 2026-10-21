@@ -268,6 +268,30 @@ router.get('/requests/export.csv', async (req, res) => {
   sendCsv(res, `name-tag-${showArchived ? 'archived' : 'requests'}.csv`, lines);
 });
 
+// A real request: "All print button should show a print preview full
+// real page on a page with a print button." The Requests tab's own
+// Print button used to call window.print() directly on the live page -
+// lands on a dedicated read-only preview page instead, same pattern as
+// routes/admin-name-tag.js's own matching route.
+router.get('/requests/print', async (req, res) => {
+  const showArchived = req.query.archived === '1';
+  const dateFilter = req.query.date || '';
+  const submissions = (await nameTagSubmissions(showArchived, dateFilter)).map((r) => ({
+    id: r.id,
+    timestamp: formatTimestamp(r.createdAt),
+    memberName: r.memberName,
+    requestTypeLabel: REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
+    dayLabel: NAME_TAG_DAY_LABELS[r.day] || r.day,
+    description: r.description || '—',
+  }));
+
+  res.render('main-admin-name-tags-print', {
+    title: `Name Tag ${showArchived ? 'Archived Requests' : 'Requests'}`,
+    showArchived,
+    submissions,
+  });
+});
+
 router.post('/requests/:id/archive', async (req, res) => {
   await db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(parseInt(req.params.id, 10));
   res.redirect('/main-admin/name-tags?tab=requests');

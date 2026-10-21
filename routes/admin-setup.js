@@ -278,6 +278,31 @@ router.get('/setup/:day/assignments', requireAdmin, requireClassDay, async (req,
   });
 });
 
+// A real request: "All print button should show a print preview full
+// real page on a page with a print button." Assignments' own Print
+// button used to call window.print() directly on the live, editable
+// page - lands on a dedicated read-only preview page instead, same
+// pattern as /setup/:day/teams/print and /setup/:day/tasks/print above,
+// reusing partials/setup-assignment-cards.ejs in its own non-editable
+// mode (editable: false) so none of the Assign/Unassign controls show up
+// in the printout.
+router.get('/setup/:day/assignments/print', requireAdmin, requireClassDay, async (req, res) => {
+  const day = req.params.day;
+  const semesterId = await resolveSemesterId(comboSemesterId(req));
+  const dates = await datesForDay(day, semesterId);
+  const { upcoming } = splitDatesByToday(dates);
+  const selectedDate = upcoming.includes(req.query.date) ? req.query.date : upcoming[0] || null;
+
+  res.render('admin-setup-assignments-print', {
+    title: `${DAY_LABELS[day]} Setup/Cleanup Assignments`,
+    day,
+    dayLabel: DAY_LABELS[day],
+    selectedDate,
+    dateLabel: selectedDate ? formatDateLabel(selectedDate) : null,
+    cards: selectedDate ? await assignmentCardsForDate(day, selectedDate, semesterId) : [],
+  });
+});
+
 // A real request: "when adding dates to setup/cleanup it should stay on
 // the pop up and simply immediately update the list with the new date
 // and allow you to continue adding dates while window is still open.
