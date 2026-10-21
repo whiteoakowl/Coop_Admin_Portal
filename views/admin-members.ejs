@@ -16,15 +16,28 @@
     <h1>Members</h1>
 
     <%
-      // Builds an /admin/members URL preserving every filter dimension
-      // except whatever's passed in overrides - one helper instead of
-      // hand-concatenating type/family/day/role/q query strings at every
-      // link on this page (filter dropdown, Export).
+      // Export still needs every filter dimension on its own URL.
       function memberHref(overrides) {
         var params = Object.assign({ type: typeFilter, family: familyFilter, day: dayFilter, role: roleFilter, q: q }, overrides);
         var qs = Object.keys(params).filter(function (k) { return params[k]; }).map(function (k) { return k + '=' + encodeURIComponent(params[k]); }).join('&');
         return '/admin/members' + (qs ? '?' + qs : '');
       }
+
+      // A real request: "filter button and search bar on co-op admin
+      // portal members should be the same as main admin portal members" -
+      // same orange Filter-button-opens-a-dialog shape as Main Admin's own
+      // Members page (views/partials/members-type-filter.ejs), with Roster
+      // Day and Role folded in as two more dropdowns alongside Type/Family
+      // since this page (unlike Main Admin's) filters by those too.
+      const selectedFamily = families.find(function (f) { return f.id === familyFilter; });
+      const filterLabelParts = [];
+      if (typeFilter === 'parent') filterLabelParts.push('Parent');
+      else if (typeFilter === 'student') filterLabelParts.push('Student');
+      else if (typeFilter === 'admin') filterLabelParts.push('Admin');
+      if (dayFilter) filterLabelParts.push(dayLabels[dayFilter]);
+      if (roleFilter === 'teacher') filterLabelParts.push('Teacher');
+      else if (roleFilter === 'assistant') filterLabelParts.push('Class Assistant');
+      if (selectedFamily) filterLabelParts.push(selectedFamily.name + ' Family');
     %>
 
     <% if (error) { %>
@@ -40,9 +53,6 @@
         trigger+dialog here. %>
 
     <div class="members-search-filter-row no-print">
-      <%# A real request: "search bar should have a go button for easy
-          searching" - the native type="search" Enter-to-submit behavior
-          stays, this is just an explicit, visible way to do the same thing. %>
       <form method="GET" action="/admin/members" class="members-search-bar">
         <input type="hidden" name="type" value="<%= typeFilter %>" />
         <input type="hidden" name="family" value="<%= familyFilter || '' %>" />
@@ -50,43 +60,52 @@
         <input type="hidden" name="role" value="<%= roleFilter %>" />
         <svg class="icon"><use href="#icon-search"/></svg>
         <input type="search" name="q" value="<%= q %>" placeholder="Search members&hellip;" aria-label="Search members" />
-        <button type="submit" class="members-search-go-btn">Go</button>
       </form>
-
-      <%# A real request: "filter by family should be under the buttons.
-          it should just say filter." Single dropdown, same "one filter
-          dimension at a time" model the type/family split already used -
-          now with a Roster Day group alongside Type/Family. A further real
-          request: "dropdown member search should include teachers and
-          class assistants" - a Role group alongside Type/Roster Day/Family,
-          since teaching/assisting a class is its own thing (class_staff.role),
-          not a member_type. %>
-      <div class="category-filter">
-        <label for="type-select">Filter</label>
-        <select id="type-select" onchange="window.fullscreenNavigate(this.value)">
-          <option value="<%= memberHref({ type: '', family: '', day: '', role: '' }) %>" <%= (!typeFilter && !familyFilter && !dayFilter && !roleFilter) ? 'selected' : '' %>>All</option>
-          <option value="<%= memberHref({ type: 'parent', family: '', day: '', role: '' }) %>" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
-          <option value="<%= memberHref({ type: 'student', family: '', day: '', role: '' }) %>" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
-          <option value="<%= memberHref({ type: 'admin', family: '', day: '', role: '' }) %>" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
-          <optgroup label="Roster Day">
-            <% activeDays.forEach(function(d) { %>
-              <option value="<%= memberHref({ type: '', family: '', day: d, role: '' }) %>" <%= dayFilter === d ? 'selected' : '' %>><%= dayLabels[d] %></option>
-            <% }); %>
-          </optgroup>
-          <optgroup label="Role">
-            <option value="<%= memberHref({ type: '', family: '', day: '', role: 'teacher' }) %>" <%= roleFilter === 'teacher' ? 'selected' : '' %>>Teacher</option>
-            <option value="<%= memberHref({ type: '', family: '', day: '', role: 'assistant' }) %>" <%= roleFilter === 'assistant' ? 'selected' : '' %>>Class Assistant</option>
-          </optgroup>
-          <% if (families.length > 0) { %>
-            <optgroup label="Family">
-              <% families.forEach(function(f) { %>
-                <option value="<%= memberHref({ type: '', family: f.id, day: '', role: '' }) %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %></option>
-              <% }); %>
-            </optgroup>
-          <% } %>
-        </select>
-      </div>
     </div>
+
+    <dialog id="members-filter-dialog" class="member-picker-dialog">
+      <form method="GET" action="/admin/members">
+        <h3>Filter Members</h3>
+        <div class="radio-group">
+          <label class="checkbox-option"><input type="radio" name="type" value="" <%= !typeFilter ? 'checked' : '' %> /> All</label>
+          <label class="checkbox-option"><input type="radio" name="type" value="parent" <%= typeFilter === 'parent' ? 'checked' : '' %> /> Parent</label>
+          <label class="checkbox-option"><input type="radio" name="type" value="student" <%= typeFilter === 'student' ? 'checked' : '' %> /> Student</label>
+          <label class="checkbox-option"><input type="radio" name="type" value="admin" <%= typeFilter === 'admin' ? 'checked' : '' %> /> Admin</label>
+        </div>
+        <div class="category-filter">
+          <label for="members-filter-day-select">Roster Day</label>
+          <select id="members-filter-day-select" name="day">
+            <option value="">Any Day</option>
+            <% activeDays.forEach(function(d) { %>
+              <option value="<%= d %>" <%= dayFilter === d ? 'selected' : '' %>><%= dayLabels[d] %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="category-filter">
+          <label for="members-filter-role-select">Role</label>
+          <select id="members-filter-role-select" name="role">
+            <option value="">Any Role</option>
+            <option value="teacher" <%= roleFilter === 'teacher' ? 'selected' : '' %>>Teacher</option>
+            <option value="assistant" <%= roleFilter === 'assistant' ? 'selected' : '' %>>Class Assistant</option>
+          </select>
+        </div>
+        <% if (families.length > 0) { %>
+          <div class="category-filter">
+            <label for="members-filter-family-select">Family</label>
+            <select id="members-filter-family-select" name="family">
+              <option value="">All Families</option>
+              <% families.forEach(function(f) { %>
+                <option value="<%= f.id %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %> Family</option>
+              <% }); %>
+            </select>
+          </div>
+        <% } %>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Apply Filter</button>
+        </div>
+      </form>
+    </dialog>
 
     <div class="roster-toolbar no-print" id="members-toolbar">
       <%# Role permissions, Import, and Add/Edit Member all live only on
@@ -98,6 +117,10 @@
           adaptive layout takes over, and 3 buttons already fits in one
           row at its own "≤4 columns" cap. %>
       <div class="roster-btn-row">
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('members-filter-dialog').showModal()">
+          <svg class="icon"><use href="#icon-filter"/></svg>
+          Filter<% if (filterLabelParts.length > 0) { %>: <%= filterLabelParts.join(', ') %><% } %>
+        </button>
         <%# A real request: "change export and print buttons to icons" -
             same icon-btn + icon-download/icon-printer pattern already
             used elsewhere (e.g. views/admin-accounting-list.ejs's own

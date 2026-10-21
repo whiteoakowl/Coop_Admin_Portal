@@ -68,7 +68,7 @@ test('Main Admin Members list: no inline Primary badge, search bar sits next to 
   assert.match(toolbarMatch[1], /class="category-filter"/);
 });
 
-test('Co-op Admin Members list: no inline Primary badge, search bar sits next to filter dropdown', async () => {
+test('Co-op Admin Members list: no inline Primary badge, Filter moved into the button toolbar same as Main Admin', async () => {
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   const cookie = loginRes.headers['set-cookie'];
   const { familyId } = await makeFamily('CoopAdminBadge');
@@ -87,10 +87,16 @@ test('Co-op Admin Members list: no inline Primary badge, search bar sits next to
   assert.equal(res.status, 200);
   assert.match(res.text, /CoopAdminBadge Primary Parent/);
   assert.doesNotMatch(res.text, /primary-parent-badge/);
-  const rowMatch = /<div class="members-search-filter-row no-print">([\s\S]*?)<div class="roster-toolbar/.exec(res.text);
-  assert.ok(rowMatch, 'expected a members-search-filter-row wrapping both the search bar and filter dropdown');
+  // A real request: "filter button and search bar on co-op admin portal
+  // members should be the same as main admin portal members" - the
+  // search-filter-row now holds only the search bar; Filter is its own
+  // orange button in the toolbar above, opening #members-filter-dialog.
+  const rowMatch = /<div class="members-search-filter-row no-print">([\s\S]*?)<\/div>/.exec(res.text);
+  assert.ok(rowMatch, 'expected a members-search-filter-row wrapping the search bar');
   assert.match(rowMatch[1], /class="members-search-bar"/);
-  assert.match(rowMatch[1], /class="category-filter"/);
+  assert.doesNotMatch(rowMatch[1], /class="category-filter"/);
+  assert.match(res.text, /<button type="button" class="roster-action-btn" onclick="document\.getElementById\('members-filter-dialog'\)\.showModal\(\)">/);
+  assert.match(res.text, /<dialog id="members-filter-dialog" class="member-picker-dialog">/);
 });
 
 test('Co-op Admin member profile still shows Primary Parent status now that the list row drops it', async () => {

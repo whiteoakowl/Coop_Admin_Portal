@@ -1,8 +1,10 @@
 // Real HTTP-level coverage for the Members page's family filter
-// (routes/admin-members.js's GET /members?family=<id>, added to the
-// existing "Filter by type" dropdown as a Family optgroup rather than a
-// separate control) - utils/members.js's membersWithDetails() gained an
-// optional familyId argument to power it.
+// (routes/admin-members.js's GET /members?family=<id>) - utils/
+// members.js's membersWithDetails() gained an optional familyId argument
+// to power it. The family picker itself now lives in the Filter dialog's
+// own <select name="family"> (a later real request: "filter button and
+// search bar on co-op admin portal members should be the same as main
+// admin portal members" moved it off the old per-option-URL dropdown).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -48,11 +50,11 @@ test('Members page family filter', async (t) => {
   const fixtureClassId = (await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, 'Family Filter Fixture Class') RETURNING id").get()).id;
   await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(fixtureClassId, kidInAId);
 
-  await t.test('the type-select dropdown lists every family as an option', async () => {
+  await t.test('the Filter dialog\'s Family select lists every family as an option', async () => {
     const res = await request(app).get('/admin/members').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, new RegExp(`<option value="/admin/members\\?family=${familyA}"[^>]*>Filter Family A</option>`));
-    assert.match(res.text, new RegExp(`<option value="/admin/members\\?family=${familyB}"[^>]*>Filter Family B</option>`));
+    assert.match(res.text, new RegExp(`<option value="${familyA}"[^>]*>Filter Family A Family</option>`));
+    assert.match(res.text, new RegExp(`<option value="${familyB}"[^>]*>Filter Family B Family</option>`));
   });
 
   await t.test('?family=<id> shows only that family\'s members', async () => {
@@ -63,9 +65,10 @@ test('Members page family filter', async (t) => {
     assert.doesNotMatch(res.text, /No Family Member/);
   });
 
-  await t.test('the selected family option is marked selected', async () => {
+  await t.test('the selected family option is marked selected, and the Filter button label shows it', async () => {
     const res = await request(app).get(`/admin/members?family=${familyA}`).set('Cookie', cookie);
-    assert.match(res.text, new RegExp(`<option value="/admin/members\\?family=${familyA}" selected>Filter Family A</option>`));
+    assert.match(res.text, new RegExp(`<option value="${familyA}" selected>Filter Family A Family</option>`));
+    assert.match(res.text, /Filter: Filter Family A Family/);
   });
 
   await t.test('export.csv also honors ?family=<id>', async () => {

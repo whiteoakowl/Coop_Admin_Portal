@@ -52,12 +52,15 @@ test('Co-op Admin pages (partials/admin-nav.ejs) load the fullscreenNavigate fal
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   const cookie = loginRes.headers['set-cookie'];
 
-  const res = await request(app).get('/admin/members').set('Cookie', cookie);
+  // Not /admin/members any more - its own Filter dropdown became a
+  // button+popup too (a real request: "filter button and search bar on
+  // co-op admin portal members should be the same as main admin portal
+  // members"), which submits via a plain <form> GET, not
+  // fullscreenNavigate. Rosters' own Filter dropdown still uses it,
+  // confirming this is a real, live consumer page.
+  const res = await request(app).get('/admin/rosters').set('Cookie', cookie);
   assert.equal(res.status, 200);
   assert.match(res.text, /<script src="\/js\/fullscreen-navigate-shim\.js"><\/script>/);
-  // The Members page's own Filter dropdown really does still rely on it -
-  // confirms this page is a real consumer, not just a page that happens
-  // to load the shim unused.
   assert.match(res.text, /onchange="window\.fullscreenNavigate\(this\.value\)"/);
 });
 

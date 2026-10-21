@@ -322,7 +322,11 @@ test('the Members page Day filter offers and correctly filters by Tuesday', asyn
   const page = await request(app).get('/admin/members?day=tuesday').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /Members Day Filter Tuesday Student/);
-  assert.match(page.text, /<option value="[^"]*day=tuesday[^"]*"[^>]* selected>Tuesday<\/option>/);
+  // The Day filter lives in the Filter dialog's own <select name="day">
+  // now (a real request: "filter button and search bar on co-op admin
+  // portal members should be the same as main admin portal members"), a
+  // plain value/label option rather than the old per-option-URL one.
+  assert.match(page.text, /<option value="tuesday" selected>Tuesday<\/option>/);
 
   const mondayFiltered = await request(app).get('/admin/members?day=monday').set('Cookie', admin.cookie);
   assert.doesNotMatch(mondayFiltered.text, /Members Day Filter Tuesday Student/, 'a Tuesday-only member must not show under the Monday filter');
