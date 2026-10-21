@@ -16,6 +16,13 @@ const {
 } = require('../utils/miscBadgeData');
 const { taskNumbersByItemId } = require('../utils/taskList');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
+const { renderViewToPdf } = require('../utils/pdfRender');
+
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
 
 router.use(requireFullAdmin);
 
@@ -132,6 +139,35 @@ router.post('/design/badges/bypass/print', async (req, res) => {
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - a PDF built from the exact same
+// -print.ejs view the Print button opens. isFullAdmin is passed
+// explicitly since renderViewToPdf renders through req.app.render(),
+// which never sees this request's own res.locals (where partials/
+// admin-nav normally finds it) - this whole router is already
+// requireFullAdmin-gated, so it's always true here.
+router.post('/design/badges/bypass/download.pdf', async (req, res) => {
+  const bypass = await getSetupCleanupBypassBadge();
+  if (!bypass) {
+    return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('No Setup/Cleanup bypass badge found.'));
+  }
+  const quantity = Math.min(50, Math.max(1, parseInt(req.body.quantity, 10) || 1));
+
+  const template = await getMiscTemplate('setupCleanup');
+  const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
+  const html = NameTagRenderCore.renderBadgeElements(template.elements, miscBadgeRowData(bypass));
+  const cards = Array.from({ length: quantity }, () => ({ html, bgCss }));
+
+  const pdf = await renderViewToPdf(req, 'admin-misc-badges-print', {
+    title: 'Print Setup/Cleanup Bypass Badges',
+    cards,
+    cardWidth: BADGE_WIDTH,
+    cardHeight: BADGE_HEIGHT,
+    isFullAdmin: true,
+  });
+  sendPdf(res, 'setup-cleanup-bypass-badges.pdf', pdf);
+});
+
 router.post('/design/badges/:type/print', requireMiscBadgeType, async (req, res) => {
   const type = req.params.type;
   const requestedIds = [].concat(req.body.badgeIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
@@ -156,6 +192,37 @@ router.post('/design/badges/:type/print', requireMiscBadgeType, async (req, res)
     cardWidth: BADGE_WIDTH,
     cardHeight: BADGE_HEIGHT,
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - a PDF built from the exact same
+// -print.ejs view the Print button opens.
+router.post('/design/badges/:type/download.pdf', requireMiscBadgeType, async (req, res) => {
+  const type = req.params.type;
+  const requestedIds = [].concat(req.body.badgeIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const all = await listMiscBadges(type);
+  const rows = requestedIds.length > 0 ? all.filter((r) => requestedIds.includes(r.id)) : all;
+
+  if (rows.length === 0) {
+    return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Select at least one badge to print.'));
+  }
+
+  const template = await getMiscTemplate(type);
+  const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
+  const taskNumbers = type === 'setupCleanup' ? await taskNumbersByItemId(rows.map((r) => r.task_item_id)) : {};
+  const cards = rows.map((row) => ({
+    html: NameTagRenderCore.renderBadgeElements(template.elements, miscBadgeRowData(row, taskNumbers[row.task_item_id])),
+    bgCss,
+  }));
+
+  const pdf = await renderViewToPdf(req, 'admin-misc-badges-print', {
+    title: `Print ${BADGE_TYPE_LABELS[type]} Badges`,
+    cards,
+    cardWidth: BADGE_WIDTH,
+    cardHeight: BADGE_HEIGHT,
+    isFullAdmin: true,
+  });
+  sendPdf(res, `${type}-badges.pdf`, pdf);
 });
 
 module.exports = router;

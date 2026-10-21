@@ -40,6 +40,15 @@ const DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday' };
         <button type="button" class="roster-action-btn" onclick="document.getElementById('<%= type %>-badge-filter-dialog').showModal()">Filter</button>
       <% } %>
       <button type="submit" class="primary-btn">Print</button>
+      <%# Download PDF renders admin-misc-badges-print.ejs through
+          utils/pdfRender.js's headless Chromium - only wired up for Co-op
+          Admin's own /admin/design/badges/:type/download.pdf route so far
+          (routes/admin-misc-badges.js), not Main Admin's separate
+          main-admin-misc-badges-print.ejs/route, so this stays hidden
+          when basePath points there instead. %>
+      <% if (badgeBasePath === '/admin/design') { %>
+        <button type="submit" formaction="<%= badgeBasePath %>/badges/<%= type %>/download.pdf" formtarget="_self" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
+      <% } %>
     </div>
   </div>
 

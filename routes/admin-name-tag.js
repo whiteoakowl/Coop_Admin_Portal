@@ -20,6 +20,13 @@ const { jsonScriptSafe } = require('../utils/json');
 const { CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
 const { byLastName } = require('../utils/members');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
+const { renderViewToPdf } = require('../utils/pdfRender');
+
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
 
 const REQUEST_TYPE_LABELS = { new_tag: 'New Name Tag', lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
 // A name tag request can also be filed for "both" days, unlike every other
@@ -150,6 +157,33 @@ router.get('/name-tag/requests/print', async (req, res) => {
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - a PDF built from the exact same
+// -print.ejs view the Print button opens. isFullAdmin is passed
+// explicitly since renderViewToPdf renders through req.app.render(),
+// which never sees this request's own res.locals (where partials/
+// admin-nav normally finds it) - this whole router is already
+// requireFullAdmin-gated, so it's always true here.
+router.get('/name-tag/requests/download.pdf', async (req, res) => {
+  const showArchived = req.query.archived === '1';
+  const dateFilter = req.query.date || '';
+  const submissions = (await nameTagSubmissions(showArchived, dateFilter)).map((r) => ({
+    id: r.id,
+    timestamp: formatTimestamp(r.createdAt),
+    memberName: r.memberName,
+    requestTypeLabel: REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
+    dayLabel: DAY_LABELS[r.day] || r.day,
+    description: r.description || '—',
+  }));
+  const pdf = await renderViewToPdf(req, 'admin-name-tag-print', {
+    title: `Name Tag ${showArchived ? 'Archived Requests' : 'Requests'}`,
+    showArchived,
+    submissions,
+    isFullAdmin: true,
+  });
+  sendPdf(res, `name-tag-${showArchived ? 'archived' : 'requests'}.pdf`, pdf);
+});
+
 router.post('/name-tag/:id/archive', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   await db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(id);
@@ -258,6 +292,38 @@ router.post('/name-tag/print', async (req, res) => {
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - a PDF built from the exact same
+// -print.ejs view the Print button opens.
+router.post('/name-tag/download.pdf', async (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect('/admin/name-tag?error=' + encodeURIComponent('Select at least one member to print.'));
+  }
+
+  const placeholders = memberIds.map(() => '?').join(',');
+  const members = (await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders})`).all(...memberIds)).sort(byLastName);
+
+  const templates = { student: await getTemplate('student'), parent: await getTemplate('parent'), admin: await getTemplate('admin') };
+  const dataByMember = await badgeDataForMembers(members);
+  const badges = members.map((m) => {
+    const layout = templates[m.member_type] || templates.student;
+    return {
+      html: NameTagRenderCore.renderBadgeElements(layout.elements, dataByMember[m.id]),
+      bgCss: NameTagRenderCore.backgroundCss(layout.background, layout.backgroundOpacity),
+    };
+  });
+
+  const pdf = await renderViewToPdf(req, 'admin-name-tag-bulk-print', {
+    title: 'Print Name Tags',
+    badges,
+    badgeWidth: BADGE_WIDTH,
+    badgeHeight: BADGE_HEIGHT,
+    isFullAdmin: true,
+  });
+  sendPdf(res, 'name-tags.pdf', pdf);
+});
+
 // A real request: "add a name tag bulk printing for plain parent name
 // tag that doesn't have a schedule on the back or setup/cleanup teams
 // listed." Reuses the parent template's own saved layout (whatever the
@@ -296,6 +362,39 @@ router.post('/name-tag/print-plain-parent', async (req, res) => {
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - a PDF built from the exact same
+// -print.ejs view the Print button opens.
+router.post('/name-tag/download-plain-parent.pdf', async (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect('/admin/name-tag?error=' + encodeURIComponent('Select at least one member to print.'));
+  }
+
+  const placeholders = memberIds.map(() => '?').join(',');
+  const members = (await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) AND member_type = 'parent'`).all(...memberIds)).sort(byLastName);
+  if (members.length === 0) {
+    return res.redirect('/admin/name-tag?error=' + encodeURIComponent('Select at least one parent to print a plain parent tag.'));
+  }
+
+  const template = await getTemplate('parent');
+  const plainElements = template.elements.filter((el) => el.field !== 'setupCleanupDays');
+  const dataByMember = await badgeDataForMembers(members);
+  const badges = members.map((m) => ({
+    html: NameTagRenderCore.renderBadgeElements(plainElements, dataByMember[m.id]),
+    bgCss: NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity),
+  }));
+
+  const pdf = await renderViewToPdf(req, 'admin-name-tag-bulk-print', {
+    title: 'Print Plain Parent Name Tags',
+    badges,
+    badgeWidth: BADGE_WIDTH,
+    badgeHeight: BADGE_HEIGHT,
+    isFullAdmin: true,
+  });
+  sendPdf(res, 'plain-parent-name-tags.pdf', pdf);
+});
+
 // Barcode-only sheet: the scan code, name, and member ID number, no name
 // tag design - for a cheap, fast-to-print stack of scan cards. A real
 // request: "printing barcodes only, should have the member ID number on
@@ -320,6 +419,28 @@ router.post('/name-tag/print-barcodes', async (req, res) => {
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - a PDF built from the exact same
+// -print.ejs view the Print button opens.
+router.post('/name-tag/download-barcodes.pdf', async (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect('/admin/name-tag?error=' + encodeURIComponent('Select at least one member to print.'));
+  }
+
+  const placeholders = memberIds.map(() => '?').join(',');
+  const members = (
+    await db.prepare(`SELECT id, name, barcode, member_code FROM members WHERE id IN (${placeholders})`).all(...memberIds)
+  ).sort(byLastName);
+
+  const pdf = await renderViewToPdf(req, 'admin-name-tag-barcode-print', {
+    title: 'Print Barcodes',
+    members,
+    isFullAdmin: true,
+  });
+  sendPdf(res, 'barcodes.pdf', pdf);
+});
+
 // Barcode + name + ID mailing-label sheet: for printing directly onto
 // Avery 08160-style address label sheets - unlike print-barcodes above
 // (fixed 3in x 1.75in cards meant to be cut into a scan-card stack), this
@@ -340,6 +461,28 @@ router.post('/name-tag/print-barcode-labels', async (req, res) => {
     title: 'Print Barcode Labels',
     members,
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - a PDF built from the exact same
+// -print.ejs view the Print button opens.
+router.post('/name-tag/download-barcode-labels.pdf', async (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect('/admin/name-tag?error=' + encodeURIComponent('Select at least one member to print.'));
+  }
+
+  const placeholders = memberIds.map(() => '?').join(',');
+  const members = (
+    await db.prepare(`SELECT id, name, barcode, member_code FROM members WHERE id IN (${placeholders})`).all(...memberIds)
+  ).sort(byLastName);
+
+  const pdf = await renderViewToPdf(req, 'admin-name-tag-barcode-labels-print', {
+    title: 'Print Barcode Labels',
+    members,
+    isFullAdmin: true,
+  });
+  sendPdf(res, 'barcode-labels.pdf', pdf);
 });
 
 module.exports = router;

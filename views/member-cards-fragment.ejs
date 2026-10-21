@@ -28,6 +28,7 @@
   </div>
   <div class="notes-dialog-actions">
     <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+    <button type="submit" formaction="/admin/members/<%= member.id %>/cards/download.pdf" formtarget="_self" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
     <button type="submit" class="primary-btn">Print</button>
   </div>
 </form>
