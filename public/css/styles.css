@@ -6711,14 +6711,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   }
   .floater-chart-table tbody tr:last-child { border-bottom: none; }
   .floater-chart-table td { display: block; width: auto; padding: 0; border: none; }
-  .floater-chart-table td:nth-child(2) { color: var(--muted); }
-  .floater-chart-table td:nth-child(2)::before { content: "\00b7\0020"; }
+  /* nth-child(3)/(4), not (2)/(3) - the Text Notification column (see
+     .floater-notify-col above) is a real DOM child even hidden by
+     default, shifting Position/Room/Floater one slot later than they
+     used to be. A real request: "floater assignments you can't see the
+     names in the dropdown its so tiny now," live-reproduced on an actual
+     phone: with the old (2)/(3) indices, the "· " separator landed on
+     Position instead of Room, and - the actual bug - Room (not Floater)
+     was the one getting flex:1 1 100%, so the select never got the row's
+     full width to size against and fell back to its own shrink-to-fit
+     minimum instead. */
+  .floater-chart-table td:nth-child(3) { color: var(--muted); }
+  .floater-chart-table td:nth-child(3)::before { content: "\00b7\0020"; }
   /* min-width: 0 - a flex item's min-width defaults to auto, which lets
      this cell's own min-content size (the select's widest-option width
      plus the Assign/Unassign button) override flex:1 1 100% and force the
      whole <tr> wider than the card. 0 lets it actually shrink to the row's
      available width instead of pushing the button off the edge. */
-  .floater-chart-table td:nth-child(3) { flex: 1 1 100%; min-width: 0; }
+  .floater-chart-table td:nth-child(4) { flex: 1 1 100%; min-width: 0; }
 
   /* Position + Room moved to their own line above, so the Floater column
      now has the card's FULL width to itself instead of a cramped third of

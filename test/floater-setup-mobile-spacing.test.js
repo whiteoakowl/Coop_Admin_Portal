@@ -89,3 +89,15 @@ test('.floater-chart-cards-grid uses auto-fit/minmax instead of a fixed-breakpoi
   );
   assert.doesNotMatch(css, /@media \(max-width: 1050px\) \{\s*\.floater-chart-cards-grid/, 'the old fixed 1050px breakpoint override should be gone, not left alongside the new rule');
 });
+
+// A real follow-up: the grid fix above wasn't the whole bug - the phone-
+// width stacked layout (@media max-width: 640px) has its OWN separate
+// nth-child(2)/(3) rules that shifted out of alignment the same way,
+// live-reproduced on an actual phone: the Floater select never got
+// flex: 1 1 100% (a different cell, Room, got it instead), so it fell
+// back to shrink-to-fit sizing instead of the row's full width.
+test('.floater-chart-table td:nth-child(3)/(4) (not (2)/(3)) get the mobile "· Room" prefix and the Floater column\'s full-row-width flex', () => {
+  assert.match(css, /\.floater-chart-table td:nth-child\(3\) \{ color: var\(--muted\); \}/, 'expected the "· " separator\'s color rule to target Room at its real nth-child position (3), not (2)');
+  assert.match(css, /\.floater-chart-table td:nth-child\(3\)::before \{ content: "\\00b7\\0020"; \}/, 'expected the "· " separator itself to target Room at (3), not (2)');
+  assert.match(css, /\.floater-chart-table td:nth-child\(4\) \{ flex: 1 1 100%; min-width: 0; \}/, "expected the Floater column's full-row-width flex to target its real nth-child position (4), not (3)");
+});
