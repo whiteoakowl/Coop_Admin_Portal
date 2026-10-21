@@ -51,7 +51,7 @@
           <% }); %>
         </div>
       <% } %>
-      <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
+      <a class="icon-btn" href="/teacher/classes/print?day=<%= day %>&view=<%= view %><%= semesterQuery %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
     </div>
 
     <% if (view === 'grid') { %>

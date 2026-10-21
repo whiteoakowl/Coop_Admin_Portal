@@ -133,4 +133,25 @@ test('Co-op Admin Classes > Class Registration Log (tab=classregistrationlog)', 
     assert.match(res.text, /tab=classregistrationlog/);
     assert.match(res.text, /Class Registration Log/);
   });
+
+  await t.test('the Print button on the live log is a link to a dedicated print preview page', async () => {
+    const res = await request(app).get('/admin/schedule?tab=classregistrationlog').set('Cookie', cookie);
+    assert.match(res.text, /<a class="icon-btn" href="\/admin\/schedule\/classregistrationlog\/print" target="_blank" aria-label="Print"/);
+  });
+
+  await t.test('GET /admin/schedule/classregistrationlog/print renders a print preview with every log row', async () => {
+    const res = await request(app).get('/admin/schedule/classregistrationlog/print').set('Cookie', cookie);
+    assert.equal(res.status, 200);
+    assert.match(res.text, /print-preview-header/);
+    assert.match(res.text, /onclick="window\.print\(\)"/);
+    assert.match(res.text, /Andy Anderson/);
+    assert.match(res.text, /Bob Baker/);
+  });
+
+  await t.test('the date filter narrows the print preview to just that date too', async () => {
+    const res = await request(app).get('/admin/schedule/classregistrationlog/print?date=2024-03-01').set('Cookie', cookie);
+    assert.equal(res.status, 200);
+    assert.match(res.text, /Andy Anderson/);
+    assert.doesNotMatch(res.text, /Bob Baker/);
+  });
 });

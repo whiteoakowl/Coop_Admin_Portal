@@ -148,10 +148,11 @@ router.get('/', async (req, res) => {
 // default-to-the-active-semester would have silently hidden classes a
 // teacher was already used to seeing); picking one narrows classesForTeacher
 // the same way allClassesList's own semesterId already supports elsewhere.
-// Print reuses the plain window.print() + .no-print pattern (see e.g.
-// admin-members.ejs) rather than a dedicated print route - .admin-sidebar
-// (portal-nav.ejs's own shell) is already globally hidden in @media print,
-// so there's nothing portal-specific to add.
+// Print is a dedicated preview page now (GET /classes/print below), this
+// app's own print-button convention (see views/admin-rosters-print.ejs),
+// reusing the exact same day/view/semester data this route computes so
+// the preview always matches whichever view and semester is on screen -
+// it used to be the plain window.print() + .no-print pattern instead.
 //
 // A further real request: "the class schedule page should show the
 // entire classes schedule grid for the semester" - Grid view's grid was
@@ -212,6 +213,34 @@ router.get('/classes', async (req, res) => {
     roomGrid,
     semesters,
     selectedSemesterId,
+  });
+});
+
+router.get('/classes/print', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const semesters = await listSemesters();
+  const selectedSemesterId = req.query.semesterId ? parseInt(req.query.semesterId, 10) : null;
+  const gridSemesterId = selectedSemesterId === null ? undefined : selectedSemesterId;
+  const classes = await classesForTeacher(member, selectedSemesterId);
+  const sorted = [...classes].sort(
+    (a, b) => (CLASS_DAY_ORDER[a.day] - CLASS_DAY_ORDER[b.day]) || a.hour_position - b.hour_position
+  );
+  const byDay = [];
+  for (const cls of sorted) {
+    let group = byDay.find((g) => g.day === cls.day);
+    if (!group) { group = { day: cls.day, dayLabel: cls.dayLabel, classes: [] }; byDay.push(group); }
+    group.classes.push(cls);
+  }
+  const view = req.query.view === 'list' ? 'list' : 'grid';
+  const activeDays = await listActiveClassDays();
+  const day = activeDays.includes(req.query.day) ? req.query.day : (activeDays[0] || 'monday');
+  const roomGrid = view === 'grid' ? await hideClassesNotVisibleToMembers(await roomGridForDay(day, gridSemesterId)) : null;
+  res.render('teacher-classes-print', {
+    title: 'Class Schedule Print Preview',
+    byDay,
+    view,
+    hours: view === 'grid' ? await hoursForDay(day, gridSemesterId) : [],
+    roomGrid,
   });
 });
 

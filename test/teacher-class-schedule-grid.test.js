@@ -94,3 +94,30 @@ test('GET /teacher/classes/:id/fragment 404s for a class id that does not exist'
   const res = await request(app).get('/teacher/classes/999999/fragment').set('Cookie', cookie);
   assert.equal(res.status, 404);
 });
+
+test('Class Schedule Print button links to a dedicated print preview page, which renders the same grid', async () => {
+  await createClass({ day: 'monday', hourPosition: 1, className: 'Woodworking', room: 'Room 3' });
+  const cookie = await loginTeacher();
+
+  const live = await request(app).get('/teacher/classes?view=grid&day=monday').set('Cookie', cookie);
+  assert.match(live.text, /<a class="icon-btn" href="\/teacher\/classes\/print\?day=monday&view=grid" target="_blank" aria-label="Print"/);
+
+  const preview = await request(app).get('/teacher/classes/print?view=grid&day=monday').set('Cookie', cookie);
+  assert.equal(preview.status, 200);
+  assert.match(preview.text, /print-preview-header/);
+  assert.match(preview.text, /onclick="window\.print\(\)"/);
+  assert.match(preview.text, /Woodworking/);
+});
+
+test('Class Schedule Print preview respects the List view too', async () => {
+  const classId = await createClass({ day: 'wednesday', hourPosition: 2, className: 'Ceramics', room: 'Room 4' });
+  const teacherMemberId = (
+    await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Ceramics Teacher', 'ceramics-teacher-barcode', 'parent', 1) RETURNING id").get()
+  ).id;
+  await db.prepare("INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, 'teacher')").run(classId, teacherMemberId);
+
+  const cookie = await loginTeacher();
+  const preview = await request(app).get('/teacher/classes/print?view=list').set('Cookie', cookie);
+  assert.equal(preview.status, 200);
+  assert.match(preview.text, /You're not staffed on any classes yet\./, 'this teacher is not staffed on Ceramics, so List view is empty for them');
+});

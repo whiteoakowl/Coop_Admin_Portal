@@ -130,4 +130,48 @@ test('Main Admin Events > Event Registration Log (tab=registrationlog)', async (
     assert.match(res.text, /tab=registrationlog/);
     assert.match(res.text, /Event Registration Log/);
   });
+
+  await t.test('the Print button on the live log is a link to a dedicated print preview page', async () => {
+    const res = await request(app).get('/main-admin/events?tab=registrationlog').set('Cookie', cookie);
+    assert.match(res.text, /<a class="icon-btn" href="\/main-admin\/events\/registrationlog\/print" target="_blank" aria-label="Print"/);
+  });
+
+  await t.test('GET /main-admin/events/registrationlog/print renders a print preview with every log row', async () => {
+    const res = await request(app).get('/main-admin/events/registrationlog/print').set('Cookie', cookie);
+    assert.equal(res.status, 200);
+    assert.match(res.text, /print-preview-header/);
+    assert.match(res.text, /onclick="window\.print\(\)"/);
+    assert.match(res.text, /Alice Anderson/);
+    assert.match(res.text, /Bob Baker/);
+  });
+
+  await t.test('the date filter narrows the print preview to just that date too', async () => {
+    const res = await request(app).get('/main-admin/events/registrationlog/print?date=2024-03-01').set('Cookie', cookie);
+    assert.equal(res.status, 200);
+    assert.match(res.text, /Alice Anderson/);
+    assert.doesNotMatch(res.text, /Bob Baker/);
+  });
+});
+
+test('Main Admin Events > Calendar tab print preview', async (t) => {
+  const cookie = await loginAsMainAdmin();
+
+  await t.test('the Print button on the live Calendar tab is a link to a dedicated print preview page', async () => {
+    const res = await request(app).get('/main-admin/events?tab=calendar').set('Cookie', cookie);
+    assert.match(res.text, /<a class="icon-btn" href="\/main-admin\/events\/print\?view=calendar&month=" target="_blank" aria-label="Print"/);
+  });
+
+  await t.test('GET /main-admin/events/print renders a print preview of the published calendar', async () => {
+    const res = await request(app).get('/main-admin/events/print?month=2024-03').set('Cookie', cookie);
+    assert.equal(res.status, 200);
+    assert.match(res.text, /print-preview-header/);
+    assert.match(res.text, /onclick="window\.print\(\)"/);
+    assert.match(res.text, /Fall Festival/);
+  });
+
+  await t.test('GET /main-admin/events/print?view=list renders the list view instead', async () => {
+    const res = await request(app).get('/main-admin/events/print?view=list&month=2024-03').set('Cookie', cookie);
+    assert.equal(res.status, 200);
+    assert.match(res.text, /Fall Festival/);
+  });
 });
