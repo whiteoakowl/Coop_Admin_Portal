@@ -50,12 +50,12 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
-async function seedStudentAccount(suffix) {
+async function seedStudentAccount(suffix, { phone = null } = {}) {
   const familyId = (await db.prepare(`INSERT INTO families (name) VALUES ('Text Family ${suffix}') RETURNING id`).get()).id;
   const memberId = (
     await db
-      .prepare("INSERT INTO members (name, barcode, member_type, family_id, active) VALUES (?, ?, 'student', ?, 1) RETURNING id")
-      .get(`Text Student ${suffix}`, `text-student-${suffix}`, familyId)
+      .prepare("INSERT INTO members (name, barcode, member_type, family_id, active, phone) VALUES (?, ?, 'student', ?, 1, ?) RETURNING id")
+      .get(`Text Student ${suffix}`, `text-student-${suffix}`, familyId, phone)
   ).id;
   const accountId = (
     await db
@@ -77,6 +77,22 @@ test('Main Admin Text tab: same candidate list/filter/select-all wiring as Email
   assert.match(page.text, />Filter</);
   assert.match(page.text, /id="email-select-all"/);
   assert.match(page.text, />Create Text</);
+});
+
+// A real request: "Remove select all and select none buttons. Instead
+// put a check box on the title row of the 1st column... Lists should
+// show just name, email and phone number. Shrink to fit tables in
+// mobile view."
+test('Main Admin Text tab: the candidate table shows only Name/Email/Phone columns, with Select All in the header cell, and shrinks instead of stacking on mobile', async () => {
+  const { cookie } = await loginAsMainAdmin();
+  await seedStudentAccount('mainPhone', { phone: '555-456-7890' });
+
+  const page = await request(app).get('/main-admin/announcements/text').set('Cookie', cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<table class="roster-table condensed-table" id="email-candidate-table">/);
+  assert.doesNotMatch(page.text, /id="email-candidate-table"[^>]*table-stack-mobile|table-stack-mobile[^>]*id="email-candidate-table"/);
+  assert.match(page.text, /<tr><th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" \/><\/th><th>Name<\/th><th>Email<\/th><th>Phone<\/th><\/tr>/);
+  assert.match(page.text, />555-456-7890</);
 });
 
 test('Main Admin Text: compose screen has a plain textarea (no rich-text toolbar, no subject/reply-to), and Send Now creates a sent text campaign', async () => {
@@ -162,11 +178,13 @@ test('Main Admin Text: scheduling saves a scheduled text without notifying yet, 
 
 test('Co-op Admin Text tab: same wiring, reached at /admin/announcements/text', async () => {
   const { cookie, csrfToken } = await loginAsAdmin();
-  const accountId = await seedStudentAccount('coopA');
+  const accountId = await seedStudentAccount('coopA', { phone: '555-222-3344' });
 
   const page = await request(app).get('/admin/announcements/text').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, new RegExp(`value="${accountId}" data-email-checkbox`));
+  assert.match(page.text, /<tr><th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" \/><\/th><th>Name<\/th><th>Email<\/th><th>Phone<\/th><\/tr>/);
+  assert.match(page.text, />555-222-3344</);
 
   const sendRes = await request(app)
     .post('/admin/announcements/text/send')

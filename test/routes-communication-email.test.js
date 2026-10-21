@@ -53,12 +53,12 @@ async function loginAsAdmin() {
 }
 
 let sectionId;
-async function seedStudentAccount(suffix, { grade = '3rd Grade', registerForClass = false, inSection = false } = {}) {
+async function seedStudentAccount(suffix, { grade = '3rd Grade', registerForClass = false, inSection = false, phone = null } = {}) {
   const familyId = (await db.prepare(`INSERT INTO families (name) VALUES ('Email Family ${suffix}') RETURNING id`).get()).id;
   const memberId = (
     await db
-      .prepare("INSERT INTO members (name, barcode, member_type, family_id, active, grade_level, birthday) VALUES (?, ?, 'student', ?, 1, ?, '2015-01-01') RETURNING id")
-      .get(`Email Student ${suffix}`, `email-student-${suffix}`, familyId, grade)
+      .prepare("INSERT INTO members (name, barcode, member_type, family_id, active, grade_level, birthday, phone) VALUES (?, ?, 'student', ?, 1, ?, '2015-01-01', ?) RETURNING id")
+      .get(`Email Student ${suffix}`, `email-student-${suffix}`, familyId, grade, phone)
   ).id;
   const accountId = (
     await db
@@ -98,6 +98,25 @@ test('Main Admin Email tab: candidate rows carry role/section/grade/age/registra
   assert.match(page.text, />Filter</);
   assert.match(page.text, /id="email-select-all"/);
   assert.doesNotMatch(page.text, /data-email-select="all"/, 'Select All/Select None buttons were replaced by a single header checkbox');
+});
+
+// A real request: "Remove select all and select none buttons. Instead
+// put a check box on the title row of the 1st column... Lists should
+// show just name, email and phone number. Shrink to fit tables in
+// mobile view."
+test('Main Admin Email tab: the candidate table shows only Name/Email/Phone columns, with Select All in the header cell, and shrinks instead of stacking on mobile', async () => {
+  const { cookie } = await loginAsMainAdmin();
+  await seedStudentAccount('mainPhone', { phone: '555-123-9876' });
+
+  const page = await request(app).get('/main-admin/announcements/email').set('Cookie', cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<table class="roster-table condensed-table" id="email-candidate-table">/);
+  assert.doesNotMatch(page.text, /id="email-candidate-table"[^>]*table-stack-mobile|table-stack-mobile[^>]*id="email-candidate-table"/);
+  assert.match(page.text, /<tr><th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" \/><\/th><th>Name<\/th><th>Email<\/th><th>Phone<\/th><\/tr>/);
+  assert.match(page.text, />555-123-9876</);
+  assert.doesNotMatch(page.text, />Grade</);
+  assert.doesNotMatch(page.text, />Section\(s\)</);
+  assert.doesNotMatch(page.text, />Registered for Classes</);
 });
 
 test('Main Admin Email: Create Email renders the compose screen with hidden recipient inputs, then Send Now creates a sent campaign and notifies each recipient', async () => {
@@ -172,12 +191,14 @@ test('Main Admin Email: scheduling saves a scheduled campaign without notifying 
 
 test('Co-op Admin Email tab: same filter/select-all/compose wiring, reached at /admin/announcements/email', async () => {
   const { cookie, csrfToken } = await loginAsAdmin();
-  const { accountId } = await seedStudentAccount('coopA');
+  const { accountId } = await seedStudentAccount('coopA', { phone: '555-000-1111' });
 
   const page = await request(app).get('/admin/announcements/email').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /<h1>Email<\/h1>/);
   assert.match(page.text, new RegExp(`value="${accountId}" data-email-checkbox`));
+  assert.match(page.text, /<tr><th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" \/><\/th><th>Name<\/th><th>Email<\/th><th>Phone<\/th><\/tr>/);
+  assert.match(page.text, />555-000-1111</);
 
   const sendRes = await request(app)
     .post('/admin/announcements/email/send')

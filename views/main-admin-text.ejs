@@ -37,23 +37,27 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <form method="POST" action="/main-admin/announcements/text/compose" id="email-select-form">
-      <%# A real request: "select all and select none check boxes should
-          be below filter and create email buttons" - same reorder as
-          the Email subpage. A later request: "remove select none
-          option" (same fix as the Email subpage) - same reasoning. %>
       <div class="roster-btn-row email-toolbar-row">
         <button type="button" class="roster-action-btn" onclick="document.getElementById('email-filter-dialog').showModal()">Filter</button>
         <button type="submit" class="roster-action-btn">Create Text</button>
       </div>
-      <div class="roster-btn-row email-toolbar-row">
-        <label class="checkbox-option email-select-all"><input type="checkbox" id="email-select-all" /> Select All</label>
-      </div>
       <p class="hint" id="email-select-count"></p>
 
+      <%# A real request: "Remove select all and select none buttons.
+          Instead put a check box on the title row of the 1st column.
+          Selecting this box checks everyone. Unchecking that box
+          unchecks everyone. Lists should show just name, email and
+          phone number. Shrink to fit tables in mobile view." The Filter
+          dialog below still filters by Role/Section/Grade/Age
+          Group/Registered - those just no longer need their own column
+          here to do it. table-stack-mobile dropped in favor of this
+          app's baseline .roster-table shrink-on-mobile behavior (smaller
+          font/padding, see styles.css's own comment on that) now that
+          there are few enough real columns for a plain table to fit. %>
       <div class="roster-scroll">
-        <table class="roster-table condensed-table table-stack-mobile" id="email-candidate-table">
+        <table class="roster-table condensed-table" id="email-candidate-table">
           <thead>
-            <tr><th class="no-print"><span class="sr-only">Select</span></th><th>Name</th><th>Email</th><th>Grade</th><th>Section(s)</th><th>Registered for Classes</th></tr>
+            <tr><th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" /></th><th>Name</th><th>Email</th><th>Phone</th></tr>
           </thead>
           <tbody>
             <% candidates.forEach(function(c) { %>
@@ -66,11 +70,9 @@
                 data-registered="<%= c.registeredForClasses ? 'yes' : 'no' %>"
               >
                 <td><input type="checkbox" name="recipientIds" value="<%= c.accountId %>" data-email-checkbox /></td>
-                <td class="table-stack-heading"><%= c.name %></td>
-                <td data-label="Email"><%= c.email || '' %></td>
-                <td data-label="Grade"><%= c.gradeLevel || '' %></td>
-                <td data-label="Section(s)"><%= c.sections.join(', ') %></td>
-                <td data-label="Registered"><%= c.registeredForClasses ? 'Yes' : 'No' %></td>
+                <td><%= c.name %></td>
+                <td><%= c.email || '' %></td>
+                <td><%= c.phone || '' %></td>
               </tr>
             <% }); %>
           </tbody>

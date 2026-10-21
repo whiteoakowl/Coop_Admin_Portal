@@ -86,12 +86,12 @@ router.get('/email', async (req, res) => {
   });
 });
 
+// recipientIds (Email/Text tab's own candidate checkboxes) or memberIds
+// (Members page's own "Bulk Action > Email" - see emailComposer.js's
+// own resolveRecipients() comment) - either lands here.
 router.post('/email/compose', async (req, res) => {
-  const recipientIds = [].concat(req.body.recipientIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
-  if (recipientIds.length === 0) return res.redirect('/main-admin/announcements/email?error=' + encodeURIComponent('Select at least one recipient.'));
-
-  const candidates = await emailComposer.listRecipientCandidates();
-  const recipients = candidates.filter((c) => recipientIds.includes(c.accountId));
+  const recipients = await emailComposer.resolveRecipients(req.body);
+  if (recipients.length === 0) return res.redirect('/main-admin/announcements/email?error=' + encodeURIComponent('Select at least one recipient.'));
   res.render('main-admin-email-compose', {
     title: 'Compose Email',
     recipients,
@@ -164,12 +164,12 @@ router.get('/text', async (req, res) => {
   });
 });
 
+// recipientIds (Email/Text tab's own candidate checkboxes) or memberIds
+// (Members page's own "Bulk Action > Text" - see emailComposer.js's own
+// resolveRecipients() comment) - either lands here.
 router.post('/text/compose', async (req, res) => {
-  const recipientIds = [].concat(req.body.recipientIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
-  if (recipientIds.length === 0) return res.redirect('/main-admin/announcements/text?error=' + encodeURIComponent('Select at least one recipient.'));
-
-  const candidates = await emailComposer.listRecipientCandidates();
-  const recipients = candidates.filter((c) => recipientIds.includes(c.accountId));
+  const recipients = await emailComposer.resolveRecipients(req.body);
+  if (recipients.length === 0) return res.redirect('/main-admin/announcements/text?error=' + encodeURIComponent('Select at least one recipient.'));
   res.render('main-admin-text-compose', {
     title: 'Compose Text',
     recipients,

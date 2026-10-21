@@ -35,7 +35,11 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
-test('Members page toolbar: Export/Print/Edit have no fixed-columns override, so the adaptive mobile layout puts all 3 on one even row', async () => {
+// A later real request removed the "Edit" toggle entirely (checkboxes
+// are permanently visible now - see test/routes-admin-members-bulk-
+// actions.test.js) and changed Export/Print to icon-only buttons
+// ("change export and print buttons to icons").
+test('Members page toolbar: Export/Print have no fixed-columns override, so the adaptive mobile layout lays them out on one row', async () => {
   const cookie = await loginAsAdmin();
   const page = await request(app).get('/admin/members').set('Cookie', cookie);
   assert.equal(page.status, 200);
@@ -43,8 +47,8 @@ test('Members page toolbar: Export/Print/Edit have no fixed-columns override, so
   assert.ok(toolbarSection, 'expected to find the Members toolbar section');
   const rowOpenTag = /<div class="roster-btn-row"([^>]*)>/.exec(toolbarSection[1]);
   assert.ok(rowOpenTag, "expected to find the toolbar's .roster-btn-row opening tag");
-  assert.doesNotMatch(rowOpenTag[1], /data-fixed-columns/, 'no fixed-columns override should remain, so the adaptive JS lays out all 3 buttons on one row');
-  assert.match(page.text, />Export</);
-  assert.match(page.text, />Print</);
-  assert.match(page.text, />Edit</);
+  assert.doesNotMatch(rowOpenTag[1], /data-fixed-columns/, 'no fixed-columns override should remain, so the adaptive JS lays out the buttons on one row');
+  assert.match(page.text, /aria-label="Export CSV"/);
+  assert.match(page.text, /aria-label="Print"/);
+  assert.doesNotMatch(page.text, />Edit</, 'the old Edit toggle button is gone');
 });

@@ -2,23 +2,18 @@
 // boxes. neatly on the same row. create email and filter button should be
 // on the same row, same size, text fit in the button, clean and
 // professional. same with text tab." Main Admin's Email/Text tabs had
-// moved to a single combined checkbox in the table header (a real earlier
-// request: "select all or none should be checkboxes not buttons") and the
-// Create Email/Create Text button used .primary-btn (a different size/
-// margin than Filter's own .roster-action-btn) - both now sit in
-// .email-toolbar-row as two plain Select All/Select None checkboxes
-// (checkbox-option, matching every bulk print picker's own pattern under
-// Design/Print) plus Filter and Create Email/Text, all .roster-action-btn.
+// moved to a single combined checkbox in the table header, then to a
+// Select All/Select None checkbox pair in their own toolbar row, then to
+// just Select All after "remove select none option."
 //
-// A later real request reordered them: "select all and select none check
-// boxes should be below filter and create email buttons" - Filter/Create
-// Email now lead their own .email-toolbar-row, Select All/Select None
-// follow in a second .email-toolbar-row right under it.
-//
-// A further real request removed Select None entirely ("remove select
-// none option") - unchecking Select All (or any individual row) already
-// clears a selection, so the separate momentary checkbox was redundant.
-// Only Select All remains in that second row now.
+// A later real request reversed course again: "Remove select all and
+// select none buttons. Instead put a check box on the title row of the
+// 1st column. Selecting this box checks everyone. Unchecking that box
+// unchecks everyone." Select All is back in the table's own header cell
+// (see test/routes-communication-email.test.js/routes-communication-
+// text.test.js for the full select-all-checkbox behavior) - Filter/Create
+// Email/Text are the toolbar's only buttons now, both plain
+// .roster-action-btn, same class/size.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -51,21 +46,17 @@ async function loginAsMainAdmin() {
 
 function checkToolbar(text) {
   const rows = [...text.matchAll(/<div class="roster-btn-row email-toolbar-row">([\s\S]*?)<\/div>/g)].map((m) => m[1]);
-  assert.equal(rows.length, 2, 'expected two separate email-toolbar-row divs');
-  const [filterRow, selectRow] = rows;
+  assert.equal(rows.length, 1, 'expected a single email-toolbar-row div - Select All no longer gets its own row');
+  const filterRow = rows[0];
   assert.match(filterRow, /class="roster-action-btn" onclick="document\.getElementById\('email-filter-dialog'\)\.showModal\(\)">Filter</);
-  // Create Email/Text is a plain roster-action-btn now, same class/size as Filter - not .primary-btn.
+  // Create Email/Text is a plain roster-action-btn, same class/size as Filter - not .primary-btn.
   assert.doesNotMatch(filterRow, /primary-btn/);
-  // "select all and select none check boxes should be below filter and
-  // create email buttons" - their own row, right after Filter/Create's.
-  assert.match(selectRow, /<label class="checkbox-option email-select-all"><input type="checkbox" id="email-select-all" \/> Select All<\/label>/);
-  assert.doesNotMatch(selectRow, /Select None/);
-  assert.ok(text.indexOf(filterRow) < text.indexOf(selectRow), 'Filter/Create row should come before the Select All row');
-  // No more combined select-all/none checkbox living in the table's own header cell.
-  assert.doesNotMatch(text, /<th><input type="checkbox" id="email-select-all"/);
+  assert.doesNotMatch(filterRow, /Select All|Select None/);
+  // Select All now lives in the table's own first-column header cell.
+  assert.match(text, /<th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" \/><\/th>/);
 }
 
-test('Main Admin Email tab: Select All checkbox and Filter/Create Email buttons share one toolbar row, same button class', async () => {
+test('Main Admin Email tab: Filter/Create Email share one toolbar row, and Select All lives in the table header', async () => {
   const cookie = await loginAsMainAdmin();
   const res = await request(app).get('/main-admin/announcements/email').set('Cookie', cookie);
   assert.equal(res.status, 200);

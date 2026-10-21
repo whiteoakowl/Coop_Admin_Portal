@@ -87,12 +87,12 @@ router.get('/announcements/email', requireAdmin, async (req, res) => {
   });
 });
 
+// recipientIds (Email/Text tab's own candidate checkboxes) or memberIds
+// (Members page's own "Bulk Action > Email" - see emailComposer.js's
+// own resolveRecipients() comment) - either lands here.
 router.post('/announcements/email/compose', requireAdmin, async (req, res) => {
-  const recipientIds = [].concat(req.body.recipientIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
-  if (recipientIds.length === 0) return res.redirect('/admin/announcements/email?error=' + encodeURIComponent('Select at least one recipient.'));
-
-  const candidates = await emailComposer.listRecipientCandidates();
-  const recipients = candidates.filter((c) => recipientIds.includes(c.accountId));
+  const recipients = await emailComposer.resolveRecipients(req.body);
+  if (recipients.length === 0) return res.redirect('/admin/announcements/email?error=' + encodeURIComponent('Select at least one recipient.'));
   res.render('admin-email-compose', {
     title: 'Compose Email',
     recipients,
@@ -165,12 +165,12 @@ router.get('/announcements/text', requireAdmin, async (req, res) => {
   });
 });
 
+// recipientIds (Email/Text tab's own candidate checkboxes) or memberIds
+// (Members page's own "Bulk Action > Text" - see emailComposer.js's own
+// resolveRecipients() comment) - either lands here.
 router.post('/announcements/text/compose', requireAdmin, async (req, res) => {
-  const recipientIds = [].concat(req.body.recipientIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
-  if (recipientIds.length === 0) return res.redirect('/admin/announcements/text?error=' + encodeURIComponent('Select at least one recipient.'));
-
-  const candidates = await emailComposer.listRecipientCandidates();
-  const recipients = candidates.filter((c) => recipientIds.includes(c.accountId));
+  const recipients = await emailComposer.resolveRecipients(req.body);
+  if (recipients.length === 0) return res.redirect('/admin/announcements/text?error=' + encodeURIComponent('Select at least one recipient.'));
   res.render('admin-text-compose', {
     title: 'Compose Text',
     recipients,

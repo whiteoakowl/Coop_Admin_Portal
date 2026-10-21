@@ -1,80 +1,64 @@
-// Members page bulk Delete/Archive/Restore: the "Edit" toggle, Select All,
-// and off-page-checkbox mechanics are all handled by
-// public/js/archive-select-toggle.js (reused as-is - it's already generic
-// over data-archive-toggle/-controls/-select-all-for/form="<id>", not
-// actually specific to "archive"). This file only covers what that one
-// doesn't: routing one shared checkbox selection to whichever endpoint
-// the admin actually picked - either Co-op Admin's own toolbar buttons
-// (Delete/Archive/Restore Selected, all submitting the SAME
-// #members-bulk-form) or Main Admin's own single "Actions" dropdown
-// (views/main-admin-members.ejs's <select data-bulk-action-select> -
-// "a dropdown also appears and says actions, delete or archive are the
-// options", a real request).
+// Members page bulk Delete/Archive/Email/Text: the per-row checkbox
+// column and the "Select All" checkbox (both now permanently visible -
+// no more "Edit Member List" toggle to reveal them) are handled by
+// public/js/archive-select-toggle.js's own generic data-select-all-for
+// wiring, reused as-is. This file covers what that one doesn't: a real
+// request - "Add a bulk action button to this page. When you select
+// members and then click bulk action it will have a drop down menu
+// asking if you want to delete the members, email them, text them" -
+// picking an option from the page's own <select data-bulk-action-select
+// form="..."> routes the shared hidden form (views/main-admin-
+// members.ejs/admin-members.ejs's own #members-select-form/#members-
+// bulk-form) to whichever endpoint that option names, then submits it
+// immediately - no separate "Save" click needed. Archive/Delete still
+// go through the sitewide confirm-dialog.js (their <option> carries
+// data-bulk-confirm, so the form's own data-confirm gates the submit);
+// Email/Text have none, so picking either jumps straight to the compose
+// screen (routes/main-admin-announcements.js's/admin-announcements.js's
+// own /email/compose, /text/compose - both now accept this page's own
+// memberIds[] the same way the Email/Text tab's own recipientIds[]
+// already worked, see utils/emailComposer.js's own resolveRecipients()).
 //
-// Each button carries its target in data-bulk-action rather than the
-// native HTML `formaction` attribute a plain <button type="submit"
+// Each selected <option> carries its target in data-bulk-action rather
+// than the native HTML `formaction` a plain <button type="submit"
 // formaction="..."> would use, because confirm-dialog.js's "Yes" button
 // re-submits the pending form via `pendingForm.requestSubmit()` with NO
 // submitter argument - the browser only honors a clicked button's
 // formaction when THAT button is the one actually driving the submit, so
 // a submitter-less requestSubmit() silently falls back to the form's own
-// plain `action` instead, sending every bulk action to whichever URL the
-// <form> tag itself happens to have. Setting form.action here directly,
-// in a click handler that runs before that whole submit/confirm/re-submit
-// sequence even starts, sidesteps that entirely - by the time
-// requestSubmit() re-fires, the form's own action already IS the right
-// endpoint.
+// plain `action` instead. Setting form.action here directly, before that
+// whole submit/confirm/re-submit sequence even starts, sidesteps that
+// entirely - by the time requestSubmit() re-fires (on first attempt, or
+// after a confirm), the form's own action already IS the right endpoint.
 //
 // confirm-dialog.js also reads its confirm text from the FORM's own
-// data-confirm at submit time, not the button's - same reasoning, this
+// data-confirm at submit time, not the option's - same reasoning, this
 // sets that form's data-confirm (and -yes-label/-safe) to match whichever
-// button was actually clicked.
+// option was actually picked, clearing it entirely for an option (Email,
+// Text) that carries no data-bulk-confirm of its own, so a stale "Delete
+// the selected members?" message from a PREVIOUS pick can never leak
+// into an Email/Text submit that should go straight through unconfirmed.
 (function () {
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-bulk-action]');
-    if (!btn) return;
-    const formId = btn.getAttribute('form');
-    const form = formId && document.getElementById(formId);
-    if (!form) return;
-    form.action = btn.dataset.bulkAction;
-    form.dataset.confirm = btn.dataset.bulkConfirm;
-    form.dataset.confirmYesLabel = btn.dataset.bulkConfirmYesLabel || 'Yes, Delete';
-    if (btn.dataset.bulkConfirmSafe) form.dataset.confirmSafe = '1';
-    else delete form.dataset.confirmSafe;
-  });
-
-  // A real request (Main Admin Members' Edit mode): "a dropdown also
-  // appears and says actions, delete or archive are the options" - the
-  // same data-bulk-action/-confirm/-confirm-yes-label/-confirm-safe
-  // wiring above, just read off the SELECTED <option> of a
-  // <select data-bulk-action-select form="..."> instead of a clicked
-  // button, since there's no single element to read data- attributes
-  // from otherwise.
-  //
-  // A later real request: "all other buttons disappear and you only see
-  // cancel button and save button" - picking an action from the dropdown
-  // no longer submits by itself; it just arms the form (same data-*
-  // wiring) and enables the page's own explicit Save button
-  // (data-bulk-action-save, form="..." - a plain submit button, so
-  // confirm-dialog.js's usual click-to-confirm flow applies to it exactly
-  // like any other submit button already wired to a data-confirm form).
   document.addEventListener('change', (e) => {
     const select = e.target.closest('[data-bulk-action-select]');
     if (!select) return;
     const option = select.selectedOptions[0];
     const formId = select.getAttribute('form');
     const form = formId && document.getElementById(formId);
-    const saveBtn = formId && document.querySelector(`[data-bulk-action-save][form="${formId}"]`);
-    if (!form) return;
-    if (!option || !option.dataset.bulkAction) {
-      if (saveBtn) saveBtn.disabled = true;
-      return;
-    }
+    if (!form || !option || !option.dataset.bulkAction) return;
+
     form.action = option.dataset.bulkAction;
-    form.dataset.confirm = option.dataset.bulkConfirm;
+    if (option.dataset.bulkConfirm) form.dataset.confirm = option.dataset.bulkConfirm;
+    else delete form.dataset.confirm;
     form.dataset.confirmYesLabel = option.dataset.bulkConfirmYesLabel || 'Yes';
     if (option.dataset.bulkConfirmSafe) form.dataset.confirmSafe = '1';
     else delete form.dataset.confirmSafe;
-    if (saveBtn) saveBtn.disabled = false;
+
+    // Reset the dropdown back to its placeholder right away - purely
+    // cosmetic (the select itself carries no `name`, so its own value is
+    // never actually submitted), but leaves it ready to pick the SAME
+    // option again later without that looking like a no-op change.
+    select.value = '';
+    form.requestSubmit();
   });
 })();

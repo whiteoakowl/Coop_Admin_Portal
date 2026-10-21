@@ -115,6 +115,69 @@ test('bulk-delete with no memberIds redirects back with an error, changing nothi
   assert.ok(row, 'the member must not have been deleted');
 });
 
+// A real request: "Add a column of check boxes in the first column of
+// every member. In the title row of this column is a single check box,
+// selecting the box will select all and deselecting the box will
+// uncheck all. Add a bulk action button to this page. When you select
+// members and then click bulk action it will have a drop down menu
+// asking if you want to delete the members, email them, text them."
+// Replaces the old "Edit" toggle (checkboxes/the Select All+Delete row
+// used to be hidden until that was clicked) - permanently visible now,
+// same shape Main Admin's own Members page uses, plus new Email/Text
+// options on the renamed "Bulk Action" dropdown.
+test('Co-op Admin Members: Select All and the Bulk Action dropdown (Delete/Email/Text) are permanently visible, no Edit toggle', async () => {
+  const { cookie } = await loginAsAdmin();
+  await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Coop Always Visible Checkbox', 'coop-avc-test-1', 'student', 1)").run();
+  const fixtureClassId = (await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, 'Coop Bulk UI Fixture Class') RETURNING id").get()).id;
+  const memberId = (await db.prepare("SELECT id FROM members WHERE barcode = 'coop-avc-test-1'").get()).id;
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(fixtureClassId, memberId);
+
+  const page = await request(app).get('/admin/members').set('Cookie', cookie);
+  assert.equal(page.status, 200);
+
+  assert.doesNotMatch(page.text, />Edit</, 'the old Edit toggle button is gone');
+  assert.doesNotMatch(page.text, /data-archive-toggle="members-bulk-form"/);
+  assert.doesNotMatch(page.text, /Delete Selected/, 'the old standalone Delete Selected button is gone');
+
+  const controlsMatch = /<div class="class-schedule-archive-controls">([\s\S]*?)<\/div>/.exec(page.text);
+  assert.ok(controlsMatch, 'expected the always-visible Select All/Bulk Action controls block');
+  const controls = controlsMatch[1];
+  assert.match(controls, /data-select-all-for="members-bulk-form"/);
+  assert.match(controls, />Bulk Action</);
+  assert.match(controls, /value="delete"[\s\S]*?data-bulk-action="\/admin\/members\/bulk-delete"/);
+  assert.match(controls, /value="email"[\s\S]*?data-bulk-action="\/admin\/announcements\/email\/compose"/);
+  assert.match(controls, /value="text"[\s\S]*?data-bulk-action="\/admin\/announcements\/text\/compose"/);
+  assert.doesNotMatch(controls, />Archive</, 'no Archive option on Co-op Admin');
+
+  // The per-row checkbox itself is no longer hidden.
+  const checkboxMatch = new RegExp(`name="memberIds" value="${memberId}" form="members-bulk-form" class="archive-select-checkbox no-print" aria-label="[^"]*" />`).exec(page.text);
+  assert.ok(checkboxMatch, 'expected a visible (not hidden) checkbox for the fixture member');
+});
+
+test('Co-op Admin Members: Bulk Action > Text posts memberIds straight to the compose screen with that member pre-filled', async () => {
+  const { cookie, csrfToken } = await loginAsAdmin();
+  const memberId = (
+    await db
+      .prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Coop Bulk Text Member', 'coop-bulk-text-member', 'student', 1) RETURNING id")
+      .get()
+  ).id;
+  const accountId = (
+    await db
+      .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, 'coop-bulk-text-member@example.com', 'x', 'active', now_text()) RETURNING id")
+      .get(memberId)
+  ).id;
+
+  const res = await request(app)
+    .post('/admin/announcements/text/compose')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ memberIds: String(memberId), _csrf: csrfToken });
+
+  assert.equal(res.status, 200);
+  assert.match(res.text, new RegExp(`name="recipientIds" value="${accountId}"`));
+  assert.match(res.text, /Coop Bulk Text Member/);
+});
+
 // Family rename/delete (POST /admin/members/families/:id/rename,
 // /admin/members/families/:id/delete) used to live here too, but a real
 // request removed the whole Manage Families dialog from Co-op Admin's

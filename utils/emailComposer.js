@@ -72,7 +72,7 @@ async function listGradeLevels() {
 async function listRecipientCandidates() {
   const rows = await db
     .prepare(
-      `SELECT ma.id AS account_id, ma.email, m.id AS member_id, m.name, m.member_type, m.grade_level, m.birthday
+      `SELECT ma.id AS account_id, ma.email, m.id AS member_id, m.name, m.member_type, m.grade_level, m.birthday, m.phone
        FROM member_accounts ma
        JOIN members m ON m.id = ma.member_id
        WHERE ma.status IN ('active', 'pending')
@@ -114,11 +114,32 @@ async function listRecipientCandidates() {
     name: r.name,
     memberType: r.member_type,
     gradeLevel: r.grade_level,
+    phone: r.phone || '',
     roles: rolesByAccount.get(r.account_id) || [],
     sections: sectionsByMember.get(r.member_id) || [],
     ageGroup: ageGroupKeyForBirthday(r.birthday),
     registeredForClasses: registeredMemberIds.has(r.member_id),
   }));
+}
+
+// A real request: Main Admin/Co-op Admin Members' own new "Bulk Action >
+// Email/Text" needs to land straight on this same compose screen with
+// the admin's selected members pre-filled - but Members' own checkboxes
+// carry member.id, not member_accounts.id the way the Email/Text tab's
+// own candidate-list checkboxes do (see listRecipientCandidates() above).
+// Shared by all four compose routes (Main Admin/Co-op Admin x Email/
+// Text): recipientIds (account ids, the Email/Text tab's own contract)
+// wins if present: memberIds (member ids, the Members page's own
+// contract) is only consulted when recipientIds is empty/absent. A
+// selected member with no portal account at all is silently left out -
+// there's nothing to email/text them at either way.
+async function resolveRecipients({ recipientIds, memberIds } = {}) {
+  const candidates = await listRecipientCandidates();
+  const accountIds = [].concat(recipientIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (accountIds.length > 0) return candidates.filter((c) => accountIds.includes(c.accountId));
+  const mIds = [].concat(memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (mIds.length > 0) return candidates.filter((c) => mIds.includes(c.memberId));
+  return [];
 }
 
 async function createAndSend({ subject, bodyHtml, replyTo, recipientAccountIds, sentByAccountId, sentByPortal }) {
@@ -173,6 +194,7 @@ module.exports = {
   listSections,
   listGradeLevels,
   listRecipientCandidates,
+  resolveRecipients,
   createAndSend,
   createScheduled,
   sendScheduled,

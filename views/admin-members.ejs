@@ -98,31 +98,47 @@
           adaptive layout takes over, and 3 buttons already fits in one
           row at its own "≤4 columns" cap. %>
       <div class="roster-btn-row">
-        <a class="roster-action-btn file-action-btn" href="/admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>">Export</a>
-        <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
-        <button type="button" class="roster-action-btn" data-archive-toggle="members-bulk-form" aria-pressed="false">Edit</button>
+        <%# A real request: "change export and print buttons to icons" -
+            same icon-btn + icon-download/icon-printer pattern already
+            used elsewhere (e.g. views/admin-accounting-list.ejs's own
+            toolbar). %>
+        <a class="icon-btn" href="/admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+        <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
         <a class="roster-action-btn" href="/admin/members/grade-level-report">Grade Level Report</a>
       </div>
 
-      <%# Edit mode's Select All + Delete Selected controls - hidden until
-          the "Edit" toggle button above is clicked (see
-          public/js/archive-select-toggle.js, reused as-is from the Class/
-          Student/Parent Schedule archive grids). No Archive/Restore here -
-          a real request: "remove member archive page, it is not needed on
-          co-op admin, only main admin." %>
-      <div class="class-schedule-archive-controls" data-archive-controls="members-bulk-form" hidden>
+      <%# A real request: "Add a column of check boxes in the first
+          column of every member. In the title row of this column is a
+          single check box, selecting the box will select all and
+          deselecting the box will uncheck all. Add a bulk action button
+          to this page. When you select members and then click bulk
+          action it will have a drop down menu asking if you want to
+          delete the members, email them, text them." Replaces the old
+          "Edit" toggle (checkboxes/this row used to be hidden until that
+          was clicked) - permanently visible now, same shape Main
+          Admin's own Members page uses. No Archive here - a real
+          request: "remove member archive page, it is not needed on
+          co-op admin, only main admin." Email/Text route straight to
+          the compose screen (routes/admin-announcements.js's own
+          /email/compose, /text/compose - see utils/emailComposer.js's
+          own resolveRecipients()), no confirm needed; Delete still
+          confirms first (public/js/members-bulk-actions.js). %>
+      <div class="class-schedule-archive-controls">
         <label class="checkbox-option class-schedule-select-all">
           <input type="checkbox" data-select-all-for="members-bulk-form" />
           Select All
         </label>
-        <button
-          type="submit"
-          form="members-bulk-form"
-          data-bulk-action="/admin/members/bulk-delete"
-          class="roster-action-btn roster-action-btn-danger"
-          data-bulk-confirm="Permanently delete the selected member(s)? This removes them from all rosters, volunteer lists, and all attendance history. This cannot be undone."
-          data-bulk-confirm-yes-label="Yes, Delete"
-        >Delete Selected</button>
+        <select data-bulk-action-select form="members-bulk-form" aria-label="Bulk Action">
+          <option value="">Bulk Action</option>
+          <option
+            value="delete"
+            data-bulk-action="/admin/members/bulk-delete"
+            data-bulk-confirm="Permanently delete the selected member(s)? This removes them from all rosters, volunteer lists, and all attendance history. This cannot be undone."
+            data-bulk-confirm-yes-label="Yes, Delete"
+          >Delete</option>
+          <option value="email" data-bulk-action="/admin/announcements/email/compose">Email</option>
+          <option value="text" data-bulk-action="/admin/announcements/text/compose">Text</option>
+        </select>
       </div>
     </div>
 
@@ -167,7 +183,7 @@
             <% } else { %>
               <span class="member-row-chevron-spacer"></span>
             <% } %>
-            <input type="checkbox" name="memberIds" value="<%= m.id %>" form="members-bulk-form" class="archive-select-checkbox no-print" aria-label="Select <%= m.name %>" hidden />
+            <input type="checkbox" name="memberIds" value="<%= m.id %>" form="members-bulk-form" class="archive-select-checkbox no-print" aria-label="Select <%= m.name %>" />
             <span class="member-avatar member-avatar-<%= avatarColorFor(m.family_id != null ? m.family_id : m.id) %>">
               <% if (m.photo_path) { %>
                 <img src="<%= photoUrl(m.photo_path) %>" alt="" />

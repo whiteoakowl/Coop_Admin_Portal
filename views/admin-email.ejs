@@ -17,16 +17,22 @@
     <form method="POST" action="/admin/announcements/email/compose" id="email-select-form">
       <div class="roster-btn-row roster-btn-row-centered">
         <button type="button" class="roster-action-btn" onclick="document.getElementById('email-filter-dialog').showModal()">Filter</button>
-        <button type="button" class="roster-action-btn" data-email-select="all">Select All</button>
-        <button type="button" class="roster-action-btn" data-email-select="none">Select None</button>
         <button type="submit" class="roster-action-btn">Create Email</button>
       </div>
       <p class="hint" id="email-select-count"></p>
 
+      <%# A real request: "Remove select all and select none buttons.
+          Instead put a check box on the title row of the 1st column.
+          Selecting this box checks everyone. Unchecking that box
+          unchecks everyone. Lists should show just name, email and
+          phone number. Shrink to fit tables in mobile view." The Filter
+          dialog below still filters by Role/Section/Grade/Age
+          Group/Registered - those just no longer need their own column
+          here to do it. %>
       <div class="roster-scroll">
         <table class="roster-table condensed-table" id="email-candidate-table">
           <thead>
-            <tr><th></th><th>Name</th><th>Email</th><th>Grade</th><th>Section(s)</th><th>Registered for Classes</th></tr>
+            <tr><th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" /></th><th>Name</th><th>Email</th><th>Phone</th></tr>
           </thead>
           <tbody>
             <% candidates.forEach(function(c) { %>
@@ -41,9 +47,7 @@
                 <td><input type="checkbox" name="recipientIds" value="<%= c.accountId %>" data-email-checkbox /></td>
                 <td><%= c.name %></td>
                 <td><%= c.email || '' %></td>
-                <td><%= c.gradeLevel || '' %></td>
-                <td><%= c.sections.join(', ') %></td>
-                <td><%= c.registeredForClasses ? 'Yes' : 'No' %></td>
+                <td><%= c.phone || '' %></td>
               </tr>
             <% }); %>
           </tbody>
