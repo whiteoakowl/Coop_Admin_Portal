@@ -97,7 +97,7 @@
           <a class="roster-action-btn" href="/main-admin/members/grade-level-report">Grade Level Report</a>
           <span class="roster-btn-row-break" aria-hidden="true"></span>
           <%- include('partials/members-type-filter', { activeTab, typeFilter, familyFilter, families }) %>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('main-admin-import-dialog').showModal()">Import</button>
+          <button type="button" class="icon-btn" onclick="document.getElementById('main-admin-import-dialog').showModal()" aria-label="Import" title="Import"><svg class="icon"><use href="#icon-upload"/></svg></button>
           <%# A real request: "change export and print buttons to icons" -
               same icon-btn + icon-download/icon-printer pattern already
               used elsewhere (e.g. views/admin-accounting-list.ejs's own

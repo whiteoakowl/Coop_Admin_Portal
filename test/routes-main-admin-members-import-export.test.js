@@ -56,9 +56,11 @@ test('Members page toolbar: Add Member/Import/Export sit above a "Filter" (not "
   const filterIndex = page.text.indexOf('members-filter-dialog');
   assert.ok(buttonRowIndex > -1 && filterIndex > -1 && buttonRowIndex < filterIndex, 'the button row must come before the filter control');
 
-  assert.match(page.text, />Import</);
-  // A real request: "change export and print buttons to icons" - Export
-  // is icon-only now (aria-label, no visible text).
+  // A real request: "change export and print buttons to icons" / "all
+  // pages/subpages with print, export, import, or download buttons
+  // should be changed to icons" - Import/Export are icon-only now
+  // (aria-label, no visible text).
+  assert.match(page.text, /aria-label="Import"/);
   assert.match(page.text, /aria-label="Export CSV"/);
   // A real request: "filter dropdown should change to an orange button
   // with a popup" - same Filter-button-opens-a-dialog shape as the

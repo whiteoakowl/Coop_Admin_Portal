@@ -83,9 +83,28 @@ test('Admins page: Add/Edit Admin Position button, Print button, and the merged 
   const page = await request(app).get('/main-admin/admins').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, />Add\/Edit Admin Position</);
-  assert.match(page.text, /onclick="window\.print\(\)">Print</);
+  // A later real request: "all pages/subpages with print, export, import,
+  // or download buttons should be changed to icons" - Print (and a new
+  // Export, added at the same time) are icon-only buttons now.
+  assert.match(page.text, /onclick="window\.print\(\)" aria-label="Print"/);
+  assert.match(page.text, /aria-label="Export CSV"/);
   assert.match(page.text, /<th>Admin Position<\/th><th>Admin Name<\/th><th>Phone<\/th><th>Email<\/th>/);
   assert.doesNotMatch(page.text, /href="\/main-admin\/roles">Roles &amp; Permissions</, 'the standalone Roles & Permissions tab link should be gone from the Settings tab strip');
+});
+
+test('GET /main-admin/admins/export.csv downloads the same rows as the page', async () => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+  await request(app)
+    .post('/main-admin/admins/positions/bulk-save')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ newPositionTitle: 'CSV Export Position', _csrf: csrfToken });
+
+  const csv = await request(app).get('/main-admin/admins/export.csv').set('Cookie', cookie);
+  assert.equal(csv.status, 200);
+  assert.match(csv.headers['content-type'], /text\/csv/);
+  assert.match(csv.text, /Admin Position.*Admin Name.*Phone.*Email/);
+  assert.match(csv.text, /CSV Export Position/);
 });
 
 test('a real request: assigning a member to a position grants them that position\'s permissions, the Main Admin role, and a star badge - all without ever touching a role or admin-type checkbox', async () => {

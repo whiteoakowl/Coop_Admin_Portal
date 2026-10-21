@@ -38,7 +38,11 @@
           system. %>
       <div class="roster-btn-row roster-btn-row-fit-text no-print">
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-position-dialog').showModal()">Add/Edit Admin Position</button>
-        <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
+        <%# A real request: "all pages/subpages with print, export,
+            import, or download buttons should be changed to icons... and
+            have all four" - this page only had Print. %>
+        <a class="icon-btn" href="/main-admin/admins/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+        <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
       </div>
     </div>
 

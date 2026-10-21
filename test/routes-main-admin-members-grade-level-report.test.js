@@ -127,10 +127,25 @@ test('Grade Level Report: grouping, ages, bar graph, Ungraded, Print button, non
     assert.match(res.text, /<div class="grade-level-report-grid">/);
   });
 
-  await t.test('a Print button and the shrink-to-fit script are present', () => {
-    assert.match(res.text, /<button type="button" class="roster-action-btn" onclick="window\.print\(\)">Print<\/button>/);
+  await t.test('an Export button, a Print button, and the shrink-to-fit script are present', () => {
+    // A later real request: "all pages/subpages with print, export,
+    // import, or download buttons should be changed to icons" - both are
+    // icon-only buttons now (this page only had Print before).
+    assert.match(res.text, /<button type="button" class="icon-btn" onclick="window\.print\(\)" aria-label="Print"/);
+    assert.match(res.text, /aria-label="Export CSV"/);
     assert.match(res.text, /<script src="\/js\/shrink-title-to-fit\.js"><\/script>/);
     assert.match(res.text, /data-shrink-to-fit-on-print/);
+  });
+
+  await t.test('GET /grade-level-report/export.csv downloads one row per student', async () => {
+    const csv = await request(app).get('/main-admin/members/grade-level-report/export.csv').set('Cookie', cookie);
+    assert.equal(csv.status, 200);
+    assert.match(csv.headers['content-type'], /text\/csv/);
+    assert.match(csv.text, /Grade Level.*Name.*Age/);
+    assert.match(csv.text, /Kindergarten.*Amy Kinder/);
+    assert.match(csv.text, /Ungraded.*No Grade Student/);
+    assert.doesNotMatch(csv.text, /Inactive Kinder/);
+    assert.doesNotMatch(csv.text, /Some Parent/);
   });
 
   await t.test('a Filter button opens a dialog offering Section/Signup/Family dropdowns', () => {

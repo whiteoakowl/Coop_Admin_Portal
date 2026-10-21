@@ -15,6 +15,7 @@ const events = require('../utils/events');
 const signupLists = require('../utils/committeesAndSignupLists');
 const notifications = require('../utils/notifications');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
+const { sendCsv } = require('../utils/spreadsheet');
 
 // A real request: "Teacher portal... remove ... events" - see
 // blockTeacherOnlyAccounts' own comment. Public/logged-out browsing of
@@ -113,6 +114,23 @@ router.get('/', async (req, res) => {
     pastEvents,
     calendar: view === 'calendar' ? events.monthGrid(req.query.month, mapped) : null,
   });
+});
+
+// A real request: "all pages/subpages with print, export, import, or
+// download buttons should be changed to icons... and have all four" -
+// this page only had Print; same visibility-filtered list as the page
+// itself (every published/approved event this visitor can see, upcoming
+// and past), as a CSV - reusing the same builder Main Admin's own
+// Events list already exports with.
+router.get('/export.csv', async (req, res) => {
+  const all = await events.listEvents({ status: 'published', approvalStatus: 'approved' });
+  let visible = req.portalAccount ? all : all.filter((e) => e.visibility === 'public');
+  if (req.portalAccount) {
+    const family = await familyForAccount(req.portalAccount.id);
+    const flags = await Promise.all(visible.map((e) => events.eventVisibleToFamily(e.id, family)));
+    visible = visible.filter((e, i) => flags[i]);
+  }
+  sendCsv(res, 'events.csv', events.buildEventsExportCsvLines(visible));
 });
 
 router.get('/print', async (req, res) => {

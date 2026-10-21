@@ -392,6 +392,26 @@ router.get('/volunteers/:day/risk', requireAdmin, requireClassDay, async (req, r
   });
 });
 
+// A real request: "all pages/subpages with print, export, import, or
+// download buttons should be changed to icons... and have all four" -
+// this tab only had Print; same classesAtRiskForDay data as the page
+// itself, just as a CSV (see partials/class-risk-table.ejs for the
+// columns this mirrors).
+router.get('/volunteers/:day/risk/export.csv', requireAdmin, requireClassDay, async (req, res) => {
+  const day = req.params.day;
+  const today = todayISO();
+  const alertDate = weekdayOf(today) === CLASS_DAY_WEEKDAY_FULL[day] ? today : null;
+  const resolvedSemesterId = await resolveSemesterId(comboSemesterId(req));
+  const classesAtRisk = await classesAtRiskForDay(day, alertDate, undefined, resolvedSemesterId);
+
+  const lines = [toCsvRow(['Hour', 'Class', 'Room', 'Expected', 'Enrolled'])];
+  classesAtRisk.forEach((c) => {
+    lines.push(toCsvRow([c.hourLabel, c.className, c.room || '', c.expectedCount, c.enrolledCount]));
+  });
+
+  sendCsv(res, `${day}-class-cancellation-risk.csv`, lines);
+});
+
 // --- Floater Teams: who's on the list for each hour, ranked ---
 
 router.get('/volunteers/:day/teams', requireAdmin, requireClassDay, async (req, res) => {

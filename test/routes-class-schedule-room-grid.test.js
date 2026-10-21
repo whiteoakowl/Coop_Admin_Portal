@@ -264,7 +264,7 @@ test('Classes grid toolbar offers an Export button next to Print, wired to the e
   const { cookie } = await loginAsAdmin();
   const res = await request(app).get('/admin/schedule').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /<a class="roster-action-btn file-action-btn" href="\/admin\/class-schedule\/monday\/export\.csv">Export<\/a>/);
+  assert.match(res.text, /<a class="icon-btn" href="\/admin\/class-schedule\/monday\/export\.csv" aria-label="Export CSV" title="Export CSV">/);
 
   const exportRes = await request(app).get('/admin/class-schedule/monday/export.csv').set('Cookie', cookie);
   assert.equal(exportRes.status, 200);

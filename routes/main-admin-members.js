@@ -38,7 +38,7 @@ const fs = require('fs');
 const { uploadMemberPhoto, savePhotoFile, deletePhotoFile } = require('../utils/memberPhoto');
 const { allSetupTeams } = require('../utils/setup');
 const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions } = require('../utils/adminPositions');
-const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/spreadsheet');
+const { buildTemplateWorkbook, readRowsFromFile, sendCsv, toCsvRow } = require('../utils/spreadsheet');
 const memberImport = require('../utils/memberImport');
 const {
   familyOf,
@@ -844,7 +844,7 @@ router.get('/schedule-print', async (req, res) => {
 // student's class_enrollments membership - the Classes grid's own
 // student roster, not Grade Level Settings - so "Signed Up" here means
 // "enrolled in at least one class," independent of which grade/semester.
-router.get('/grade-level-report', async (req, res) => {
+async function gradeLevelReportStudents(req) {
   const sectionId = req.query.sectionId ? parseInt(req.query.sectionId, 10) : null;
   const signup = ['signedUp', 'notSignedUp'].includes(req.query.signup) ? req.query.signup : '';
   const familyId = req.query.familyId ? parseInt(req.query.familyId, 10) : null;
@@ -866,7 +866,27 @@ router.get('/grade-level-report', async (req, res) => {
     students = students.filter((s) => (signup === 'signedUp' ? enrolledIds.has(s.id) : !enrolledIds.has(s.id)));
   }
 
-  students = students.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  return students.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+// A real request: "all pages/subpages with print, export, import, or
+// download buttons should be changed to icons... and have all four" -
+// this page only had Print; same filtered student list as the report
+// itself, one row per student, as a CSV.
+router.get('/grade-level-report/export.csv', async (req, res) => {
+  const students = await gradeLevelReportStudents(req);
+  const lines = [toCsvRow(['Grade Level', 'Name', 'Age'])];
+  students.forEach((s) => {
+    lines.push(toCsvRow([s.gradeLevel || 'Ungraded', s.name, s.age ?? '']));
+  });
+  sendCsv(res, 'grade-level-report.csv', lines);
+});
+
+router.get('/grade-level-report', async (req, res) => {
+  const sectionId = req.query.sectionId ? parseInt(req.query.sectionId, 10) : null;
+  const signup = ['signedUp', 'notSignedUp'].includes(req.query.signup) ? req.query.signup : '';
+  const familyId = req.query.familyId ? parseInt(req.query.familyId, 10) : null;
+  const students = await gradeLevelReportStudents(req);
 
   const columns = GRADE_LEVELS.map((gradeLevel) => ({
     gradeLevel,

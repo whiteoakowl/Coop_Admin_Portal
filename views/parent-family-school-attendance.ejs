@@ -47,9 +47,9 @@
           family student's - see routes/parent-family-school.js's own
           /attendance/export.csv and /attendance/download.csv. %>
       <div class="roster-btn-row roster-btn-row-fit-text no-print">
-        <a class="roster-action-btn file-action-btn" href="/parent/family-school/attendance/export.csv?studentId=<%= selectedStudentId %>">Export</a>
-        <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
-        <a class="roster-action-btn file-action-btn" href="/parent/family-school/attendance/download.csv">Download</a>
+        <a class="icon-btn" href="/parent/family-school/attendance/export.csv?studentId=<%= selectedStudentId %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+        <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
+        <a class="icon-btn" href="/parent/family-school/attendance/download.csv" aria-label="Download CSV" title="Download CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
         <details class="filter-details">
           <summary class="roster-action-btn">Filter</summary>
           <form method="GET" action="/parent/family-school/attendance" class="filter-panel">

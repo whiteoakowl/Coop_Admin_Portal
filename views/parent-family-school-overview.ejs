@@ -29,9 +29,9 @@
         set (this page has no single-student selector the way Attendance/
         Grades/Journal do, since it normally shows every student at once). %>
     <div class="roster-btn-row roster-btn-row-fit-text no-print">
-      <a class="roster-action-btn file-action-btn" href="/parent/family-school/export.csv">Export</a>
-      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
-      <a class="roster-action-btn file-action-btn" href="/parent/family-school/download.csv">Download</a>
+      <a class="icon-btn" href="/parent/family-school/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+      <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
+      <a class="icon-btn" href="/parent/family-school/download.csv" aria-label="Download CSV" title="Download CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
       <% if (allStudents.length > 0) { %>
         <details class="filter-details">
           <summary class="roster-action-btn">Filter</summary>

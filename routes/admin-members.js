@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { sendCsv } = require('../utils/spreadsheet');
+const { sendCsv, toCsvRow } = require('../utils/spreadsheet');
 const { formatDateLabel, formatDateNumeric, formatTime, ageFromBirthday, isChildAge, isValidISODate } = require('../utils/dates');
 const { uploadMemberPhoto, savePhotoFile, deletePhotoFile } = require('../utils/memberPhoto');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
@@ -358,7 +358,7 @@ const PROFILE_TABS = ['profile', 'schedule', 'attendance'];
 // already has (routes/main-admin-members.js) - a real request to add it
 // here on the Co-op Admin side too. Registered ahead of GET /:id below
 // so "grade-level-report" is never swallowed as a member id.
-router.get('/members/grade-level-report', async (req, res) => {
+async function gradeLevelReportStudents(req) {
   const sectionId = req.query.sectionId ? parseInt(req.query.sectionId, 10) : null;
   const signup = ['signedUp', 'notSignedUp'].includes(req.query.signup) ? req.query.signup : '';
   const familyId = req.query.familyId ? parseInt(req.query.familyId, 10) : null;
@@ -380,7 +380,27 @@ router.get('/members/grade-level-report', async (req, res) => {
     students = students.filter((s) => (signup === 'signedUp' ? enrolledIds.has(s.id) : !enrolledIds.has(s.id)));
   }
 
-  students = students.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  return students.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+// A real request: "all pages/subpages with print, export, import, or
+// download buttons should be changed to icons... and have all four" -
+// this page only had Print; same filtered student list as the report
+// itself, one row per student, as a CSV.
+router.get('/members/grade-level-report/export.csv', async (req, res) => {
+  const students = await gradeLevelReportStudents(req);
+  const lines = [toCsvRow(['Grade Level', 'Name', 'Age'])];
+  students.forEach((s) => {
+    lines.push(toCsvRow([s.gradeLevel || 'Ungraded', s.name, s.age ?? '']));
+  });
+  sendCsv(res, 'grade-level-report.csv', lines);
+});
+
+router.get('/members/grade-level-report', async (req, res) => {
+  const sectionId = req.query.sectionId ? parseInt(req.query.sectionId, 10) : null;
+  const signup = ['signedUp', 'notSignedUp'].includes(req.query.signup) ? req.query.signup : '';
+  const familyId = req.query.familyId ? parseInt(req.query.familyId, 10) : null;
+  const students = await gradeLevelReportStudents(req);
 
   const columns = GRADE_LEVELS.map((gradeLevel) => ({
     gradeLevel,

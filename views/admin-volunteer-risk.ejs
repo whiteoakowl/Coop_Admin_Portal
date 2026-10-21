@@ -22,7 +22,8 @@
       <div class="roster-toolbar no-print">
         <%- include('partials/schedule-combo-picker', { combos, basePrefix: '/admin/volunteers', pathSuffix: '/risk', selectedComboId }) %>
         <div class="roster-btn-row">
-          <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+          <a class="icon-btn" href="/admin/volunteers/<%= day %>/risk/export.csv?semesterId=<%= semesterId %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+          <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
         </div>
       </div>
 

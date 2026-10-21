@@ -31,8 +31,8 @@
           <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Add/Edit Dates</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-job-dialog').showModal()">+ Add/Edit Permanent Positions</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-temp-job-dialog').showModal()">+ Add/Edit Temporary Position</button>
-          <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/export.csv?semesterId=<%= semesterId %>">Export</a>
-          <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+          <a class="icon-btn" href="/admin/volunteers/<%= day %>/export.csv?semesterId=<%= semesterId %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+          <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
           <%# A real request: "Add a button that says text notification.
               When you click this button a check box appears next to
               each floater assignment. When you click the check boxes

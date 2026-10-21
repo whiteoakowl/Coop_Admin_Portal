@@ -55,11 +55,13 @@ test('Members tab toolbar: buttons/filter appear in the exact requested 3/2/4 ro
   const break2Idx = toolbar.indexOf('roster-btn-row-break', break1Idx + 1);
   // Row 3: Filter, Import, Export, Print. Filter is a button+popup now
   // (a real request: "filter dropdown should change to an orange button
-  // with a popup"), not a <select>. Export/Print are icon-only buttons
-  // now ("change export and print buttons to icons") - located by their
-  // aria-label instead of visible text.
+  // with a popup"), not a <select>. Import/Export/Print are all icon-
+  // only buttons now ("change export and print buttons to icons" / "all
+  // pages/subpages with print, export, import, or download buttons
+  // should be changed to icons") - located by their aria-label instead
+  // of visible text.
   const filterIdx = toolbar.indexOf("document.getElementById('members-filter-dialog')");
-  const importIdx = toolbar.indexOf('>Import<');
+  const importIdx = toolbar.indexOf('aria-label="Import"');
   const exportIdx = toolbar.indexOf('aria-label="Export CSV"');
   const printIdx = toolbar.indexOf('aria-label="Print"');
 

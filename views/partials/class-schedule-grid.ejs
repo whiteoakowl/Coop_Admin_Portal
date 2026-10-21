@@ -126,7 +126,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
     <% if (!gridReadOnly) { %>
       <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog-<%= day %>').showModal()">+ Add Class</button>
       <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-schedule-dialog-<%= day %>').showModal()">Edit Schedule Grids</button>
-      <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog-<%= day %>').showModal()">Import</button>
+      <button type="button" class="icon-btn" onclick="document.getElementById('import-dialog-<%= day %>').showModal()" aria-label="Import" title="Import"><svg class="icon"><use href="#icon-upload"/></svg></button>
       <button type="button" class="roster-action-btn" data-bulk-edit-toggle="class-bulk-edit-form-<%= day %>" data-bulk-edit-dialog="bulk-edit-dialog-<%= day %>" aria-pressed="false">Bulk Edit</button>
     <% } %>
     <%# A real request: "Class schedules, add an export button." The CSV
@@ -137,8 +137,8 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
         below was ever actually wired up here. requireAdmin (not
         requireFullAdmin) on that route, same as Print just beside it, so
         it's available outside the !gridReadOnly block above too. %>
-    <a class="roster-action-btn file-action-btn" href="/admin/class-schedule/<%= day %>/export.csv">Export</a>
-    <a class="roster-action-btn print-action-btn" href="/admin/class-schedule/<%= day %>/print" target="_blank">Print</a>
+    <a class="icon-btn" href="/admin/class-schedule/<%= day %>/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+    <a class="icon-btn" href="/admin/class-schedule/<%= day %>/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
   </div>
 </div>
 

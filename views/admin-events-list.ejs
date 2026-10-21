@@ -16,7 +16,7 @@
           <a class="roster-action-btn" href="/main-admin/events/new">+ New Event</a>
         <% } %>
         <% if (activeTab === 'calendar') { %>
-          <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+          <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
         <% } %>
         <%# A real request: "remove export and import buttons from the
             event settings page" - still shown on Calendar/Drafts/
@@ -27,8 +27,8 @@
             list this generic Export button hits) and has no Import of
             its own at all. %>
         <% if (activeTab !== 'settings' && activeTab !== 'registrationlog') { %>
-          <a class="roster-action-btn file-action-btn" href="/main-admin/events/export.csv">Export</a>
-          <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-events-dialog').showModal()">Import</button>
+          <a class="icon-btn" href="/main-admin/events/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+          <button type="button" class="icon-btn" onclick="document.getElementById('import-events-dialog').showModal()" aria-label="Import" title="Import"><svg class="icon"><use href="#icon-upload"/></svg></button>
         <% } %>
       </div>
     </div>
@@ -188,8 +188,8 @@
         </form>
         <% if (dateFilter) { %><a class="roster-action-btn" href="/main-admin/events?tab=registrationlog">Clear</a><% } %>
         <div class="roster-btn-row">
-          <a class="roster-action-btn file-action-btn" href="/main-admin/events/registrationlog/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
-          <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+          <a class="icon-btn" href="/main-admin/events/registrationlog/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+          <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
         </div>
       </div>
 

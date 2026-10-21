@@ -69,9 +69,11 @@ test('the Members toolbar carries a single .roster-btn-row, with Edit Permission
   assert.doesNotMatch(rowHtml, />Edit Permissions</);
   assert.doesNotMatch(rowHtml, />Add\/Edit Sections</);
   assert.match(rowHtml, /\+ Add Member/);
-  assert.match(rowHtml, />Import</);
-  // A later real request: "change export and print buttons to icons" -
-  // Export is now an icon-only link (aria-label, no visible text).
+  // A later real request: "change export and print buttons to icons" /
+  // "all pages/subpages with print, export, import, or download buttons
+  // should be changed to icons" - Import/Export are now icon-only
+  // buttons (aria-label, no visible text).
+  assert.match(rowHtml, /aria-label="Import"/);
   assert.match(rowHtml, /aria-label="Export CSV"/);
   // A later real request: "delete create account button. every member
   // already automatically has an account. instead there can be an add

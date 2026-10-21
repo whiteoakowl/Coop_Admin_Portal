@@ -38,8 +38,8 @@
           </form>
           <% if (dateFilter) { %><a class="roster-action-btn" href="/admin/logs?tab=classregistration">Clear</a><% } %>
           <div class="roster-btn-row">
-            <a class="roster-action-btn file-action-btn" href="/admin/logs/classregistration/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
-            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+            <a class="icon-btn" href="/admin/logs/classregistration/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+            <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
           </div>
         </div>
 
@@ -127,8 +127,8 @@
           </form>
           <% if (dateFilter) { %><a class="roster-action-btn" href="/admin/logs?tab=missedduty">Clear</a><% } %>
           <div class="roster-btn-row">
-            <a class="roster-action-btn file-action-btn" href="/admin/logs/missedduty/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
-            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+            <a class="icon-btn" href="/admin/logs/missedduty/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+            <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
           </div>
         </div>
 
@@ -198,8 +198,8 @@
           </form>
           <% if (dateFilter) { %><a class="roster-action-btn" href="/admin/logs?tab=absence">Clear</a><% } %>
           <div class="roster-btn-row">
-            <a class="roster-action-btn file-action-btn" href="/admin/logs/absence/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
-            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+            <a class="icon-btn" href="/admin/logs/absence/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+            <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
           </div>
         </div>
 
@@ -283,8 +283,8 @@
             </select>
           </div>
           <div class="roster-btn-row">
-            <a class="roster-action-btn file-action-btn" href="/admin/logs/<%= tab %>/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
-            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+            <a class="icon-btn" href="/admin/logs/<%= tab %>/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+            <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
           </div>
         </div>
 
@@ -349,8 +349,8 @@
               class="roster-action-btn archived-toggle-btn<%= showArchived ? ' active' : '' %>"
               href="/admin/logs?tab=nametag<%= showArchived ? '' : '&archived=1' %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>"
             >Archived</a>
-            <a class="roster-action-btn file-action-btn" href="/admin/logs/nametag/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
-            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+            <a class="icon-btn" href="/admin/logs/nametag/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+            <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
           </div>
         </div>
 
@@ -451,8 +451,8 @@
             <% } %>
           </div>
           <div class="roster-btn-row">
-            <a class="roster-action-btn file-action-btn" href="/admin/logs/classrisk/export.csv?filterBy=<%= filterBy %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %><%= classIdFilter != null ? '&classId=' + classIdFilter : '' %>">Export</a>
-            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+            <a class="icon-btn" href="/admin/logs/classrisk/export.csv?filterBy=<%= filterBy %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %><%= classIdFilter != null ? '&classId=' + classIdFilter : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+            <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
           </div>
         </div>
 
@@ -530,7 +530,7 @@
             </div>
           </div>
           <div class="roster-btn-row">
-            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+            <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
           </div>
         </div>
 
@@ -573,8 +573,8 @@
         <div class="roster-toolbar no-print">
           <div></div>
           <div class="roster-btn-row">
-            <a class="roster-action-btn file-action-btn" href="/admin/logs/allergies/export.csv">Export</a>
-            <a class="roster-action-btn print-action-btn" href="/admin/logs/allergies/print" target="_blank">Print</a>
+            <a class="icon-btn" href="/admin/logs/allergies/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+            <a class="icon-btn" href="/admin/logs/allergies/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
           </div>
         </div>
         <%- include('partials/allergy-log-fragment', { medicalMembers }) %>

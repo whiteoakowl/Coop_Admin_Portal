@@ -32,13 +32,13 @@
         <div class="roster-btn-row roster-btn-row-fit-text">
           <button type="button" class="roster-action-btn" onclick="document.getElementById('new-team-dialog').showModal()">+ Create New Team</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
-          <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/export.csv?semesterId=<%= semesterId %>">Export</a>
+          <a class="icon-btn" href="/admin/setup/<%= day %>/export.csv?semesterId=<%= semesterId %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
           <%# A real bug report: "floater team and setup cleanup teams
               should have a print preview before going to print." Lands on
               a dedicated read-only preview page (admin-setup-teams-print.ejs)
               with its own Print button, instead of jumping straight to the
               OS print dialog off this live edit page. %>
-          <a class="roster-action-btn print-action-btn" href="/admin/setup/<%= day %>/teams/print?semesterId=<%= semesterId %>" target="_blank">Print</a>
+          <a class="icon-btn" href="/admin/setup/<%= day %>/teams/print?semesterId=<%= semesterId %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
         </div>
       </div>
 

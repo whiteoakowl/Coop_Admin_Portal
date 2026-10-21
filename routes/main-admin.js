@@ -15,6 +15,7 @@ const babysitters = require('../utils/babysitters');
 const photos = require('../utils/photos');
 const directory = require('../utils/directory');
 const classifieds = require('../utils/classifieds');
+const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const {
   listAdminPositions,
   addAdminPosition,
@@ -181,10 +182,20 @@ router.get('/quick-links', (req, res) => {
 // current and future holder shares it), same shape
 // routes/main-admin.js's own POST /roles/:id/permissions already uses
 // for role_permissions, just scoped to an admin_position instead.
+async function buildAdminRows() {
+  const [adminPositions, leadersByPosition] = await Promise.all([listAdminPositions(), membersByAdminPosition()]);
+  const rows = [];
+  for (const p of adminPositions) {
+    const leaders = leadersByPosition[p.id] || [];
+    if (leaders.length === 0) rows.push({ position: p, member: null });
+    else for (const leader of leaders) rows.push({ position: p, member: leader });
+  }
+  return { adminPositions, rows };
+}
+
 async function renderAdmins(req, res, error, notice) {
-  const [adminPositions, leadersByPosition, permissions] = await Promise.all([
-    listAdminPositions(),
-    membersByAdminPosition(),
+  const [{ adminPositions, rows }, permissions] = await Promise.all([
+    buildAdminRows(),
     db.prepare('SELECT * FROM permissions ORDER BY label').all(),
   ]);
   // One permission-ids lookup per position, all independent of each
@@ -194,13 +205,6 @@ async function renderAdmins(req, res, error, notice) {
     adminPositions.map(async (p) => [p.id, await permissionIdsForPosition(p.id)])
   );
   const positionPermissionIds = Object.fromEntries(positionPermissionIdsEntries);
-
-  const rows = [];
-  for (const p of adminPositions) {
-    const leaders = leadersByPosition[p.id] || [];
-    if (leaders.length === 0) rows.push({ position: p, member: null });
-    else for (const leader of leaders) rows.push({ position: p, member: leader });
-  }
 
   res.render('main-admin-admins', {
     title: 'Admins',
@@ -216,6 +220,18 @@ async function renderAdmins(req, res, error, notice) {
 
 router.get('/admins', requirePortalPermission('manage_users'), async (req, res) => {
   await renderAdmins(req, res, req.query.error || null, req.query.notice || null);
+});
+
+// A real request: "all pages/subpages with print, export, import, or
+// download buttons should be changed to icons... and have all four" -
+// this page only had Print; same rows as the page itself, as a CSV.
+router.get('/admins/export.csv', requirePortalPermission('manage_users'), async (req, res) => {
+  const { rows } = await buildAdminRows();
+  const lines = [toCsvRow(['Admin Position', 'Admin Name', 'Phone', 'Email'])];
+  rows.forEach((row) => {
+    lines.push(toCsvRow([row.position.title, row.member ? row.member.name : '', (row.member && row.member.phone) || '', (row.member && row.member.email) || '']));
+  });
+  sendCsv(res, 'admins.csv', lines);
 });
 
 // "Add/Edit Admin Position" button - one popup listing every existing

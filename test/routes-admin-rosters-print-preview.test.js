@@ -61,6 +61,21 @@ test('GET /admin/rosters/print', async (t) => {
     assert.doesNotMatch(res.text, /print-action-btn" onclick="window\.print\(\)"/);
   });
 
+  // A later real request: "all pages/subpages with print, export,
+  // import, or download buttons should be changed to icons... and have
+  // all four" - this toolbar only had Print; Export reuses the roster's
+  // own already-existing GET /admin/roster/:tab/export.csv route, just
+  // newly linked from here as an icon button.
+  await t.test('the toolbar now also has an icon Export button wired to the existing per-roster export route', async () => {
+    const res = await request(app).get('/admin/rosters?tab=monday-parent').set('Cookie', cookie);
+    assert.match(res.text, /<a class="icon-btn" href="\/admin\/roster\/monday-parent\/export\.csv" aria-label="Export CSV"/);
+    assert.match(res.text, /<a class="icon-btn" href="\/admin\/rosters\/print\?tab=monday-parent" target="_blank" aria-label="Print"/);
+
+    const csv = await request(app).get('/admin/roster/monday-parent/export.csv').set('Cookie', cookie);
+    assert.equal(csv.status, 200);
+    assert.match(csv.headers['content-type'], /text\/csv/);
+  });
+
   await t.test('?tab=monday-parent renders a read-only preview with a Print button, no shrink-to-fit wrapper, and no editable controls', async () => {
     const { ensureDayRoster } = require('../utils/classSchedule');
     const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Print Preview Parent', 'print-preview-parent', 'parent') RETURNING id").get()).id;

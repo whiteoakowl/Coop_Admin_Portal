@@ -27,7 +27,11 @@
           <svg class="icon"><use href="#icon-filter"/></svg>
           Filter<% if (filterLabelParts.length > 0) { %>: <%= filterLabelParts.join(', ') %><% } %>
         </button>
-        <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
+        <%# A real request: "all pages/subpages with print, export,
+            import, or download buttons should be changed to icons... and
+            have all four" - this page only had Print. %>
+        <a class="icon-btn" href="/admin/members/grade-level-report/export.csv<%= hasActiveFilter ? '?' + ['sectionId=' + (selectedSectionId || ''), 'signup=' + (selectedSignup || ''), 'familyId=' + (selectedFamilyId || '')].join('&') : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+        <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
       </div>
     </div>
 

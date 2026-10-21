@@ -67,7 +67,7 @@ test('the legend row, description, orange buttons, and month navigation render i
 
   const legendIdx = res.text.indexOf('fs-attendance-legend-present');
   const descriptionIdx = res.text.indexOf('Click a date to mark present');
-  const exportIdx = res.text.indexOf('>Export<');
+  const exportIdx = res.text.indexOf('aria-label="Export CSV"');
   const navRowIdx = res.text.indexOf('fs-attendance-nav-row');
   const calendarIdx = res.text.indexOf('fs-attendance-calendar');
 

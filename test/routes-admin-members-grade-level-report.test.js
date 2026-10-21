@@ -73,4 +73,18 @@ test('Co-op Admin Grade Level Report: groups students by grade level with ages, 
   assert.equal(res.status, 200);
   assert.match(res.text, new RegExp(`<div class="grade-level-report-col-title" title="Kindergarten">Kindergarten</div>\\s*<p class="grade-level-report-name">Coop Kinder \\(${expectedAge}\\)</p>`));
   assert.match(res.text, /<div class="grade-level-report-col-title" title="Ungraded">Ungraded<\/div>\s*<p class="grade-level-report-name">Coop No Grade \(\d+\)<\/p>/);
+
+  // A later real request: "all pages/subpages with print, export,
+  // import, or download buttons should be changed to icons... and have
+  // all four" - this page only had Print; Export and Print are icon
+  // buttons now, and Export downloads a CSV of the same students.
+  assert.match(res.text, /<a class="icon-btn" href="\/admin\/members\/grade-level-report\/export\.csv[^"]*" aria-label="Export CSV"/);
+  assert.match(res.text, /<button type="button" class="icon-btn" onclick="window\.print\(\)" aria-label="Print"/);
+
+  const csv = await request(app).get('/admin/members/grade-level-report/export.csv').set('Cookie', cookie);
+  assert.equal(csv.status, 200);
+  assert.match(csv.headers['content-type'], /text\/csv/);
+  assert.match(csv.text, /Grade Level.*Name.*Age/);
+  assert.match(csv.text, /Kindergarten.*Coop Kinder/);
+  assert.match(csv.text, /Ungraded.*Coop No Grade/);
 });

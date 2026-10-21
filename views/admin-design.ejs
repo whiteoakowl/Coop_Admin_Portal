@@ -32,8 +32,8 @@
               class="roster-action-btn archived-toggle-btn<%= showArchived ? ' active' : '' %>"
               href="/admin/design?tab=requests<%= showArchived ? '' : '&archived=1' %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>"
             >Archived</a>
-            <a class="roster-action-btn file-action-btn" href="/admin/design/requests/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
-            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+            <a class="icon-btn" href="/admin/design/requests/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+            <button type="button" class="icon-btn" onclick="window.print()" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></button>
           </div>
         </div>
 
