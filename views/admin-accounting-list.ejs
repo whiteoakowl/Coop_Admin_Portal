@@ -63,6 +63,7 @@
           on the same row next to each other." %>
       <div class="roster-btn-row accounting-accounts-toolbar-3 no-print" data-fixed-columns="2">
         <a class="icon-btn" href="/main-admin/accounting/print<%= q ? '?q=' + encodeURIComponent(q) : '' %>" target="_blank" aria-label="Print Preview" title="Print Preview"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        <a class="icon-btn" href="/main-admin/accounting/download.pdf<%= q ? '?q=' + encodeURIComponent(q) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         <a class="icon-btn" href="/main-admin/accounting/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
       </div>
     </div>

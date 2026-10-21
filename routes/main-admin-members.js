@@ -39,6 +39,13 @@ const { uploadMemberPhoto, savePhotoFile, deletePhotoFile } = require('../utils/
 const { allSetupTeams } = require('../utils/setup');
 const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions } = require('../utils/adminPositions');
 const { buildTemplateWorkbook, readRowsFromFile, sendCsv, toCsvRow } = require('../utils/spreadsheet');
+const { renderViewToPdf } = require('../utils/pdfRender');
+
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
 const memberImport = require('../utils/memberImport');
 const {
   familyOf,
@@ -285,6 +292,40 @@ router.get('/print', async (req, res) => {
     sectionIdsByMember,
     avatarColorFor,
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - same filtered list as the print
+// preview above, as a PDF. photoUrl is passed explicitly since
+// renderViewToPdf renders through req.app.render(), which never sees
+// this request's own res.locals (where server.js's own middleware
+// normally puts it for every view).
+router.get('/download.pdf', async (req, res) => {
+  const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
+  const familyFilter = parseInt(req.query.family, 10) || null;
+  const q = (req.query.q || '').trim().toLowerCase();
+
+  let withRosters = (await membersWithDetails(typeFilter, familyFilter))
+    .filter((m) => Number(m.active) === 1)
+    .map((m) => ({ ...m, age: ageFromBirthday(m.birthday), birthdayLabel: m.birthday ? formatDateNumeric(m.birthday) : null }));
+  if (q) withRosters = withRosters.filter((m) => m.name.toLowerCase().includes(q));
+
+  const sections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
+  const sectionIdsByMember = await sectionIdsForMembers(withRosters.map((m) => m.id));
+
+  const pdf = await renderViewToPdf(req, 'main-admin-members-print', {
+    title: 'Members Print Preview',
+    members: withRosters,
+    typeFilter,
+    familyFilter,
+    q,
+    families: await allFamilies(),
+    sections,
+    sectionIdsByMember,
+    avatarColorFor,
+    photoUrl: res.locals.photoUrl,
+  });
+  sendPdf(res, `members${typeFilter ? '-' + typeFilter : ''}.pdf`, pdf);
 });
 
 // A real request: "add member button, edit permissions button, edit,
@@ -975,6 +1016,21 @@ router.get('/grade-level-report/print', async (req, res) => {
     maxCount,
     filterLabelParts,
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - same gradeLevelReportData as the
+// print preview above, as a PDF.
+router.get('/grade-level-report/download.pdf', async (req, res) => {
+  const { columns, maxCount, filterLabelParts } = await gradeLevelReportData(req);
+
+  const pdf = await renderViewToPdf(req, 'main-admin-members-grade-level-report-print', {
+    title: 'Grade Level Report Print Preview',
+    columns,
+    maxCount,
+    filterLabelParts,
+  });
+  sendPdf(res, 'grade-level-report.pdf', pdf);
 });
 
 const PROFILE_TABS = ['profile', 'schedule', 'attendance'];

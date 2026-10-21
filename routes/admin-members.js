@@ -3,6 +3,13 @@ const router = express.Router();
 const db = require('../db');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { sendCsv, toCsvRow } = require('../utils/spreadsheet');
+const { renderViewToPdf } = require('../utils/pdfRender');
+
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
 const { formatDateLabel, formatDateNumeric, formatTime, ageFromBirthday, isChildAge, isValidISODate } = require('../utils/dates');
 const { uploadMemberPhoto, savePhotoFile, deletePhotoFile } = require('../utils/memberPhoto');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
@@ -254,6 +261,29 @@ router.get('/members/print', async (req, res) => {
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - same filteredMembersForPrint list as
+// the print preview above, as a PDF. isFullAdmin is passed explicitly
+// since renderViewToPdf renders through req.app.render(), which never
+// sees this request's own res.locals (where partials/admin-nav normally
+// finds it) - this whole router is already requireFullAdmin-gated, so
+// it's always true here.
+router.get('/members/download.pdf', async (req, res) => {
+  const { typeFilter, familyFilter, dayFilter, roleFilter, withRosters } = await filteredMembersForPrint(req);
+  const pdf = await renderViewToPdf(req, 'admin-members-print', {
+    title: 'Members Print Preview',
+    members: withRosters,
+    typeFilter,
+    familyFilter,
+    dayFilter,
+    roleFilter,
+    dayLabels: CLASS_DAY_LABELS_FULL,
+    families: await allFamilies(),
+    isFullAdmin: true,
+  });
+  sendPdf(res, `members${typeFilter ? '-' + typeFilter : ''}.pdf`, pdf);
+});
+
 // Powers the Members page's per-row Cards button (fetch-on-open - see
 // public/js/members-dialogs.js). The same badge/schedule-card rendering
 // the /members list route used to do for every row up front, done here
@@ -484,6 +514,23 @@ router.get('/members/grade-level-report/print', async (req, res) => {
     maxCount,
     filterLabelParts,
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - same gradeLevelReportData as the
+// print preview above, as a PDF. isFullAdmin is passed explicitly for
+// the same reason as /members/download.pdf above.
+router.get('/members/grade-level-report/download.pdf', async (req, res) => {
+  const { columns, maxCount, filterLabelParts } = await gradeLevelReportData(req);
+
+  const pdf = await renderViewToPdf(req, 'admin-members-grade-level-report-print', {
+    title: 'Grade Level Report Print Preview',
+    columns,
+    maxCount,
+    filterLabelParts,
+    isFullAdmin: true,
+  });
+  sendPdf(res, 'grade-level-report.pdf', pdf);
 });
 
 // Clicking a member's name anywhere lands here - a read-only profile with
@@ -768,25 +815,24 @@ const CARD_PRINT_LAYOUTS = ['nameTag', 'scheduleCard', 'frontBack'];
 // bulk Design/Print flows use (routes/admin-design.js), just with a
 // single-member list, so a member's cards always print identically
 // whether they were printed one at a time here or in a bulk batch there.
-router.get('/members/:id/cards/print', async (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
-  if (!member) return res.status(404).send('Not found');
-
-  const layout = CARD_PRINT_LAYOUTS.includes(req.query.layout) ? req.query.layout : 'nameTag';
-
+// Shared by the Print route and its Download PDF sibling below, so both
+// ever build this member/layout's own view+locals exactly one way.
+async function cardsPrintView(member, layout) {
   if (layout === 'frontBack') {
     const { frontPages, backPages } = buildDuplexPages(await buildCardPairs([member]));
-    return res.render('admin-cards-duplex-print', {
-      title: `Cards - ${member.name}`,
-      frontPages,
-      backPages,
-      badgeWidth: BADGE_WIDTH,
-      badgeHeight: BADGE_HEIGHT,
-      cardWidth: CARD_WIDTH,
-      cardHeight: CARD_HEIGHT,
-      SCHEDULE_CARD_SAFE_INSET,
-    });
+    return {
+      viewName: 'admin-cards-duplex-print',
+      locals: {
+        title: `Cards - ${member.name}`,
+        frontPages,
+        backPages,
+        badgeWidth: BADGE_WIDTH,
+        badgeHeight: BADGE_HEIGHT,
+        cardWidth: CARD_WIDTH,
+        cardHeight: CARD_HEIGHT,
+        SCHEDULE_CARD_SAFE_INSET,
+      },
+    };
   }
 
   const cards = [];
@@ -810,12 +856,38 @@ router.get('/members/:id/cards/print', async (req, res) => {
     });
   }
 
-  res.render('admin-member-cards-print', {
-    title: `Cards - ${member.name}`,
-    memberName: member.name,
-    cards,
-    SCHEDULE_CARD_SAFE_INSET,
-  });
+  return {
+    viewName: 'admin-member-cards-print',
+    locals: { title: `Cards - ${member.name}`, memberName: member.name, cards, SCHEDULE_CARD_SAFE_INSET },
+  };
+}
+
+router.get('/members/:id/cards/print', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+  if (!member) return res.status(404).send('Not found');
+
+  const layout = CARD_PRINT_LAYOUTS.includes(req.query.layout) ? req.query.layout : 'nameTag';
+  const { viewName, locals } = await cardsPrintView(member, layout);
+  res.render(viewName, locals);
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - a PDF built from the exact same
+// -print.ejs view (and layout) the Print button opens. isFullAdmin is
+// passed explicitly since renderViewToPdf renders through
+// req.app.render(), which never sees this request's own res.locals
+// (where partials/admin-nav normally finds it) - this whole router is
+// already requireFullAdmin-gated, so it's always true here.
+router.get('/members/:id/cards/download.pdf', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+  if (!member) return res.status(404).send('Not found');
+
+  const layout = CARD_PRINT_LAYOUTS.includes(req.query.layout) ? req.query.layout : 'nameTag';
+  const { viewName, locals } = await cardsPrintView(member, layout);
+  const pdf = await renderViewToPdf(req, viewName, { ...locals, isFullAdmin: true });
+  sendPdf(res, 'member-cards.pdf', pdf);
 });
 
 // Shared by the single-row Delete button and the bulk "Delete Selected"

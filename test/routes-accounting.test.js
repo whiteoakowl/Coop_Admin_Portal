@@ -40,6 +40,21 @@ function extractCsrf(html) {
   return /name="csrf-token" content="([^"]*)"/.exec(html)[1];
 }
 
+// Same buffer-a-binary-response shape as test/parent-family-school-print-
+// preview-and-pdf.test.js's own getBuffer - supertest's default text
+// parser corrupts a real PDF's binary body.
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
 async function loginAsMainAdmin() {
   const loginRes = await request(app).post('/login').type('form').send({ email: process.env.MAIN_ADMIN_EMAIL, password: process.env.MAIN_ADMIN_PASSWORD, next: '/main-admin' });
   const cookie = loginRes.headers['set-cookie'];
@@ -230,6 +245,16 @@ test('Main Admin Accounts list Print button links to a read-only print preview',
   assert.match(preview.text, /print-preview-header/);
   assert.match(preview.text, /onclick="window\.print\(\)"/);
   assert.match(preview.text, new RegExp(`Parent ${familyCounter}`));
+
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - Download PDF sits right beside
+  // Print, and is a real PDF built from that exact same preview view.
+  assert.match(list.text, /href="\/main-admin\/accounting\/download\.pdf" aria-label="Download PDF"/);
+  const pdf = await getBuffer('/main-admin/accounting/download.pdf', admin.cookie);
+  assert.equal(pdf.status, 200);
+  assert.equal(pdf.headers['content-type'], 'application/pdf');
+  assert.match(pdf.headers['content-disposition'], /attachment; filename="accounting-accounts\.pdf"/);
+  assert.equal(pdf.body.slice(0, 5).toString(), '%PDF-');
 });
 
 test('Main Admin Account page Print button links to a read-only print preview, respecting ?year=, and leaves autoprint alone', async () => {
@@ -244,6 +269,7 @@ test('Main Admin Account page Print button links to a read-only print preview, r
   const memberPage = await request(app).get(`/main-admin/accounting/members/${parent.memberId}`).set('Cookie', admin.cookie);
   assert.match(memberPage.text, new RegExp(`href="/main-admin/accounting/members/${parent.memberId}/print"`));
   assert.doesNotMatch(memberPage.text, /print-action-btn no-print" onclick="window\.print\(\)"/);
+  assert.match(memberPage.text, new RegExp(`href="/main-admin/accounting/members/${parent.memberId}/download\\.pdf" aria-label="Download PDF"`));
 
   const preview = await request(app).get(`/main-admin/accounting/members/${parent.memberId}/print`).set('Cookie', admin.cookie);
   assert.equal(preview.status, 200);
@@ -253,6 +279,14 @@ test('Main Admin Account page Print button links to a read-only print preview, r
 
   const previewAllYears = await request(app).get(`/main-admin/accounting/members/${parent.memberId}/print?year=all`).set('Cookie', admin.cookie);
   assert.match(previewAllYears.text, /All Years/);
+
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - a real PDF built from the exact
+  // same preview view the Print button opens, respecting ?year= too.
+  const pdf = await getBuffer(`/main-admin/accounting/members/${parent.memberId}/download.pdf`, admin.cookie);
+  assert.equal(pdf.status, 200);
+  assert.equal(pdf.headers['content-type'], 'application/pdf');
+  assert.equal(pdf.body.slice(0, 5).toString(), '%PDF-');
 
   // The autoprint mechanism (the Accounts list's own per-row printer
   // icon, ?autoprint=1) still jumps straight to window.print() on THIS
@@ -273,12 +307,21 @@ test('Parent Accounting page Print button links to a read-only print preview', a
   const home = await request(app).get('/accounting').set('Cookie', parent.cookie);
   assert.match(home.text, /href="\/accounting\/print"/);
   assert.doesNotMatch(home.text, /onclick="window\.print\(\)"/);
+  assert.match(home.text, /href="\/accounting\/download\.pdf" aria-label="Download PDF"/);
 
   const preview = await request(app).get('/accounting/print').set('Cookie', parent.cookie);
   assert.equal(preview.status, 200);
   assert.match(preview.text, /print-preview-header/);
   assert.match(preview.text, /onclick="window\.print\(\)"/);
   assert.match(preview.text, /Parent Print Preview Fee/);
+
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - a real PDF built from the exact
+  // same preview view the Print button opens.
+  const pdf = await getBuffer('/accounting/download.pdf', parent.cookie);
+  assert.equal(pdf.status, 200);
+  assert.equal(pdf.headers['content-type'], 'application/pdf');
+  assert.equal(pdf.body.slice(0, 5).toString(), '%PDF-');
 });
 
 test('an account only ever sees its own family\'s charges, not another family\'s', async () => {

@@ -111,6 +111,7 @@
               Carries the same Type/Family/search filters as Export CSV
               above, plus the search box's own q. %>
           <a class="icon-btn" href="/main-admin/members/print<%= (typeFilter || familyFilter || q) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %><%= ((typeFilter || familyFilter) && q) ? '&' : '' %><%= q ? 'q=' + encodeURIComponent(q) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+          <a class="icon-btn" href="/main-admin/members/download.pdf<%= (typeFilter || familyFilter || q) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %><%= ((typeFilter || familyFilter) && q) ? '&' : '' %><%= q ? 'q=' + encodeURIComponent(q) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         </div>
 
         <dialog id="main-admin-import-dialog" class="member-picker-dialog">
