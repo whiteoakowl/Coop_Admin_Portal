@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1><%= member.name %></h1>
+      <p class="hint">Account Year: <%= yearFilter === 'current' ? 'Current Year' : yearFilter === 'all' ? 'All Years' : yearFilter %></p>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub"><%= member.name %> &mdash; Account Statement</p>
+      </div>
+    </div>
+
+    <p>
+      <span class="badge-pill badge-pill-<%= balanceCents > 0 ? 'orange' : 'green' %>"><%= formatCents(balanceCents) %> due</span>
+      <% if (member.parked) { %> <span class="badge-pill badge-pill-gray" title="Auto-parked: an auto-park invoice is overdue and unpaid">Parked</span><% } %>
+    </p>
+
+    <div class="manage-section">
+      <h2>Invoices</h2>
+      <% if (invoices.length === 0) { %>
+        <p class="roster-empty">No invoices for this period.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table accounting-table-mobile-fit accounting-table-mobile-fit-tighter">
+            <thead>
+              <tr>
+                <th>Invoice #</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Paid</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% invoices.forEach(function(c) { %>
+                <tr>
+                  <td>#<%= c.id %></td>
+                  <td><%= c.description %></td>
+                  <td><%= formatCents(c.amount_cents) %></td>
+                  <td><%= formatCents(c.amountPaid) %></td>
+                  <td><span class="badge-pill badge-pill-<%= c.status === 'paid' ? 'green' : c.status === 'cancelled' || c.status === 'refunded' ? 'gray' : 'orange' %>"><%= c.status.replace('_', ' ') %></span></td>
+                  <td><%= c.dateLabel %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="manage-section">
+      <h2>Payments</h2>
+      <% if (paymentRows.length === 0) { %>
+        <p class="roster-empty">No payments for this period.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table accounting-table-mobile-fit accounting-table-mobile-fit-tighter">
+            <thead>
+              <tr>
+                <th>For</th>
+                <th>Amount</th>
+                <th>Note</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% paymentRows.forEach(function(p) { %>
+                <tr>
+                  <td><%= p.chargeDescription %></td>
+                  <td><%= formatCents(p.amount_cents) %></td>
+                  <td><%= p.note || '' %></td>
+                  <td><%= p.dateLabel %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="manage-section">
+      <h2>Adjustments, Credits &amp; Refunds</h2>
+      <% if (refundRows.length === 0 && cancelledCharges.length === 0) { %>
+        <p class="roster-empty">No adjustments for this period.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table accounting-table-mobile-fit accounting-table-mobile-fit-tighter">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>For</th>
+                <th>Amount</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% refundRows.forEach(function(p) { %>
+                <tr>
+                  <td><span class="badge-pill badge-pill-gray"><%= p.adjustment_type ? p.adjustment_type.charAt(0).toUpperCase() + p.adjustment_type.slice(1) : 'Refund' %></span></td>
+                  <td><%= p.chargeDescription %></td>
+                  <td><%= formatCents(p.amount_cents) %></td>
+                  <td><%= p.dateLabel %></td>
+                </tr>
+              <% }); %>
+              <% cancelledCharges.forEach(function(c) { %>
+                <tr>
+                  <td><span class="badge-pill badge-pill-gray">Cancelled Charge</span></td>
+                  <td><%= c.description %></td>
+                  <td><%= formatCents(c.amount_cents) %></td>
+                  <td><%= c.dateLabel %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

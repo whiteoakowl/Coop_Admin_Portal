@@ -49,4 +49,23 @@ router.get('/', async (req, res) => {
   });
 });
 
+// Dedicated print-preview route for the Print button above - same
+// filtered data as the live page, read-only, same pattern as every
+// other print button in this app (see views/admin-rosters-print.ejs's
+// own route).
+router.get('/print', async (req, res) => {
+  const self = await memberForAccount(req.portalAccount.id);
+  const member = self ? await db.prepare('SELECT * FROM members WHERE id = ?').get(await primaryParentForBilling(self.id)) : null;
+  const overview = member ? await payments.accountOverviewForMember(member.id, req.query.year || 'current') : null;
+  res.render('accounting-home-print', {
+    title: 'Accounting Print Preview',
+    member,
+    ...(overview || {}),
+    invoicesTotalCents: overview ? sumCents(overview.invoices, 'amount_cents') : 0,
+    paymentsTotalCents: overview ? sumCents(overview.paymentRows, 'amount_cents') : 0,
+    adjustmentsTotalCents: overview ? sumCents(overview.refundRows, 'amount_cents') + sumCents(overview.cancelledCharges, 'amount_cents') : 0,
+    formatCents: payments.formatCents,
+  });
+});
+
 module.exports = router;

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Accounts</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Accounts</p>
+      </div>
+    </div>
+
+    <% if (members.length === 0) { %>
+      <p class="roster-empty">No active members yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table accounting-table-mobile-fit accounting-accounts-table-fit">
+          <thead>
+            <tr>
+              <th>Member</th>
+              <th>Balance</th>
+              <th>Past Due</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% members.forEach(function(m) { %>
+              <tr>
+                <td class="roster-name-col"><%= m.name %></td>
+                <td><span class="badge-pill badge-pill-<%= m.balanceCents > 0 ? 'orange' : 'green' %>"><%= formatCents(m.balanceCents) %></span></td>
+                <td><% if (m.balanceCents > 0) { %><span class="badge-pill badge-pill-orange">Past Due</span><% } else { %>&mdash;<% } %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

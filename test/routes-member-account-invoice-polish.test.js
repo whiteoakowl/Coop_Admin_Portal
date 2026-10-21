@@ -73,7 +73,7 @@ test('Member account page: invoice name is a clickable link to the invoice, and 
   const memberPage = await request(app).get(`/main-admin/accounting/members/${memberId}`).set('Cookie', admin.cookie);
   assert.equal(memberPage.status, 200);
   assert.match(memberPage.text, new RegExp(`<a href="/main-admin/accounting/invoices/${charge.id}/edit">Fall Festival</a>`));
-  assert.match(memberPage.text, /class="roster-action-btn print-action-btn no-print" onclick="window\.print\(\)">Print</);
+  assert.match(memberPage.text, new RegExp(`class="roster-action-btn print-action-btn no-print" href="/main-admin/accounting/members/${memberId}/print" target="_blank">Print</`));
 });
 
 test('Member account page: a paid invoice drops Record Payment and the red Delete icon, keeping Edit and Cancel', async () => {
@@ -121,7 +121,7 @@ test('Parent Portal Accounting page has a Print button', async () => {
   const cookie = loginRes.headers['set-cookie'];
   const page = await request(app).get('/accounting').set('Cookie', cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /class="roster-action-btn print-action-btn no-print" onclick="window\.print\(\)">Print</);
+  assert.match(page.text, /class="roster-action-btn print-action-btn no-print" href="\/accounting\/print" target="_blank">Print</);
 });
 
 test('Data cleanup migration: an existing event-registration charge with the old verbose "Event Registration" description is stripped down to just the event title', async () => {

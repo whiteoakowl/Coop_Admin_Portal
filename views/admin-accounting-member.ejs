@@ -15,7 +15,7 @@
       <% if (member.parked) { %><span class="badge-pill badge-pill-gray" title="Auto-parked: an auto-park invoice is overdue and unpaid">Parked</span><% } %>
       <%# A real request: "add print button to member account pages on
           parent portal and main admin portal." %>
-      <button type="button" class="roster-action-btn print-action-btn no-print" onclick="window.print()">Print</button>
+      <a class="roster-action-btn print-action-btn no-print" href="/main-admin/accounting/members/<%= member.id %>/print<%= yearFilter !== 'current' ? '?year=' + yearFilter : '' %>" target="_blank">Print</a>
     </div>
     <p class="no-print"><a href="/main-admin/accounting">&larr; All Accounts</a></p>
 

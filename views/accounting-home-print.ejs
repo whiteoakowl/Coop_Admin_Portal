@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: sharedPortalTitle('Accounting'),
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/accounting', icon: 'file-text', label: 'Accounting' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <% if (!member) { %>
+      <h1>Accounting</h1>
+      <p class="hint">No account on file yet.</p>
+    <% } else { %>
+      <div class="print-preview-header no-print">
+        <h1>Accounting</h1>
+        <p class="hint">Account Year: <%= yearFilter === 'current' ? 'Current Year' : yearFilter === 'all' ? 'All Years' : yearFilter %></p>
+        <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+      </div>
+
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub"><%= member.name %> &mdash; Account Statement</p>
+        </div>
+      </div>
+
+      <p><span class="badge-pill badge-pill-<%= balanceCents > 0 ? 'orange' : 'green' %>"><%= balanceCents > 0 ? formatCents(balanceCents) + ' due' : 'Paid in full' %></span></p>
+
+      <div class="manage-section">
+        <h2>Invoices</h2>
+        <% if (invoices.length === 0) { %>
+          <p class="roster-empty">No invoices for this period.</p>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table accounting-table-mobile-fit table-stack-mobile">
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th>Amount</th>
+                  <th>Paid</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% invoices.forEach(function(c) { %>
+                  <tr>
+                    <td class="table-stack-heading"><%= c.description %></td>
+                    <td data-label="Amount"><%= formatCents(c.amount_cents) %></td>
+                    <td data-label="Paid"><%= formatCents(c.amountPaid) %></td>
+                    <td data-label="Status"><span class="badge-pill badge-pill-<%= c.status === 'paid' ? 'green' : c.status === 'cancelled' || c.status === 'refunded' ? 'gray' : 'orange' %>"><%= c.status.replace('_', ' ') %></span></td>
+                    <td data-label="Date"><%= c.dateLabel %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+          <p class="accounting-section-total">Total: <%= formatCents(invoicesTotalCents) %></p>
+        <% } %>
+      </div>
+
+      <div class="manage-section">
+        <h2>Payments</h2>
+        <% if (paymentRows.length === 0) { %>
+          <p class="roster-empty">No payments for this period.</p>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table accounting-table-mobile-fit table-stack-mobile">
+              <thead>
+                <tr>
+                  <th>For</th>
+                  <th>Amount</th>
+                  <th>Note</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% paymentRows.forEach(function(p) { %>
+                  <tr>
+                    <td class="table-stack-heading"><%= p.chargeDescription %></td>
+                    <td data-label="Amount"><%= formatCents(p.amount_cents) %></td>
+                    <td data-label="Note"><%= p.note || '' %></td>
+                    <td data-label="Date"><%= p.dateLabel %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+          <p class="accounting-section-total">Total: <%= formatCents(paymentsTotalCents) %></p>
+        <% } %>
+      </div>
+
+      <div class="manage-section">
+        <h2>Adjustments, Credits &amp; Refunds</h2>
+        <% if (refundRows.length === 0 && cancelledCharges.length === 0) { %>
+          <p class="roster-empty">No adjustments for this period.</p>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table accounting-table-mobile-fit table-stack-mobile">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>For</th>
+                  <th>Amount</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% refundRows.forEach(function(p) { %>
+                  <tr>
+                    <td class="table-stack-heading"><span class="badge-pill badge-pill-gray">Refund</span></td>
+                    <td data-label="For"><%= p.chargeDescription %></td>
+                    <td data-label="Amount"><%= formatCents(p.amount_cents) %></td>
+                    <td data-label="Date"><%= p.dateLabel %></td>
+                  </tr>
+                <% }); %>
+                <% cancelledCharges.forEach(function(c) { %>
+                  <tr>
+                    <td class="table-stack-heading"><span class="badge-pill badge-pill-gray">Cancelled Charge</span></td>
+                    <td data-label="For"><%= c.description %></td>
+                    <td data-label="Amount"><%= formatCents(c.amount_cents) %></td>
+                    <td data-label="Date"><%= c.dateLabel %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+          <p class="accounting-section-total">Total: <%= formatCents(adjustmentsTotalCents) %></p>
+        <% } %>
+      </div>
+    <% } %>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>
