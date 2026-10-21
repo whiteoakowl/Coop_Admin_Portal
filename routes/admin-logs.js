@@ -5,6 +5,7 @@ const requireAdmin = require('../middleware/requireAdmin');
 const { formatDateLabel, formatTime, formatDateAndTime, formatNumericDateAndTime, todayISO, weekdayOf } = require('../utils/dates');
 const { REASON_LABELS } = require('../utils/rosters');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { renderViewToPdf } = require('../utils/pdfRender');
 const { classesAtRiskForDay, CLASS_DAY_LABELS_FULL, listActiveClassDays, ensureDayMemberRosters } = require('../utils/classSchedule');
 const { isValidClassDay, CLASS_DAY_WEEKDAY_FULL } = require('../utils/classDays');
 const { substituteBoard } = require('../utils/substitutes');
@@ -13,6 +14,12 @@ const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../ut
 const { scannedTasksForMemberDate } = require('../utils/setup');
 
 const LOG_TABS = ['absence', 'checkinout', 'classcheckinout', 'nametag', 'classrisk', 'substitutes', 'allergies', 'classregistration', 'missedduty'];
+
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
 
 function todayIfSessionDay(day) {
   const today = todayISO();
@@ -737,6 +744,17 @@ router.get('/logs/allergies/print', requireAdmin, async (req, res) => {
   res.render('logs-allergies-print', { title: 'Allergies/Medical Log', medicalMembers: await membersWithMedicalNotes() });
 });
 
+// isFullAdmin is normally set once per request by server.js's own
+// res.locals middleware, which every *-print.ejs view's included
+// partials/admin-nav relies on - but renderViewToPdf renders through
+// req.app.render(), which only sees the locals object handed to it, not
+// res.locals, so it has to be passed through explicitly here (and below)
+// or admin-nav throws trying to read it.
+router.get('/logs/allergies/download.pdf', requireAdmin, async (req, res) => {
+  const pdf = await renderViewToPdf(req, 'logs-allergies-print', { isFullAdmin: res.locals.isFullAdmin, title: 'Allergies/Medical Log', medicalMembers: await membersWithMedicalNotes() });
+  sendPdf(res, 'allergies-medical-log.pdf', pdf);
+});
+
 router.get('/logs/absence/export.csv', requireAdmin, async (req, res) => {
   const dateFilter = req.query.date || '';
   const submissions = await allAbsenceSubmissions(dateFilter);
@@ -757,6 +775,18 @@ router.get('/logs/absence/print', requireAdmin, async (req, res) => {
     dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
     allSubmissions: await allAbsenceSubmissions(dateFilter),
   });
+});
+
+router.get('/logs/absence/download.pdf', requireAdmin, async (req, res) => {
+  const dateFilter = req.query.date || '';
+  const pdf = await renderViewToPdf(req, 'logs-absence-print', {
+    isFullAdmin: res.locals.isFullAdmin,
+    title: 'Absence/Late Log',
+    dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
+    allSubmissions: await allAbsenceSubmissions(dateFilter),
+  });
+  sendPdf(res, 'absence-late-log.pdf', pdf);
 });
 
 router.get('/logs/classrisk/export.csv', requireAdmin, async (req, res) => {
@@ -797,6 +827,28 @@ router.get('/logs/classrisk/print', requireAdmin, async (req, res) => {
   });
 });
 
+router.get('/logs/classrisk/download.pdf', requireAdmin, async (req, res) => {
+  const filterBy = req.query.filterBy === 'class' ? 'class' : 'date';
+  const classIdFilter = req.query.classId ? parseInt(req.query.classId, 10) : null;
+  const dateFilter = filterBy === 'date' ? req.query.date || '' : '';
+  const allRows = await classCancellationRiskRows();
+  const rows =
+    filterBy === 'class' && classIdFilter != null
+      ? allRows.filter((r) => r.classId === classIdFilter)
+      : dateFilter
+        ? allRows.filter((r) => r.date === dateFilter)
+        : allRows;
+  const pdf = await renderViewToPdf(req, 'logs-classrisk-print', {
+    isFullAdmin: res.locals.isFullAdmin,
+    title: 'Class Cancellation Risk',
+    dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
+    classNameFilter: classIdFilter != null ? (allRows.find((r) => r.classId === classIdFilter) || {}).className || null : null,
+    allSubmissions: rows,
+  });
+  sendPdf(res, 'class-cancellation-risk-log.pdf', pdf);
+});
+
 router.get('/logs/missedduty/export.csv', requireAdmin, async (req, res) => {
   const dateFilter = req.query.date || '';
   const allRows = await missedDutyRows();
@@ -829,6 +881,19 @@ router.get('/logs/missedduty/print', requireAdmin, async (req, res) => {
   });
 });
 
+router.get('/logs/missedduty/download.pdf', requireAdmin, async (req, res) => {
+  const dateFilter = req.query.date || '';
+  const allRows = await missedDutyRows();
+  const pdf = await renderViewToPdf(req, 'logs-missedduty-print', {
+    isFullAdmin: res.locals.isFullAdmin,
+    title: 'Missed Duty / No-Show Log',
+    dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
+    allSubmissions: dateFilter ? allRows.filter((r) => r.date === dateFilter) : allRows,
+  });
+  sendPdf(res, 'missed-duty-no-show-log.pdf', pdf);
+});
+
 router.get('/logs/classregistration/export.csv', requireAdmin, async (req, res) => {
   const dateFilter = req.query.date || '';
   const registrations = await allClassRegistrations(dateFilter);
@@ -847,6 +912,18 @@ router.get('/logs/classregistration/print', requireAdmin, async (req, res) => {
     dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
     allSubmissions: await allClassRegistrations(dateFilter),
   });
+});
+
+router.get('/logs/classregistration/download.pdf', requireAdmin, async (req, res) => {
+  const dateFilter = req.query.date || '';
+  const pdf = await renderViewToPdf(req, 'logs-classregistration-print', {
+    isFullAdmin: res.locals.isFullAdmin,
+    title: 'Class Registration Log',
+    dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
+    allSubmissions: await allClassRegistrations(dateFilter),
+  });
+  sendPdf(res, 'class-registration-log.pdf', pdf);
 });
 
 router.get('/logs/checkinout/export.csv', requireAdmin, async (req, res) => {
@@ -886,6 +963,26 @@ router.get('/logs/checkinout/print', requireAdmin, async (req, res) => {
   });
 });
 
+router.get('/logs/checkinout/download.pdf', requireAdmin, async (req, res) => {
+  const dateFilter = req.query.date || '';
+  const allRows = (await checkinoutLogRows(dateFilter, 'coop')).map((r) => ({
+    memberName: r.memberName,
+    rosterName: r.rosterName,
+    dateLabel: formatDateLabel(r.date),
+    checkInTime: formatTime(r.checkInTime) || '—',
+    checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : '—',
+    number: r.number ?? '—',
+  }));
+  const pdf = await renderViewToPdf(req, 'logs-checkinout-print', {
+    isFullAdmin: res.locals.isFullAdmin,
+    title: 'Co-op Check-In/Out Log',
+    dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
+    allRows,
+  });
+  sendPdf(res, 'co-op-check-in-out-log.pdf', pdf);
+});
+
 router.get('/logs/classcheckinout/export.csv', requireAdmin, async (req, res) => {
   const dateFilter = req.query.date || '';
   const rows = await checkinoutLogRows(dateFilter, 'class');
@@ -921,6 +1018,26 @@ router.get('/logs/classcheckinout/print', requireAdmin, async (req, res) => {
     dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
     allRows,
   });
+});
+
+router.get('/logs/classcheckinout/download.pdf', requireAdmin, async (req, res) => {
+  const dateFilter = req.query.date || '';
+  const allRows = (await checkinoutLogRows(dateFilter, 'class')).map((r) => ({
+    memberName: r.memberName,
+    rosterName: r.rosterName,
+    dateLabel: formatDateLabel(r.date),
+    checkInTime: formatTime(r.checkInTime) || '—',
+    checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : '—',
+    number: r.number ?? '—',
+  }));
+  const pdf = await renderViewToPdf(req, 'logs-classcheckinout-print', {
+    isFullAdmin: res.locals.isFullAdmin,
+    title: 'Class Check-In/Out Log',
+    dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
+    allRows,
+  });
+  sendPdf(res, 'class-check-in-out-log.pdf', pdf);
 });
 
 router.get('/logs/nametag/export.csv', requireAdmin, async (req, res) => {
@@ -963,6 +1080,27 @@ router.get('/logs/nametag/print', requireAdmin, async (req, res) => {
   });
 });
 
+router.get('/logs/nametag/download.pdf', requireAdmin, async (req, res) => {
+  const showArchived = req.query.archived === '1';
+  const dateFilter = req.query.date || '';
+  const allSubmissions = (await nameTagSubmissions(showArchived, dateFilter)).map((r) => ({
+    ...formatDateAndTime(r.createdAt),
+    memberName: r.memberName,
+    requestTypeLabel: REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
+    dayLabel: NAME_TAG_DAY_LABELS[r.day] || r.day,
+    description: r.description || '—',
+  }));
+  const pdf = await renderViewToPdf(req, 'logs-nametag-print', {
+    isFullAdmin: res.locals.isFullAdmin,
+    title: showArchived ? 'Archived Name Tag Requests' : 'Name Tag Requests',
+    showArchived,
+    dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
+    allSubmissions,
+  });
+  sendPdf(res, `name-tag-${showArchived ? 'archived' : 'requests'}.pdf`, pdf);
+});
+
 router.post('/logs/nametag/:id/archive', requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   await db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(id);
@@ -988,6 +1126,23 @@ router.get('/logs/substitutes/print', requireAdmin, async (req, res) => {
     dateFilter,
     board,
   });
+});
+
+router.get('/logs/substitutes/download.pdf', requireAdmin, async (req, res) => {
+  const activeDays = await listActiveClassDays();
+  const day = isValidClassDay(req.query.day) ? req.query.day : (activeDays[0] || 'monday');
+  const dateFilter = req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : todayIfSessionDay(day) || '';
+  const fullBoard = await substituteBoard(day, dateFilter || null);
+  const board = fullBoard.map((hour) => ({ ...hour, slots: hour.slots.filter((s) => s.slotType === 'class') }));
+  const pdf = await renderViewToPdf(req, 'logs-substitutes-print', {
+    isFullAdmin: res.locals.isFullAdmin,
+    title: 'Substitutes Needed',
+    day,
+    dayLabel: CLASS_DAY_LABELS_FULL[day],
+    dateFilter,
+    board,
+  });
+  sendPdf(res, 'substitutes-needed.pdf', pdf);
 });
 
 // Old standalone URLs now live under the unified Logs tab.
