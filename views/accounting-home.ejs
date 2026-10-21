@@ -29,7 +29,7 @@
         <span class="badge-pill badge-pill-<%= balanceCents > 0 ? 'orange' : 'green' %>"><%= balanceCents > 0 ? formatCents(balanceCents) + ' due' : 'Paid in full' %></span>
         <%# A real request: "add print button to member account pages on
             parent portal and main admin portal." %>
-        <button type="button" class="roster-action-btn print-action-btn no-print" onclick="window.print()">Print</button>
+        <a class="roster-action-btn print-action-btn no-print" href="/accounting/print<%= yearFilter !== 'current' ? '?year=' + yearFilter : '' %>" target="_blank">Print</a>
       </div>
       <%# Same year filter as the Main Admin Account page - "current,
           all or the individual years for accounting." %>

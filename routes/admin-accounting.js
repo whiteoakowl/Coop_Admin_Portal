@@ -109,6 +109,19 @@ router.get('/', async (req, res) => {
   });
 });
 
+// Same pattern as every other dedicated print-preview route in this app
+// (see views/admin-rosters-print.ejs's own route) - a bare read-only page
+// with its own Print button, reflecting the same ?q= filter as the live
+// list instead of the old onclick="window.print()" on the editable table.
+router.get('/print', async (req, res) => {
+  const q = (req.query.q || '').trim().toLowerCase();
+  res.render('admin-accounting-list-print', {
+    title: 'Accounts Print Preview',
+    members: await accountRows(q),
+    formatCents: payments.formatCents,
+  });
+});
+
 async function recipientAccountIdsForMembers(memberIds) {
   const accounts = await db.prepare("SELECT id, member_id FROM member_accounts WHERE status IN ('active', 'pending')").all();
   const accountIdsByMember = new Map();
@@ -585,6 +598,23 @@ router.get('/members/:memberId', async (req, res) => {
     methods: await paymentMethods(),
     notice: req.query.notice || null,
     error: req.query.error || null,
+    formatCents: payments.formatCents,
+  });
+});
+
+// Dedicated print-preview route for the persistent Print button above -
+// deliberately separate from the ?autoprint=1 flow the Accounts list's
+// own per-row printer icon uses (that one jumps straight to the print
+// dialog on THIS page, not the preview below).
+router.get('/members/:memberId/print', async (req, res) => {
+  const member = await db.prepare('SELECT id, name, parked FROM members WHERE id = ?').get(req.params.memberId);
+  if (!member) return res.status(404).render('404', { title: 'Not Found' });
+  const overview = await payments.accountOverviewForMember(member.id, req.query.year || 'current');
+
+  res.render('admin-accounting-member-print', {
+    title: `${member.name} Print Preview`,
+    member,
+    ...overview,
     formatCents: payments.formatCents,
   });
 });

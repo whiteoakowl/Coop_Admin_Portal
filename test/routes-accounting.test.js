@@ -211,6 +211,76 @@ test('Main Admin Accounting home: lists every active member, charge history or n
   assert.match(memberPage.text, /No invoices for this period/);
 });
 
+// Real request: "All print button should show a print preview full real
+// page on a page with a print button. That print button will then send
+// it to the printer." - same dedicated-preview-page pattern as the rest
+// of the app's Print buttons (see views/admin-rosters-print.ejs), now
+// applied to the 3 Accounting pages that used to call window.print()
+// directly on the live, editable view.
+test('Main Admin Accounts list Print button links to a read-only print preview', async () => {
+  const admin = await loginAsMainAdmin();
+  const parent = await createParentAccount();
+
+  const list = await request(app).get('/main-admin/accounting').set('Cookie', admin.cookie);
+  assert.match(list.text, /href="\/main-admin\/accounting\/print"/);
+  assert.doesNotMatch(list.text, /onclick="window\.print\(\)"/);
+
+  const preview = await request(app).get('/main-admin/accounting/print').set('Cookie', admin.cookie);
+  assert.equal(preview.status, 200);
+  assert.match(preview.text, /print-preview-header/);
+  assert.match(preview.text, /onclick="window\.print\(\)"/);
+  assert.match(preview.text, new RegExp(`Parent ${familyCounter}`));
+});
+
+test('Main Admin Account page Print button links to a read-only print preview, respecting ?year=, and leaves autoprint alone', async () => {
+  const admin = await loginAsMainAdmin();
+  const parent = await createParentAccount();
+  await request(app)
+    .post(`/main-admin/accounting/members/${parent.memberId}/charges`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ description: 'Print Preview Fee', amount: '30.00', _csrf: admin.csrfToken });
+
+  const memberPage = await request(app).get(`/main-admin/accounting/members/${parent.memberId}`).set('Cookie', admin.cookie);
+  assert.match(memberPage.text, new RegExp(`href="/main-admin/accounting/members/${parent.memberId}/print"`));
+  assert.doesNotMatch(memberPage.text, /print-action-btn no-print" onclick="window\.print\(\)"/);
+
+  const preview = await request(app).get(`/main-admin/accounting/members/${parent.memberId}/print`).set('Cookie', admin.cookie);
+  assert.equal(preview.status, 200);
+  assert.match(preview.text, /print-preview-header/);
+  assert.match(preview.text, /onclick="window\.print\(\)"/);
+  assert.match(preview.text, /Print Preview Fee/);
+
+  const previewAllYears = await request(app).get(`/main-admin/accounting/members/${parent.memberId}/print?year=all`).set('Cookie', admin.cookie);
+  assert.match(previewAllYears.text, /All Years/);
+
+  // The autoprint mechanism (the Accounts list's own per-row printer
+  // icon, ?autoprint=1) still jumps straight to window.print() on THIS
+  // page, untouched by the above.
+  const autoprintPage = await request(app).get(`/main-admin/accounting/members/${parent.memberId}?autoprint=1`).set('Cookie', admin.cookie);
+  assert.match(autoprintPage.text, /window\.addEventListener\('load', \(\) => window\.print\(\)\)/);
+});
+
+test('Parent Accounting page Print button links to a read-only print preview', async () => {
+  const admin = await loginAsMainAdmin();
+  const parent = await createParentAccount();
+  await request(app)
+    .post(`/main-admin/accounting/members/${parent.memberId}/charges`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ description: 'Parent Print Preview Fee', amount: '15.00', _csrf: admin.csrfToken });
+
+  const home = await request(app).get('/accounting').set('Cookie', parent.cookie);
+  assert.match(home.text, /href="\/accounting\/print"/);
+  assert.doesNotMatch(home.text, /onclick="window\.print\(\)"/);
+
+  const preview = await request(app).get('/accounting/print').set('Cookie', parent.cookie);
+  assert.equal(preview.status, 200);
+  assert.match(preview.text, /print-preview-header/);
+  assert.match(preview.text, /onclick="window\.print\(\)"/);
+  assert.match(preview.text, /Parent Print Preview Fee/);
+});
+
 test('an account only ever sees its own family\'s charges, not another family\'s', async () => {
   const admin = await loginAsMainAdmin();
   const parentA = await createParentAccount();
