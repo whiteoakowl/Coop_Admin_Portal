@@ -33,6 +33,8 @@
     <div class="roster-toolbar">
       <div class="roster-btn-row">
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-registration-dialog').showModal()">+ Add Registration</button>
+      </div>
+      <div class="roster-btn-row">
         <a class="icon-btn" href="/main-admin/events/<%= event.id %>/registrations/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
         <a class="icon-btn" href="/main-admin/events/<%= event.id %>/registrations/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         <a class="icon-btn" href="/main-admin/events/<%= event.id %>/registrations/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>

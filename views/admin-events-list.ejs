@@ -15,6 +15,8 @@
         <% if (activeTab === 'calendar' || activeTab === 'drafts') { %>
           <a class="roster-action-btn" href="/main-admin/events/new">+ New Event</a>
         <% } %>
+      </div>
+      <div class="roster-btn-row no-print">
         <% if (activeTab === 'calendar') { %>
           <a class="icon-btn" href="/main-admin/events/print?view=<%= calendarView %>&month=<%= monthParam %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
           <a class="icon-btn" href="/main-admin/events/download.pdf?view=<%= calendarView %>&month=<%= monthParam %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
