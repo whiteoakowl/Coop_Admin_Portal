@@ -1,0 +1,18 @@
+<%
+// A real request: "Family school management, add a bar graph tracker to
+// show percentage of 180 days completed." presentDays/attendanceTargetDays
+// (utils/familySchool.js's overviewForFamily, ATTENDANCE_TARGET_DAYS=180)
+// already powered the plain "X/180" text stat on both the Parent Portal
+// and Student Portal Overview pages - this partial is the shared visual
+// bar underneath it, pure CSS (no chart library), shared so the two
+// portals never drift into two slightly different bar implementations.
+const target = attendanceTargetDays || 0;
+const present = presentDays || 0;
+const percent = target > 0 ? Math.min(100, Math.round((present / target) * 100)) : 0;
+%>
+<div class="fs-attendance-bar-wrap">
+  <div class="fs-attendance-bar-track" role="progressbar" aria-valuenow="<%= percent %>" aria-valuemin="0" aria-valuemax="100" aria-label="Percentage of 180 instructional days completed">
+    <div class="fs-attendance-bar-fill" style="width: <%= percent %>%;"></div>
+  </div>
+  <span class="fs-attendance-bar-label"><%= percent %>% of <%= target %> days</span>
+</div>

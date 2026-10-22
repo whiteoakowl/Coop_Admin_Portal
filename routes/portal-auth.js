@@ -18,6 +18,7 @@ const membershipFormFields = require('../utils/membershipFormFields');
 const path = require('path');
 const fs = require('fs');
 const { createStorageClient, downloadFile } = require('../utils/storage');
+const { uploadIntakePhotos, savePhotoFile, parseArrayField } = require('../utils/memberIntake');
 
 const portalLoginLimiter = createFailureRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 8 });
 
@@ -133,7 +134,7 @@ router.get('/register', async (req, res) => {
     error: null,
     formValues: {},
     children: [],
-    gradeOptions: GRADE_OPTIONS,
+    additionalParents: [],
     handbookHtml: await membershipHandbook.getHandbookHtml(),
     handbookFile: await membershipHandbook.getHandbookFile(),
     paymentInfo: await membershipHandbook.getPaymentInfo(),
@@ -142,27 +143,13 @@ router.get('/register', async (req, res) => {
   });
 });
 
-// multer isn't in play here (no file upload on this form), but the
-// "children[0][firstName]"-style bracket fields still need pulling out
-// of req.body into a real array the same way routes/membership.js's own
-// parseChildren does for the admin-entered Membership Form - same
-// bracket-naming convention, same reason (a removed block client-side
-// can leave the array sparse).
-function parseChildren(body) {
-  if (Array.isArray(body.children)) return body.children;
-  if (body.children && typeof body.children === 'object') {
-    return Object.keys(body.children).map((k) => body.children[k]);
-  }
-  return [];
-}
-
-async function renderRegisterError(res, error, formValues, children) {
+async function renderRegisterError(res, error, formValues, children, additionalParents) {
   return res.render('portal-register', {
     title: 'Request Membership',
     error,
     formValues,
     children,
-    gradeOptions: GRADE_OPTIONS,
+    additionalParents,
     handbookHtml: await membershipHandbook.getHandbookHtml(),
     handbookFile: await membershipHandbook.getHandbookFile(),
     paymentInfo: await membershipHandbook.getPaymentInfo(),
@@ -187,16 +174,23 @@ async function renderRegisterError(res, error, formValues, children) {
 // student-portal access shouldn't need a Main Admin to hand-create every
 // one of those accounts one at a time (though a Main Admin still can,
 // from Users > Create Account, for a member who didn't self-register).
-router.post('/register', async (req, res) => {
+router.post('/register', uploadIntakePhotos('/register'), async (req, res) => {
   const firstName = (req.body.firstName || '').trim();
   const lastName = (req.body.lastName || '').trim();
   const email = (req.body.email || '').trim();
   const phone = (req.body.phone || '').trim();
   const smsOptIn = req.body.smsOptIn === '1';
   const password = req.body.password || '';
-  const formValues = { firstName, lastName, email, phone, customFields: req.body.customFields };
+  // "Under first parent/guardian it should have address 1, address 2,
+  // city, state, zip code."
+  const address = (req.body.address || '').trim();
+  const address2 = (req.body.address2 || '').trim();
+  const city = (req.body.city || '').trim();
+  const state = (req.body.state || '').trim();
+  const zip = (req.body.zip || '').trim();
+  const formValues = { firstName, lastName, email, phone, address, address2, city, state, zip, customFields: req.body.customFields };
 
-  const rawChildren = parseChildren(req.body).map((c, index) => ({ ...c, index }));
+  const rawChildren = parseArrayField(req.body, 'children').map((c, index) => ({ ...c, index }));
   // A blank block the visitor never filled in (or removed down to zero
   // fields client-side) is dropped rather than rejected - children are
   // entirely optional on this form, unlike the admin Membership Form's
@@ -207,14 +201,21 @@ router.post('/register', async (req, res) => {
   // already typed gets lost, but never their password.
   const childrenForRerender = rawChildren.map((c) => ({ ...c, loginPassword: '', loginPasswordConfirm: '' }));
 
+  // "There is a +child button. There should also be an add adult
+  // button." Same optional, drop-if-blank treatment as a child block -
+  // see partials/register-adult-fields.ejs's own header comment for why
+  // there's no login/password here, unlike a child block.
+  const rawAdults = parseArrayField(req.body, 'additionalParents').map((a, index) => ({ ...a, index }));
+  const additionalParents = rawAdults.filter((a) => a && ((a.firstName || '').trim() || (a.lastName || '').trim()));
+
   if (!firstName || !lastName || !email || !password) {
-    return renderRegisterError(res, 'All fields are required.', formValues, childrenForRerender);
+    return renderRegisterError(res, 'All fields are required.', formValues, childrenForRerender, rawAdults);
   }
   if (password.length < 8) {
-    return renderRegisterError(res, 'Password must be at least 8 characters.', formValues, childrenForRerender);
+    return renderRegisterError(res, 'Password must be at least 8 characters.', formValues, childrenForRerender, rawAdults);
   }
   if (password !== req.body.confirmPassword) {
-    return renderRegisterError(res, 'Passwords do not match.', formValues, childrenForRerender);
+    return renderRegisterError(res, 'Passwords do not match.', formValues, childrenForRerender, rawAdults);
   }
   // A real request: "can't submit application without checking the
   // box" (having read the Policy Handbook). The checkbox itself is
@@ -222,24 +223,30 @@ router.post('/register', async (req, res) => {
   // handbook (public/js/portal-register-form.js) - checked again here
   // since a disabled attribute is only ever a client-side nicety.
   if (req.body.handbookRead !== '1') {
-    return renderRegisterError(res, 'Please scroll through and confirm you have read the Policy Handbook before submitting.', formValues, childrenForRerender);
+    return renderRegisterError(res, 'Please scroll through and confirm you have read the Policy Handbook before submitting.', formValues, childrenForRerender, rawAdults);
   }
 
   for (const c of children) {
     if (!(c.firstName || '').trim() || !(c.lastName || '').trim()) {
-      return renderRegisterError(res, 'Each child needs both a first and last name.', formValues, childrenForRerender);
+      return renderRegisterError(res, 'Each child needs both a first and last name.', formValues, childrenForRerender, rawAdults);
     }
     if (!c.wantsLogin) continue;
     const childEmail = (c.loginEmail || '').trim();
     const childPassword = c.loginPassword || '';
     if (!childEmail || !childPassword) {
-      return renderRegisterError(res, `${c.firstName}'s portal login needs an email and password.`, formValues, childrenForRerender);
+      return renderRegisterError(res, `${c.firstName}'s portal login needs an email and password.`, formValues, childrenForRerender, rawAdults);
     }
     if (childPassword.length < 8) {
-      return renderRegisterError(res, `${c.firstName}'s password must be at least 8 characters.`, formValues, childrenForRerender);
+      return renderRegisterError(res, `${c.firstName}'s password must be at least 8 characters.`, formValues, childrenForRerender, rawAdults);
     }
     if (childPassword !== c.loginPasswordConfirm) {
-      return renderRegisterError(res, `${c.firstName}'s passwords do not match.`, formValues, childrenForRerender);
+      return renderRegisterError(res, `${c.firstName}'s passwords do not match.`, formValues, childrenForRerender, rawAdults);
+    }
+  }
+
+  for (const a of additionalParents) {
+    if (!(a.firstName || '').trim() || !(a.lastName || '').trim()) {
+      return renderRegisterError(res, 'Each additional parent/guardian needs both a first and last name.', formValues, childrenForRerender, rawAdults);
     }
   }
 
@@ -253,19 +260,37 @@ router.post('/register', async (req, res) => {
   for (const e of wantedEmails) {
     const key = e.toLowerCase();
     if (seen.has(key)) {
-      return renderRegisterError(res, 'Each login on this form needs its own, different email address.', formValues, childrenForRerender);
+      return renderRegisterError(res, 'Each login on this form needs its own, different email address.', formValues, childrenForRerender, rawAdults);
     }
     seen.add(key);
   }
   for (const e of wantedEmails) {
     if (await findAccountByEmail(e)) {
-      return renderRegisterError(res, `${e} is already in use by another account. Try logging in instead, or use a different email.`, formValues, childrenForRerender);
+      return renderRegisterError(res, `${e} is already in use by another account. Try logging in instead, or use a different email.`, formValues, childrenForRerender, rawAdults);
     }
   }
 
   const fullName = `${firstName} ${lastName}`;
   const parentRole = await db.prepare("SELECT id FROM roles WHERE key = 'parent'").get();
   const studentRole = await db.prepare("SELECT id FROM roles WHERE key = 'student'").get();
+
+  // "Should be able to upload parent profile photos and student profile
+  // photos." Saved to disk/the storage bucket BEFORE the transaction
+  // (not something a rolled-back transaction could undo anyway - a
+  // saved file isn't itself transactional), same timing utils/
+  // memberIntake.js's own callers already use (routes/membership.js).
+  const primaryPhotoFile = (req.files || []).find((f) => f.fieldname === 'photo');
+  const primaryPhotoPath = primaryPhotoFile ? await savePhotoFile(primaryPhotoFile) : null;
+  const childPhotoPaths = {};
+  for (const c of children) {
+    const file = (req.files || []).find((f) => f.fieldname === `children[${c.index}][photo]`);
+    childPhotoPaths[c.index] = file ? await savePhotoFile(file) : null;
+  }
+  const adultPhotoPaths = {};
+  for (const a of additionalParents) {
+    const file = (req.files || []).find((f) => f.fieldname === `additionalParents[${a.index}][photo]`);
+    adultPhotoPaths[a.index] = file ? await savePhotoFile(file) : null;
+  }
 
   // Custom field answers (utils/membershipFormFields.js) are saved
   // AFTER the transaction below, via the module-level `db` connection -
@@ -275,6 +300,7 @@ router.post('/register', async (req, res) => {
   // generateMemberCode comment on this exact class of bug).
   let newParentMemberId = null;
   const newChildMemberIds = [];
+  const newAdultMemberIds = [];
 
   await db.withTransaction(async (tx) => {
     let member = await tx.prepare('SELECT * FROM members WHERE LOWER(email) = LOWER(?) AND email IS NOT NULL').get(email);
@@ -290,10 +316,10 @@ router.post('/register', async (req, res) => {
       const code = await generateMemberCode(tx);
       const info = await tx
         .prepare(
-          `INSERT INTO members (name, barcode, member_code, member_type, email, phone, family_id, is_primary_parent, sms_consent, sms_consent_at)
-           VALUES (?, ?, ?, 'parent', ?, ?, ?, 1, ?, ?)`
+          `INSERT INTO members (name, barcode, member_code, member_type, email, phone, family_id, is_primary_parent, address, address2, city, state, zip, photo_path, sms_consent, sms_consent_at)
+           VALUES (?, ?, ?, 'parent', ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .run(fullName, code, code, email, phone || null, familyId, smsOptIn, smsOptIn ? new Date().toISOString() : null);
+        .run(fullName, code, code, email, phone || null, familyId, address || null, address2 || null, city || null, state || null, zip || null, primaryPhotoPath, smsOptIn, smsOptIn ? new Date().toISOString() : null);
       member = await tx.prepare('SELECT * FROM members WHERE id = ?').get(info.lastInsertRowid);
     } else if (phone && !member.phone) {
       await tx.prepare('UPDATE members SET phone = ? WHERE id = ?').run(phone, member.id);
@@ -315,11 +341,45 @@ router.post('/register', async (req, res) => {
       await tx.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(parentAccountInfo.lastInsertRowid, parentRole.id);
     }
 
+    // "When adding an additional parent there should be a check box that
+    // says address is the same." Checked (the default) means this
+    // adult's own posted address fields are ignored in favor of the
+    // primary parent's - unchecked means they typed their own.
+    for (const a of additionalParents) {
+      const sameAddress = a.sameAddress === '1';
+      const aCode = await generateMemberCode(tx);
+      const aAddress = sameAddress ? address : (a.address || '').trim();
+      const aAddress2 = sameAddress ? address2 : (a.address2 || '').trim();
+      const aCity = sameAddress ? city : (a.city || '').trim();
+      const aState = sameAddress ? state : (a.state || '').trim();
+      const aZip = sameAddress ? zip : (a.zip || '').trim();
+      const aInfo = await tx
+        .prepare(
+          `INSERT INTO members (name, barcode, member_code, member_type, family_id, email, phone, is_primary_parent, address, address2, city, state, zip, photo_path)
+           VALUES (?, ?, ?, 'parent', ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          `${a.firstName.trim()} ${a.lastName.trim()}`,
+          aCode,
+          aCode,
+          familyId,
+          (a.email || '').trim() || null,
+          (a.phone || '').trim() || null,
+          aAddress || null,
+          aAddress2 || null,
+          aCity || null,
+          aState || null,
+          aZip || null,
+          adultPhotoPaths[a.index] || null
+        );
+      newAdultMemberIds.push(aInfo.lastInsertRowid);
+    }
+
     for (const c of children) {
       const childCode = await generateMemberCode(tx);
       const childInfo = await tx
         .prepare(
-          `INSERT INTO members (name, barcode, member_code, member_type, family_id, birthday, grade_level, medical_notes)
+          `INSERT INTO members (name, barcode, member_code, member_type, family_id, birthday, medical_notes, photo_path)
            VALUES (?, ?, ?, 'student', ?, ?, ?, ?)`
         )
         .run(
@@ -328,8 +388,8 @@ router.post('/register', async (req, res) => {
           childCode,
           familyId,
           isValidISODate((c.birthdate || '').trim()) ? c.birthdate.trim() : null,
-          GRADE_OPTIONS.includes(c.gradeLevel) ? c.gradeLevel : null,
-          (c.medicalNotes || '').trim() || null
+          (c.medicalNotes || '').trim() || null,
+          childPhotoPaths[c.index] || null
         );
       newChildMemberIds.push({ memberId: childInfo.lastInsertRowid, customFields: c.customFields });
 

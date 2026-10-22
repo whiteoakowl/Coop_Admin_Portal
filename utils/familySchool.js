@@ -392,47 +392,54 @@ const LETTER_GRADE_GPA_POINTS = { A: 4, B: 3, C: 2, D: 1, F: 0 };
 //     most US states require of a homeschooler's year), e.g. "1/180".
 const ATTENDANCE_TARGET_DAYS = 180;
 
+// The per-student grades/GPA/attendance stat bundle the Overview cards
+// show - its own function (rather than inlined in overviewForFamily's
+// own map callback) so the new Portfolio subpage (a real request: "add
+// a subpage called portfolio... summarize all family school management
+// features for each student") can build the exact same numbers for ONE
+// student without re-deriving this logic a second, possibly-drifting
+// way.
+async function statsForStudent(student) {
+  const classes = await classesForStudent(student.id);
+  const classesWithGrades = await Promise.all(
+    classes.map(async (cls) => {
+      const totals = await db
+        .prepare(
+          `SELECT COALESCE(SUM(s.points_earned), 0) AS earned, COALESCE(SUM(ci.points_possible), 0) AS possible
+           FROM family_school_lessons l
+           JOIN family_school_content_items ci ON ci.lesson_id = l.id AND ci.type = 'assignment_submission'
+           JOIN family_school_assignment_submissions s ON s.content_item_id = ci.id AND s.student_id = ? AND s.status = 'graded'
+           WHERE l.class_id = ?`
+        )
+        .get(student.id, cls.id);
+      const possible = Number(totals.possible);
+      const percent = possible > 0 ? (Number(totals.earned) / possible) * 100 : null;
+      return { ...cls, gradePercent: percent, gradeLetter: percentToLetterGrade(percent) };
+    })
+  );
+  const gradedClasses = classesWithGrades.filter((c) => c.gradeLetter);
+  const gpa =
+    gradedClasses.length > 0
+      ? gradedClasses.reduce((sum, c) => sum + LETTER_GRADE_GPA_POINTS[c.gradeLetter], 0) / gradedClasses.length
+      : null;
+  const presentDays = Number(
+    (await db.prepare("SELECT COUNT(*) AS n FROM family_school_attendance WHERE student_id = ? AND status = 'present'").get(student.id)).n
+  );
+  return {
+    ...student,
+    photoUrl: memberPhotoUrl(student.photo_path),
+    classes: classesWithGrades,
+    gpa,
+    presentDays,
+    attendanceTargetDays: ATTENDANCE_TARGET_DAYS,
+  };
+}
+
 async function overviewForFamily(familyId) {
   const students = await db
     .prepare("SELECT * FROM members WHERE family_id = ? AND member_type = 'student' AND active = 1 ORDER BY name COLLATE \"C\"")
     .all(familyId);
-  return Promise.all(
-    students.map(async (student) => {
-      const classes = await classesForStudent(student.id);
-      const classesWithGrades = await Promise.all(
-        classes.map(async (cls) => {
-          const totals = await db
-            .prepare(
-              `SELECT COALESCE(SUM(s.points_earned), 0) AS earned, COALESCE(SUM(ci.points_possible), 0) AS possible
-               FROM family_school_lessons l
-               JOIN family_school_content_items ci ON ci.lesson_id = l.id AND ci.type = 'assignment_submission'
-               JOIN family_school_assignment_submissions s ON s.content_item_id = ci.id AND s.student_id = ? AND s.status = 'graded'
-               WHERE l.class_id = ?`
-            )
-            .get(student.id, cls.id);
-          const possible = Number(totals.possible);
-          const percent = possible > 0 ? (Number(totals.earned) / possible) * 100 : null;
-          return { ...cls, gradePercent: percent, gradeLetter: percentToLetterGrade(percent) };
-        })
-      );
-      const gradedClasses = classesWithGrades.filter((c) => c.gradeLetter);
-      const gpa =
-        gradedClasses.length > 0
-          ? gradedClasses.reduce((sum, c) => sum + LETTER_GRADE_GPA_POINTS[c.gradeLetter], 0) / gradedClasses.length
-          : null;
-      const presentDays = Number(
-        (await db.prepare("SELECT COUNT(*) AS n FROM family_school_attendance WHERE student_id = ? AND status = 'present'").get(student.id)).n
-      );
-      return {
-        ...student,
-        photoUrl: memberPhotoUrl(student.photo_path),
-        classes: classesWithGrades,
-        gpa,
-        presentDays,
-        attendanceTargetDays: ATTENDANCE_TARGET_DAYS,
-      };
-    })
-  );
+  return Promise.all(students.map(statsForStudent));
 }
 
 // --- Attendance (the Attendance subpage - a real request: "View a
@@ -686,6 +693,38 @@ async function deleteJournalAttachment(id) {
   }
 }
 
+// --- Volunteer Hours (its own subpage - a real request: "Family
+// school management, add a subpage for volunteer hours. Be able to
+// track and add volunteer hours per student and have a log.") A
+// family's own self-tracked homeschool volunteer hours - NOT the
+// separate co-op-wide Volunteers/Floater system (utils/volunteers.js). ---
+
+async function volunteerHoursForStudent(studentId) {
+  return db
+    .prepare('SELECT * FROM family_school_volunteer_hours WHERE student_id = ? ORDER BY hour_date DESC, id DESC')
+    .all(studentId);
+}
+
+async function totalVolunteerHoursForStudent(studentId) {
+  const row = await db.prepare('SELECT COALESCE(SUM(hours), 0) AS total FROM family_school_volunteer_hours WHERE student_id = ?').get(studentId);
+  return Number(row.total);
+}
+
+async function createVolunteerHourEntry({ studentId, hourDate, hours, activityDescription, createdByAccountId }) {
+  const info = await db
+    .prepare('INSERT INTO family_school_volunteer_hours (student_id, hour_date, hours, activity_description, created_by_account_id) VALUES (?, ?, ?, ?, ?)')
+    .run(studentId, hourDate, hours, activityDescription || null, createdByAccountId);
+  return info.lastInsertRowid;
+}
+
+async function getVolunteerHourEntry(id) {
+  return db.prepare('SELECT * FROM family_school_volunteer_hours WHERE id = ?').get(id);
+}
+
+async function deleteVolunteerHourEntry(id) {
+  await db.prepare('DELETE FROM family_school_volunteer_hours WHERE id = ?').run(id);
+}
+
 // --- Annual Planner (its own subpage - a real request: "Family
 // management should also have a subpage called annual planner where
 // it is organized by student and you add curriculum under each
@@ -814,6 +853,33 @@ function weekDateRangeLabel(dates) {
   return `${formatDateLong(sorted[0])} - ${formatDateLong(sorted[sorted.length - 1])}`;
 }
 
+// A real request: "show a circle graph for each week below the week
+// plan that shows percentage of each subject calculated based off the
+// subject of the lessons or assignments that are assigned." Flattens
+// every date's own .assignments (weekGrid's own shape) and tallies by
+// .subject - an assignment added without ever typing one groups under a
+// literal "Other" bucket rather than being silently dropped from the
+// chart. Shared by both the Parent Portal (editable) and Student Portal
+// (read-only) weekly planner pages, and the print/PDF view, so the exact
+// same breakdown/rounding is never recomputed three slightly different
+// ways.
+function subjectBreakdownForGrid(grid) {
+  const counts = new Map();
+  let total = 0;
+  for (const d of grid) {
+    for (const a of d.assignments) {
+      const subject = (a.subject || '').trim() || 'Other';
+      counts.set(subject, (counts.get(subject) || 0) + 1);
+      total += 1;
+    }
+  }
+  return Array.from(counts.entries()).map(([subject, count]) => ({
+    subject,
+    count,
+    percent: total > 0 ? Math.round((count / total) * 1000) / 10 : 0,
+  }));
+}
+
 async function createWeekAssignment({ weekDateId, subject, title, contentItemId }) {
   const { next_position: nextPosition } = await db
     .prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM family_school_week_assignments WHERE week_date_id = ?')
@@ -832,6 +898,14 @@ async function deleteWeekAssignment(id) {
   await db.prepare('DELETE FROM family_school_week_assignments WHERE id = ?').run(id);
 }
 
+// A real request: "allow to drag and drop lessons and assignments
+// between days." The grid itself has no separate ordering concern across
+// days (position only orders assignments WITHIN one day) - a drag just
+// reassigns which date's column this assignment belongs to.
+async function moveWeekAssignment(assignmentId, newWeekDateId) {
+  await db.prepare('UPDATE family_school_week_assignments SET week_date_id = ? WHERE id = ?').run(newWeekDateId, assignmentId);
+}
+
 // "Dropdown to choose an assignment from family management assignments
 // from parent created classes" - every assignment-type content item
 // (not video/text/file) across every class this family has ever
@@ -848,6 +922,47 @@ async function assignmentOptionsForFamily(familyId) {
        ORDER BY c.class_name COLLATE "C", ci.title COLLATE "C"`
     )
     .all(familyId);
+}
+
+// --- Portfolio (its own subpage - a real request: "add a subpage
+// called portfolio. This will summarize all family school management
+// features for each student and create a visual profile of everything.
+// Pdf and print view.") Pulls together every other subpage's own data
+// for ONE student into a single bundle - no new tables, just read-only
+// aggregation of what classesForStudent/statsForStudent/curriculumFor
+// Student/totalVolunteerHoursForStudent/journalEntriesForStudent/
+// weeksForOwner+weekGrid+subjectBreakdownForGrid already compute
+// elsewhere. recentWeek is this student's own most-recently-created
+// Weekly Planner week (if any) - showing every week here would make the
+// page unbounded, and "a visual profile" reads as a snapshot, not a
+// full history dump (the Weekly Planner subpage itself is still where
+// every week lives). ---
+async function portfolioForStudent(studentId) {
+  const student = await db.prepare("SELECT * FROM members WHERE id = ? AND member_type = 'student'").get(studentId);
+  if (!student) return null;
+  const stats = await statsForStudent(student);
+  const curriculum = await curriculumForStudent(studentId);
+  const totalVolunteerHours = await totalVolunteerHoursForStudent(studentId);
+  const journalEntries = (await journalEntriesForStudent(studentId)).slice(0, 5);
+  const weeks = await weeksForOwner(student.family_id, 'student', studentId);
+  let recentWeek = null;
+  let recentWeekGrid = null;
+  let recentWeekSubjectBreakdown = [];
+  if (weeks.length > 0) {
+    recentWeek = weeks[0];
+    recentWeekGrid = await weekGrid(recentWeek.id);
+    recentWeekGrid.forEach((d) => { d.dateLabel = formatDateLabel(d.date); });
+    recentWeekSubjectBreakdown = subjectBreakdownForGrid(recentWeekGrid);
+  }
+  return {
+    ...stats,
+    curriculum,
+    totalVolunteerHours,
+    journalEntries,
+    recentWeek,
+    recentWeekGrid,
+    recentWeekSubjectBreakdown,
+  };
 }
 
 module.exports = {
@@ -900,6 +1015,11 @@ module.exports = {
   getJournalAttachment,
   addJournalAttachment,
   deleteJournalAttachment,
+  volunteerHoursForStudent,
+  totalVolunteerHoursForStudent,
+  createVolunteerHourEntry,
+  getVolunteerHourEntry,
+  deleteVolunteerHourEntry,
   currentSchoolYear,
   schoolYearOptions,
   curriculumForStudent,
@@ -913,8 +1033,11 @@ module.exports = {
   getWeekDate,
   weekGrid,
   weekDateRangeLabel,
+  subjectBreakdownForGrid,
   createWeekAssignment,
   getWeekAssignment,
   deleteWeekAssignment,
+  moveWeekAssignment,
   assignmentOptionsForFamily,
+  portfolioForStudent,
 };

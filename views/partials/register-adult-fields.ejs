@@ -1,0 +1,71 @@
+<%
+// One repeatable "Adult" block on the public self-registration form
+// (views/portal-register.ejs) - a real request: "There is a +child
+// button. There should also be an add adult button." Same clone-a-
+// <template> pattern as partials/register-child-fields.ejs (see public/
+// js/portal-register-form.js), for a second (or third, etc.) parent/
+// guardian beyond the one already inline at the top of the form.
+//
+// Fully optional, same as a child block here - a blank block is
+// silently dropped server-side (routes/portal-auth.js's own additional-
+// parents filter) rather than blocking submission. No portal-login
+// toggle (unlike a child block) - an additional adult here is a profile
+// entry only; a Main Admin can grant them their own login later from
+// Users, the same as any other admin-entered member without one yet.
+//
+// `values` carries back whatever the visitor typed if the whole form
+// re-renders after a validation error, same as register-child-fields.ejs.
+const v = (typeof values !== 'undefined' && values) || {};
+%>
+<div class="manage-section register-adult-block" data-adult-block>
+  <div class="membership-child-header">
+    <h3>Additional Parent/Guardian</h3>
+    <button type="button" class="icon-btn register-remove-adult" aria-label="Remove adult" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+  </div>
+  <div class="member-form-grid">
+    <label>First Name
+      <input type="text" name="additionalParents[<%= index %>][firstName]" value="<%= v.firstName || '' %>" />
+    </label>
+    <label>Last Name
+      <input type="text" name="additionalParents[<%= index %>][lastName]" value="<%= v.lastName || '' %>" />
+    </label>
+    <label>Email
+      <input type="email" name="additionalParents[<%= index %>][email]" value="<%= v.email || '' %>" />
+    </label>
+    <label>Phone Number
+      <input type="tel" name="additionalParents[<%= index %>][phone]" value="<%= v.phone || '' %>" placeholder="555-123-4567" />
+    </label>
+  </div>
+
+  <%# "When adding an additional parent there should be a check box that
+      says address is the same." Checked by default - most families
+      share one address, and public/js/portal-register-form.js hides
+      (not disables) the fields below while it's checked so a visitor
+      never has to clear them back out to use their own address. %>
+  <label class="checkbox-option">
+    <input type="checkbox" class="register-adult-same-address-toggle" data-adult-same-address-toggle name="additionalParents[<%= index %>][sameAddress]" value="1" <%= v.sameAddress === false ? '' : 'checked' %> />
+    Address is the same as the first parent/guardian
+  </label>
+  <div class="member-form-grid register-adult-address-fields" data-adult-address-fields <%= v.sameAddress === false ? '' : 'hidden' %>>
+    <label class="member-form-full">Address
+      <input type="text" name="additionalParents[<%= index %>][address]" value="<%= v.address || '' %>" />
+    </label>
+    <label class="member-form-full">Address 2
+      <input type="text" name="additionalParents[<%= index %>][address2]" value="<%= v.address2 || '' %>" />
+    </label>
+    <label>City
+      <input type="text" name="additionalParents[<%= index %>][city]" value="<%= v.city || '' %>" />
+    </label>
+    <label>State
+      <input type="text" name="additionalParents[<%= index %>][state]" value="<%= v.state || '' %>" />
+    </label>
+    <label>Zip Code
+      <input type="text" name="additionalParents[<%= index %>][zip]" value="<%= v.zip || '' %>" />
+    </label>
+  </div>
+
+  <%# A real request: "Should be able to upload parent profile photos." %>
+  <label class="member-form-full">Photo
+    <input type="file" name="additionalParents[<%= index %>][photo]" accept="image/*" />
+  </label>
+</div>

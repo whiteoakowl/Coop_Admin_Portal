@@ -13,7 +13,7 @@
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <form method="POST" action="/register" id="portal-register-form" class="form-outer-panel">
+    <form method="POST" action="/register" id="portal-register-form" class="form-outer-panel" enctype="multipart/form-data">
       <div class="form-section">
         <h2>Parent / Guardian</h2>
         <div class="member-form-grid">
@@ -29,17 +29,54 @@
           <label class="member-form-full">Phone Number
             <input type="tel" id="register-phone-input" name="phone" value="<%= formValues.phone || '' %>" placeholder="555-123-4567" autocomplete="tel" />
           </label>
+          <%# "Under first parent/guardian it should have address 1,
+              address 2, city, state, zip code." %>
+          <label class="member-form-full">Address
+            <input type="text" name="address" value="<%= formValues.address || '' %>" autocomplete="address-line1" />
+          </label>
+          <label class="member-form-full">Address 2
+            <input type="text" name="address2" value="<%= formValues.address2 || '' %>" autocomplete="address-line2" />
+          </label>
+          <label>City
+            <input type="text" name="city" value="<%= formValues.city || '' %>" autocomplete="address-level2" />
+          </label>
+          <label>State
+            <input type="text" name="state" value="<%= formValues.state || '' %>" autocomplete="address-level1" />
+          </label>
+          <label>Zip Code
+            <input type="text" name="zip" value="<%= formValues.zip || '' %>" autocomplete="postal-code" />
+          </label>
+          <%# "Should be able to upload parent profile photos." %>
+          <label class="member-form-full">Photo
+            <input type="file" name="photo" accept="image/*" />
+          </label>
         </div>
         <% parentFields.forEach(function(f) { %>
           <%- include('partials/membership-form-field', { field: f, namePrefix: 'customFields', values: formValues.customFields }) %>
         <% }); %>
       </div>
 
+      <%# A real request: "There is a +child button. There should also
+          be an add adult button." A second (or third, etc.) parent/
+          guardian, kept in its own section rather than crowded into the
+          one inline block above - partials/register-adult-fields.ejs's
+          own header comment for why there's no portal-login toggle here
+          the way a child block gets one. %>
+      <div class="form-section">
+        <h2>Additional Parents / Guardians</h2>
+        <div id="register-adults">
+          <% (additionalParents && additionalParents.length ? additionalParents : []).forEach(function(adult, i) { %>
+            <%- include('partials/register-adult-fields', { index: i, values: adult }) %>
+          <% }); %>
+        </div>
+        <button type="button" class="btn-secondary" id="add-adult-btn">+ Add Adult</button>
+      </div>
+
       <div class="form-section">
         <h2>Children</h2>
         <div id="register-children">
           <% (children && children.length ? children : []).forEach(function(child, i) { %>
-            <%- include('partials/register-child-fields', { index: i, gradeOptions, values: child, childFields }) %>
+            <%- include('partials/register-child-fields', { index: i, values: child, childFields }) %>
           <% }); %>
         </div>
         <button type="button" class="btn-secondary" id="add-child-btn">+ Add Child</button>
@@ -79,10 +116,19 @@
             self-contained screenshot/link target, without scrolling back
             up to prove a phone number was actually entered. %>
         <p class="hint">Texting: <strong id="sms-opt-in-phone-echo">(enter your phone number above)</strong></p>
-        <p class="hint">Sanford Homeschoolers may send SMS text messages to the phone number above for co-op announcements, event reminders, and schedule changes. Message frequency varies. Msg &amp; data rates may apply. Reply STOP to a message at any time to opt out, or HELP for help. See our <a href="/privacy-policy" target="_blank">Privacy Policy</a> and <a href="/terms-and-conditions" target="_blank">Terms and Conditions</a>.</p>
+        <%# A real request: "Agree to sms notification the check box
+            should be on the first row next to the first word of the
+            permission." The checkbox now sits inline, directly before
+            "Sanford Homeschoolers may send..." (the permission text
+            itself), on the same row/paragraph, instead of on its own
+            separate line below it - the old standalone "I agree to
+            receive..." sentence is folded into this same label rather
+            than kept as a second, redundant agreement statement.
+            name="smsOptIn"/the server-side handling in routes/portal-
+            auth.js are unchanged. %>
         <label class="checkbox-option">
           <input type="checkbox" name="smsOptIn" value="1" />
-          I agree to receive SMS text messages from Sanford Homeschoolers at the phone number provided above.
+          Sanford Homeschoolers may send SMS text messages to the phone number above for co-op announcements, event reminders, and schedule changes. Message frequency varies. Msg &amp; data rates may apply. Reply STOP to a message at any time to opt out, or HELP for help. See our <a href="/privacy-policy" target="_blank">Privacy Policy</a> and <a href="/terms-and-conditions" target="_blank">Terms and Conditions</a>.
         </label>
         <p class="hint">Optional - you can still register without opting in to SMS, and can change this later from your account's Notification Preferences.</p>
       </div>
@@ -114,7 +160,7 @@
         </div>
         <label class="checkbox-option">
           <input type="checkbox" name="handbookRead" id="handbook-read-checkbox" value="1" required disabled />
-          I have read the Policy Handbook
+          I have read and agree to the Sanford Homeschoolers Policy Handbook.
         </label>
         <p class="hint" id="handbook-scroll-hint">Scroll through the handbook above to enable this checkbox.</p>
       </div>
@@ -140,8 +186,12 @@
     </form>
   </main>
 
+  <template id="register-adult-template">
+    <%- include('partials/register-adult-fields', { index: '__INDEX__', values: {} }) %>
+  </template>
+
   <template id="register-child-template">
-    <%- include('partials/register-child-fields', { index: '__INDEX__', gradeOptions, values: {}, childFields }) %>
+    <%- include('partials/register-child-fields', { index: '__INDEX__', values: {}, childFields }) %>
   </template>
 
   <script src="/js/portal-register-form.js"></script>

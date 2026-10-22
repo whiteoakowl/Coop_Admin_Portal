@@ -1,0 +1,108 @@
+<%
+// Shared by the live Portfolio page and its print/PDF view - a real
+// request: "This will summarize all family school management features
+// for each student and create a visual profile of everything." Pulls
+// together classes/grades/GPA, attendance (the same 180-day bar the
+// Overview cards show), Volunteer Hours, Curriculum, recent Daily
+// Learning Log entries, and the student's most recent Weekly Planner
+// week's own subject breakdown - one read-only snapshot, not a second
+// copy of any of those subpages' own editing UI.
+const gradeBadgeClass = function (letter) {
+  if (letter === 'A' || letter === 'B') return 'badge-pill-green';
+  if (letter === 'C') return 'badge-pill-gold';
+  if (letter === 'D' || letter === 'F') return 'badge-pill-red';
+  return 'badge-pill-gray';
+};
+%>
+<% if (!portfolio) { %>
+  <p class="roster-empty">No homeschool record on file yet.</p>
+<% } else { %>
+  <div class="fs-portfolio">
+    <div class="fs-portfolio-header">
+      <span class="member-avatar fs-overview-avatar member-avatar-<%= avatarColorFor(portfolio.id) %>">
+        <% if (portfolio.photoUrl) { %>
+          <img src="<%= portfolio.photoUrl %>" alt="" />
+        <% } else { %>
+          <%= portfolio.name.charAt(0).toUpperCase() %>
+        <% } %>
+      </span>
+      <div>
+        <h2 class="fs-overview-name"><%= portfolio.name %></h2>
+        <p class="hint"><%= portfolio.grade_level || 'No grade level set' %></p>
+      </div>
+    </div>
+
+    <div class="fs-overview-stats fs-portfolio-stats">
+      <div class="fs-overview-stat">
+        <span class="fs-overview-stat-label">GPA</span>
+        <span class="fs-overview-stat-value"><%= portfolio.gpa != null ? portfolio.gpa.toFixed(2) : '—' %></span>
+      </div>
+      <div class="fs-overview-stat">
+        <span class="fs-overview-stat-label">Attendance</span>
+        <span class="fs-overview-stat-value"><%= portfolio.presentDays %>/<%= portfolio.attendanceTargetDays %></span>
+      </div>
+      <div class="fs-overview-stat">
+        <span class="fs-overview-stat-label">Volunteer Hours</span>
+        <span class="fs-overview-stat-value"><%= portfolio.totalVolunteerHours %></span>
+      </div>
+    </div>
+    <%- include('fs-attendance-bar', { presentDays: portfolio.presentDays, attendanceTargetDays: portfolio.attendanceTargetDays }) %>
+
+    <div class="fs-portfolio-section">
+      <h3>Classes &amp; Grades</h3>
+      <% if (portfolio.classes.length === 0) { %>
+        <p class="roster-empty">Not assigned to any family classes yet.</p>
+      <% } else { %>
+        <ul class="fs-overview-classes-list">
+          <% portfolio.classes.forEach(function(c) { %>
+            <li>
+              <span><%= c.class_name %></span>
+              <span class="badge-pill <%= gradeBadgeClass(c.gradeLetter) %>"><%= c.gradeLetter || 'No grade yet' %></span>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+    </div>
+
+    <div class="fs-portfolio-section">
+      <h3>Curriculum</h3>
+      <% if (portfolio.curriculum.length === 0) { %>
+        <p class="roster-empty">No curriculum added yet.</p>
+      <% } else { %>
+        <ul class="fs-overview-classes-list">
+          <% portfolio.curriculum.forEach(function(c) { %>
+            <li>
+              <span><%= c.name %><% if (c.subject) { %> &mdash; <%= c.subject %><% } %></span>
+              <span class="hint"><%= c.school_year || '' %></span>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+    </div>
+
+    <div class="fs-portfolio-section">
+      <h3>Recent Daily Learning Log</h3>
+      <% if (portfolio.journalEntries.length === 0) { %>
+        <p class="roster-empty">No journal entries yet.</p>
+      <% } else { %>
+        <ul class="fs-portfolio-journal-list">
+          <% portfolio.journalEntries.forEach(function(j) { %>
+            <li>
+              <span class="hint"><%= j.entry_date %></span>
+              <div><%- j.body %></div>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+    </div>
+
+    <div class="fs-portfolio-section">
+      <h3>Weekly Planner<% if (portfolio.recentWeek) { %> &mdash; <%= portfolio.recentWeek.title %><% } %></h3>
+      <% if (!portfolio.recentWeek) { %>
+        <p class="roster-empty">No weekly plans yet.</p>
+      <% } else { %>
+        <%- include('family-school-subject-chart', { subjectBreakdown: portfolio.recentWeekSubjectBreakdown }) %>
+      <% } %>
+    </div>
+  </div>
+<% } %>
