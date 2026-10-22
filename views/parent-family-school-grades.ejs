@@ -26,9 +26,6 @@
         tab instead of calling window.print() directly here. %>
     <% if (familyStudents.length > 0) { %>
       <div class="roster-btn-row roster-btn-row-fit-text no-print">
-        <a class="icon-btn" href="/parent/family-school/grades/export.csv?studentId=<%= selectedStudentId %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-        <a class="icon-btn" href="/parent/family-school/grades/print?studentId=<%= selectedStudentId %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
-        <a class="icon-btn" href="/parent/family-school/grades/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         <details class="filter-details">
           <summary class="roster-action-btn">Filter</summary>
           <form method="GET" action="/parent/family-school/grades" class="filter-panel">
@@ -40,6 +37,11 @@
             </select>
           </form>
         </details>
+      </div>
+      <div class="roster-btn-row no-print">
+        <a class="icon-btn" href="/parent/family-school/grades/export.csv?studentId=<%= selectedStudentId %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/grades/print?studentId=<%= selectedStudentId %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/grades/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
       </div>
     <% } %>
 

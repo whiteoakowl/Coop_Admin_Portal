@@ -36,11 +36,8 @@
         the current Filter selection carried over as repeated studentId
         params) in a new tab instead of calling window.print() directly
         here. %>
-    <div class="roster-btn-row roster-btn-row-fit-text no-print">
-      <a class="icon-btn" href="/parent/family-school/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-      <a class="icon-btn" href="/parent/family-school/print<% if (filterStudentIds.length) { %>?<% filterStudentIds.forEach(function(id, i) { %><%= i > 0 ? '&' : '' %>studentId=<%= id %><% }); %><% } %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
-      <a class="icon-btn" href="/parent/family-school/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
-      <% if (allStudents.length > 0) { %>
+    <% if (allStudents.length > 0) { %>
+      <div class="roster-btn-row roster-btn-row-fit-text no-print">
         <details class="filter-details">
           <summary class="roster-action-btn">Filter</summary>
           <form method="GET" action="/parent/family-school" class="filter-panel">
@@ -53,7 +50,12 @@
             <button type="submit" class="primary-btn">Apply</button>
           </form>
         </details>
-      <% } %>
+      </div>
+    <% } %>
+    <div class="roster-btn-row no-print">
+      <a class="icon-btn" href="/parent/family-school/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+      <a class="icon-btn" href="/parent/family-school/print<% if (filterStudentIds.length) { %>?<% filterStudentIds.forEach(function(id, i) { %><%= i > 0 ? '&' : '' %>studentId=<%= id %><% }); %><% } %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+      <a class="icon-btn" href="/parent/family-school/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
     </div>
 
     <%
