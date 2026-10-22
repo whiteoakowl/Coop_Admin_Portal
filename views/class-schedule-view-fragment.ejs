@@ -145,11 +145,13 @@
   <div class="class-manage-roster-col">
     <div class="roster-btn-row roster-btn-row-fit-text class-view-roster-actions">
       <button type="button" class="roster-action-btn" onclick="document.getElementById('add-roster-member-dialog-<%= cls.id %>').showModal()">+ Add Member</button>
+      <button type="button" class="roster-action-btn" data-open-allergy-log><svg class="icon"><use href="#icon-medical-bag"/></svg> Allergies/Medical</button>
+      <a class="roster-action-btn" href="/kiosk/class-checkin/classes/<%= cls.id %>/attendance" target="_blank"><svg class="icon"><use href="#icon-user-check"/></svg> Class Check-In Link</a>
+    </div>
+    <div class="roster-btn-row">
       <button type="button" class="icon-btn" onclick="document.getElementById('roster-import-dialog-<%= cls.id %>').showModal()" aria-label="Import" title="Import"><svg class="icon"><use href="#icon-upload"/></svg></button>
       <a class="icon-btn" href="/admin/class-schedule/classes/<%= cls.id %>/roster/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
       <a class="icon-btn" href="/admin/class-schedule/classes/<%= cls.id %>/roster/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
-      <button type="button" class="roster-action-btn" data-open-allergy-log><svg class="icon"><use href="#icon-medical-bag"/></svg> Allergies/Medical</button>
-      <a class="roster-action-btn" href="/kiosk/class-checkin/classes/<%= cls.id %>/attendance" target="_blank"><svg class="icon"><use href="#icon-user-check"/></svg> Class Check-In Link</a>
     </div>
 
     <div class="manage-section">

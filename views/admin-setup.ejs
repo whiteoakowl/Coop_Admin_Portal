@@ -32,6 +32,8 @@
         <div class="roster-btn-row roster-btn-row-fit-text">
           <button type="button" class="roster-action-btn" onclick="document.getElementById('new-team-dialog').showModal()">+ Create New Team</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
+        </div>
+        <div class="roster-btn-row">
           <a class="icon-btn" href="/admin/setup/<%= day %>/export.csv?semesterId=<%= semesterId %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
           <%# A real bug report: "floater team and setup cleanup teams
               should have a print preview before going to print." Lands on
