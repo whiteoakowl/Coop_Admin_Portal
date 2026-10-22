@@ -63,6 +63,11 @@ const {
   getJournalAttachment,
   addJournalAttachment,
   deleteJournalAttachment,
+  volunteerHoursForStudent,
+  totalVolunteerHoursForStudent,
+  createVolunteerHourEntry,
+  getVolunteerHourEntry,
+  deleteVolunteerHourEntry,
   currentSchoolYear,
   schoolYearOptions,
   curriculumForStudent,
@@ -76,10 +81,13 @@ const {
   getWeekDate,
   weekGrid,
   weekDateRangeLabel,
+  subjectBreakdownForGrid,
   createWeekAssignment,
   getWeekAssignment,
   deleteWeekAssignment,
+  moveWeekAssignment,
   assignmentOptionsForFamily,
+  portfolioForStudent,
 } = require('../utils/familySchool');
 const { isValidISODate, formatDateLabel } = require('../utils/dates');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
@@ -842,6 +850,59 @@ router.post('/family-school/journal/:id/attachments/:attachmentId/delete', async
   res.redirect(`/parent/family-school/journal?studentId=${entry.student_id}&notice=` + encodeURIComponent('Attachment removed.'));
 });
 
+// --- Volunteer Hours subpage - a real request: "Family school
+// management, add a subpage for volunteer hours. Be able to track and
+// add volunteer hours per student and have a log." Same per-student
+// owner-select UX as Attendance/Journal above. ---
+
+router.get('/family-school/volunteer-hours', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
+  const isOwnStudent = selectedStudentId && familyStudents.some((s) => s.id === selectedStudentId);
+  const entries = isOwnStudent ? await volunteerHoursForStudent(selectedStudentId) : [];
+  const totalHours = isOwnStudent ? await totalVolunteerHoursForStudent(selectedStudentId) : 0;
+  res.render('parent-family-school-volunteer-hours', {
+    title: 'Volunteer Hours',
+    familyStudents,
+    selectedStudentId: isOwnStudent ? selectedStudentId : null,
+    entries,
+    totalHours,
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+router.get('/family-school/volunteer-hours/export.csv', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
+  const student = familyStudents.find((s) => s.id === selectedStudentId);
+  const entries = student ? await volunteerHoursForStudent(student.id) : [];
+  const lines = [toCsvRow(['Student', 'Date', 'Hours', 'Activity']), ...entries.map((e) => toCsvRow([student.name, e.hour_date, e.hours, e.activity_description || '']))];
+  sendCsv(res, 'volunteer-hours.csv', lines);
+});
+
+router.post('/family-school/volunteer-hours', async (req, res) => {
+  const studentId = parseInt(req.body.studentId, 10);
+  if (!(await requireOwnStudent(req, studentId))) return res.status(404).send('Not found');
+  const hourDate = (req.body.hourDate || '').trim();
+  const hours = Number(req.body.hours);
+  const activityDescription = (req.body.activityDescription || '').trim();
+  const backUrl = `/parent/family-school/volunteer-hours?studentId=${studentId}`;
+  if (!isValidISODate(hourDate)) return res.redirect(`${backUrl}&error=` + encodeURIComponent('Choose a valid date.'));
+  if (!Number.isFinite(hours) || hours <= 0) return res.redirect(`${backUrl}&error=` + encodeURIComponent('Hours must be a positive number.'));
+  await createVolunteerHourEntry({ studentId, hourDate, hours, activityDescription, createdByAccountId: req.portalAccount.id });
+  res.redirect(`${backUrl}&notice=` + encodeURIComponent('Volunteer hours added.'));
+});
+
+router.post('/family-school/volunteer-hours/:id/delete', async (req, res) => {
+  const entry = await getVolunteerHourEntry(parseInt(req.params.id, 10));
+  if (!entry || !(await requireOwnStudent(req, entry.student_id))) return res.status(404).send('Not found');
+  await deleteVolunteerHourEntry(entry.id);
+  res.redirect(`/parent/family-school/volunteer-hours?studentId=${entry.student_id}&notice=` + encodeURIComponent('Entry removed.'));
+});
+
 // --- Annual Planner subpage - a real request: "Family management
 // should also have a subpage called annual planner where it is
 // organized by student and you add curriculum under each student. Pop
@@ -1005,9 +1066,11 @@ router.get('/family-school/weekly-planner', async (req, res) => {
   const selectedWeekId = req.query.weekId ? parseInt(req.query.weekId, 10) : null;
   const selectedWeek = selectedWeekId ? weeks.find((w) => w.id === selectedWeekId) : null;
   let grid = null;
+  let subjectBreakdown = null;
   if (selectedWeek) {
     grid = await weekGrid(selectedWeek.id);
     grid.forEach((d) => { d.dateLabel = formatDateLabel(d.date); });
+    subjectBreakdown = subjectBreakdownForGrid(grid);
   }
 
   res.render('parent-family-school-weekly-planner', {
@@ -1018,6 +1081,7 @@ router.get('/family-school/weekly-planner', async (req, res) => {
     weeks,
     selectedWeek,
     grid,
+    subjectBreakdown,
     assignmentOptions: await assignmentOptionsForFamily(familyId),
     notice: req.query.notice || null,
     error: req.query.error || null,
@@ -1088,6 +1152,26 @@ router.post('/family-school/weekly-planner/assignments/:id/delete', async (req, 
   res.redirect(`/parent/family-school/weekly-planner?owner=${encodeURIComponent(owner)}&weekId=${week.id}&notice=` + encodeURIComponent('Assignment removed.'));
 });
 
+// A real request: "allow to drag and drop lessons and assignments
+// between days." A drag-and-drop action, not a full-page form submit -
+// JSON in/out, like routes/teacher-portal.js's own barcode-scan routes.
+// Same ownership check as the delete route above, PLUS a second check
+// that the drop target date belongs to this SAME week - a drag can only
+// ever originate from (and the client-side JS only ever offers) a date
+// column already rendered as part of the one selectedWeek on this page,
+// but the request body is still never trusted blindly.
+router.post('/family-school/weekly-planner/assignments/:id/move', async (req, res) => {
+  const assignment = await getWeekAssignment(parseInt(req.params.id, 10));
+  const weekDate = assignment && (await getWeekDate(assignment.week_date_id));
+  const week = weekDate && (await requireOwnWeek(req, weekDate.week_id));
+  if (!week) return res.json({ ok: false, message: 'Not found.' });
+  const newWeekDateId = parseInt(req.body.weekDateId, 10);
+  const targetDate = await getWeekDate(newWeekDateId);
+  if (!targetDate || targetDate.week_id !== week.id) return res.json({ ok: false, message: 'That day is not part of this week.' });
+  await moveWeekAssignment(assignment.id, newWeekDateId);
+  res.json({ ok: true });
+});
+
 // A real request: "Print should show the whole week on one page clean.
 // Title should be the students name and the date range for the week."
 async function weeklyPlannerPrintLocals(req) {
@@ -1103,6 +1187,7 @@ async function weeklyPlannerPrintLocals(req) {
     ownerLabel: ownerDisplayLabel(week.owner_type === 'student' ? { ownerType: 'student', studentId: week.student_id } : { ownerType: week.owner_type }, familyStudents),
     dateRangeLabel: weekDateRangeLabel(dates),
     dates,
+    subjectBreakdown: subjectBreakdownForGrid(dates),
   };
 }
 
@@ -1117,6 +1202,49 @@ router.get('/family-school/weekly-planner/download.pdf', async (req, res) => {
   if (!locals) return res.status(404).send('Not found');
   const pdf = await renderViewToPdf(req, 'parent-family-school-weekly-planner-print', locals);
   sendPdf(res, 'weekly-planner.pdf', pdf);
+});
+
+// A real request: "add a subpage called portfolio. This will summarize
+// all family school management features for each student and create a
+// visual profile of everything. Pdf and print view." One student at a
+// time (a per-student owner-select, same convention as Weekly Planner/
+// Attendance/Journal above) rather than every student at once, since
+// "a visual profile" reads as a single student's own portfolio, not a
+// family-wide summary page (that's what the bare Overview page already
+// is). portfolioForStudent (utils/familySchool.js) does all the
+// aggregation; this route is just picking which student and loading it.
+async function resolvePortfolioStudent(req) {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  if (familyStudents.length === 0) return { familyStudents, studentId: null, portfolio: null };
+  const requestedId = req.query.studentId ? parseInt(req.query.studentId, 10) : null;
+  const studentId = requestedId && familyStudents.some((s) => s.id === requestedId) ? requestedId : familyStudents[0].id;
+  const portfolio = await portfolioForStudent(studentId);
+  return { familyStudents, studentId, portfolio };
+}
+
+router.get('/family-school/portfolio', async (req, res) => {
+  const { familyStudents, studentId, portfolio } = await resolvePortfolioStudent(req);
+  res.render('parent-family-school-portfolio', {
+    title: 'Portfolio',
+    familyStudents,
+    studentId,
+    portfolio,
+    avatarColorFor,
+  });
+});
+
+router.get('/family-school/portfolio/print', async (req, res) => {
+  const { familyStudents, studentId, portfolio } = await resolvePortfolioStudent(req);
+  if (!portfolio) return res.status(404).send('Not found');
+  res.render('parent-family-school-portfolio-print', { title: 'Portfolio', familyStudents, studentId, portfolio, avatarColorFor });
+});
+
+router.get('/family-school/portfolio/download.pdf', async (req, res) => {
+  const { familyStudents, studentId, portfolio } = await resolvePortfolioStudent(req);
+  if (!portfolio) return res.status(404).send('Not found');
+  const pdf = await renderViewToPdf(req, 'parent-family-school-portfolio-print', { title: 'Portfolio', familyStudents, studentId, portfolio, avatarColorFor });
+  sendPdf(res, `portfolio-${portfolio.name.replace(/[^a-z0-9]+/gi, '-')}.pdf`, pdf);
 });
 
 module.exports = router;

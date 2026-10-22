@@ -13,8 +13,10 @@
         <a class="btn-secondary" href="/parent/family-school/classes">Family Classes</a>
         <a class="btn-secondary" href="/parent/family-school/grades">Family Grades</a>
         <a class="btn-secondary" href="/parent/family-school/attendance">Family Attendance</a>
+        <a class="btn-secondary" href="/parent/family-school/volunteer-hours">Volunteer Hours</a>
         <a class="btn-secondary" href="/parent/family-school/annual-planner">Annual Planner</a>
         <a class="btn-secondary" href="/parent/family-school/weekly-planner">Weekly Planner</a>
+        <a class="btn-secondary" href="/parent/family-school/portfolio">Portfolio</a>
       </div>
     </div>
 
@@ -98,6 +100,7 @@
                 <span class="fs-overview-stat-value"><%= s.presentDays %>/<%= s.attendanceTargetDays %></span>
               </div>
             </div>
+            <%- include('partials/fs-attendance-bar', { presentDays: s.presentDays, attendanceTargetDays: s.attendanceTargetDays }) %>
 
             <div class="fs-overview-classes">
               <% if (s.classes.length === 0) { %>

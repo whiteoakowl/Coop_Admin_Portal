@@ -26,6 +26,7 @@ const {
   gradesForStudent,
   weeksForOwner,
   weekGrid,
+  subjectBreakdownForGrid,
 } = require('../utils/familySchool');
 
 router.use(requirePortalAuth, requirePortal('student'));
@@ -72,15 +73,18 @@ router.get('/family-school/weekly-planner', async (req, res) => {
   const selectedWeekId = req.query.weekId ? parseInt(req.query.weekId, 10) : null;
   const selectedWeek = selectedWeekId ? weeks.find((w) => w.id === selectedWeekId) : null;
   let grid = null;
+  let subjectBreakdown = null;
   if (selectedWeek) {
     grid = await weekGrid(selectedWeek.id);
     grid.forEach((d) => { d.dateLabel = formatDateLabel(d.date); });
+    subjectBreakdown = subjectBreakdownForGrid(grid);
   }
   res.render('student-family-school-weekly-planner', {
     title: 'Weekly Planner',
     weeks,
     selectedWeek,
     grid,
+    subjectBreakdown,
   });
 });
 

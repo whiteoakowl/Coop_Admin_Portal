@@ -1,0 +1,37 @@
+<%
+// A real request: "show a circle graph for each week below the week
+// plan that shows percentage of each subject calculated based off the
+// subject of the lessons or assignments that are assigned." Shared by
+// the Parent Portal (editable) and Student Portal (read-only) weekly
+// planner pages, plus the print/PDF view, all of which already compute
+// the same `subjectBreakdown` shape (utils/familySchool.js's own
+// subjectBreakdownForGrid) and just pass it in here. Pure CSS
+// conic-gradient circle - no chart library, no canvas/SVG math - so it
+// renders identically in a normal page view and in the Puppeteer-
+// rendered PDF/print view with zero extra work.
+const breakdown = (typeof subjectBreakdown !== 'undefined' && subjectBreakdown) || [];
+const CHART_PALETTE = ['#2e6da4', '#E7AA7B', '#85BB65', '#a16207', '#9333ea', '#dc2626', '#0d9488', '#64748b'];
+let runningPercent = 0;
+const stops = breakdown.map(function (b, i) {
+  const color = CHART_PALETTE[i % CHART_PALETTE.length];
+  const start = runningPercent;
+  runningPercent += b.percent;
+  return color + ' ' + start + '% ' + runningPercent + '%';
+});
+const totalCount = breakdown.reduce(function (sum, b) { return sum + b.count; }, 0);
+%>
+<% if (totalCount === 0) { %>
+  <p class="roster-empty">No assignments yet this week.</p>
+<% } else { %>
+  <div class="fs-weekly-plan-subject-chart">
+    <div class="fs-weekly-plan-subject-circle" style="background: conic-gradient(<%= stops.join(', ') %>);"></div>
+    <ul class="fs-weekly-plan-subject-legend">
+      <% breakdown.forEach(function(b, i) { %>
+        <li>
+          <span class="fs-weekly-plan-subject-swatch" style="background-color: <%= CHART_PALETTE[i % CHART_PALETTE.length] %>;"></span>
+          <%= b.subject %> &mdash; <%= b.percent %>%
+        </li>
+      <% }); %>
+    </ul>
+  </div>
+<% } %>

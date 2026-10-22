@@ -50,6 +50,51 @@
     });
   }
 
+  // A real request: "There is a +child button. There should also be an
+  // add adult button." Same clone-a-<template> pattern as the children
+  // block above, plus the "Address is the same" checkbox's own show/hide
+  // (partials/register-adult-fields.ejs's own data-adult-same-address-
+  // toggle/data-adult-address-fields) - no server round-trip needed to
+  // hide those fields, same as a child's own login-fields toggle.
+  const adultsList = document.getElementById('register-adults');
+  const addAdultBtn = document.getElementById('add-adult-btn');
+  const adultTemplate = document.getElementById('register-adult-template');
+  let adultIndex = adultsList ? adultsList.querySelectorAll('[data-adult-block]').length : 0;
+
+  function bindSameAddressToggle(block) {
+    const toggle = block.querySelector('[data-adult-same-address-toggle]');
+    const fields = block.querySelector('[data-adult-address-fields]');
+    if (!toggle || !fields) return;
+    toggle.addEventListener('change', () => {
+      fields.hidden = toggle.checked;
+    });
+  }
+
+  function bindRemoveAdult(block) {
+    const btn = block.querySelector('.register-remove-adult');
+    if (btn) btn.addEventListener('click', () => block.remove());
+  }
+
+  if (adultsList) {
+    adultsList.querySelectorAll('[data-adult-block]').forEach((block) => {
+      bindSameAddressToggle(block);
+      bindRemoveAdult(block);
+    });
+  }
+
+  if (addAdultBtn && adultTemplate && adultsList) {
+    addAdultBtn.addEventListener('click', () => {
+      const html = adultTemplate.innerHTML.split('__INDEX__').join(String(adultIndex));
+      adultIndex++;
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = html.trim();
+      const block = wrapper.firstElementChild;
+      adultsList.appendChild(block);
+      bindSameAddressToggle(block);
+      bindRemoveAdult(block);
+    });
+  }
+
   // A real request: "the phone number field is far away from the
   // request, should there be another phone number bar close to the
   // permissions" - echoes the real phone field's live value next to the

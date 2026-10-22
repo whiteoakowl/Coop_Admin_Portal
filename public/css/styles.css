@@ -3444,6 +3444,26 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    room there is free of controls nobody can click on paper. */
 .fs-weekly-plan-print-grid .fs-weekly-plan-assignment-list li { display: block; }
 
+/* "Allow to drag and drop lessons and assignments between days." Each
+   day's own dropzone wraps its (possibly empty) assignment list so an
+   empty day is just as valid a drop target as one that already has
+   items (public/js/weekly-planner-dragdrop.js). */
+.fs-weekly-plan-dropzone { min-height: 2.5rem; border-radius: 4px; transition: background-color 0.1s ease; }
+.fs-weekly-plan-dropzone.fs-weekly-plan-drop-target-hover { background: var(--brand-soft); outline: 2px dashed var(--brand); outline-offset: 2px; }
+.fs-weekly-plan-drag-handle { margin-top: 0.1rem; font-size: 1rem; flex-shrink: 0; }
+.fs-weekly-plan-assignment-text { flex: 1 1 auto; }
+li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(--brand-soft); }
+
+/* Per-week subject percentage circle graph - a real request: "show a
+   circle graph for each week below the week plan that shows percentage
+   of each subject." Plain CSS conic-gradient, no chart library/canvas -
+   see views/partials/family-school-subject-chart.ejs. */
+.fs-weekly-plan-subject-chart { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
+.fs-weekly-plan-subject-circle { width: 140px; height: 140px; border-radius: 50%; flex-shrink: 0; }
+.fs-weekly-plan-subject-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.fs-weekly-plan-subject-legend li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
+.fs-weekly-plan-subject-swatch { display: inline-block; width: 0.85rem; height: 0.85rem; border-radius: 3px; flex-shrink: 0; }
+
 .roster-name-col { text-align: left !important; position: sticky; left: 0; background: var(--surface); font-weight: 600; }
 .roster-table thead .roster-name-col { background: var(--brand-soft); }
 
@@ -13901,9 +13921,31 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 }
 .fs-overview-stat-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.02em; }
 .fs-overview-stat-value { font-size: 1.15rem; font-weight: 700; }
+/* A real request: "add a bar graph tracker to show percentage of 180
+   days completed." views/partials/fs-attendance-bar.ejs's own shared
+   bar, under the GPA/Attendance stat row on both portals' Overview
+   pages (and the print view). */
+.fs-attendance-bar-wrap { margin-top: 0.6rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.fs-attendance-bar-track { height: 10px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.fs-attendance-bar-fill { height: 100%; border-radius: 999px; background: var(--brand); transition: width 0.2s ease; }
+.fs-attendance-bar-label { font-size: 0.72rem; color: var(--muted); text-align: right; }
 .fs-overview-classes-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .fs-overview-classes-list li { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .fs-overview-classes-list li a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* A real request: "add a subpage called portfolio... create a visual
+   profile of everything." views/partials/family-school-portfolio-body.ejs
+   - a single-column read-only snapshot, reusing .fs-overview-* classes
+   above for its header/stats/class list rather than inventing a second
+   set just for this page. */
+.fs-portfolio { max-width: 760px; display: flex; flex-direction: column; gap: 1rem; }
+.fs-portfolio-header { display: flex; align-items: center; gap: 0.75rem; }
+.fs-portfolio-stats { margin-top: 0; }
+.fs-portfolio-section { background: var(--surface); border-radius: var(--radius); padding: 1rem; }
+.fs-portfolio-section h3 { margin-top: 0; }
+.fs-portfolio-journal-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+.fs-portfolio-journal-list li { border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+.fs-portfolio-journal-list li:last-child { border-bottom: none; padding-bottom: 0; }
 
 /* Family School Management - Attendance calendar (views/parent-family-
    school-attendance.ejs). A real request: "View a calendar and mark days

@@ -184,4 +184,4 @@ async function createChildMember(familyId, address, child, photoFile) {
   return info.lastInsertRowid;
 }
 
-module.exports = { resolveFamilyId, createParentMember, createChildMember, uploadIntakePhotos, parseArrayField };
+module.exports = { resolveFamilyId, createParentMember, createChildMember, uploadIntakePhotos, parseArrayField, savePhotoFile };

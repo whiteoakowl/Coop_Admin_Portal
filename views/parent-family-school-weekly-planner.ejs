@@ -68,28 +68,41 @@
           </thead>
           <tbody>
             <tr>
+              <%# "Allow to drag and drop lessons and assignments between
+                  days." Every day's own content (whether it already has
+                  assignments or not) is wrapped in one drop-target div
+                  tagged with its own week-date id, so an empty day is
+                  just as valid a drop target as one that already has a
+                  list - public/js/weekly-planner-dragdrop.js. %>
               <% grid.forEach(function(d) { %>
                 <td>
-                  <% if (d.assignments.length === 0) { %>
-                    <p class="roster-empty">Nothing yet.</p>
-                  <% } else { %>
-                    <ul class="fs-weekly-plan-assignment-list">
+                  <div class="fs-weekly-plan-dropzone" data-week-date-id="<%= d.id %>">
+                    <% if (d.assignments.length === 0) { %>
+                      <p class="roster-empty fs-weekly-plan-empty-hint">Nothing yet.</p>
+                    <% } %>
+                    <ul class="fs-weekly-plan-assignment-list" <%= d.assignments.length === 0 ? 'hidden' : '' %>>
                       <% d.assignments.forEach(function(a) { %>
-                        <li>
-                          <span><% if (a.subject) { %><strong><%= a.subject %>:</strong> <% } %><%= a.title %></span>
+                        <li data-assignment-id="<%= a.id %>">
+                          <span class="lesson-drag-handle fs-weekly-plan-drag-handle" data-assignment-drag-handle title="Drag to move to another day">&#9776;</span>
+                          <span class="fs-weekly-plan-assignment-text"><% if (a.subject) { %><strong><%= a.subject %>:</strong> <% } %><%= a.title %></span>
                           <form method="POST" action="/parent/family-school/weekly-planner/assignments/<%= a.id %>/delete" class="inline-block-form">
                             <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete assignment" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                           </form>
                         </li>
                       <% }); %>
                     </ul>
-                  <% } %>
+                  </div>
                   <button type="button" class="roster-action-btn fs-weekly-plan-add-btn" onclick="document.getElementById('add-assignment-dialog-<%= d.id %>').showModal()">+ Assignment</button>
                 </td>
               <% }); %>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="manage-section">
+        <h2>This Week by Subject</h2>
+        <%- include('partials/family-school-subject-chart', { subjectBreakdown }) %>
       </div>
 
       <%# "Add an assignment button. Pop up allows you to write subject,
@@ -160,5 +173,6 @@
       </form>
     </dialog>
   </main>
+  <script src="/js/weekly-planner-dragdrop.js"></script>
 </body>
 </html>

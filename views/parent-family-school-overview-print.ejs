@@ -57,6 +57,7 @@
                   <span class="fs-overview-stat-value"><%= s.presentDays %>/<%= s.attendanceTargetDays %></span>
                 </div>
               </div>
+              <%- include('partials/fs-attendance-bar', { presentDays: s.presentDays, attendanceTargetDays: s.attendanceTargetDays }) %>
               <div class="fs-overview-classes">
                 <% if (s.classes.length === 0) { %>
                   <p class="roster-empty">Not assigned to any family classes yet.</p>

@@ -5381,3 +5381,20 @@ create table if not exists family_school_week_assignments (
   created_at text not null default now_text()
 );
 create index if not exists idx_family_school_week_assignments_date on family_school_week_assignments(week_date_id);
+
+-- Public registration form "address 1, address 2" field. See the
+-- member_address2 migration's own header comment.
+alter table members add column if not exists address2 text;
+
+-- Family School Management > Volunteer Hours subpage. See the
+-- family_school_volunteer_hours migration's own header comment.
+create table if not exists family_school_volunteer_hours (
+  id integer generated always as identity primary key,
+  student_id integer not null references members(id) on delete cascade,
+  hour_date text not null,
+  hours numeric not null,
+  activity_description text,
+  created_by_account_id integer references member_accounts(id) on delete set null,
+  created_at text not null default now_text()
+);
+create index if not exists idx_family_school_volunteer_hours_student on family_school_volunteer_hours(student_id);

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.5in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Portfolio<% if (portfolio) { %> &mdash; <%= portfolio.name %><% } %></h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Portfolio<% if (portfolio) { %> &mdash; <%= portfolio.name %><% } %></p>
+      </div>
+    </div>
+
+    <%- include('partials/family-school-portfolio-body', { portfolio, avatarColorFor }) %>
+  </main>
+</body>
+</html>

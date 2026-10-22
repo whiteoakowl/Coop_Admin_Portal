@@ -34,16 +34,22 @@ const v = (typeof values !== 'undefined' && values) || {};
     <label>Birthdate
       <input type="date" name="children[<%= index %>][birthdate]" value="<%= v.birthdate || '' %>" />
     </label>
-    <label>Grade
-      <select name="children[<%= index %>][gradeLevel]">
-        <option value="">Select Grade</option>
-        <% gradeOptions.forEach(function(g) { %>
-          <option value="<%= g %>" <%= v.gradeLevel === g ? 'selected' : '' %>><%= g %></option>
-        <% }); %>
-      </select>
-    </label>
+    <%# A real request: "Should not be able to choose a grade level.
+        Remove this options, its only on admin portals and done by the
+        system itself through behaviors." A visitor self-registering a
+        child never picks a grade level here - Main Admin sets it (and
+        the system advances it year over year) once the child is a real,
+        approved member. %>
     <label class="member-form-full">Medical / Allergy Notes
       <textarea name="children[<%= index %>][medicalNotes]" rows="2"><%= v.medicalNotes || '' %></textarea>
+    </label>
+    <%# A real request: "Should be able to upload... student profile
+        photos." Same single-file-per-block convention views/member-
+        intake-form.ejs's own child photo field already uses -
+        routes/portal-auth.js's own POST /register matches it back to
+        this child by this exact fieldname via req.files. %>
+    <label class="member-form-full">Photo
+      <input type="file" name="children[<%= index %>][photo]" accept="image/*" />
     </label>
   </div>
 
