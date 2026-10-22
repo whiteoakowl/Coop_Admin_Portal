@@ -4710,6 +4710,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .roster-btn-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .roster-btn-form { display: flex; flex: 1; min-width: 5.5rem; }
+/* A real request: "print, export, import and pdf download icons should
+   be on the same row together, and orange buttons should be on the
+   same rows together." Several toolbars used to cram an orange
+   .roster-action-btn/.primary-btn in the same .roster-btn-row as the
+   Print/Export/Import/Download PDF .icon-btn group - splitting those
+   into two sibling .roster-btn-row divs (orange buttons first, file-
+   action icons last, matching the Accounting page's own existing
+   multi-row toolbar order) needs this gap between them, since
+   .roster-btn-row itself carries no margin of its own by design (most
+   of its other callers are a single row with nothing stacked directly
+   below - see the Accounting page's own per-page .accounting-list-
+   toolbar/.accounting-accounts-toolbar-2 margin-bottom, the same fix
+   made general here instead of repeated per page). */
+.roster-btn-row + .roster-btn-row { margin-top: 0.75rem; }
 
 /* Site-wide toolbar action button (New/Edit/Duplicate/view-toggle, etc.)
    - solid purple fill by default. Import/Export/Print override to green
