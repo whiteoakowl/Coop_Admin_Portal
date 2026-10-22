@@ -101,8 +101,8 @@ test('a teacher-only account is blocked from Business Directory/Classifieds/Shop
     await t.test(`GET ${url} is a 403, not the full member page`, async () => {
       const res = await request(app).get(url).set('Cookie', cookie);
       assert.equal(res.status, 403);
-      assert.match(res.text, /isn&#39;t available from the Teacher Portal/);
-      assert.match(res.text, /Back to Teacher Portal/);
+      assert.match(res.text, /isn&#39;t available from the Co-op Teacher Portal/);
+      assert.match(res.text, /Back to Co-op Teacher Portal/);
     });
   }
 
@@ -121,7 +121,7 @@ test('an account that is BOTH teacher and parent keeps full access to these page
     await t.test(`GET ${url} still renders normally for a teacher+parent account`, async () => {
       const res = await request(app).get(url).set('Cookie', cookie);
       assert.equal(res.status, 200);
-      assert.doesNotMatch(res.text, /isn&#39;t available from the Teacher Portal/);
+      assert.doesNotMatch(res.text, /isn&#39;t available from the Co-op Teacher Portal/);
     });
   }
 });

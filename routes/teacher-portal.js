@@ -1,4 +1,4 @@
-// Teacher Portal - view-only access to the classes a member is staffed on
+// Co-op Teacher Portal - view-only access to the classes a member is staffed on
 // (class_staff, the EXISTING teacher/assistant model routes/admin-schedule.js
 // already uses), plus each class's roster. Reuses utils/classSchedule.js's
 // allClassesList for the same computed fields (timeLabel, gradeLabel,
@@ -62,7 +62,7 @@ const trainingModule = require('../utils/training');
 
 // Same per-device throttle shape as the kiosk's own Class Check-In scan
 // (routes/kiosk-class-checkin.js's own classScanLimiter) - its own
-// independent counter, scoped to this Teacher Portal surface only.
+// independent counter, scoped to this Co-op Teacher Portal surface only.
 const teacherScanLimiter = createRateLimiter({ windowMs: 60 * 1000, maxAttempts: 40 });
 
 router.use(requirePortalAuth, requirePortal('teacher'));
@@ -91,7 +91,7 @@ async function classesForTeacher(member, semesterId) {
 // in this router, the same way req.portalRoles is populated centrally in
 // middleware/portalAuth.js rather than once per route - so every
 // views/teacher-*.ejs page gets it automatically just by passing
-// portalTitle: 'Teacher Portal' into that partial, with no per-route
+// portalTitle: 'Co-op Teacher Portal' into that partial, with no per-route
 // res.render() change needed.
 router.use(async (req, res, next) => {
   const member = await memberForAccount(req.portalAccount.id);
@@ -129,7 +129,7 @@ router.get('/', async (req, res) => {
     announcementsForAccount(req.portalAccount.id),
   ]);
   const classes = await classesForTeacher(member);
-  res.render('teacher-home', { title: 'Teacher Portal', member, classes, announcements });
+  res.render('teacher-home', { title: 'Co-op Teacher Portal', member, classes, announcements });
 });
 
 // "Class Schedule" tab - a real request: "Co-op classes should be called
@@ -253,7 +253,7 @@ router.get('/classes/print', async (req, res) => {
 // ?viewer=parent-<id> branch of GET /classes/dashboard/:id - a teacher/
 // assistant with no specific child involved never gets quiz-taking,
 // Assignments/Grades/Attendance tabs, since those are per-STUDENT
-// academic records), just reached natively from Teacher Portal's own
+// academic records), just reached natively from Co-op Teacher Portal's own
 // URL/nav instead of only through a Parent Portal account that also
 // happens to hold this same teacher role. The old roster/assignment-
 // management page moved to its own "Edit Class" button/route below
@@ -291,7 +291,7 @@ router.get('/classes/:id', async (req, res) => {
   const classes = await classesForTeacher(member);
   const cls = classes.find((c) => c.id === parseInt(req.params.id, 10));
   if (!cls) {
-    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Co-op Teacher Portal' });
   }
   let tab = TEACHER_CLASS_DETAIL_TABS.includes(req.query.tab) ? req.query.tab : 'details';
   if (tab === 'chat' && !cls.allow_parent_chat) tab = 'details';
@@ -355,7 +355,7 @@ router.get('/classes/:id/edit', async (req, res) => {
   const classes = await classesForTeacher(member);
   const cls = classes.find((c) => c.id === parseInt(req.params.id, 10));
   if (!cls) {
-    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Co-op Teacher Portal' });
   }
   const students = (
     await db.prepare(`SELECT m.* FROM class_enrollments ce JOIN members m ON m.id = ce.student_id WHERE ce.class_id = ?`).all(cls.id)
@@ -370,7 +370,7 @@ router.post('/classes/:id/assignments', async (req, res) => {
   const cls = classes.find((c) => c.id === parseInt(req.params.id, 10));
   const back = `/teacher/classes/${req.params.id}/edit`;
   if (!cls) {
-    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Co-op Teacher Portal' });
   }
   const title = (req.body.title || '').trim();
   if (!title) return res.redirect(back + '?error=' + encodeURIComponent('An assignment title is required.'));
@@ -403,7 +403,7 @@ router.get('/assignments/:id', async (req, res) => {
   const assignment = await getAssignment(parseInt(req.params.id, 10));
   const cls = assignment ? classes.find((c) => c.id === assignment.class_id) : null;
   if (!cls) {
-    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Co-op Teacher Portal' });
   }
   const { rows } = await gradebookForAssignment(assignment.id);
   // Same fix as routes/admin-class-schedule.js's own identical route -
@@ -424,7 +424,7 @@ router.post('/assignments/:id/edit', async (req, res) => {
   const assignment = await getAssignment(assignmentId);
   const cls = assignment ? classes.find((c) => c.id === assignment.class_id) : null;
   if (!cls) {
-    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Co-op Teacher Portal' });
   }
   const back = `/teacher/assignments/${assignmentId}`;
   const title = (req.body.title || '').trim();
@@ -482,7 +482,7 @@ const LESSON_CONTENT_TYPES = ['video', 'text', 'file', 'quiz', 'assignment_uploa
 router.post('/assignments/:id/content', uploadLessonAttachment, async (req, res) => {
   const assignmentId = parseInt(req.params.id, 10);
   const found = await assignmentForTeacher(req, assignmentId);
-  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Co-op Teacher Portal' });
   const back = `/teacher/assignments/${assignmentId}`;
   const type = req.body.type;
   if (!LESSON_CONTENT_TYPES.includes(type)) return res.redirect(back + '?error=' + encodeURIComponent('Choose a content type.'));
@@ -538,7 +538,7 @@ router.post('/assignments/:id/content', uploadLessonAttachment, async (req, res)
 // views/partials/lesson-content-manage.ejs form.
 router.post('/content/:id/edit', uploadLessonAttachment, async (req, res) => {
   const found = await contentItemForTeacher(req, parseInt(req.params.id, 10));
-  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Co-op Teacher Portal' });
   const contentItem = found.contentItem;
   const back = `/teacher/assignments/${found.assignment.id}`;
   const type = contentItem.type;
@@ -573,7 +573,7 @@ router.post('/content/:id/edit', uploadLessonAttachment, async (req, res) => {
 
 router.post('/content/:id/delete', async (req, res) => {
   const found = await contentItemForTeacher(req, parseInt(req.params.id, 10));
-  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Co-op Teacher Portal' });
   await deleteContentItem(found.contentItem.id);
   res.redirect(`/teacher/assignments/${found.assignment.id}?notice=` + encodeURIComponent('Content removed.'));
 });
@@ -642,7 +642,7 @@ router.get('/content/:id/questions', async (req, res) => {
 
 router.post('/content/:id/questions', async (req, res) => {
   const found = await contentItemForTeacher(req, parseInt(req.params.id, 10));
-  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Co-op Teacher Portal' });
   const back = `/teacher/assignments/${found.assignment.id}`;
   const type = req.body.type === 'short_answer' ? 'short_answer' : 'multiple_choice';
   const prompt = (req.body.prompt || '').trim();
@@ -667,7 +667,7 @@ router.post('/questions/:id/delete', async (req, res) => {
   const question = await db.prepare('SELECT q.*, lci.assignment_id FROM quiz_questions q JOIN lesson_content_items lci ON lci.id = q.content_item_id WHERE q.id = ?').get(questionId);
   if (!question) return res.status(404).send('Not found');
   const found = await assignmentForTeacher(req, question.assignment_id);
-  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Co-op Teacher Portal' });
   await deleteQuizQuestion(questionId);
   res.redirect(`/teacher/assignments/${found.assignment.id}?notice=` + encodeURIComponent('Question removed.'));
 });
@@ -691,7 +691,7 @@ router.post('/quiz-answers/:id/score', async (req, res) => {
     .get(answerId);
   if (!answer) return res.status(404).send('Not found');
   const found = await assignmentForTeacher(req, answer.assignment_id);
-  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Co-op Teacher Portal' });
   const pointsEarned = req.body.pointsEarned === '' || req.body.pointsEarned == null ? 0 : Number(req.body.pointsEarned);
   await scoreAnswer({ answerId, isCorrect: pointsEarned > 0, pointsEarned, gradedByAccountId: req.portalAccount.id });
   res.redirect('/teacher/quiz-review?notice=' + encodeURIComponent('Answer scored.'));
@@ -704,7 +704,7 @@ router.post('/assignments/:id/grades', async (req, res) => {
   const assignment = await getAssignment(assignmentId);
   const cls = assignment ? classes.find((c) => c.id === assignment.class_id) : null;
   if (!cls) {
-    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Co-op Teacher Portal' });
   }
 
   const { rows } = await gradebookForAssignment(assignmentId);
@@ -1016,8 +1016,8 @@ router.post('/instructor-profile', async (req, res) => {
 // goes to parent portal. It should stay in teacher portal." Mirrors
 // routes/parent-portal.js's own GET /training exactly - the shared,
 // originally-anonymous-only Training module (routes/training.js) has no
-// Teacher Portal equivalent of Parent Portal's own nav-shelled bridging
-// page, so Teacher Portal's own nav link fell straight through to the
+// Co-op Teacher Portal equivalent of Parent Portal's own nav-shelled bridging
+// page, so Co-op Teacher Portal's own nav link fell straight through to the
 // bare "pick your name" picker (effectively landing on no portal shell
 // at all, perceived as "goes to parent portal" since that's the other
 // shell these shared Training routes DO already special-case via

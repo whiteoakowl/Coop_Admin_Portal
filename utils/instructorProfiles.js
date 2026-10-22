@@ -37,7 +37,7 @@ async function setInstructorProfileEnabled(memberId, enabled) {
     .run(memberId, enabled ? 1 : 0);
 }
 
-// The edit form (admin-side AND the teacher's own Teacher Portal self-edit,
+// The edit form (admin-side AND the teacher's own Co-op Teacher Portal self-edit,
 // both routes/admin-teachers.js and routes/teacher-portal.js save through
 // this same function) - deliberately never touches `enabled`, which only
 // setInstructorProfileEnabled above (admin-only) ever changes. A teacher

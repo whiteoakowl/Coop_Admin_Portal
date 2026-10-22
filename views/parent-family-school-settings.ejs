@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
+    <div class="roster-toolbar no-print">
+      <h1>Settings</h1>
+    </div>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <%# A real request: "Family school management settings subpage.
+        Parent can add school name, school logo and colors. NC
+        homeschool ID number. The school name, logo and colors will be
+        used as the header for all family school management pdf pages
+        and printing pages." %>
+    <div class="manage-section">
+      <form method="POST" action="/parent/family-school/settings" enctype="multipart/form-data" class="stack-form">
+        <label>School Name
+          <input type="text" name="schoolName" value="<%= settings.school_name || '' %>" placeholder="e.g. The Smith Family Homeschool" />
+        </label>
+
+        <label>NC Homeschool ID Number
+          <input type="text" name="ncHomeschoolId" value="<%= settings.nc_homeschool_id || '' %>" placeholder="e.g. 123456" />
+        </label>
+
+        <% if (settings.logoUrl) { %>
+          <div class="fs-settings-logo-preview">
+            <img src="<%= settings.logoUrl %>" alt="Current school logo" />
+          </div>
+        <% } %>
+        <label>School Logo
+          <input type="file" name="logo" accept="image/*" />
+        </label>
+
+        <label>Primary Color
+          <input type="color" name="colorPrimary" value="<%= settings.color_primary || '#2e6da4' %>" />
+        </label>
+        <label>Secondary Color
+          <input type="color" name="colorSecondary" value="<%= settings.color_secondary || '#2e6da4' %>" />
+        </label>
+
+        <div class="notes-dialog-actions">
+          <button type="submit" class="primary-btn">Save Settings</button>
+        </div>
+      </form>
+    </div>
+  </main>
+</body>
+</html>

@@ -16,7 +16,7 @@
   <style>@page { size: letter; margin: 0.5in; }</style>
 </head>
 <body class="admin-page">
-  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+  <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
   <main id="main-content" tabindex="-1" class="admin-main">
     <%# A real request: "All print button should show a print preview
         full real page on a page with a print button. That print button
@@ -27,13 +27,7 @@
       <h1>Family Attendance</h1>
       <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
     </div>
-    <div class="print-header">
-      <img src="/img/logo.png" alt="" />
-      <div>
-        <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub">Family Attendance &mdash; <%= schoolYearLabel %> School Year</p>
-      </div>
-    </div>
+    <%- include('partials/family-school-print-header', { familySettings, subtitle: `Family Attendance — ${schoolYearLabel} School Year` }) %>
 
     <%
       // A real request: "Pdf and print should show all 12 months,

@@ -75,33 +75,33 @@ async function createDualRoleAccount() {
   return { cookie: loginRes.headers['set-cookie'], memberId };
 }
 
-test('a dual-role (parent+teacher) account clicking Chat from Teacher Portal stays in Teacher Portal on the category and thread pages too', async () => {
+test('a dual-role (parent+teacher) account clicking Chat from Co-op Teacher Portal stays in Co-op Teacher Portal on the category and thread pages too', async () => {
   const admin = await loginAsMainAdmin();
   const categoryId = await createGeneralCategory(admin);
   const dual = await createDualRoleAccount();
 
   const list = await request(app).get('/forums?portal=teacher').set('Cookie', dual.cookie);
   assert.equal(list.status, 200);
-  assert.match(list.text, /<p class="portal-nav-title">Teacher Portal<\/p>/);
+  assert.match(list.text, /<p class="portal-nav-title">Co-op Teacher Portal<\/p>/);
   // The category link on the list page must carry ?portal=teacher
   // forward - this is the exact link that used to drop it.
   assert.match(list.text, new RegExp(`href="/forums/${categoryId}\\?portal=teacher"`));
 
   const category = await request(app).get(`/forums/${categoryId}?portal=teacher`).set('Cookie', dual.cookie);
   assert.equal(category.status, 200);
-  assert.match(category.text, /<p class="portal-nav-title">Teacher Portal<\/p>/);
+  assert.match(category.text, /<p class="portal-nav-title">Co-op Teacher Portal<\/p>/);
   assert.match(category.text, new RegExp(`href="/forums/${categoryId}/new\\?portal=teacher"`));
 
   const newThreadPage = await request(app).get(`/forums/${categoryId}/new?portal=teacher`).set('Cookie', dual.cookie);
   assert.equal(newThreadPage.status, 200);
-  assert.match(newThreadPage.text, /<p class="portal-nav-title">Teacher Portal<\/p>/);
+  assert.match(newThreadPage.text, /<p class="portal-nav-title">Co-op Teacher Portal<\/p>/);
   const csrfToken = extractCsrf(newThreadPage.text);
 
   const createRes = await request(app)
     .post(`/forums/${categoryId}/threads?portal=teacher`)
     .set('Cookie', dual.cookie)
     .type('form')
-    .send({ title: 'From Teacher Portal', body: '<p>Hi</p>', _csrf: csrfToken });
+    .send({ title: 'From Co-op Teacher Portal', body: '<p>Hi</p>', _csrf: csrfToken });
   assert.equal(createRes.status, 302);
   assert.match(createRes.headers.location, /\?portal=teacher$/);
 
@@ -110,7 +110,7 @@ test('a dual-role (parent+teacher) account clicking Chat from Teacher Portal sta
   // This is the exact page that, before the fix, fell back to Parent
   // Portal for a dual-role account once the ?portal=teacher tag was
   // lost navigating from the list into a thread.
-  assert.match(threadView.text, /<p class="portal-nav-title">Teacher Portal<\/p>/);
+  assert.match(threadView.text, /<p class="portal-nav-title">Co-op Teacher Portal<\/p>/);
 });
 
 test('without the ?portal=teacher tag, a dual-role account still defaults to Parent Portal (unchanged priority)', async () => {
@@ -121,18 +121,18 @@ test('without the ?portal=teacher tag, a dual-role account still defaults to Par
   assert.match(list.text, /<p class="portal-nav-title">Parent Portal<\/p>/);
 });
 
-test('Teacher Portal Training nav link points at /teacher/training, not the bare shared /training picker', async () => {
+test('Co-op Teacher Portal Training nav link points at /teacher/training, not the bare shared /training picker', async () => {
   const dual = await createDualRoleAccount();
   const home = await request(app).get('/teacher').set('Cookie', dual.cookie);
   assert.equal(home.status, 200);
   assert.match(home.text, /href="\/teacher\/training"/);
 });
 
-test('GET /teacher/training stays in the Teacher Portal shell and auto-resolves the signed-in teacher - no anonymous name picker', async () => {
+test('GET /teacher/training stays in the Co-op Teacher Portal shell and auto-resolves the signed-in teacher - no anonymous name picker', async () => {
   const dual = await createDualRoleAccount();
   const res = await request(app).get('/teacher/training').set('Cookie', dual.cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /<p class="portal-nav-title">Teacher Portal<\/p>/);
+  assert.match(res.text, /<p class="portal-nav-title">Co-op Teacher Portal<\/p>/);
   assert.match(res.text, /<h1>Training<\/h1>/);
   // The anonymous picker's own "pick your name" prompt must never show
   // for an already-identified signed-in account.

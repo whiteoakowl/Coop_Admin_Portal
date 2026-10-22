@@ -7,7 +7,7 @@
   // Same fix as directory-list.ejs's own comment.
   const hasParentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'parent');
   const hasStudentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'student');
-  // A real request moved Photos into Teacher Portal's own main nav
+  // A real request moved Photos into Co-op Teacher Portal's own main nav
   // (portal-nav.ejs's own TEACHER_NAV_LINKS) - a teacher-only account
   // used to fall through to the plain public shell below (neither
   // hasParentRole nor hasStudentRole), the exact same "lost their
@@ -27,7 +27,7 @@
       // whichever portal they actually clicked from instead of always
       // landing in Parent.
     %>
-    <%- include('partials/portal-nav', { portalTitle: sharedPortalTitle(hasParentRole ? 'Parent Portal' : hasStudentRole ? 'Student Portal' : 'Teacher Portal') }) %>
+    <%- include('partials/portal-nav', { portalTitle: sharedPortalTitle(hasParentRole ? 'Parent Portal' : hasStudentRole ? 'Student Portal' : 'Co-op Teacher Portal') }) %>
   <% } else { %>
   <%- include('partials/icon-sprite') %>
 

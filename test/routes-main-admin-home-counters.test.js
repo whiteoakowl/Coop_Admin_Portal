@@ -129,7 +129,13 @@ test('a non-Main-Admin portal keeps its plain Settings link, no gear dropdown', 
   const cookie = loginRes.headers['set-cookie'];
   const res = await request(app).get('/parent').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.doesNotMatch(res.text, /portal-switcher-details/);
+  // A real request ("Homeschool family management tab on parent
+  // portal. It needs to become its own portal") made the 'parent' role
+  // reach TWO portals now (Parent + Family School Management - see
+  // routes/portal-auth.js's own expandPortalRoles), so a parent-only
+  // account sees the Switch Portal dropdown too, even with one real
+  // role - the Settings link below stays a plain link regardless.
+  assert.match(res.text, /portal-switcher-details/);
   // Carries a ?portal=parent tag now (see portal-nav.ejs's own
   // cornerPortalQuery comment) so a dual-role account's Settings link
   // stays on whichever portal it's currently viewing.
@@ -153,7 +159,7 @@ test('Teacher count: distinct members assigned as teacher on class_staff, teachi
   const assistantId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Just An Assistant', 'just-assistant-1', 'admin') RETURNING id").get()).id;
   await db.prepare("INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, 'assistant')").run(classId1, assistantId);
 
-  // Holds the Teacher Portal role but isn't assigned to teach any actual
+  // Holds the Co-op Teacher Portal role but isn't assigned to teach any actual
   // class - should NOT count, unlike the old member_account_roles query.
   const portalOnlyId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Portal Role Only', 'portal-role-only-1', 'admin') RETURNING id").get()).id;
   const portalAccountId = (

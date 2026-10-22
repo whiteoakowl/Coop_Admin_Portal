@@ -46,7 +46,7 @@ const db = require('../db');
 function signedInPortalTitle(req) {
   const roles = req.portalRoles || [];
   if (roles.some((r) => r.key === 'parent')) return 'Parent Portal';
-  if (roles.some((r) => r.key === 'teacher')) return 'Teacher Portal';
+  if (roles.some((r) => r.key === 'teacher')) return 'Co-op Teacher Portal';
   return null;
 }
 

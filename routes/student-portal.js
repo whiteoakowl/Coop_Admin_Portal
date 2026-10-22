@@ -87,7 +87,7 @@ const uploadNatureNewsPhoto = multer({ storage: multer.memoryStorage(), limits: 
 
 // Every class this student is enrolled in - re-derived from
 // class_enrollments on every request, the same "never trust a class id
-// belongs to this account" rule Parent/Teacher Portal both follow.
+// belongs to this account" rule Parent/Co-op Teacher Portal both follow.
 async function classesForStudent(member) {
   if (!member) return [];
   const enrolledRows = await db.prepare('SELECT class_id FROM class_enrollments WHERE student_id = ?').all(member.id);
@@ -98,13 +98,13 @@ async function classesForStudent(member) {
 }
 
 // Announcements on the homepage - same site-wide + per-account
-// 'announcement' notification pattern Parent/Teacher Portal's own home
+// 'announcement' notification pattern Parent/Co-op Teacher Portal's own home
 // routes already established (routes/parent-portal.js, routes/teacher-
 // portal.js) - a personal announcement is already filtered to the right
 // audience at send time (Main/Co-op Admin's own role-targeted "Send to"
 // dropdown - see routes/main-admin-announcements.js/routes/admin-
 // announcements.js). Replaces this route's own earlier site-only,
-// LIMIT-5 query with the same richer feed Parent/Teacher Portal show.
+// LIMIT-5 query with the same richer feed Parent/Co-op Teacher Portal show.
 async function announcementsForAccount(accountId) {
   const siteRows = await db
     .prepare("SELECT * FROM announcements WHERE (expires_at IS NULL OR expires_at > now_text()) ORDER BY published_at DESC LIMIT 10")

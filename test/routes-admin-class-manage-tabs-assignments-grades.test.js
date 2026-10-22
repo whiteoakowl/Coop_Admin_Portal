@@ -2,7 +2,7 @@
 // be called classes. When you click a classes it should take you to the
 // classes full settings page with tabs for all of that classes features.
 // Admin and teachers can change classes information or upload
-// assignments, grades etc." Teacher Portal already lets a teacher manage
+// assignments, grades etc." Co-op Teacher Portal already lets a teacher manage
 // their own class's assignments/grades (routes/teacher-portal.js); this
 // adds the admin-side equivalent as new Assignments/Grades tabs on the
 // class's own full settings page (views/admin-class-schedule-manage.ejs),

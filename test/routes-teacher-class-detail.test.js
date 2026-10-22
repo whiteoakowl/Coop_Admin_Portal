@@ -7,7 +7,7 @@
 // "staff viewing their own class" page Parent Portal's own Classroom
 // Dashboard already built for a teacher/assistant with no child involved
 // (routes/parent-portal.js's own ?viewer=parent-<id> branch) - this is
-// that same behavior natively on Teacher Portal's own GET /classes/:id,
+// that same behavior natively on Co-op Teacher Portal's own GET /classes/:id,
 // with the old roster/assignment-management page moved to its own
 // GET /classes/:id/edit behind an "Edit Class" button.
 const test = require('node:test');

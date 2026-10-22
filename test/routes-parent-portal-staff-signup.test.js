@@ -3,11 +3,11 @@
 // own class view (views/parent-class-fragment.ejs) only ever letting a
 // parent register their CHILDREN for a class, never themselves as
 // Teacher/Assistant. That self-signup only existed on the separate
-// Teacher Portal's own "Sign Up to Teach" page, which requires the
+// Co-op Teacher Portal's own "Sign Up to Teach" page, which requires the
 // account to already have a 'teacher' portal role - an ordinary parent
 // account could never reach it. Adds the same self-signup directly to
 // the Parent Portal class view (POST /parent/classes/:id/join), sharing
-// utils/classRegistration.js's own joinClassAsStaff with Teacher Portal's
+// utils/classRegistration.js's own joinClassAsStaff with Co-op Teacher Portal's
 // route so neither can drift from the other.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -109,7 +109,7 @@ test('Parent Portal class fragment offers Register as Teacher/Assistant buttons 
   assert.match(fragment.text, />Register as Assistant</);
 });
 
-test('A parent can register themselves as an assistant directly from Parent Portal, with no separate Teacher Portal role', async () => {
+test('A parent can register themselves as an assistant directly from Parent Portal, with no separate Co-op Teacher Portal role', async () => {
   const admin = await loginAsAdmin();
   const cls = await createClass(admin, { className: 'Self Signup Assistant Class' });
   const parent = await createParentWithChild();

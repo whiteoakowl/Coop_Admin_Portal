@@ -11,7 +11,7 @@
 // "empty means unrestricted" rule sections/schedule grids already
 // follow):
 //   - open_for_parent_teacher: a parent/staff member signing themselves
-//     up to teach (Teacher Portal's own /classes/:id/join, role=teacher)
+//     up to teach (Co-op Teacher Portal's own /classes/:id/join, role=teacher)
 //   - open_for_parent_assistant: same route, role=assistant
 //   - open_for_parent_register_student: a parent registering their own
 //     child (registerForClass, registrantType='parent')

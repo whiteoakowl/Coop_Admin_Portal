@@ -6,7 +6,7 @@
   <style>@page { size: letter landscape; margin: 0.4in; }</style>
 </head>
 <body class="admin-page">
-  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+  <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="print-preview-header no-print">
       <h1><%= week.title %></h1>
@@ -15,18 +15,15 @@
     <%# A real request: "Print should show the whole week on one page
         clean. Title should be the students name and the date range for
         the week." %>
-    <div class="print-header">
-      <img src="/img/logo.png" alt="" />
-      <div>
-        <p class="print-header-title"><%= ownerLabel %></p>
-        <p class="print-header-sub"><%= week.title %> &mdash; <%= dateRangeLabel %></p>
-      </div>
-    </div>
+    <%- include('partials/family-school-print-header', { familySettings, subtitle: `${ownerLabel} — ${week.title} — ${dateRangeLabel}` }) %>
 
     <table class="roster-table fs-weekly-plan-grid fs-weekly-plan-print-grid">
       <thead>
         <tr>
-          <% dates.forEach(function(d) { %><th><%= d.dateLabel %></th><% }); %>
+          <%# "Check box on each day for teacher to confirm the day is
+              complete" - printed as a plain checkmark prefix, read-only
+              here same as every other checkbox on paper. %>
+          <% dates.forEach(function(d) { %><th><% if (d.completed) { %>&#9745; <% } %><%= d.dateLabel %></th><% }); %>
         </tr>
       </thead>
       <tbody>
@@ -38,7 +35,12 @@
               <% } else { %>
                 <ul class="fs-weekly-plan-assignment-list">
                   <% d.assignments.forEach(function(a) { %>
-                    <li><% if (a.subject) { %><strong><%= a.subject %>:</strong> <% } %><%= a.title %></li>
+                    <li>
+                      <%= a.completed ? '☑' : '☐' %>
+                      <% if (a.subject) { %><strong><%= a.subject %>:</strong> <% } %><%= a.title %>
+                      <% if (a.grade) { %> (Grade: <%= a.grade %>)<% } %>
+                      <% if (a.description) { %><br /><span class="hint"><%= a.description %></span><% } %>
+                    </li>
                   <% }); %>
                 </ul>
               <% } %>

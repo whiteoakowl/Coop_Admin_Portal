@@ -369,7 +369,7 @@ async function coopClassNamesForStudent(studentId) {
 // to File], an option for assignment upload, text box with word count
 // and full editing features, also be able to upload a file such as doc,
 // pdf, jpg etc." - assignment_upload's own attachment, shared between
-// Co-op Admin's and Teacher Portal's identical Add Assignments form
+// Co-op Admin's and Co-op Teacher Portal's identical Add Assignments form
 // (views/partials/lesson-content-manage.ejs), same public-bucket-or-
 // local-disk shape utils/classSchedule.js's own CLASS_IMAGES_BUCKET/
 // classImageUrl already use for a class's own photo.

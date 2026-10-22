@@ -421,15 +421,43 @@ router.post('/register', uploadIntakePhotos('/register'), async (req, res) => {
 // entirely and goes straight in.
 const PORTAL_HOME_ROUTES = {
   parent: '/parent',
+  // A real request: "Homeschool family management tab on parent
+  // portal. It needs to become its own portal and all the subpages
+  // becomes the tabs." No new DB role for this - every account holding
+  // the existing 'parent' role already has full access to /parent/
+  // family-school (routes/parent-family-school.js's own
+  // requirePortal('parent')) - this just gives that same role a SECOND
+  // portal-switcher card and its own nav shell (views/partials/portal-
+  // nav.ejs's own FAMILY_SCHOOL_NAV_LINKS), reached from the one 'parent'
+  // role exactly the way a real second role would be.
+  family_school: '/parent/family-school',
   student: '/student',
   teacher: '/teacher',
   coop_admin: '/admin',
   main_admin: '/main-admin',
 };
 
+// Splices a synthetic "Family School Management" card in right after
+// the real 'parent' role - see PORTAL_HOME_ROUTES's own comment on why
+// this is a second card for the same role rather than a second DB role.
+function expandPortalRoles(roles) {
+  const expanded = [];
+  for (const role of roles) {
+    expanded.push(role);
+    if (role.key === 'parent') {
+      expanded.push({
+        key: 'family_school',
+        label: 'Family School Management',
+        description: 'Homeschool classes, grades, attendance, planners, and portfolio for your own family.',
+      });
+    }
+  }
+  return expanded;
+}
+
 router.get('/portal', async (req, res) => {
   if (!req.portalAccount) return res.redirect('/login?next=%2Fportal');
-  const roles = req.portalRoles;
+  const roles = expandPortalRoles(req.portalRoles);
   if (roles.length === 1) return res.redirect(PORTAL_HOME_ROUTES[roles[0].key] || '/portal');
   res.render('portal-switcher', { title: 'My Portals', roles, portalHomeRoutes: PORTAL_HOME_ROUTES });
 });

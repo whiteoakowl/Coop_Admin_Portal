@@ -1,11 +1,11 @@
-// Coverage for Teacher Portal > Instructor Profile self-edit - a real
+// Coverage for Co-op Teacher Portal > Instructor Profile self-edit - a real
 // request: "Teachers can edit their instructor profile on the teacher
 // portal if they are given permission to view that portal and if their
 // profile has been enabled." (routes/teacher-portal.js's own GET/POST
 // /teacher/instructor-profile). Reaching this router at all already
 // proves "given permission to view that portal" (router.use(
 // requirePortalAuth, requirePortal('teacher')) in routes/teacher-
-// portal.js - untested here, covered by the many other Teacher Portal
+// portal.js - untested here, covered by the many other Co-op Teacher Portal
 // test files); this file covers the other half - the admin-only
 // enabled flag.
 const test = require('node:test');
@@ -57,7 +57,7 @@ async function loginTeacher() {
   return { memberId, cookie, csrfToken };
 }
 
-test('Teacher Portal nav offers an Instructor Profile link', async () => {
+test('Co-op Teacher Portal nav offers an Instructor Profile link', async () => {
   const { cookie } = await loginTeacher();
   const res = await request(app).get('/teacher').set('Cookie', cookie);
   assert.equal(res.status, 200);

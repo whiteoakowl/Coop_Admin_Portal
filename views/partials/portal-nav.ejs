@@ -8,7 +8,14 @@
 // language across every portal, just a different link set and the
 // portal switcher below, which only ever appears when there's more than
 // one portal to switch between.
-const showSwitcher = typeof portalRoles !== 'undefined' && portalRoles.length > 1;
+// A real request: "Homeschool family management tab on parent portal.
+// It needs to become its own portal." Every account holding the real
+// 'parent' role now reaches TWO portals (Parent + Family School
+// Management) from that one role - routes/portal-auth.js's own
+// expandPortalRoles - so "Switch Portal" needs to show for a parent-
+// only account too, not just a genuinely multi-role one.
+const hasParentRole = typeof portalRoles !== 'undefined' && portalRoles.some(function (r) { return r.key === 'parent'; });
+const showSwitcher = typeof portalRoles !== 'undefined' && (portalRoles.length > 1 || hasParentRole);
 
 // A real request: "under main admin portal the users tab should be
 // under the settings icon at the top" (and later, Website too) - Main
@@ -34,12 +41,12 @@ const cornerPortalQuery = portalTitle === 'Parent Portal' ? '?portal=parent' : p
 // contact admins." Main Admin already has every admin department's own
 // contact info and isn't who this feature is for, so it's left out here -
 // the Co-op Admin portal doesn't render this partial at all.
-const showContactAdmins = portalTitle === 'Parent Portal' || portalTitle === 'Student Portal' || portalTitle === 'Teacher Portal';
+const showContactAdmins = portalTitle === 'Parent Portal' || portalTitle === 'Student Portal' || portalTitle === 'Co-op Teacher Portal' || portalTitle === 'Family School Management';
 // cornerPortalQuery above only ever distinguishes parent vs. student (the
 // one ambiguity /portal/profile and settingsHref's shared URLs have) - this
 // link's own target (routes/contact-admins.js) needs to know Teacher too,
 // since sharedPortalTitle doesn't cover it, so it gets its own query value.
-const contactAdminsPortalQuery = portalTitle === 'Parent Portal' ? '?portal=parent' : portalTitle === 'Student Portal' ? '?portal=student' : portalTitle === 'Teacher Portal' ? '?portal=teacher' : '';
+const contactAdminsPortalQuery = portalTitle === 'Parent Portal' || portalTitle === 'Family School Management' ? '?portal=parent' : portalTitle === 'Student Portal' ? '?portal=student' : portalTitle === 'Co-op Teacher Portal' ? '?portal=teacher' : '';
 
 // Main Admin's own primary nav - a real request: "there are many
 // duplicate tabs, these should be the tabs and in this order." Every
@@ -238,31 +245,16 @@ const PARENT_NAV_LINKS = [
     { href: '/absence', label: 'Absence/Late Form' },
     { href: '/parent/handbook', label: 'Policy Handbook' },
   ] },
-  // A real request: "Parent portal, student portal and main admin
-  // portal add a tab called family school management... These classes
-  // are completely seperate from co-op classes and schedules as well as
-  // co-op teachers. It has nothing to do with that at all" - its own
-  // standalone nav entry, deliberately not folded into Co-op Classes
-  // above (routes/parent-family-school.js, a parallel data model).
-  // A real request: "Parent portal move transcripts to a subpage under
-  // family school management. Move diploma subpage to family school
-  // management tab. Remove stand alone academics tab and make name tags
-  // its own tab." Transcripts/Diplomas keep their own existing
-  // /parent/academics* routes (routes/parent-portal.js) - only their nav
-  // placement moved, same as Name Tags' own standalone entry below.
-  { href: '/parent/family-school', icon: 'home-heart', label: 'Family School Management', mobileLabel: 'Family School<br>Management', subpages: [
-    { href: '/parent/family-school', label: 'Family School Management' },
-    { href: '/parent/family-school/classes', label: 'Family Classes' },
-    { href: '/parent/family-school/grades', label: 'Family Grades' },
-    { href: '/parent/family-school/attendance', label: 'Family Attendance' },
-    { href: '/parent/family-school/journal', label: 'Daily Learning Log' },
-    { href: '/parent/family-school/volunteer-hours', label: 'Volunteer Hours' },
-    { href: '/parent/family-school/annual-planner', label: 'Annual Planner' },
-    { href: '/parent/family-school/weekly-planner', label: 'Weekly Planner' },
-    { href: '/parent/academics', label: 'Transcripts' },
-    { href: '/parent/academics/diplomas', label: 'Diplomas' },
-    { href: '/parent/family-school/portfolio', label: 'Portfolio' },
-  ] },
+  // A real request: "Homeschool family management tab on parent
+  // portal. It needs to become its own portal and all the subpages
+  // becomes the tabs." Family School Management used to be its own
+  // standalone nav entry here (with every page below as its subpages) -
+  // it's now reached only via the Portal Switcher's own second card for
+  // this same 'parent' role (routes/portal-auth.js's own
+  // expandPortalRoles), exactly the way Teacher/Student/Co-op Admin are
+  // each their own portal rather than a Parent Portal tab. See
+  // FAMILY_SCHOOL_NAV_LINKS below for its own flat nav, one entry per
+  // page that used to be a subpage here.
   { href: '/forums?portal=parent', icon: 'users', label: 'Chat' },
   { href: '/parent/training', icon: 'graduation-cap', label: 'Training' },
   { href: '/directory', icon: 'map-pin', label: 'Business Directory', mobileLabel: 'Business<br>Directory' },
@@ -281,7 +273,31 @@ const PARENT_NAV_LINKS = [
   { href: '/parent/reading', icon: 'book', label: 'Reading Challenge', mobileLabel: 'Reading<br>Challenge' },
   { href: '/accounting', icon: 'check-circle', label: 'Accounting' },
 ];
-// Teacher Portal's own primary nav - same anti-drift reasoning as
+// Family School Management's own primary nav - a real request:
+// "Homeschool family management tab on parent portal. It needs to
+// become its own portal and all the subpages becomes the tabs." Every
+// page that used to be a subpage under Parent Portal's own Family
+// School Management entry (see PARENT_NAV_LINKS's own comment above) is
+// now a direct top-level tab here instead, same flat-list shape as
+// every other portal's own nav - no subpages anywhere in this list.
+// Reached via routes/portal-auth.js's own expandPortalRoles (a second
+// Portal Switcher card for the same 'parent' role, not a new DB role) -
+// every /parent/family-school/* URL is completely unchanged.
+const FAMILY_SCHOOL_NAV_LINKS = [
+  { href: '/parent/family-school', icon: 'home', label: 'Home' },
+  { href: '/parent/family-school/classes', icon: 'graduation-cap', label: 'Family Classes' },
+  { href: '/parent/family-school/grades', icon: 'clipboard-list', label: 'Family Grades' },
+  { href: '/parent/family-school/attendance', icon: 'calendar-check', label: 'Family Attendance' },
+  { href: '/parent/family-school/journal', icon: 'book', label: 'Daily Learning Log', mobileLabel: 'Learning<br>Log' },
+  { href: '/parent/family-school/volunteer-hours', icon: 'clock', label: 'Volunteer Hours', mobileLabel: 'Volunteer<br>Hours' },
+  { href: '/parent/family-school/annual-planner', icon: 'calendar-check', label: 'Annual Planner', mobileLabel: 'Annual<br>Planner' },
+  { href: '/parent/family-school/weekly-planner', icon: 'calendar-check', label: 'Weekly Planner', mobileLabel: 'Weekly<br>Planner' },
+  { href: '/parent/academics', icon: 'graduation-cap', label: 'Transcripts' },
+  { href: '/parent/academics/diplomas', icon: 'graduation-cap', label: 'Diplomas' },
+  { href: '/parent/family-school/portfolio', icon: 'file-text', label: 'Portfolio' },
+  { href: '/parent/family-school/settings', icon: 'gear', label: 'Settings' },
+];
+// Co-op Teacher Portal's own primary nav - same anti-drift reasoning as
 // MAIN_ADMIN_NAV_LINKS above, centralizing what used to be an identical
 // navLinks array copy-pasted into all 11 views/teacher-*.ejs files.
 // Chat/Photos originally lived only in their own separate Community
@@ -411,7 +427,8 @@ const primaryNavLinks =
   portalTitle === 'Main Admin' ? MAIN_ADMIN_NAV_LINKS
     : portalTitle === 'Student Portal' ? STUDENT_NAV_LINKS
     : portalTitle === 'Parent Portal' ? PARENT_NAV_LINKS
-    : portalTitle === 'Teacher Portal' ? TEACHER_NAV_LINKS
+    : portalTitle === 'Family School Management' ? FAMILY_SCHOOL_NAV_LINKS
+    : portalTitle === 'Co-op Teacher Portal' ? TEACHER_NAV_LINKS
     : navLinks;
 
 // Optional - only a caller with no forced primaryNavLinks override above
@@ -428,15 +445,15 @@ const primaryNavLinks =
 // into MAIN_ADMIN_NAV_LINKS above; Parent Portal's old "Co-op Classes"
 // group folded into PARENT_NAV_LINKS above per a later real request
 // ("Parent portal is not divided into sections").
-const classLinks = portalTitle === 'Student Portal' ? STUDENT_ACTIVITY_LINKS : (portalTitle === 'Main Admin' || portalTitle === 'Parent Portal') ? null : (typeof locals.classLinks !== 'undefined' ? locals.classLinks : null);
+const classLinks = portalTitle === 'Student Portal' ? STUDENT_ACTIVITY_LINKS : (portalTitle === 'Main Admin' || portalTitle === 'Parent Portal' || portalTitle === 'Family School Management') ? null : (typeof locals.classLinks !== 'undefined' ? locals.classLinks : null);
 // A real request: "Teacher portal dashboard add section for my classes
 // tab. Each tab after that should be each class that teacher is signed
-// up for to teach." Teacher Portal's own classLinks (above) is the one
+// up for to teach." Co-op Teacher Portal's own classLinks (above) is the one
 // remaining caller-supplied case - routes/teacher-portal.js computes it
 // per request (one entry per class this teacher is actually staffed on),
 // since unlike Student Portal's fixed STUDENT_ACTIVITY_LINKS, which
 // class list it is varies by account.
-const classLinksTitle = portalTitle === 'Student Portal' ? 'Activities' : portalTitle === 'Teacher Portal' ? 'My Classes' : 'Co-op Classes';
+const classLinksTitle = portalTitle === 'Student Portal' ? 'Activities' : portalTitle === 'Co-op Teacher Portal' ? 'My Classes' : 'Co-op Classes';
 
 // The Community & Commerce feature set (Events, Forums, Store, Business
 // Directory, Classifieds, Member Directory, Newsletter, Photos,
@@ -490,7 +507,7 @@ const COMMUNITY_LINKS_PARENT = [];
 // as Parent/Student Portal below) - a real request: "teacher portal,
 // remove the following tabs. newsletter, forms, store, publications,
 // accounting, notifications, member directory, business directory,
-// classifieds, events and reports" ("Reports" is Teacher Portal's own
+// classifieds, events and reports" ("Reports" is Co-op Teacher Portal's own
 // tab, dropped from its own navLinks array in every views/teacher-*.ejs
 // file, not from this shared list) first trimmed this down to just
 // Chat/Photos; a later real request ("there should be a community
@@ -532,7 +549,8 @@ const COMMUNITY_LINKS_STUDENT = [];
 const communityLinks =
   portalTitle === 'Main Admin' ? []
     : portalTitle === 'Parent Portal' ? COMMUNITY_LINKS_PARENT
-    : portalTitle === 'Teacher Portal' ? COMMUNITY_LINKS_TEACHER
+    : portalTitle === 'Family School Management' ? []
+    : portalTitle === 'Co-op Teacher Portal' ? COMMUNITY_LINKS_TEACHER
     : portalTitle === 'Student Portal' ? COMMUNITY_LINKS_STUDENT
     : COMMUNITY_LINKS;
 %>

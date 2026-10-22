@@ -5,7 +5,7 @@
 // (utils/academics.js) already existed but no route ever called it, so a
 // content item's own title/url/body/due date/points could only be set
 // once, at creation - these tests exercise the new POST .../content/:id/edit
-// routes (Co-op Admin and Teacher Portal) that finally wire it up, plus
+// routes (Co-op Admin and Co-op Teacher Portal) that finally wire it up, plus
 // the page's own Edit/Delete icons and mobile table-stacking markup.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -161,7 +161,7 @@ test('Lesson page shows an Edit and Delete icon for every content item, a clicka
   assert.match(page.text, /Manage Questions/);
 });
 
-test('Teacher Portal: a teacher can edit their own class\'s content item, but not one on a class they do not teach', async () => {
+test('Co-op Teacher Portal: a teacher can edit their own class\'s content item, but not one on a class they do not teach', async () => {
   const { assignmentId: ownAssignmentId, classId: ownClassId } = await createClassAndAssignment();
   const { assignmentId: otherAssignmentId } = await createClassAndAssignment();
   const teacher = await createTeacherForClass(ownClassId, 'teacher-edit-test@example.com');
