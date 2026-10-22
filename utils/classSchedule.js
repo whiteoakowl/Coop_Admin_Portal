@@ -1135,18 +1135,33 @@ async function listScheduleCombos() {
        LEFT JOIN semesters s ON s.id = cs.semester_id`
     )
     .all();
-  return rows
-    .map((r) => ({
-      id: r.id,
-      day: r.day,
-      semesterId: r.semester_id,
-      semesterTitle: r.semester_title,
-      startDate: r.start_date,
-      endDate: r.end_date,
-      visibleToMembers: !!r.visible_to_members,
-      visibleToPublic: !!r.visible_to_public,
-      label: r.semester_title ? `${r.semester_title} - ${CLASS_DAY_LABELS_FULL[r.day]}` : CLASS_DAY_LABELS_FULL[r.day],
-    }))
+  const mapped = rows.map((r) => ({
+    id: r.id,
+    day: r.day,
+    semesterId: r.semester_id,
+    semesterTitle: r.semester_title,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    visibleToMembers: !!r.visible_to_members,
+    visibleToPublic: !!r.visible_to_public,
+    label: r.semester_title ? `${r.semester_title} - ${CLASS_DAY_LABELS_FULL[r.day]}` : CLASS_DAY_LABELS_FULL[r.day],
+  }));
+  // A real bug report: "there is a Monday and Wednesday by themselves
+  // without a semester. These should not be in the drop down menu now
+  // that it is specifically fall or spring." The migration that created
+  // class_schedules (20261025010000_class_schedules_day_settings.sql)
+  // permanently seeds an untagged Monday/Wednesday row so those two days
+  // still resolve to something on a brand new, semester-less install -
+  // that seed is still needed (so a fresh co-op with zero semesters
+  // doesn't lose Monday/Wednesday from this picker entirely), but once a
+  // day has a real semester-tagged combo of its own, that untagged
+  // fallback for the SAME day is just leftover clutter, not a real
+  // choice anyone wants - drop it from the list rather than deleting the
+  // underlying row (which stays, harmlessly unused, as the fallback for
+  // if every semester covering that day is ever removed).
+  const daysWithSemester = new Set(mapped.filter((c) => c.semesterId != null).map((c) => c.day));
+  return mapped
+    .filter((c) => c.semesterId != null || !daysWithSemester.has(c.day))
     .sort((a, b) => {
       // Semester-tagged combos before untagged ones, newest semester
       // first (mirrors utils/semesterAssignment.js's own "most recently

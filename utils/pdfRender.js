@@ -34,7 +34,19 @@ function localChromiumPath() {
 async function launchBrowser() {
   const puppeteer = require('puppeteer-core');
   if (process.env.LAMBDA_TASK_ROOT) {
-    const chromium = require('@sparticuz/chromium');
+    // A real production bug: "all pdf buttons in family school management
+    // say something went wrong" - confirmed by actually requiring this
+    // package and calling its API the way this file used to
+    // (TypeError: chromium.executablePath is not a function). @sparticuz/
+    // chromium ships as an ES module; a plain require() here returns the
+    // module's whole namespace object (__esModule: true, default: <the
+    // real chromium object>, ...), not the chromium object itself, so
+    // chromium.args/.executablePath()/.headless were all reading
+    // properties off the wrong object. .default unwraps it - confirmed by
+    // actually launching a real browser and rendering a PDF this way,
+    // not just by inspecting the exports.
+    const chromiumModule = require('@sparticuz/chromium');
+    const chromium = chromiumModule.default || chromiumModule;
     return puppeteer.launch({
       args: chromium.args,
       executablePath: await chromium.executablePath(),

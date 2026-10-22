@@ -58,6 +58,34 @@ test('listScheduleCombos labels an untagged (no-semester) combo with just the da
   assert.equal(taggedAfter, false, 'no semester-tagged combo sorts after an untagged one');
 });
 
+// A real bug report: "there is a Monday and Wednesday by themselves
+// without a semester. These should not be in the drop down menu now
+// that it is specifically fall or spring." class_schedules permanently
+// seeds an untagged Monday/Wednesday row (20261025010000_class_
+// schedules_day_settings.sql) so a brand new, semester-less install
+// still has something to show - but once a real semester covers that
+// same day, the leftover untagged entry for it is just clutter.
+test('listScheduleCombos drops an untagged combo once the SAME day has a semester-tagged combo, but keeps it for an untouched day', async () => {
+  const fall = await createSemester('Fall 2026 Same Day Test');
+  const spring = await createSemester('Spring 2027 Same Day Test');
+  // Monday is seeded untagged by the migration itself (semester_id null)
+  // - simulate that plus two real semesters now covering it, same as the
+  // live bug report.
+  await createClassSchedule({ title: 'Monday (legacy, no semester)', dayOfWeek: 'saturday', semesterId: null });
+  await createClassSchedule({ title: 'Fall 2026 - Saturday', dayOfWeek: 'saturday', semesterId: fall.id });
+  await createClassSchedule({ title: 'Spring 2027 - Saturday', dayOfWeek: 'saturday', semesterId: spring.id });
+  // Sunday has no semester-tagged combo at all yet - its untagged combo
+  // must stay, so Sunday doesn't silently vanish from the picker.
+  await createClassSchedule({ title: 'Sunday (no semester yet)', dayOfWeek: 'sunday', semesterId: null });
+
+  const combos = await listScheduleCombos();
+  assert.equal(combos.filter((c) => c.day === 'saturday').length, 2, 'only the two semester-tagged Saturday combos remain');
+  assert.ok(combos.every((c) => !(c.day === 'saturday' && c.semesterId == null)), 'the untagged Saturday combo is gone');
+  assert.ok(combos.some((c) => c.day === 'saturday' && c.semesterId === fall.id));
+  assert.ok(combos.some((c) => c.day === 'saturday' && c.semesterId === spring.id));
+  assert.ok(combos.some((c) => c.day === 'sunday' && c.semesterId == null), 'Sunday\'s untagged combo stays - no semester covers it yet');
+});
+
 test('listScheduleCombos carries each combo\'s own id, startDate, and endDate through untouched', async () => {
   const fall = await createSemester('Fall 2026 Dates Test');
   await createClassSchedule({ title: 'Monday', dayOfWeek: 'monday', semesterId: fall.id, startDate: '2026-08-24', endDate: '2026-12-11' });
