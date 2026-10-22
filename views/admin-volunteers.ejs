@@ -39,6 +39,7 @@
               selectedDate the exact same way this page's own GET route
               does if the query param is left off. %>
           <a class="icon-btn" href="/admin/volunteers/<%= day %>/manage/print?date=<%= selectedDate %>&semesterId=<%= semesterId %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+          <a class="icon-btn" href="/admin/volunteers/<%= day %>/manage/download.pdf?date=<%= selectedDate %>&semesterId=<%= semesterId %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
           <%# A real request: "Add a button that says text notification.
               When you click this button a check box appears next to
               each floater assignment. When you click the check boxes
