@@ -85,14 +85,13 @@ const { playgroundHourLabel } = require('../utils/playground');
 const { allItems: allLibraryItems, allLibraryTypes } = require('../utils/library');
 const { schedulesForMembers } = require('../utils/schedule');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
-const { renderViewToPdf } = require('../utils/pdfRender');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_name_tags'));
 
 // A real request: "the download should be a pdf of exactly how it would
-// also look when printing" - sends a headless-Chromium-rendered PDF of
-// viewName (one of this router's own *-print.ejs views), same helper
-// shape as routes/parent-family-school.js's own sendPdf.
+// also look when printing," applied to every Print button below - see
+// utils/pdfRender.js and routes/parent-family-school.js's own matching
+// sendPdf for the pattern this mirrors.
 function sendPdf(res, filename, pdfBuffer) {
   res.set('Content-Type', 'application/pdf');
   res.set('Content-Disposition', `attachment; filename="${filename}"`);
@@ -106,16 +105,6 @@ const BADGE_TYPE_LABELS = { setupCleanup: 'Setup/Cleanup', custom: 'Custom' };
 
 const REQUEST_TYPE_LABELS = { new_tag: 'New Name Tag', lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
 const NAME_TAG_DAY_LABELS = { ...CLASS_DAY_LABELS_FULL, both: 'Both' };
-
-// A real request: "the download should be a pdf of exactly how it would
-// also look when printing," applied to every Print button below - see
-// utils/pdfRender.js and routes/parent-family-school.js's own matching
-// sendPdf for the pattern this mirrors.
-function sendPdf(res, filename, pdfBuffer) {
-  res.set('Content-Type', 'application/pdf');
-  res.set('Content-Disposition', `attachment; filename="${filename}"`);
-  res.send(pdfBuffer);
-}
 
 const DESIGN_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'name-tags');
 const NAME_TAG_IMAGES_BUCKET = 'name-tag-images';

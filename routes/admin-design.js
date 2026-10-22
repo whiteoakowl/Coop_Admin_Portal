@@ -19,7 +19,6 @@ const { allClassesList, UNASSIGNED_ROOM, HOUR_POSITIONS, listActiveClassDays, CL
 const { allSetupTeamsEverySemester } = require('../utils/setup');
 const { playgroundHourLabel } = require('../utils/playground');
 const { allItems: allLibraryItems, allLibraryTypes } = require('../utils/library');
-const { renderViewToPdf } = require('../utils/pdfRender');
 
 router.use(requireFullAdmin);
 
@@ -263,12 +262,6 @@ router.get('/design/requests/print', async (req, res) => {
 // would also look when printing" - the exact same (unarchived/archived,
 // date-filtered) list the Print preview above renders, now a PDF built
 // from that same -print.ejs view instead of a second, independent copy.
-function sendPdf(res, filename, pdfBuffer) {
-  res.set('Content-Type', 'application/pdf');
-  res.set('Content-Disposition', `attachment; filename="${filename}"`);
-  res.send(pdfBuffer);
-}
-
 router.get('/design/requests/download.pdf', async (req, res) => {
   const showArchived = req.query.archived === '1';
   const dateFilter = req.query.date || '';
