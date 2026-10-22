@@ -13,6 +13,7 @@ const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexP
 const { buildCardPairs } = require('../utils/cardPairs');
 const { formatDateLabel, formatTimestamp } = require('../utils/dates');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { renderViewToPdf } = require('../utils/pdfRender');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 const { allClassesList, UNASSIGNED_ROOM, HOUR_POSITIONS, listActiveClassDays, CLASS_DAY_LABELS_FULL, listSemesters } = require('../utils/classSchedule');
 const { allSetupTeamsEverySemester } = require('../utils/setup');
@@ -256,6 +257,40 @@ router.get('/design/requests/print', async (req, res) => {
     allSubmissions,
     showArchived,
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - the exact same (unarchived/archived,
+// date-filtered) list the Print preview above renders, now a PDF built
+// from that same -print.ejs view instead of a second, independent copy.
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
+
+router.get('/design/requests/download.pdf', async (req, res) => {
+  const showArchived = req.query.archived === '1';
+  const dateFilter = req.query.date || '';
+  const allSubmissions = (await nameTagSubmissions(showArchived, dateFilter)).map((r) => ({
+    timestamp: formatTimestamp(r.createdAt),
+    memberName: r.memberName,
+    requestTypeLabel: REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
+    dayLabel: NAME_TAG_DAY_LABELS[r.day] || r.day,
+    description: r.description || '—',
+  }));
+  const pdf = await renderViewToPdf(req, 'admin-design-requests-print', {
+    title: `${showArchived ? 'Archived ' : ''}Name Tag Requests Print Preview`,
+    allSubmissions,
+    showArchived,
+    // req.app.render() (what renderViewToPdf renders through) never runs
+    // the res.locals-populating middleware a normal request goes through
+    // (server.js's own isFullAdmin), so partials/admin-nav needs it
+    // passed explicitly here - always true, since requireFullAdmin above
+    // already gates every route in this file to the master Admin session.
+    isFullAdmin: true,
+  });
+  sendPdf(res, `name-tag-${showArchived ? 'archived' : 'requests'}.pdf`, pdf);
 });
 
 router.post('/design/requests/:id/archive', async (req, res) => {

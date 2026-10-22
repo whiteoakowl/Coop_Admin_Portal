@@ -65,6 +65,20 @@ async function csrfFrom(cookie, url) {
   return /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
 }
 
+// Same buffered-binary-response idiom test/parent-family-school-print-
+// preview-and-pdf.test.js already uses to check a real PDF body.
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
 test('a parent can add, edit, and delete transcript entries, grouped by school year with a per-year and cumulative GPA', async () => {
   const familyId = await createFamily('Transcript Family');
   const parent = await createPortalMember({ name: 'Transcript Parent', familyId, memberType: 'parent', roleKey: 'parent' });
@@ -181,6 +195,9 @@ test('Print full page view: the transcript print page shows the per-year and cum
   const { createTranscriptEntry } = require('../utils/academics');
   await createTranscriptEntry({ studentId: student.memberId, schoolYear: 'Year 1', className: 'Geometry', creditHours: 1, gradeLetter: 'A', createdByAccountId: null });
 
+  const page = await request(app).get('/parent/academics').set('Cookie', parent.cookie);
+  assert.match(page.text, new RegExp(`<a class="icon-btn" href="/parent/academics/transcripts/${student.memberId}/download\\.pdf" aria-label="Download PDF"`));
+
   const printPage = await request(app).get(`/parent/academics/transcripts/${student.memberId}/print`).set('Cookie', parent.cookie);
   assert.equal(printPage.status, 200);
   assert.match(printPage.text, /Official Transcript/);
@@ -192,4 +209,16 @@ test('Print full page view: the transcript print page shows the per-year and cum
   const otherParent = await createPortalMember({ name: 'Transcript Print Other Parent', familyId: otherFamilyId, memberType: 'parent', roleKey: 'parent' });
   const hijackPrint = await request(app).get(`/parent/academics/transcripts/${student.memberId}/print`).set('Cookie', otherParent.cookie);
   assert.equal(hijackPrint.status, 404);
+
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - this same transcript, now a real
+  // PDF, scoped by the same requireOwnChild check as Print above.
+  const pdfRes = await getBuffer(`/parent/academics/transcripts/${student.memberId}/download.pdf`, parent.cookie);
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.match(pdfRes.headers['content-disposition'], /attachment; filename="Transcript-Print-Student-transcript\.pdf"/);
+  assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
+
+  const hijackDownload = await request(app).get(`/parent/academics/transcripts/${student.memberId}/download.pdf`).set('Cookie', otherParent.cookie);
+  assert.equal(hijackDownload.status, 404);
 });

@@ -28,6 +28,7 @@
           <div class="roster-btn-row no-print">
             <button type="button" class="roster-action-btn" onclick="document.getElementById('add-entry-dialog-<%= rec.child.id %>').showModal()">+ Add Class</button>
             <a class="btn-secondary" href="/parent/academics/transcripts/<%= rec.child.id %>/print" target="_blank">Print</a>
+            <a class="icon-btn" href="/parent/academics/transcripts/<%= rec.child.id %>/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
           </div>
         </div>
 
