@@ -52,6 +52,7 @@
         </div>
       <% } %>
       <a class="icon-btn" href="/teacher/classes/print?day=<%= day %>&view=<%= view %><%= semesterQuery %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+      <a class="icon-btn" href="/teacher/classes/download.pdf?day=<%= day %>&view=<%= view %><%= semesterQuery %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
     </div>
 
     <% if (view === 'grid') { %>

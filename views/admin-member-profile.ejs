@@ -94,6 +94,7 @@
               should say print schedules and should be at the top of the
               page." %>
           <a class="roster-action-btn print-action-btn no-print" href="/admin/schedule/print?familyId=<%= member.family_id %>" target="_blank">Print Schedules</a>
+          <a class="icon-btn no-print" href="/admin/schedule/download.pdf?familyId=<%= member.family_id %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
           <% familySchedules.forEach(function(fs) { %>
             <div class="form-section member-profile-family-schedule-card">
               <h2 class="member-profile-family-schedule-name"><%= fs.member.name %></h2>
@@ -161,6 +162,7 @@
             <% }); %>
           </div>
           <a class="roster-action-btn print-action-btn no-print" href="/admin/schedule/print?memberId=<%= member.id %>" target="_blank">Print Schedule</a>
+          <a class="icon-btn no-print" href="/admin/schedule/download.pdf?memberId=<%= member.id %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         <% } %>
       <% } else { %>
         <% if (familyRoster.length > 1) { %>

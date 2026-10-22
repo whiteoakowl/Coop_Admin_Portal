@@ -13,6 +13,7 @@ const { getMemberSchedule, schedulesForMembers, scheduleList } = require('../uti
 const { byLastName, allFamilies } = require('../utils/members');
 const { allClassRegistrationActions, buildClassRegistrationLogExportCsvLines } = require('../utils/classRegistration');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
+const { renderViewToPdf } = require('../utils/pdfRender');
 const {
   CLASS_DAYS,
   CLASS_DAY_LABELS_FULL: CLASS_DAY_LABELS,
@@ -1007,6 +1008,28 @@ router.get('/schedule/classregistrationlog/print', requireAdmin, async (req, res
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - same date-filtered list the Print preview
+// above renders, now a PDF built from the exact same -print.ejs view.
+router.get('/schedule/classregistrationlog/download.pdf', requireAdmin, async (req, res) => {
+  const dateFilter = req.query.date || '';
+  const allActions = await allClassRegistrationActions();
+  const allSubmissions = dateFilter ? allActions.filter((a) => a.date === dateFilter) : allActions;
+  const pdf = await renderViewToPdf(req, 'admin-schedule-classregistrationlog-print', {
+    title: 'Class Registration Log Print Preview',
+    allSubmissions,
+    dateFilter,
+    // partials/admin-nav reads isFullAdmin straight off res.locals on a
+    // normal res.render() - req.app.render() (what renderViewToPdf uses
+    // under the hood) never sees res.locals at all, so it has to be
+    // passed through explicitly here or the nav partial throws.
+    isFullAdmin: res.locals.isFullAdmin,
+  });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', 'attachment; filename="class-registration-log.pdf"');
+  res.send(pdf);
+});
+
 router.get('/schedule/export.csv', requireFullAdmin, async (req, res) => {
   const activeDays = await listActiveClassDays();
   const filters = {
@@ -1076,6 +1099,48 @@ router.get('/schedule/print', requireFullAdmin, async (req, res) => {
     });
   }
   res.render('admin-schedule-print', { title: 'Print Schedules', rows, activeDays, dayLabels: CLASS_DAY_LABELS, compact: !!familyId });
+});
+
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - same filtered/sorted rows the Print preview
+// above renders, now a PDF built from the exact same -print.ejs view.
+router.get('/schedule/download.pdf', requireFullAdmin, async (req, res) => {
+  const familyId = req.query.familyId ? parseInt(req.query.familyId, 10) : null;
+  const activeDays = await listActiveClassDays();
+  const filters = {
+    search: (req.query.search || '').trim(),
+    day: activeDays.includes(req.query.day) ? req.query.day : '',
+    grade: req.query.grade || '',
+    teacher: req.query.teacher || '',
+    room: req.query.room || '',
+    className: req.query.className || '',
+    rosterId: req.query.rosterId ? parseInt(req.query.rosterId, 10) : null,
+    memberId: req.query.memberId ? parseInt(req.query.memberId, 10) : null,
+    familyId,
+  };
+  let rows = await scheduleList(filters);
+  if (familyId) {
+    rows = [...rows].sort((a, b) => {
+      const aIsStudent = a.member.member_type === 'student';
+      const bIsStudent = b.member.member_type === 'student';
+      if (aIsStudent !== bIsStudent) return aIsStudent ? 1 : -1;
+      if (aIsStudent) {
+        const aAge = ageFromBirthday(a.member.birthday);
+        const bAge = ageFromBirthday(b.member.birthday);
+        if (aAge == null && bAge == null) return 0;
+        if (aAge == null) return 1;
+        if (bAge == null) return -1;
+        return bAge - aAge;
+      }
+      return 0;
+    });
+  }
+  // See the Class Registration Log download.pdf route's own comment
+  // above on why isFullAdmin has to be passed through by hand here.
+  const pdf = await renderViewToPdf(req, 'admin-schedule-print', { title: 'Print Schedules', rows, activeDays, dayLabels: CLASS_DAY_LABELS, compact: !!familyId, isFullAdmin: res.locals.isFullAdmin });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', 'attachment; filename="class-schedules.pdf"');
+  res.send(pdf);
 });
 
 module.exports = router;

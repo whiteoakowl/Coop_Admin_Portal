@@ -24,6 +24,7 @@ const {
   ensureDayRoster,
 } = require('../utils/classSchedule');
 const { CLASS_DAY_ORDER, CLASS_DAY_LABELS_FULL } = require('../utils/classDays');
+const { renderViewToPdf } = require('../utils/pdfRender');
 const {
   assignmentsForClass,
   getAssignment,
@@ -242,6 +243,40 @@ router.get('/classes/print', async (req, res) => {
     hours: view === 'grid' ? await hoursForDay(day, gridSemesterId) : [],
     roomGrid,
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - same data the Print preview above renders,
+// now a PDF built from the exact same -print.ejs view.
+router.get('/classes/download.pdf', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const semesters = await listSemesters();
+  const selectedSemesterId = req.query.semesterId ? parseInt(req.query.semesterId, 10) : null;
+  const gridSemesterId = selectedSemesterId === null ? undefined : selectedSemesterId;
+  const classes = await classesForTeacher(member, selectedSemesterId);
+  const sorted = [...classes].sort(
+    (a, b) => (CLASS_DAY_ORDER[a.day] - CLASS_DAY_ORDER[b.day]) || a.hour_position - b.hour_position
+  );
+  const byDay = [];
+  for (const cls of sorted) {
+    let group = byDay.find((g) => g.day === cls.day);
+    if (!group) { group = { day: cls.day, dayLabel: cls.dayLabel, classes: [] }; byDay.push(group); }
+    group.classes.push(cls);
+  }
+  const view = req.query.view === 'list' ? 'list' : 'grid';
+  const activeDays = await listActiveClassDays();
+  const day = activeDays.includes(req.query.day) ? req.query.day : (activeDays[0] || 'monday');
+  const roomGrid = view === 'grid' ? await hideClassesNotVisibleToMembers(await roomGridForDay(day, gridSemesterId)) : null;
+  const pdf = await renderViewToPdf(req, 'teacher-classes-print', {
+    title: 'Class Schedule Print Preview',
+    byDay,
+    view,
+    hours: view === 'grid' ? await hoursForDay(day, gridSemesterId) : [],
+    roomGrid,
+  });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', 'attachment; filename="class-schedule.pdf"');
+  res.send(pdf);
 });
 
 // A real request: "Teacher portal. When clicking on a class they view
