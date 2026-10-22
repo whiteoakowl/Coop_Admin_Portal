@@ -174,6 +174,15 @@
           <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
         <% } %>
+        <button type="button" class="roster-action-btn" data-open-allergy-log><svg class="icon"><use href="#icon-medical-bag"/></svg> Allergies/Medical</button>
+        <% if (!classId) { %>
+          <form method="POST" action="/admin/rosters/<%= day %>/resync<%= selectedSemesterId ? '?semesterId=' + selectedSemesterId : '' %>" class="inline-block-form" data-confirm="Resync <%= dayLabel %> Parent/Student rosters and floater auto-assignment from the current class schedule and staffing? Anyone automatically added who no longer belongs (for example, a non-primary parent added under old logic) will be removed. Anyone added by hand via + Add Member is left untouched." data-confirm-yes-label="Yes, Resync" data-confirm-icon="icon-rotate" data-confirm-safe="1">
+            <input type="hidden" name="tab" value="<%= tab %>" />
+            <button type="submit" class="roster-action-btn">Resync</button>
+          </form>
+        <% } %>
+      </div>
+      <div class="roster-btn-row">
         <%# A real request: "all pages/subpages with print, export,
             import, or download buttons should be changed to icons... and
             have all four" - this toolbar only had Print; Export reuses
@@ -186,13 +195,6 @@
             comment above. %>
         <a class="icon-btn" href="/admin/rosters/print?tab=<%= tab %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
         <a class="icon-btn" href="/admin/rosters/download.pdf?tab=<%= tab %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
-        <button type="button" class="roster-action-btn" data-open-allergy-log><svg class="icon"><use href="#icon-medical-bag"/></svg> Allergies/Medical</button>
-        <% if (!classId) { %>
-          <form method="POST" action="/admin/rosters/<%= day %>/resync<%= selectedSemesterId ? '?semesterId=' + selectedSemesterId : '' %>" class="inline-block-form" data-confirm="Resync <%= dayLabel %> Parent/Student rosters and floater auto-assignment from the current class schedule and staffing? Anyone automatically added who no longer belongs (for example, a non-primary parent added under old logic) will be removed. Anyone added by hand via + Add Member is left untouched." data-confirm-yes-label="Yes, Resync" data-confirm-icon="icon-rotate" data-confirm-safe="1">
-            <input type="hidden" name="tab" value="<%= tab %>" />
-            <button type="submit" class="roster-action-btn">Resync</button>
-          </form>
-        <% } %>
       </div>
     </div>
 

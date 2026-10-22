@@ -353,6 +353,8 @@
               class="roster-action-btn archived-toggle-btn<%= showArchived ? ' active' : '' %>"
               href="/admin/logs?tab=nametag<%= showArchived ? '' : '&archived=1' %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>"
             >Archived</a>
+          </div>
+          <div class="roster-btn-row">
             <a class="icon-btn" href="/admin/logs/nametag/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
             <a class="icon-btn" href="/admin/logs/nametag/print?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
             <a class="icon-btn" href="/admin/logs/nametag/download.pdf?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
