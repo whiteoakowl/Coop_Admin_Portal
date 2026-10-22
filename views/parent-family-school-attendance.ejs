@@ -100,9 +100,6 @@
           page in a new tab instead of calling window.print() on this
           live, editable calendar. %>
       <div class="roster-btn-row roster-btn-row-fit-text no-print">
-        <a class="icon-btn" href="/parent/family-school/attendance/export.csv?studentId=<%= studentIdParam %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-        <a class="icon-btn" href="/parent/family-school/attendance/print?studentId=<%= studentIdParam %>&year=<%= year %>&month=<%= month %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
-        <a class="icon-btn" href="/parent/family-school/attendance/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         <details class="filter-details">
           <summary class="roster-action-btn">Filter</summary>
           <form method="GET" action="/parent/family-school/attendance" class="filter-panel">
@@ -120,6 +117,11 @@
             </select>
           </form>
         </details>
+      </div>
+      <div class="roster-btn-row no-print">
+        <a class="icon-btn" href="/parent/family-school/attendance/export.csv?studentId=<%= studentIdParam %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/attendance/print?studentId=<%= studentIdParam %>&year=<%= year %>&month=<%= month %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/attendance/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
       </div>
 
       <table class="fs-attendance-calendar" data-fs-attendance-calendar data-student-id="<%= studentIdParam %>" data-toggle-url="<%= isFamilyMode ? '/parent/family-school/attendance/family/toggle' : '/parent/family-school/attendance/' + selectedStudentId + '/toggle' %>">
