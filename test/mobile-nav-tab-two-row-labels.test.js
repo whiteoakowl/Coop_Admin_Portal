@@ -78,18 +78,20 @@ test('Main Admin mobile tabs: Business Directory and Family School Management sp
   assert.match(res.text, /Family School<br\/?>Management/);
 });
 
-test('Parent Portal mobile tabs: Co-op Classes, Family School Management, Business Directory, and Reading Challenge split into two rows', async () => {
+// Family School Management is no longer one of Parent Portal's own
+// tabs (it's its own portal now - see test/family-school-management.
+// test.js), so this no longer checks for it here.
+test('Parent Portal mobile tabs: Co-op Classes, Business Directory, and Reading Challenge split into two rows', async () => {
   const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('Mobile Tab Parent Family') RETURNING id").get()).id;
   const cookie = await createPortalMember({ name: 'Mobile Tab Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const res = await request(app).get('/parent').set('Cookie', cookie);
   assert.equal(res.status, 200);
   assert.match(res.text, /Co-op<br\/?>Classes/);
-  assert.match(res.text, /Family School<br\/?>Management/);
   assert.match(res.text, /Business<br\/?>Directory/);
   assert.match(res.text, /Reading<br\/?>Challenge/);
 });
 
-test('Teacher Portal mobile tabs: Instructor Profile splits into two rows', async () => {
+test('Co-op Teacher Portal mobile tabs: Instructor Profile splits into two rows', async () => {
   const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('Mobile Tab Teacher Family') RETURNING id").get()).id;
   const cookie = await createPortalMember({ name: 'Mobile Tab Teacher', familyId, memberType: 'parent', roleKey: 'teacher' });
   const res = await request(app).get('/teacher').set('Cookie', cookie);

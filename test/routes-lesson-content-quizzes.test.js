@@ -327,7 +327,7 @@ test('A lesson past its close date hides its content again, like one that hasn\'
     .type('form')
     .send({ _csrf: admin.csrfToken, type: 'text', title: 'Should Be Hidden After Close', body: 'closed content' });
 
-  // The Lesson Details form (shared with Teacher Portal) saves closeDate.
+  // The Lesson Details form (shared with Co-op Teacher Portal) saves closeDate.
   const detailPage = await request(app).get(`/admin/class-schedule/assignments/${assignmentId}`).set('Cookie', admin.cookie);
   const detailCsrf = extractCsrf(detailPage.text);
   await request(app)
@@ -394,9 +394,9 @@ test('A closed-but-never-finished lesson does not permanently block the next les
 
 // A real request: "Add assignments should be a button and then pop up to
 // create the assignment." Shared partials/lesson-content-manage.ejs, so
-// one test per portal covers both the Co-op Admin and Teacher Portal
+// one test per portal covers both the Co-op Admin and Co-op Teacher Portal
 // lesson detail pages.
-test('the "Add Assignments" form is a button + popup dialog, not an always-visible inline card, on both Co-op Admin and Teacher Portal', async () => {
+test('the "Add Assignments" form is a button + popup dialog, not an always-visible inline card, on both Co-op Admin and Co-op Teacher Portal', async () => {
   const admin = await loginAsAdmin();
   const teacher = await createClassAndTeacher('lesson-add-assignments-dialog-teacher@example.com');
 
@@ -417,7 +417,7 @@ test('the "Add Assignments" form is a button + popup dialog, not an always-visib
   assert.match(teacherPage.text, /<dialog id="add-content-dialog"/);
 });
 
-test('Teacher Portal: a teacher cannot manage lesson content on a class they do not teach', async () => {
+test('Co-op Teacher Portal: a teacher cannot manage lesson content on a class they do not teach', async () => {
   const admin = await loginAsAdmin();
   const outsiderTeacher = await createClassAndTeacher('lesson-outsider-teacher@example.com');
   const ownerClassId = (await db.prepare("INSERT INTO classes (class_name, day, hour_position) VALUES ('Owner Only Class', 'monday', 2) RETURNING id").get()).id;

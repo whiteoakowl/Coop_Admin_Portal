@@ -5382,6 +5382,17 @@ create table if not exists family_school_week_assignments (
 );
 create index if not exists idx_family_school_week_assignments_date on family_school_week_assignments(week_date_id);
 
+-- Weekly Planner: "Add New Assignment" extra fields + per-assignment/
+-- per-day completion checkboxes. See the weekly_planner_checkboxes_and_
+-- new_fields migration's own header comment.
+alter table family_school_week_assignments add column if not exists description text;
+alter table family_school_week_assignments add column if not exists link_url text;
+alter table family_school_week_assignments add column if not exists file_key text;
+alter table family_school_week_assignments add column if not exists file_name text;
+alter table family_school_week_assignments add column if not exists grade text;
+alter table family_school_week_assignments add column if not exists completed boolean not null default false;
+alter table family_school_week_dates add column if not exists completed boolean not null default false;
+
 -- Public registration form "address 1, address 2" field. See the
 -- member_address2 migration's own header comment.
 alter table members add column if not exists address2 text;
@@ -5398,3 +5409,21 @@ create table if not exists family_school_volunteer_hours (
   created_at text not null default now_text()
 );
 create index if not exists idx_family_school_volunteer_hours_student on family_school_volunteer_hours(student_id);
+
+-- Family School Management > Settings (school name/logo/colors/NC
+-- homeschool ID, used as the header on every Family School Management
+-- PDF/print page). See the family_school_settings migration's own
+-- header comment.
+create table if not exists family_school_settings (
+  family_id integer primary key references families(id) on delete cascade,
+  school_name text,
+  logo_key text,
+  color_primary text,
+  color_secondary text,
+  nc_homeschool_id text,
+  updated_at text not null default now_text()
+);
+
+-- Portal picker: Teacher Portal renamed to Co-op Teacher Portal. See
+-- the rename_teacher_role_label migration's own header comment.
+UPDATE roles SET label = 'Co-op Teacher' WHERE key = 'teacher';

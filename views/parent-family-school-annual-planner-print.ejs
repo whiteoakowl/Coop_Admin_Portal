@@ -6,19 +6,13 @@
   <style>@page { size: letter; margin: 0.5in; }</style>
 </head>
 <body class="admin-page">
-  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+  <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="print-preview-header no-print">
       <h1>Annual Planner</h1>
       <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
     </div>
-    <div class="print-header">
-      <img src="/img/logo.png" alt="" />
-      <div>
-        <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub">Annual Planner &mdash; <%= schoolYear %></p>
-      </div>
-    </div>
+    <%- include('partials/family-school-print-header', { familySettings, subtitle: `Annual Planner — ${schoolYear}` }) %>
 
     <% if (familyStudents.length === 0) { %>
       <p class="roster-empty">No students in your family yet.</p>

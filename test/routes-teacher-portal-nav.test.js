@@ -2,7 +2,7 @@
 // add section for my classes tab. Each tab after that should be each
 // class that teacher is signed up for to teach. Classes tab should be
 // called co-op classes and have all the same subpages as parent portal
-// co-op classes tab." Teacher Portal's own nav (views/partials/
+// co-op classes tab." Co-op Teacher Portal's own nav (views/partials/
 // portal-nav.ejs's TEACHER_NAV_LINKS) was still a copy-pasted navLinks
 // array in all 11 views/teacher-*.ejs files before this - centralized
 // here the same way Main Admin/Parent/Student Portal's own nav already
@@ -68,7 +68,7 @@ async function loginTeacher(classIds) {
   return loginRes.headers['set-cookie'];
 }
 
-test('Teacher Portal nav: "Classes" is renamed "Class Schedule", with no subpages', async () => {
+test('Co-op Teacher Portal nav: "Classes" is renamed "Class Schedule", with no subpages', async () => {
   const classId = await makeClass();
   const cookie = await loginTeacher([classId]);
   const page = await request(app).get('/teacher').set('Cookie', cookie);
@@ -78,7 +78,7 @@ test('Teacher Portal nav: "Classes" is renamed "Class Schedule", with no subpage
   assert.match(page.text, /<a href="\/teacher\/classes">[\s\S]*?Class Schedule<\/a>/);
 });
 
-test('Teacher Portal Class Schedule tab: List view shows a day-by-day table of the classes this teacher teaches, no subpages', async () => {
+test('Co-op Teacher Portal Class Schedule tab: List view shows a day-by-day table of the classes this teacher teaches, no subpages', async () => {
   const classId = await makeClass('Schedule Tab Class');
   const cookie = await loginTeacher([classId]);
   const page = await request(app).get('/teacher/classes?view=list').set('Cookie', cookie);
@@ -94,7 +94,7 @@ test('Teacher Portal Class Schedule tab: List view shows a day-by-day table of t
 // yet", with the actual co-op-wide schedule grid hidden a click away
 // behind the Grid icon. Grid view is now the default, same as Parent
 // Portal's own Class Registration page.
-test('Teacher Portal Class Schedule tab: defaults to Grid view, has a Semester dropdown, a Print button, and Grid/List view icons', async () => {
+test('Co-op Teacher Portal Class Schedule tab: defaults to Grid view, has a Semester dropdown, a Print button, and Grid/List view icons', async () => {
   const fall = (await db.prepare("INSERT INTO semesters (title) VALUES ('Fall Nav Test') RETURNING id").get()).id;
   const spring = (await db.prepare("INSERT INTO semesters (title) VALUES ('Spring Nav Test') RETURNING id").get()).id;
   const fallClass = await makeClass('Fall Semester Class', { semesterId: fall });
@@ -125,7 +125,7 @@ test('Teacher Portal Class Schedule tab: defaults to Grid view, has a Semester d
   assert.match(gridView.text, /Fall Semester Class/);
 });
 
-test('Teacher Portal Class Schedule tab: Grid view shows the entire co-op schedule grid for one day, not just this teacher\'s own classes - same page as Parent Portal\'s own Class Registration grid', async () => {
+test('Co-op Teacher Portal Class Schedule tab: Grid view shows the entire co-op schedule grid for one day, not just this teacher\'s own classes - same page as Parent Portal\'s own Class Registration grid', async () => {
   const fall = (await db.prepare("INSERT INTO semesters (title) VALUES ('Fall Grid Test') RETURNING id").get()).id;
   const spring = (await db.prepare("INSERT INTO semesters (title) VALUES ('Spring Grid Test') RETURNING id").get()).id;
   const myClass = await makeClass('My Own Grid Class', { day: 'monday', hourPosition: 1, semesterId: fall });
@@ -146,10 +146,10 @@ test('Teacher Portal Class Schedule tab: Grid view shows the entire co-op schedu
 });
 
 // "Members can view whatever schedule grids are unlocked for members to
-// see" - Teacher Portal is a member-facing portal too, so its Grid view
+// see" - Co-op Teacher Portal is a member-facing portal too, so its Grid view
 // now runs through the exact same visible_to_members browse-time gate
 // (hideClassesNotVisibleToMembers) Parent Portal's own grid already did.
-test('Teacher Portal Class Schedule tab: Grid view hides classes under a grid locked away from members, same as Parent Portal\'s grid', async () => {
+test('Co-op Teacher Portal Class Schedule tab: Grid view hides classes under a grid locked away from members, same as Parent Portal\'s grid', async () => {
   const semesterId = (await db.prepare("INSERT INTO semesters (title) VALUES ('Locked Grid Semester') RETURNING id").get()).id;
   await db
     .prepare('INSERT INTO class_schedules (title, day_of_week, semester_id, visible_to_members, visible_to_public) VALUES (?, ?, ?, 0, 0)')
@@ -167,7 +167,7 @@ test('Teacher Portal Class Schedule tab: Grid view hides classes under a grid lo
 // section." Chat/Photos moved out of their own separate Community
 // section (which had nothing else in it) and into TEACHER_NAV_LINKS
 // itself, same as Parent/Student Portal's own single flat nav.
-test('Teacher Portal nav: Chat and Photos are in the main section, with no separate Community section', async () => {
+test('Co-op Teacher Portal nav: Chat and Photos are in the main section, with no separate Community section', async () => {
   const classId = await makeClass();
   const cookie = await loginTeacher([classId]);
   const page = await request(app).get('/teacher').set('Cookie', cookie);
@@ -184,24 +184,24 @@ test('Teacher Portal nav: Chat and Photos are in the main section, with no separ
 // A real bug this surfaced: sharedPortalTitle (middleware/portalAuth.js)
 // never checked for a teacher role before, so a teacher-only account
 // clicking Chat or Photos fell through to a degraded/public shell
-// instead of keeping their own Teacher Portal sidebar - the same "wrong
+// instead of keeping their own Co-op Teacher Portal sidebar - the same "wrong
 // portal" bug already fixed for parent/student dual-role accounts.
-test('Teacher Portal: clicking Chat or Photos keeps the full Teacher Portal nav shell, not a degraded one', async () => {
+test('Co-op Teacher Portal: clicking Chat or Photos keeps the full Co-op Teacher Portal nav shell, not a degraded one', async () => {
   const classId = await makeClass();
   const cookie = await loginTeacher([classId]);
 
   const chatPage = await request(app).get('/forums?portal=teacher').set('Cookie', cookie);
   assert.equal(chatPage.status, 200);
-  assert.match(chatPage.text, /class="portal-nav-title">Teacher Portal</, 'Chat should keep the Teacher Portal nav shell');
-  assert.match(chatPage.text, /href="\/teacher\/attendance"/, 'the full Teacher Portal nav, not a 2-link fallback');
+  assert.match(chatPage.text, /class="portal-nav-title">Co-op Teacher Portal</, 'Chat should keep the Co-op Teacher Portal nav shell');
+  assert.match(chatPage.text, /href="\/teacher\/attendance"/, 'the full Co-op Teacher Portal nav, not a 2-link fallback');
 
   const photosPage = await request(app).get('/photos?portal=teacher').set('Cookie', cookie);
   assert.equal(photosPage.status, 200);
-  assert.match(photosPage.text, /class="portal-nav-title">Teacher Portal</, 'Photos should keep the Teacher Portal nav shell');
-  assert.match(photosPage.text, /href="\/teacher\/attendance"/, 'the full Teacher Portal nav, not the plain public site header');
+  assert.match(photosPage.text, /class="portal-nav-title">Co-op Teacher Portal</, 'Photos should keep the Co-op Teacher Portal nav shell');
+  assert.match(photosPage.text, /href="\/teacher\/attendance"/, 'the full Co-op Teacher Portal nav, not the plain public site header');
 });
 
-test('Teacher Portal nav: a "My Classes" section lists one entry per class this teacher actually teaches', async () => {
+test('Co-op Teacher Portal nav: a "My Classes" section lists one entry per class this teacher actually teaches', async () => {
   const classA = await makeClass('Nav My Classes A');
   const classB = await makeClass('Nav My Classes B');
   const otherClass = await makeClass('Nav Not My Class');
@@ -222,7 +222,7 @@ test('Teacher Portal nav: a "My Classes" section lists one entry per class this 
   assert.doesNotMatch(soloPage.text, /Nav My Classes A/);
 });
 
-test('Teacher Portal nav: every page carries the same centralized nav, not a per-page copy', async () => {
+test('Co-op Teacher Portal nav: every page carries the same centralized nav, not a per-page copy', async () => {
   const classId = await makeClass();
   const cookie = await loginTeacher([classId]);
   for (const url of ['/teacher', '/teacher/classes', '/teacher/attendance', '/teacher/assignments']) {

@@ -1,5 +1,5 @@
 // Shared "is this member allowed into this section-restricted thing"
-// checks - reused by Parent/Student/Teacher Portal class registration
+// checks - reused by Parent/Student/Co-op Teacher Portal class registration
 // (class_sections), member/public Events (event_sections), and Chat
 // category visibility (forum_category_sections). A class/event/category
 // with NO rows in its own join table is unrestricted (open to everyone) -

@@ -70,10 +70,14 @@ async function csrfFrom(cookie, url) {
   return /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
 }
 
+// Family School Management is its own portal now (test/family-school-
+// management.test.js covers the switch), so its Annual Planner/Weekly
+// Planner tabs are checked on its own nav (/parent/family-school), not
+// on Parent Portal's.
 test('Annual Planner and Weekly Planner nav entries appear under Family School Management', async () => {
   const familyId = await createFamily('Planner Nav Family');
   const parent = await createPortalMember({ name: 'Planner Nav Parent', familyId, memberType: 'parent', roleKey: 'parent' });
-  const page = await request(app).get('/parent').set('Cookie', parent.cookie);
+  const page = await request(app).get('/parent/family-school').set('Cookie', parent.cookie);
   assert.match(page.text, /href="\/parent\/family-school\/annual-planner"/);
   assert.match(page.text, /href="\/parent\/family-school\/weekly-planner"/);
 });
@@ -105,9 +109,58 @@ test('Annual Planner: organized by student, a parent can add and delete curricul
   assert.match(page.text, /\$79\.99/);
 
   const item = await db.prepare('SELECT id FROM family_school_curriculum_items WHERE student_id = ?').get(studentA.memberId);
+  // A real request: "No refresh page when delete, it simple disappears"
+  // - JSON in/out now, same shape as the Weekly Planner move route.
   const deleteRes = await request(app).post(`/parent/family-school/annual-planner/${item.id}/delete`).set('Cookie', parent.cookie).type('form').send({ _csrf: csrf });
-  assert.equal(deleteRes.status, 302);
+  assert.equal(deleteRes.status, 200);
+  assert.equal(deleteRes.body.ok, true);
   assert.equal(await db.prepare('SELECT 1 FROM family_school_curriculum_items WHERE id = ?').get(item.id), undefined);
+});
+
+// A real request: "Add edit and delete icons to all annual planning
+// curriculum rows that are added."
+test('Annual Planner: each curriculum row has an Edit icon pre-fillable from its own data, the edit route updates it, and another family cannot edit it', async () => {
+  const familyId = await createFamily('Curriculum Edit Family');
+  const parent = await createPortalMember({ name: 'Curriculum Edit Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Curriculum Edit Student', familyId, memberType: 'student', roleKey: 'student' });
+
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/annual-planner');
+  const createRes = await request(app)
+    .post('/parent/family-school/annual-planner')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: student.memberId, name: 'Saxon Math 5', brand: 'Saxon', level: '5th Grade', price: '79.99', _csrf: csrf });
+  assert.equal(createRes.status, 302);
+
+  const item = await db.prepare('SELECT id FROM family_school_curriculum_items WHERE student_id = ?').get(student.memberId);
+  const page = await request(app).get('/parent/family-school/annual-planner').set('Cookie', parent.cookie);
+  assert.match(page.text, new RegExp(`data-edit-curriculum="${item.id}"[\\s\\S]*?data-name="Saxon Math 5"`));
+  assert.match(page.text, new RegExp(`data-delete-curriculum="${item.id}"`));
+  assert.match(page.text, new RegExp(`<tr data-curriculum-id="${item.id}">`));
+
+  const editRes = await request(app)
+    .post(`/parent/family-school/annual-planner/${item.id}/edit`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ name: 'Saxon Math 6', brand: 'Saxon', level: '6th Grade', price: '89.99', _csrf: csrf });
+  assert.equal(editRes.status, 302);
+  assert.match(editRes.headers.location, /notice=/);
+  const updated = await db.prepare('SELECT * FROM family_school_curriculum_items WHERE id = ?').get(item.id);
+  assert.equal(updated.name, 'Saxon Math 6');
+  assert.equal(updated.level, '6th Grade');
+  assert.equal(String(updated.price), '89.99');
+
+  const otherFamilyId = await createFamily('Curriculum Edit Other Family');
+  const otherParent = await createPortalMember({ name: 'Curriculum Edit Other Parent', familyId: otherFamilyId, memberType: 'parent', roleKey: 'parent' });
+  const otherCsrf = await csrfFrom(otherParent.cookie, '/parent/family-school/annual-planner');
+  const hijackEditRes = await request(app)
+    .post(`/parent/family-school/annual-planner/${item.id}/edit`)
+    .set('Cookie', otherParent.cookie)
+    .type('form')
+    .send({ name: 'Hijacked', _csrf: otherCsrf });
+  assert.equal(hijackEditRes.status, 404);
+  const stillUpdated = await db.prepare('SELECT name FROM family_school_curriculum_items WHERE id = ?').get(item.id);
+  assert.equal(stillUpdated.name, 'Saxon Math 6');
 });
 
 test('Annual Planner: a curriculum name is required, and another family cannot delete this item', async () => {
@@ -130,7 +183,8 @@ test('Annual Planner: a curriculum name is required, and another family cannot d
   const otherParent = await createPortalMember({ name: 'Curriculum Other Parent', familyId: otherFamilyId, memberType: 'parent', roleKey: 'parent' });
   const otherCsrf = await csrfFrom(otherParent.cookie, '/parent/family-school/annual-planner');
   const hijackRes = await request(app).post(`/parent/family-school/annual-planner/${itemId}/delete`).set('Cookie', otherParent.cookie).type('form').send({ _csrf: otherCsrf });
-  assert.equal(hijackRes.status, 404);
+  assert.equal(hijackRes.status, 200);
+  assert.equal(hijackRes.body.ok, false);
   assert.ok(await db.prepare('SELECT 1 FROM family_school_curriculum_items WHERE id = ?').get(itemId), "another family's parent must not be able to delete this item");
 });
 
@@ -251,12 +305,80 @@ test('Weekly Planner: a parent can create a named week from chosen dates, add a 
   const gridPage = await request(app).get(`/parent/family-school/weekly-planner?owner=${student.memberId}&weekId=${week.id}`).set('Cookie', parent.cookie);
   assert.match(gridPage.text, /Fractions worksheet/);
 
-  await request(app).post(`/parent/family-school/weekly-planner/assignments/${assignment.id}/delete`).set('Cookie', parent.cookie).type('form').send({ _csrf: csrf });
+  // A real request: "No refresh page when delete, it simple disappears"
+  // - JSON in/out now, same shape as the move route below.
+  const deleteAssignRes = await request(app).post(`/parent/family-school/weekly-planner/assignments/${assignment.id}/delete`).set('Cookie', parent.cookie).type('form').send({ _csrf: csrf });
+  assert.equal(deleteAssignRes.status, 200);
+  assert.equal(deleteAssignRes.body.ok, true);
   assert.equal(await db.prepare('SELECT 1 FROM family_school_week_assignments WHERE id = ?').get(assignment.id), undefined);
 
   await request(app).post(`/parent/family-school/weekly-planner/${week.id}/delete`).set('Cookie', parent.cookie).type('form').send({ _csrf: csrf });
   assert.equal(await db.prepare('SELECT 1 FROM family_school_weeks WHERE id = ?').get(week.id), undefined);
   assert.equal(await db.prepare('SELECT 1 FROM family_school_week_dates WHERE week_id = ?').get(week.id), undefined, 'deleting a week also removes its own dates');
+});
+
+// A real request: "Add edit icon and delete to all weekly planner
+// assignments."
+test('Weekly Planner: each assignment has an Edit icon pre-fillable from its own data, the edit route updates it, and another family cannot edit or delete it', async () => {
+  const familyId = await createFamily('Weekly Planner Edit Family');
+  const parent = await createPortalMember({ name: 'Weekly Planner Edit Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Weekly Planner Edit Student', familyId, memberType: 'student', roleKey: 'student' });
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/weekly-planner');
+
+  const createRes = await request(app)
+    .post('/parent/family-school/weekly-planner')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ ownerType: 'student', studentId: student.memberId, title: 'Week 1', date: ['2026-10-05'], _csrf: csrf });
+  assert.equal(createRes.status, 302);
+  const week = await db.prepare("SELECT * FROM family_school_weeks WHERE title = 'Week 1' AND student_id = ?").get(student.memberId);
+  const dateRow = await db.prepare('SELECT id FROM family_school_week_dates WHERE week_id = ?').get(week.id);
+
+  const assignRes = await request(app)
+    .post(`/parent/family-school/weekly-planner/dates/${dateRow.id}/assignments`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ subject: 'Math', title: 'Fractions worksheet', description: 'Pages 1-3', link: 'https://example.com', grade: 'A', _csrf: csrf });
+  assert.equal(assignRes.status, 302);
+  const assignment = await db.prepare('SELECT * FROM family_school_week_assignments WHERE week_date_id = ?').get(dateRow.id);
+
+  const page = await request(app).get(`/parent/family-school/weekly-planner?owner=${student.memberId}&weekId=${week.id}`).set('Cookie', parent.cookie);
+  assert.match(page.text, new RegExp(`data-edit-assignment="${assignment.id}"[\\s\\S]*?data-title="Fractions worksheet"`));
+  assert.match(page.text, new RegExp(`data-delete-assignment="${assignment.id}"`));
+
+  const editRes = await request(app)
+    .post(`/parent/family-school/weekly-planner/assignments/${assignment.id}/edit`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ subject: 'Math', title: 'Fractions worksheet - revised', description: 'Pages 1-5', link: 'https://example.com/2', grade: 'A+', _csrf: csrf });
+  assert.equal(editRes.status, 302);
+  assert.match(editRes.headers.location, /notice=/);
+  const updated = await db.prepare('SELECT * FROM family_school_week_assignments WHERE id = ?').get(assignment.id);
+  assert.equal(updated.title, 'Fractions worksheet - revised');
+  assert.equal(updated.description, 'Pages 1-5');
+  assert.equal(updated.grade, 'A+');
+
+  const otherFamilyId = await createFamily('Weekly Planner Edit Other Family');
+  const otherParent = await createPortalMember({ name: 'Weekly Planner Edit Other Parent', familyId: otherFamilyId, memberType: 'parent', roleKey: 'parent' });
+  const otherCsrf = await csrfFrom(otherParent.cookie, '/parent/family-school/weekly-planner');
+
+  const hijackEditRes = await request(app)
+    .post(`/parent/family-school/weekly-planner/assignments/${assignment.id}/edit`)
+    .set('Cookie', otherParent.cookie)
+    .type('form')
+    .send({ title: 'Hijacked', _csrf: otherCsrf });
+  assert.equal(hijackEditRes.status, 404);
+
+  const hijackDeleteRes = await request(app)
+    .post(`/parent/family-school/weekly-planner/assignments/${assignment.id}/delete`)
+    .set('Cookie', otherParent.cookie)
+    .type('form')
+    .send({ _csrf: otherCsrf });
+  assert.equal(hijackDeleteRes.status, 200);
+  assert.equal(hijackDeleteRes.body.ok, false);
+
+  const stillUpdated = await db.prepare('SELECT title FROM family_school_week_assignments WHERE id = ?').get(assignment.id);
+  assert.equal(stillUpdated.title, 'Fractions worksheet - revised');
 });
 
 test('Weekly Planner: an assignment can be picked from an existing class assignment instead of typed by hand', async () => {

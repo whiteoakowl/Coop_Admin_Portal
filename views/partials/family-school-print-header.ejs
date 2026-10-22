@@ -1,0 +1,24 @@
+<%
+// A real request: "Family school management settings subpage. Parent
+// can add school name, school logo and colors. NC homeschool ID
+// number. The school name, logo and colors will be used as the header
+// for all family school management pdf pages and printing pages."
+// Shared by every Family School Management *-print.ejs view - each one
+// used to carry its own hardcoded "Sanford Homeschoolers" logo/title
+// here instead. `subtitle` is that page's own existing print-header-sub
+// text (e.g. "Family School Management", a week's own title/date
+// range) - unchanged, just rendered through this one shared block now.
+const settings = (typeof familySettings !== 'undefined' && familySettings) || null;
+const logoSrc = (settings && settings.logoUrl) || '/img/logo.png';
+const schoolName = (settings && settings.school_name) || 'Sanford Homeschoolers';
+const primaryColor = settings && settings.color_primary;
+const secondaryColor = settings && settings.color_secondary;
+%>
+<div class="print-header family-school-print-header"<% if (secondaryColor) { %> style="border-color: <%= secondaryColor %>;"<% } %>>
+  <img src="<%= logoSrc %>" alt="" />
+  <div>
+    <p class="print-header-title"<% if (primaryColor) { %> style="color: <%= primaryColor %>;"<% } %>><%= schoolName %></p>
+    <p class="print-header-sub"><%= subtitle %></p>
+    <% if (settings && settings.nc_homeschool_id) { %><p class="print-header-sub">NC Homeschool ID: <%= settings.nc_homeschool_id %></p><% } %>
+  </div>
+</div>

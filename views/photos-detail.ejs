@@ -15,7 +15,7 @@
     <%
       // Same fix as photos-list.ejs's own comment.
     %>
-    <%- include('partials/portal-nav', { portalTitle: sharedPortalTitle(hasParentRole ? 'Parent Portal' : hasStudentRole ? 'Student Portal' : 'Teacher Portal') }) %>
+    <%- include('partials/portal-nav', { portalTitle: sharedPortalTitle(hasParentRole ? 'Parent Portal' : hasStudentRole ? 'Student Portal' : 'Co-op Teacher Portal') }) %>
   <% } else { %>
   <%- include('partials/icon-sprite') %>
 

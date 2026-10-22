@@ -29,10 +29,10 @@ function resolvePortalTitle(req) {
   const requestedPortal = req.query.portal;
   if (requestedPortal === 'parent' && hasParent) return 'Parent Portal';
   if (requestedPortal === 'student' && hasStudent) return 'Student Portal';
-  if (requestedPortal === 'teacher' && hasTeacher) return 'Teacher Portal';
+  if (requestedPortal === 'teacher' && hasTeacher) return 'Co-op Teacher Portal';
   if (hasParent) return 'Parent Portal';
   if (hasStudent) return 'Student Portal';
-  if (hasTeacher) return 'Teacher Portal';
+  if (hasTeacher) return 'Co-op Teacher Portal';
   if (hasMainAdmin) return 'Main Admin';
   return 'Parent Portal';
 }

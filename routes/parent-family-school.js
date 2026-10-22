@@ -20,7 +20,7 @@ const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth')
 const { memberForAccount } = require('../utils/portalAuth');
 const { avatarColorFor } = require('../utils/members');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
-const { lessonAttachmentFileFilter } = require('../utils/uploads');
+const { lessonAttachmentFileFilter, imageFileFilter } = require('../utils/uploads');
 const {
   CONTENT_ITEM_TYPES,
   classesForFamily,
@@ -73,6 +73,7 @@ const {
   curriculumForStudent,
   createCurriculumItem,
   getCurriculumItem,
+  updateCurriculumItem,
   deleteCurriculumItem,
   weeksForOwner,
   getWeek,
@@ -84,10 +85,15 @@ const {
   subjectBreakdownForGrid,
   createWeekAssignment,
   getWeekAssignment,
+  updateWeekAssignment,
   deleteWeekAssignment,
   moveWeekAssignment,
+  toggleWeekAssignmentComplete,
+  toggleWeekDateComplete,
   assignmentOptionsForFamily,
   portfolioForStudent,
+  getFamilySchoolSettings,
+  saveFamilySchoolSettings,
 } = require('../utils/familySchool');
 const { isValidISODate, formatDateLabel } = require('../utils/dates');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
@@ -114,6 +120,25 @@ function plainText(html) {
 }
 
 router.use(requirePortalAuth, requirePortal('parent'));
+
+// "The school name, logo and colors will be used as the header for all
+// family school management pdf pages and printing pages." Computed
+// once per request here (same re-derive-every-time convention every
+// other per-request value in this router already follows - familyId
+// itself is never cached either) so every res.render() call in this
+// router automatically has res.locals.familySettings available without
+// each individual route needing to fetch and pass it itself -
+// partials/family-school-print-header.ejs is the one place every
+// *-print.ejs view reads it from. res.render() merges res.locals in
+// automatically; the handful of /download.pdf routes use
+// req.app.render() instead (utils/pdfRender.js's own renderViewToPdf),
+// which does NOT see res.locals, so those still pass it through
+// explicitly off res.locals.familySettings.
+router.use(async (req, res, next) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  res.locals.familySettings = await getFamilySchoolSettings(familyId);
+  next();
+});
 
 // Every route below re-derives the signed-in parent's own family_id and
 // re-checks that whatever class/lesson/content item/student id is in the
@@ -208,6 +233,7 @@ router.get('/family-school/download.pdf', async (req, res) => {
     title: 'Family School Management',
     mode: 'family',
     students,
+    familySettings: res.locals.familySettings,
   });
   sendPdf(res, 'family-school-management-detail.pdf', pdf);
 });
@@ -351,6 +377,21 @@ function uploadAttachment(req, res, next) {
       return res.redirect(
         `/parent/family-school/lessons/${req.params.id}?error=` +
           encodeURIComponent(`That file is too large - attachments are limited to ${MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB.`)
+      );
+    }
+    next(err);
+  });
+}
+
+// "Add New Assignment... upload." Same multer instance/size limit as
+// the Lesson content attachment above - a fresh Weekly Planner entry's
+// own optional file is stored the exact same way (saveAttachment,
+// ATTACHMENTS_BUCKET), just a different field name and error redirect.
+function uploadWeekAssignmentFile(req, res, next) {
+  attachmentUpload.single('upload')(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') {
+      return res.redirect(
+        `/parent/family-school/weekly-planner?error=` + encodeURIComponent(`That file is too large - uploads are limited to ${MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB.`)
       );
     }
     next(err);
@@ -504,6 +545,7 @@ router.get('/family-school/grades/download.pdf', async (req, res) => {
     title: 'Family Grades',
     mode: 'family',
     familyRows,
+    familySettings: res.locals.familySettings,
   });
   sendPdf(res, 'family-grades-all.pdf', pdf);
 });
@@ -682,6 +724,7 @@ router.get('/family-school/attendance/download.pdf', async (req, res) => {
     schoolYearLabel: `${schoolYearStart}-${schoolYearStart + 1}`,
     MONTH_NAMES,
     familyRows,
+    familySettings: res.locals.familySettings,
   });
   sendPdf(res, 'family-attendance-all.pdf', pdf);
 });
@@ -776,6 +819,7 @@ router.get('/family-school/journal/download.pdf', async (req, res) => {
     title: 'Daily Learning Log',
     mode: 'family',
     familyRows,
+    familySettings: res.locals.familySettings,
   });
   sendPdf(res, 'teacher-journal-all.pdf', pdf);
 });
@@ -956,11 +1000,36 @@ router.post('/family-school/annual-planner', async (req, res) => {
   res.redirect('/parent/family-school/annual-planner?notice=' + encodeURIComponent('Curriculum added.'));
 });
 
-router.post('/family-school/annual-planner/:id/delete', async (req, res) => {
+// A real request: "Add edit and delete icons to all annual planning
+// curriculum rows." Same body shape/validation as the Add Curriculum
+// route above, just an UPDATE instead of an INSERT - studentId/school
+// year move with it like the Add dialog's own fields, so re-assigning
+// either still works from the same Edit dialog.
+router.post('/family-school/annual-planner/:id/edit', async (req, res) => {
   const item = await getCurriculumItem(parseInt(req.params.id, 10));
   if (!item || !(await requireOwnStudent(req, item.student_id))) return res.status(404).send('Not found');
+  const name = (req.body.name || '').trim();
+  if (!name) return res.redirect('/parent/family-school/annual-planner?error=' + encodeURIComponent('A curriculum name is required.'));
+  await updateCurriculumItem(item.id, {
+    name,
+    subject: (req.body.subject || '').trim(),
+    brand: (req.body.brand || '').trim(),
+    level: (req.body.level || '').trim(),
+    price: (req.body.price || '').trim(),
+    schoolYear: (req.body.schoolYear || '').trim() || currentSchoolYear(),
+  });
+  res.redirect('/parent/family-school/annual-planner?notice=' + encodeURIComponent('Curriculum updated.'));
+});
+
+// A real request: "No refresh page when delete, it simply disappears
+// and you can keep viewing the same page and same spot." JSON in/out,
+// same fetch-based shape as the drag-and-drop move route above, instead
+// of the old full-page-redirect form submit.
+router.post('/family-school/annual-planner/:id/delete', async (req, res) => {
+  const item = await getCurriculumItem(parseInt(req.params.id, 10));
+  if (!item || !(await requireOwnStudent(req, item.student_id))) return res.json({ ok: false, message: 'Not found.' });
   await deleteCurriculumItem(item.id);
-  res.redirect('/parent/family-school/annual-planner?notice=' + encodeURIComponent('Curriculum removed.'));
+  res.json({ ok: true });
 });
 
 // A real request: "Add a print, pdf and export icons." Export/Download
@@ -994,6 +1063,7 @@ router.get('/family-school/annual-planner/download.pdf', async (req, res) => {
     familyStudents,
     curriculumByStudent: await curriculumByStudentFor(familyStudents, schoolYear),
     schoolYear: schoolYear || 'All Years',
+    familySettings: res.locals.familySettings,
   });
   sendPdf(res, 'annual-planner.pdf', pdf);
 });
@@ -1058,11 +1128,23 @@ async function requireOwnWeek(req, weekId) {
   return week.family_id === familyId ? week : null;
 }
 
+// "Add a filter button. Choose student, choose school year and choose
+// week. Remove plan for dropdown of student choice." The old standalone
+// "Plan for" <select> is gone - its own student/parent/family options
+// now live inside the Filter popover's own Student field, alongside two
+// new fields: School Year (derived per-week from each week's own
+// earliest date, weeksForOwner's own schoolYear - see utils/
+// familySchool.js) and Week itself (so the filter alone can jump
+// straight to a week, instead of needing the separate tab row below it
+// for that).
 router.get('/family-school/weekly-planner', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
   const owner = resolveWeekOwner(req, familyStudents);
-  const weeks = await weeksForOwner(familyId, owner.ownerType, owner.studentId);
+  const allWeeks = await weeksForOwner(familyId, owner.ownerType, owner.studentId);
+  const weekSchoolYearOptions = [...new Set(allWeeks.map((w) => w.schoolYear).filter(Boolean))].sort();
+  const schoolYearFilter = req.query.schoolYear || 'all';
+  const weeks = schoolYearFilter === 'all' ? allWeeks : allWeeks.filter((w) => w.schoolYear === schoolYearFilter);
   const selectedWeekId = req.query.weekId ? parseInt(req.query.weekId, 10) : null;
   const selectedWeek = selectedWeekId ? weeks.find((w) => w.id === selectedWeekId) : null;
   let grid = null;
@@ -1079,6 +1161,8 @@ router.get('/family-school/weekly-planner', async (req, res) => {
     owner,
     ownerParam: ownerParam(owner),
     weeks,
+    schoolYearFilter,
+    weekSchoolYearOptions,
     selectedWeek,
     grid,
     subjectBreakdown,
@@ -1115,7 +1199,20 @@ router.post('/family-school/weekly-planner/:id/delete', async (req, res) => {
   res.redirect(`/parent/family-school/weekly-planner?owner=${encodeURIComponent(owner)}&notice=` + encodeURIComponent('Week removed.'));
 });
 
-router.post('/family-school/weekly-planner/dates/:dateId/assignments', async (req, res) => {
+// "Add two buttons add class assignment and add new assignment... When
+// adding a new class assignment popup, it should show a dropdown of
+// classes, lessons and assignments... When clicking the add new
+// assignment button you can add a fresh and new assignment and it will
+// ask title, description, link, upload, grade, subject." One route
+// still handles both dialogs (same as before this split) - contentItemId
+// present means the "Add Class Assignment" dialog posted (every other
+// field below is ignored); its absence means "Add New Assignment" did,
+// so description/link/upload/grade are read and saved. uploadWeekAssignmentFile
+// is a no-op multer pass-through when the "Add Class Assignment" dialog's
+// own plain (non-multipart) form posts here instead - multer only reads
+// multipart bodies, and silently leaves req.body/req.file alone for a
+// normal urlencoded POST.
+router.post('/family-school/weekly-planner/dates/:dateId/assignments', uploadWeekAssignmentFile, async (req, res) => {
   const weekDate = await getWeekDate(parseInt(req.params.dateId, 10));
   const week = weekDate && (await requireOwnWeek(req, weekDate.week_id));
   if (!week) return res.status(404).send('Not found');
@@ -1126,6 +1223,9 @@ router.post('/family-school/weekly-planner/dates/:dateId/assignments', async (re
   const contentItemId = req.body.contentItemId ? parseInt(req.body.contentItemId, 10) : null;
   let subject = (req.body.subject || '').trim();
   let title = (req.body.title || '').trim();
+  const description = (req.body.description || '').trim();
+  const linkUrl = (req.body.link || '').trim();
+  const grade = (req.body.grade || '').trim();
   if (contentItemId) {
     // "Dropdown to choose an assignment from family management
     // assignments from parent created classes" - only ever a real
@@ -1138,18 +1238,49 @@ router.post('/family-school/weekly-planner/dates/:dateId/assignments', async (re
     title = title || picked.title || picked.class_name;
   }
   if (!title) return res.redirect(`${backUrl}&error=` + encodeURIComponent('A title is required.'));
-  await createWeekAssignment({ weekDateId: weekDate.id, subject, title, contentItemId });
+  let fileKey = null;
+  let fileName = null;
+  if (req.file) {
+    fileKey = await saveAttachment(req.file);
+    fileName = req.file.originalname;
+  }
+  await createWeekAssignment({ weekDateId: weekDate.id, subject, title, contentItemId, description, linkUrl, fileKey, fileName, grade });
   res.redirect(`${backUrl}&notice=` + encodeURIComponent('Assignment added.'));
 });
 
-router.post('/family-school/weekly-planner/assignments/:id/delete', async (req, res) => {
+// A real request: "Add edit icon and delete to all weekly planner
+// assignments." Same editable fields as the "Add New Assignment"
+// dialog (minus the upload - see updateWeekAssignment's own comment).
+router.post('/family-school/weekly-planner/assignments/:id/edit', async (req, res) => {
   const assignment = await getWeekAssignment(parseInt(req.params.id, 10));
   const weekDate = assignment && (await getWeekDate(assignment.week_date_id));
   const week = weekDate && (await requireOwnWeek(req, weekDate.week_id));
   if (!week) return res.status(404).send('Not found');
-  await deleteWeekAssignment(assignment.id);
   const owner = week.owner_type === 'student' ? week.student_id : week.owner_type;
-  res.redirect(`/parent/family-school/weekly-planner?owner=${encodeURIComponent(owner)}&weekId=${week.id}&notice=` + encodeURIComponent('Assignment removed.'));
+  const backUrl = `/parent/family-school/weekly-planner?owner=${encodeURIComponent(owner)}&weekId=${week.id}`;
+  const title = (req.body.title || '').trim();
+  if (!title) return res.redirect(`${backUrl}&error=` + encodeURIComponent('A title is required.'));
+  await updateWeekAssignment(assignment.id, {
+    subject: (req.body.subject || '').trim(),
+    title,
+    description: (req.body.description || '').trim(),
+    linkUrl: (req.body.link || '').trim(),
+    grade: (req.body.grade || '').trim(),
+  });
+  res.redirect(`${backUrl}&notice=` + encodeURIComponent('Assignment updated.'));
+});
+
+// A real request: "No refresh page when delete, it simple disappears
+// and you can keep view the same page and same spot." JSON in/out, same
+// fetch-based shape as the drag-and-drop move route below, instead of
+// the old full-page-redirect form submit.
+router.post('/family-school/weekly-planner/assignments/:id/delete', async (req, res) => {
+  const assignment = await getWeekAssignment(parseInt(req.params.id, 10));
+  const weekDate = assignment && (await getWeekDate(assignment.week_date_id));
+  const week = weekDate && (await requireOwnWeek(req, weekDate.week_id));
+  if (!week) return res.json({ ok: false, message: 'Not found.' });
+  await deleteWeekAssignment(assignment.id);
+  res.json({ ok: true });
 });
 
 // A real request: "allow to drag and drop lessons and assignments
@@ -1170,6 +1301,49 @@ router.post('/family-school/weekly-planner/assignments/:id/move', async (req, re
   if (!targetDate || targetDate.week_id !== week.id) return res.json({ ok: false, message: 'That day is not part of this week.' });
   await moveWeekAssignment(assignment.id, newWeekDateId);
   res.json({ ok: true });
+});
+
+// "Check boxes next to each assignment." A plain checkbox-per-row form
+// (auto-submitted onchange, same convention as the roster-cell-select
+// pattern elsewhere in this app) rather than a fetch - no JS dependency
+// to mark an assignment done, and the page reload keeps the checkbox's
+// own visual state (strikethrough) in sync with the DB without a second
+// round of client-side bookkeeping.
+router.post('/family-school/weekly-planner/assignments/:id/toggle-complete', async (req, res) => {
+  const assignment = await getWeekAssignment(parseInt(req.params.id, 10));
+  const weekDate = assignment && (await getWeekDate(assignment.week_date_id));
+  const week = weekDate && (await requireOwnWeek(req, weekDate.week_id));
+  if (!week) return res.status(404).send('Not found');
+  await toggleWeekAssignmentComplete(assignment.id);
+  const owner = week.owner_type === 'student' ? week.student_id : week.owner_type;
+  res.redirect(`/parent/family-school/weekly-planner?owner=${encodeURIComponent(owner)}&weekId=${week.id}`);
+});
+
+// "Check box on each day for teacher to confirm the day is complete."
+router.post('/family-school/weekly-planner/dates/:dateId/toggle-complete', async (req, res) => {
+  const weekDate = await getWeekDate(parseInt(req.params.dateId, 10));
+  const week = weekDate && (await requireOwnWeek(req, weekDate.week_id));
+  if (!week) return res.status(404).send('Not found');
+  await toggleWeekDateComplete(weekDate.id);
+  const owner = week.owner_type === 'student' ? week.student_id : week.owner_type;
+  res.redirect(`/parent/family-school/weekly-planner?owner=${encodeURIComponent(owner)}&weekId=${week.id}`);
+});
+
+// "Print, pdf and export icon to the left" - Weekly Planner's own
+// toolbar gained a third icon alongside the existing Print/PDF ones:
+// one row per assignment in the selected week.
+router.get('/family-school/weekly-planner/export.csv', async (req, res) => {
+  const week = await requireOwnWeek(req, parseInt(req.query.weekId, 10));
+  if (!week) return res.status(404).send('Not found');
+  const dates = await weekGrid(week.id);
+  dates.forEach((d) => { d.dateLabel = formatDateLabel(d.date); });
+  const lines = [toCsvRow(['Date', 'Subject', 'Title', 'Description', 'Link', 'Grade', 'Completed'])];
+  for (const d of dates) {
+    for (const a of d.assignments) {
+      lines.push(toCsvRow([d.dateLabel, a.subject || '', a.title, a.description || '', a.link_url || '', a.grade || '', a.completed ? 'Yes' : 'No']));
+    }
+  }
+  sendCsv(res, `weekly-planner-${week.title.replace(/[^a-z0-9]+/gi, '-')}.csv`, lines);
 });
 
 // A real request: "Print should show the whole week on one page clean.
@@ -1200,7 +1374,7 @@ router.get('/family-school/weekly-planner/print', async (req, res) => {
 router.get('/family-school/weekly-planner/download.pdf', async (req, res) => {
   const locals = await weeklyPlannerPrintLocals(req);
   if (!locals) return res.status(404).send('Not found');
-  const pdf = await renderViewToPdf(req, 'parent-family-school-weekly-planner-print', locals);
+  const pdf = await renderViewToPdf(req, 'parent-family-school-weekly-planner-print', { ...locals, familySettings: res.locals.familySettings });
   sendPdf(res, 'weekly-planner.pdf', pdf);
 });
 
@@ -1243,8 +1417,47 @@ router.get('/family-school/portfolio/print', async (req, res) => {
 router.get('/family-school/portfolio/download.pdf', async (req, res) => {
   const { familyStudents, studentId, portfolio } = await resolvePortfolioStudent(req);
   if (!portfolio) return res.status(404).send('Not found');
-  const pdf = await renderViewToPdf(req, 'parent-family-school-portfolio-print', { title: 'Portfolio', familyStudents, studentId, portfolio, avatarColorFor });
+  const pdf = await renderViewToPdf(req, 'parent-family-school-portfolio-print', { title: 'Portfolio', familyStudents, studentId, portfolio, avatarColorFor, familySettings: res.locals.familySettings });
   sendPdf(res, `portfolio-${portfolio.name.replace(/[^a-z0-9]+/gi, '-')}.pdf`, pdf);
+});
+
+// A real request: "Family school management settings subpage. Parent
+// can add school name, school logo and colors. NC homeschool ID
+// number." logoUpload (multer, 'logo' field) is its own small instance
+// rather than reusing attachmentUpload above - a logo is always an
+// image (imageFileFilter), never a lesson's own pdf/doc/image mix.
+const logoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_ATTACHMENT_BYTES }, fileFilter: imageFileFilter });
+function uploadSchoolLogo(req, res, next) {
+  logoUpload.single('logo')(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') {
+      return res.redirect(`/parent/family-school/settings?error=` + encodeURIComponent(`That logo is too large - logos are limited to ${MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB.`));
+    }
+    next(err);
+  });
+}
+
+router.get('/family-school/settings', async (req, res) => {
+  res.render('parent-family-school-settings', {
+    title: 'Settings',
+    settings: res.locals.familySettings || {},
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+router.post('/family-school/settings', uploadSchoolLogo, async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  let logoKey;
+  if (req.file) logoKey = await saveAttachment(req.file);
+  await saveFamilySchoolSettings({
+    familyId,
+    schoolName: (req.body.schoolName || '').trim(),
+    colorPrimary: (req.body.colorPrimary || '').trim(),
+    colorSecondary: (req.body.colorSecondary || '').trim(),
+    ncHomeschoolId: (req.body.ncHomeschoolId || '').trim(),
+    logoKey,
+  });
+  res.redirect('/parent/family-school/settings?notice=' + encodeURIComponent('Settings saved.'));
 });
 
 module.exports = router;

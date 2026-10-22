@@ -500,7 +500,7 @@ test('Parent Portal self-signup to teach/assist is also gated by a registration 
   assert.match(decodeURIComponent(allowed.headers.location), /notice=/);
 });
 
-test('Teacher Portal no longer exposes any self-signup route or page', async () => {
+test('Co-op Teacher Portal no longer exposes any self-signup route or page', async () => {
   const admin = await loginAsAdmin();
   const cls = await createClass(admin, { className: 'No Teacher Self Signup Class' });
   const teacher = await createTeacherAccount();

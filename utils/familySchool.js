@@ -747,11 +747,17 @@ function currentSchoolYear() {
 // one is actually selected, same "the selected value never drops out of
 // its own <select>" rule the Attendance page's own year dropdown already
 // follows (routes/parent-family-school.js's own yearOptions).
+// A real request: "Annual planner. Year dropdown menu, add the next 20
+// years of dates starting with 2030-2031." 2049 (not just currentStart
+// + 3) as a hard floor on the upper end guarantees 2030-2031 through
+// 2049-2050 - 20 school years - are always offered here, regardless of
+// what today's actual date is, on top of the existing near-past/near-
+// future coverage around whichever year is actually selected.
 function schoolYearOptions(selected) {
   const [currentStart] = currentSchoolYear().split('-').map(Number);
   const [selectedStart] = (selected || currentSchoolYear()).split('-').map(Number);
   const rangeStart = Math.min(selectedStart, currentStart - 5);
-  const rangeEnd = Math.max(selectedStart, currentStart + 3);
+  const rangeEnd = Math.max(selectedStart, currentStart + 3, 2049);
   const options = [];
   for (let y = rangeStart; y <= rangeEnd; y++) options.push(`${y}-${y + 1}`);
   return options;
@@ -779,6 +785,14 @@ async function getCurriculumItem(id) {
   return db.prepare('SELECT * FROM family_school_curriculum_items WHERE id = ?').get(id);
 }
 
+async function updateCurriculumItem(id, { name, subject, brand, level, price, schoolYear }) {
+  await db
+    .prepare(
+      'UPDATE family_school_curriculum_items SET name = ?, subject = ?, brand = ?, level = ?, price = ?, school_year = ? WHERE id = ?'
+    )
+    .run(name, subject || null, brand || null, level || null, price != null && price !== '' ? price : null, schoolYear || null, id);
+}
+
 async function deleteCurriculumItem(id) {
   await db.prepare('DELETE FROM family_school_curriculum_items WHERE id = ?').run(id);
 }
@@ -796,13 +810,40 @@ async function deleteCurriculumItem(id) {
 // own header comment for why the old tables are left in place,
 // unused, rather than migrated or dropped. ---
 
+// "Add a filter button. Choose student, choose school year and choose
+// week." A week has no school_year column of its own (unlike curriculum
+// items) - schoolYear here is derived from the week's own EARLIEST
+// chosen date (the same Aug-Jul boundary currentSchoolYear() already
+// uses), so the filter never needs the parent to separately tag a
+// week with a year that could then contradict its own real dates.
+function schoolYearForDate(dateStr) {
+  if (!dateStr) return null;
+  const [year, month] = dateStr.split('-').map(Number);
+  const startYear = month >= 8 ? year : year - 1;
+  return `${startYear}-${startYear + 1}`;
+}
+
 async function weeksForOwner(familyId, ownerType, studentId) {
-  if (ownerType === 'student') {
-    return db
-      .prepare("SELECT * FROM family_school_weeks WHERE family_id = ? AND owner_type = 'student' AND student_id = ? ORDER BY created_at DESC, id DESC")
-      .all(familyId, studentId);
-  }
-  return db.prepare('SELECT * FROM family_school_weeks WHERE family_id = ? AND owner_type = ? ORDER BY created_at DESC, id DESC').all(familyId, ownerType);
+  const rows =
+    ownerType === 'student'
+      ? await db
+          .prepare(
+            `SELECT w.*, MIN(d.date) AS first_date FROM family_school_weeks w
+             LEFT JOIN family_school_week_dates d ON d.week_id = w.id
+             WHERE w.family_id = ? AND w.owner_type = 'student' AND w.student_id = ?
+             GROUP BY w.id ORDER BY w.created_at DESC, w.id DESC`
+          )
+          .all(familyId, studentId)
+      : await db
+          .prepare(
+            `SELECT w.*, MIN(d.date) AS first_date FROM family_school_weeks w
+             LEFT JOIN family_school_week_dates d ON d.week_id = w.id
+             WHERE w.family_id = ? AND w.owner_type = ?
+             GROUP BY w.id ORDER BY w.created_at DESC, w.id DESC`
+          )
+          .all(familyId, ownerType);
+  for (const w of rows) w.schoolYear = schoolYearForDate(w.first_date);
+  return rows;
 }
 
 async function getWeek(id) {
@@ -837,6 +878,10 @@ async function weekGrid(weekId) {
   const dates = await db.prepare('SELECT * FROM family_school_week_dates WHERE week_id = ? ORDER BY position, id').all(weekId);
   for (const d of dates) {
     d.assignments = await db.prepare('SELECT * FROM family_school_week_assignments WHERE week_date_id = ? ORDER BY position, id').all(d.id);
+    // "Add New Assignment... upload" - a fresh assignment's own optional
+    // file, same attachmentUrl() resolution every other Family School
+    // Management upload already uses (never a second URL-building rule).
+    for (const a of d.assignments) a.fileUrl = attachmentUrl(a.file_key);
   }
   return dates;
 }
@@ -880,13 +925,23 @@ function subjectBreakdownForGrid(grid) {
   }));
 }
 
-async function createWeekAssignment({ weekDateId, subject, title, contentItemId }) {
+// "Add two buttons add class assignment and add new assignment... When
+// clicking the add new assignment button you can add a fresh and new
+// assignment and it will ask title, description, link, upload, grade,
+// subject." description/linkUrl/fileKey/fileName/grade are only ever
+// set by that "Add New Assignment" dialog - "Add Class Assignment"
+// (contentItemId set) leaves them all null, same as before.
+async function createWeekAssignment({ weekDateId, subject, title, contentItemId, description, linkUrl, fileKey, fileName, grade }) {
   const { next_position: nextPosition } = await db
     .prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM family_school_week_assignments WHERE week_date_id = ?')
     .get(weekDateId);
   const assignment = await db
-    .prepare('INSERT INTO family_school_week_assignments (week_date_id, subject, title, content_item_id, position) VALUES (?, ?, ?, ?, ?) RETURNING id')
-    .get(weekDateId, subject || null, title, contentItemId || null, nextPosition);
+    .prepare(
+      `INSERT INTO family_school_week_assignments
+       (week_date_id, subject, title, content_item_id, position, description, link_url, file_key, file_name, grade)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+    )
+    .get(weekDateId, subject || null, title, contentItemId || null, nextPosition, description || null, linkUrl || null, fileKey || null, fileName || null, grade || null);
   return assignment.id;
 }
 
@@ -896,6 +951,36 @@ async function getWeekAssignment(id) {
 
 async function deleteWeekAssignment(id) {
   await db.prepare('DELETE FROM family_school_week_assignments WHERE id = ?').run(id);
+}
+
+// A real request: "Add edit icon to all weekly planner assignments."
+// Same editable fields as the "Add New Assignment" dialog, minus the
+// upload (left as-is, same as a class-assignment pick's own
+// content_item_id - neither is meant to be swapped out from this
+// dialog, just the text fields around it).
+async function updateWeekAssignment(id, { subject, title, description, linkUrl, grade }) {
+  await db
+    .prepare('UPDATE family_school_week_assignments SET subject = ?, title = ?, description = ?, link_url = ?, grade = ? WHERE id = ?')
+    .run(subject || null, title, description || null, linkUrl || null, grade || null, id);
+}
+
+// "Check boxes next to each assignment." Returns the new state so the
+// caller can redirect/respond without a second read.
+async function toggleWeekAssignmentComplete(id) {
+  const row = await db
+    .prepare('UPDATE family_school_week_assignments SET completed = NOT completed WHERE id = ? RETURNING completed')
+    .get(id);
+  return row ? row.completed : null;
+}
+
+// "Check box on each day for teacher to confirm the day is complete" -
+// the parent/home-instructor's own independent sign-off, not a rollup
+// of that day's own assignment checkboxes.
+async function toggleWeekDateComplete(id) {
+  const row = await db
+    .prepare('UPDATE family_school_week_dates SET completed = NOT completed WHERE id = ? RETURNING completed')
+    .get(id);
+  return row ? row.completed : null;
 }
 
 // A real request: "allow to drag and drop lessons and assignments
@@ -965,6 +1050,42 @@ async function portfolioForStudent(studentId) {
   };
 }
 
+// --- Settings (its own subpage - a real request: "Parent can add
+// school name, school logo and colors. NC homeschool ID number. The
+// school name, logo and colors will be used as the header for all
+// family school management pdf pages and printing pages.") One row
+// per family, upserted - views/partials/family-school-print-header.ejs
+// is the one place every *-print.ejs view reads it back to build its
+// own header instead of the hardcoded "Sanford Homeschoolers" logo/
+// title every one of those views used to carry on its own. ---
+async function getFamilySchoolSettings(familyId) {
+  if (!familyId) return null;
+  const row = await db.prepare('SELECT * FROM family_school_settings WHERE family_id = ?').get(familyId);
+  if (!row) return null;
+  return { ...row, logoUrl: attachmentUrl(row.logo_key) };
+}
+
+async function saveFamilySchoolSettings({ familyId, schoolName, colorPrimary, colorSecondary, ncHomeschoolId, logoKey }) {
+  const existing = await db.prepare('SELECT logo_key FROM family_school_settings WHERE family_id = ?').get(familyId);
+  const resolvedLogoKey = typeof logoKey !== 'undefined' ? logoKey : existing ? existing.logo_key : null;
+  if (existing) {
+    await db
+      .prepare(
+        `UPDATE family_school_settings
+         SET school_name = ?, color_primary = ?, color_secondary = ?, nc_homeschool_id = ?, logo_key = ?, updated_at = now_text()
+         WHERE family_id = ?`
+      )
+      .run(schoolName || null, colorPrimary || null, colorSecondary || null, ncHomeschoolId || null, resolvedLogoKey, familyId);
+  } else {
+    await db
+      .prepare(
+        `INSERT INTO family_school_settings (family_id, school_name, color_primary, color_secondary, nc_homeschool_id, logo_key)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .run(familyId, schoolName || null, colorPrimary || null, colorSecondary || null, ncHomeschoolId || null, resolvedLogoKey);
+  }
+}
+
 module.exports = {
   CONTENT_ITEM_TYPES,
   attachmentUrl,
@@ -1025,6 +1146,7 @@ module.exports = {
   curriculumForStudent,
   createCurriculumItem,
   getCurriculumItem,
+  updateCurriculumItem,
   deleteCurriculumItem,
   weeksForOwner,
   getWeek,
@@ -1036,8 +1158,14 @@ module.exports = {
   subjectBreakdownForGrid,
   createWeekAssignment,
   getWeekAssignment,
+  updateWeekAssignment,
   deleteWeekAssignment,
   moveWeekAssignment,
+  toggleWeekAssignmentComplete,
+  toggleWeekDateComplete,
   assignmentOptionsForFamily,
   portfolioForStudent,
+  getFamilySchoolSettings,
+  saveFamilySchoolSettings,
+  schoolYearForDate,
 };

@@ -129,7 +129,12 @@ async function seedIfMissing(db) {
 const PORTAL_ROLES = [
   { key: 'parent', label: 'Parent', description: 'Class registration, event registration, family homeschool management, etc.', isSystem: true },
   { key: 'student', label: 'Student', description: 'View and complete lessons, chat with friends. Challenges, play games etc.', isSystem: true },
-  { key: 'teacher', label: 'Teacher', description: 'Attendance, manage classes. Lesson plans. Etc.', isSystem: true },
+  // A real request: "Teacher portal should be called co-op teacher
+  // portal." label renamed to match (parallel to 'Co-op Admin' just
+  // below) - the in-portal nav shell itself (middleware/portalAuth.js's
+  // own sharedPortalTitle, every teacher-*.ejs view's own portalTitle)
+  // says the fuller "Co-op Teacher Portal".
+  { key: 'teacher', label: 'Co-op Teacher', description: 'Attendance, manage classes. Lesson plans. Etc.', isSystem: true },
   { key: 'coop_admin', label: 'Co-op Admin', description: 'Co-op classes, schedules, floaters, name tags, attendance etc.', isSystem: true },
   { key: 'main_admin', label: 'Main Admin', description: 'Group management, events, chat groups, approvals, website settings etc.', isSystem: true },
 ];

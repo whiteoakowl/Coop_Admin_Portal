@@ -440,7 +440,7 @@ const CLASS_MANAGE_TABS = ['details', 'staffRoster', 'assignments', 'grades', 'c
 // opening the popup fragment. A real request: "when you click a classes
 // it should take you to the classes full settings page with tabs for all
 // of that classes features. Admin and teachers can change classes
-// information or upload assignments, grades etc." - Teacher Portal
+// information or upload assignments, grades etc." - Co-op Teacher Portal
 // already lets a teacher manage their own classes' assignments/grades
 // (routes/teacher-portal.js's own /classes/:id, /assignments/:id); this
 // adds the equivalent Assignments/Grades tabs here so an admin has the
@@ -562,7 +562,7 @@ router.post('/class-schedule/classes/:id/assignments/reorder', requireFullAdmin,
 });
 
 // Grading/managing one assignment - own page rather than a third thing
-// crammed into the class's own Grades tab, same shape as Teacher Portal's
+// crammed into the class's own Grades tab, same shape as Co-op Teacher Portal's
 // own /assignments/:id (routes/teacher-portal.js) so an admin grading a
 // class works exactly like a teacher grading their own. Also the lesson's
 // own content-item management surface (video/text/file/quiz blocks) and

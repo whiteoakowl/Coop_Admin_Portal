@@ -87,15 +87,20 @@ async function loginAsMainAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
-test('Parent Portal nav: no standalone Academics tab, Name Tags is its own tab, and Transcripts/Diplomas are Family School Management subpages', async () => {
+// Family School Management is its own portal now (test/family-school-
+// management.test.js covers the switch) - Transcripts/Diplomas are its
+// own top-level tabs there, not a Parent Portal subpage.
+test('Parent Portal nav: no standalone Academics tab, Name Tags is its own tab, and Transcripts/Diplomas are Family School Management tabs', async () => {
   const familyId = await createFamily('Nav Family');
   const parent = await createPortalMember({ name: 'Nav Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const page = await request(app).get('/parent').set('Cookie', parent.cookie);
   assert.equal(page.status, 200);
   assert.doesNotMatch(page.text, />Academics</);
   assert.match(page.text, /href="\/parent\/name-tags"[^>]*>(?:(?!<\/a>).)*Name Tags/s);
-  assert.match(page.text, /href="\/parent\/academics">\s*Transcripts/s);
-  assert.match(page.text, /href="\/parent\/academics\/diplomas">\s*Diplomas/s);
+
+  const fsmPage = await request(app).get('/parent/family-school').set('Cookie', parent.cookie);
+  assert.match(fsmPage.text, /href="\/parent\/academics"[^>]*>(?:(?!<\/a>).)*Transcripts/s);
+  assert.match(fsmPage.text, /href="\/parent\/academics\/diplomas"[^>]*>(?:(?!<\/a>).)*Diplomas/s);
 });
 
 test('a parent can design a diploma with a template, color, display name, and two signatures, and it shows on the list page and the print page', async () => {

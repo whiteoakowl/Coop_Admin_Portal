@@ -3454,6 +3454,57 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .fs-weekly-plan-assignment-text { flex: 1 1 auto; }
 li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(--brand-soft); }
 
+/* "Check boxes next to each assignment. Check box on each day for
+   teacher to confirm the day is complete." A completed assignment's
+   own text strikes through (still fully readable, just visually
+   "done") rather than disappearing - these are a parent's own planning
+   notes, not a checklist that should vanish on check. */
+.fs-weekly-plan-assignment-done .fs-weekly-plan-assignment-text { text-decoration: line-through; color: var(--muted); }
+.fs-weekly-plan-day-complete-form { margin-bottom: 0.4rem; }
+.fs-weekly-plan-day-complete { font-size: 0.78rem; font-weight: 600; }
+.fs-weekly-plan-add-btn-row { margin-top: 0.5rem; }
+.fs-weekly-plan-day-label-mobile { display: none; }
+
+/* "Adequate space between buttons and features on page and popups." */
+.fs-weekly-plan-row-spaced { margin-bottom: 1rem; }
+
+/* "Each day should be stacked vertically for easier view on mobile.
+   Everything is currently overlapping such as text, buttons etc." The
+   grid's own table-layout: fixed (above) forces all 7 day columns into
+   an equal, increasingly tiny share of a phone's width - not just small
+   text, but real overlap once a day's own checkbox/list/two buttons no
+   longer fit their sliver of a column at all. Below 640px (the same
+   breakpoint .table-stack-mobile elsewhere in this file already uses)
+   the table drops column layout entirely - each day becomes its own
+   full-width card, in document order, with its real <th> label swapped
+   for .fs-weekly-plan-day-label-mobile since <thead> is hidden. Not
+   .table-stack-mobile itself: that convention's "label: value" per
+   cell (td[data-label]::before) fits simple tabular data, not a day's
+   richer content (a checkbox, a list, two buttons) that needs to stay
+   intact and left-aligned, not squeezed into one flex row. */
+@media (max-width: 640px) {
+  .fs-weekly-plan-grid, .fs-weekly-plan-grid tbody, .fs-weekly-plan-grid tr { display: block; width: 100%; }
+  .fs-weekly-plan-grid thead { display: none; }
+  .fs-weekly-plan-grid td {
+    display: block;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.65rem 0.7rem;
+    margin-bottom: 0.65rem;
+    white-space: normal;
+  }
+  .fs-weekly-plan-grid td:last-child { margin-bottom: 0; }
+  .fs-weekly-plan-day-label-mobile {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .roster-scroll:has(> .fs-weekly-plan-grid) { overflow-x: visible; border: none; background: none; }
+}
+
 /* Per-week subject percentage circle graph - a real request: "show a
    circle graph for each week below the week plan that shows percentage
    of each subject." Plain CSS conic-gradient, no chart library/canvas -
@@ -13960,6 +14011,12 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .fs-portfolio-journal-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.75rem; }
 .fs-portfolio-journal-list li { border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
 .fs-portfolio-journal-list li:last-child { border-bottom: none; padding-bottom: 0; }
+
+/* Family School Management > Settings - a real request: "Parent can
+   add school name, school logo and colors... used as the header for
+   all family school management pdf pages and printing pages." */
+.fs-settings-logo-preview { margin-bottom: 0.5rem; }
+.fs-settings-logo-preview img { max-height: 80px; max-width: 200px; border-radius: var(--radius); border: 1px solid var(--border); }
 
 /* Family School Management - Attendance calendar (views/parent-family-
    school-attendance.ejs). A real request: "View a calendar and mark days

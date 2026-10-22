@@ -8,7 +8,7 @@
 // template library, never tied to any one class - "Assign to Class"
 // (POST .../assign below) deep-copies a template into a brand new,
 // completely independent class Lesson (see utils/lessonPlans.js's own
-// assignLessonPlanToClass). Teacher Portal's own "Add Assignments" flow
+// assignLessonPlanToClass). Co-op Teacher Portal's own "Add Assignments" flow
 // (routes/teacher-portal.js) is entirely untouched by this file.
 const express = require('express');
 const router = express.Router();

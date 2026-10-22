@@ -74,18 +74,39 @@ async function csrfFrom(cookie, url) {
   return /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
 }
 
-test('Family School Management nav tab appears on Parent, Student, and Main Admin portals', async () => {
+// A later real request: "Homeschool family management tab on parent
+// portal. It needs to become its own portal and all the subpages
+// becomes the tabs." Family School Management is no longer a Parent
+// Portal nav tab - it's reached via the Portal Switcher's own second
+// card for the 'parent' role (routes/portal-auth.js's own
+// expandPortalRoles), with every one of its old subpages now a direct
+// top-level tab in its own nav shell (views/partials/portal-nav.ejs's
+// own FAMILY_SCHOOL_NAV_LINKS). Student/Main Admin's own tabs for this
+// feature are untouched (the user only asked about Parent Portal).
+test('Family School Management is its own portal reached from the parent role, and the Student/Main Admin tabs are unaffected', async () => {
   const familyId = await createFamily('Nav Family');
   const parent = await createPortalMember({ name: 'Nav Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const student = await createPortalMember({ name: 'Nav Student', familyId, memberType: 'student', roleKey: 'student' });
   const mainAdmin = await createPortalMember({ name: 'Nav Admin', familyId: null, memberType: 'admin', roleKey: 'main_admin' });
 
-  // A later real request ("split the words into two rows to help
-  // shrink the width of the tabs") renders the bottom mobile tab bar's
-  // own copy of this label as "Family School<br>Management" instead of
-  // plain text - allow either shape.
   const parentHome = await request(app).get('/parent').set('Cookie', parent.cookie);
-  assert.match(parentHome.text, />Family School(?:<br\/?>| )Management</);
+  assert.doesNotMatch(parentHome.text, />Family School(?:<br\/?>| )Management</, 'Family School Management is no longer a Parent Portal nav tab');
+  // A parent-only account now reaches two portals from that one role -
+  // "Switch Portal" must show even though it holds only one real role.
+  assert.match(parentHome.text, /Switch Portal/);
+
+  const switcher = await request(app).get('/portal').set('Cookie', parent.cookie);
+  assert.match(switcher.text, /class="portal-picker-title">Family School Management</);
+  assert.match(switcher.text, /href="\/parent\/family-school"/);
+
+  const fsmHome = await request(app).get('/parent/family-school').set('Cookie', parent.cookie);
+  assert.equal(fsmHome.status, 200);
+  assert.match(fsmHome.text, /<p class="portal-nav-title">Family School Management<\/p>/);
+  // Every old subpage is now a direct top-level tab, not nested under a
+  // Family School Management group.
+  assert.match(fsmHome.text, /href="\/parent\/family-school\/classes"/);
+  assert.match(fsmHome.text, /href="\/parent\/family-school\/weekly-planner"/);
+  assert.match(fsmHome.text, /href="\/parent\/family-school\/settings"/);
 
   // A later real request ("Student portal add a tab that says family
   // homeschooling...") renamed Student Portal's own nav entry for this

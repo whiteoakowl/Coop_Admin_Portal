@@ -333,7 +333,7 @@ router.get('/classes', async (req, res) => {
   const day = activeDays.includes(req.query.day) ? req.query.day : (activeDays[0] || 'monday');
   const view = req.query.view === 'list' ? 'list' : 'grid';
   // A real request: "Parent portal should have a semester dropdown picker
-  // too" - same All Semesters/one-semester select as Teacher Portal's own
+  // too" - same All Semesters/one-semester select as Co-op Teacher Portal's own
   // Class Schedule page (routes/teacher-portal.js's own GET /classes).
   // null (All Semesters) becomes undefined for roomGridForDay/
   // classesForDaySemester, same leniency every other caller of that
@@ -518,7 +518,7 @@ router.get('/classes/:id/fragment', async (req, res) => {
   // joinClassAsStaff. This is now the ONLY self-signup path - a follow-up
   // request ("they should be able to signup under parent portal not
   // teacher portal. Teacher portal should not have that feature at
-  // all") removed Teacher Portal's own former "Sign Up to Teach" page
+  // all") removed Co-op Teacher Portal's own former "Sign Up to Teach" page
   // and its /browse-classes, /classes/:id/join, /classes/:id/leave
   // routes outright, rather than keeping both.
   // A later real request: "it should list all parent names in that
@@ -689,7 +689,7 @@ async function classesForChild(childId) {
 
 // Every class one specific parent is staffing (teacher or assistant role)
 // - the parent-facing twin of classesForChild above, same class_staff
-// table Teacher Portal's own classesForTeacher (routes/teacher-portal.js)
+// table Co-op Teacher Portal's own classesForTeacher (routes/teacher-portal.js)
 // already reads.
 async function classesStaffedByMember(memberId) {
   const staffRows = await db.prepare('SELECT class_id FROM class_staff WHERE member_id = ?').all(memberId);
