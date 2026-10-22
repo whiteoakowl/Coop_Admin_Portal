@@ -12,27 +12,25 @@
       <h1>Annual Planner</h1>
     </div>
 
-    <%# A real request: "Export, pdf and print button to the right. On
-        the same row, add curriculum and year picking drop down button
-        to the left." One combined toolbar row (.roster-toolbar's own
-        justify-content: space-between) instead of the two separate
-        rows this used to be. %>
+    <%# A real request: "Year dropdown, remove school year title. Move
+        dropdown and add curriculum button to the same row as the print
+        icons. Shrink to fit." One single roster-btn-row-fit-text row
+        (not two separate flex groups under a space-between
+        .roster-toolbar, which wrapped onto two lines on mobile) - every
+        control sized to its own content instead. %>
     <div class="roster-toolbar no-print">
-      <div class="roster-toolbar-left">
+      <div class="roster-btn-row roster-btn-row-fit-text">
         <% if (familyStudents.length > 0) { %>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-curriculum-dialog').showModal()">+ Add Curriculum</button>
         <% } %>
-        <form method="GET" action="/parent/family-school/annual-planner" class="roster-btn-row roster-btn-row-fit-text">
-          <label class="hint" for="annual-planner-school-year">School Year</label>
-          <select id="annual-planner-school-year" name="schoolYear" onchange="this.form.submit()">
+        <form method="GET" action="/parent/family-school/annual-planner" class="inline-block-form">
+          <select id="annual-planner-school-year" name="schoolYear" onchange="this.form.submit()" aria-label="School Year">
             <option value="all" <%= schoolYear === 'all' ? 'selected' : '' %>>All Years</option>
             <% yearOptions.forEach(function(y) { %>
               <option value="<%= y %>" <%= schoolYear === y ? 'selected' : '' %>><%= y %></option>
             <% }); %>
           </select>
         </form>
-      </div>
-      <div class="roster-btn-row roster-btn-row-fit-text">
         <a class="icon-btn" href="/parent/family-school/annual-planner/export.csv?schoolYear=<%= schoolYear %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
         <a class="icon-btn" href="/parent/family-school/annual-planner/print?schoolYear=<%= schoolYear %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
         <a class="icon-btn" href="/parent/family-school/annual-planner/download.pdf?schoolYear=<%= schoolYear %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
@@ -51,9 +49,10 @@
     <% } else { %>
       <% familyStudents.forEach(function(s) { %>
         <% var items = curriculumByStudent[s.id]; %>
+        <% var studentTotal = items.reduce(function(sum, item) { return sum + (item.price != null ? Number(item.price) : 0); }, 0); %>
         <div class="manage-section" data-curriculum-section>
           <div class="grid-box-header">
-            <h2><%= s.name %></h2>
+            <h2><%= s.name %> <span class="hint" data-curriculum-total>Total: $<%= studentTotal.toFixed(2) %></span></h2>
           </div>
           <p class="roster-empty" data-curriculum-empty <%- items.length > 0 ? 'hidden' : '' %>>No curriculum added yet.</p>
           <div class="roster-scroll" <%- items.length === 0 ? 'hidden' : '' %>>

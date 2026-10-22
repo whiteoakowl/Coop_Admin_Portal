@@ -12,6 +12,7 @@
       <h1>Family Classes</h1>
       <div class="roster-btn-row">
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog').showModal()">+ New Class</button>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-preplanned-class-dialog').showModal()">+ Preplanned Class</button>
       </div>
     </div>
 
@@ -66,6 +67,33 @@
       <label>Description
         <textarea name="description" rows="2"></textarea>
       </label>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+        <button type="submit" class="primary-btn">Create Class</button>
+      </div>
+    </form>
+  </dialog>
+
+  <%# A real request: "Add a button that says +preplanned class" -
+      "Pick from built-in curriculum templates." A small, fixed set of
+      app-provided starter classes (utils/familySchool.js's own
+      PREPLANNED_CLASS_TEMPLATES) - picking one creates the class plus
+      a few starter lessons already in place, rather than starting from
+      a blank Class Name/Description form. %>
+  <dialog id="add-preplanned-class-dialog" class="class-form-dialog">
+    <form method="POST" action="/parent/family-school/classes/from-template" class="stack-form">
+      <div class="class-form-dialog-header">
+        <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
+        <h3>Preplanned Class</h3>
+      </div>
+      <label>Template
+        <select name="templateKey" required>
+          <% preplannedTemplates.forEach(function(t) { %>
+            <option value="<%= t.key %>"><%= t.name %></option>
+          <% }); %>
+        </select>
+      </label>
+      <p class="hint">Creates the class with a starter set of lessons already added - you can edit or remove any of them afterward.</p>
       <div class="notes-dialog-actions">
         <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
         <button type="submit" class="primary-btn">Create Class</button>

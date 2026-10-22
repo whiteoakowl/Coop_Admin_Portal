@@ -460,20 +460,23 @@ test('Overview: the bare /parent/family-school page shows a card per student wit
 
 // A real request: "Add the following buttons to each page. Export,
 // print, download, filter." Export/Download are CSV downloads (Print is
-// just window.print(), nothing server-side to test); Filter is the
-// Overview page's own student checkbox set (Attendance/Grades/Journal
-// already had a student selector, just moved into the new Filter
-// popover - covered implicitly by their own existing tests above still
-// passing with the restructured toolbar).
-test('Overview: Export/Download CSV buttons and the Filter checkbox set', async () => {
+// just window.print(), nothing server-side to test). A later real
+// request ("remove filter button and feature") removed the Overview
+// page's own Filter checkbox set entirely - every family student always
+// shows now, and a further request ("remove blue page buttons") removed
+// the old Family Classes/Grades/.../Portfolio quick-link row too (those
+// pages are now direct top-level nav tabs instead - test/family-school-
+// management.test.js's own nav test already covers that).
+test('Overview: Export/Download CSV buttons cover the whole family, the old quick-link buttons and Filter are gone, and the school info header renders', async () => {
   const familyId = await createFamily('CSV Family');
   const parent = await createPortalMember({ name: 'CSV Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const studentA = await createPortalMember({ name: 'CSV Student A', familyId, memberType: 'student', roleKey: 'student' });
   const studentB = await createPortalMember({ name: 'CSV Student B', familyId, memberType: 'student', roleKey: 'student' });
 
-  const { createClass, assignClassToStudents } = require('../utils/familySchool');
+  const { createClass, assignClassToStudents, saveFamilySchoolSettings } = require('../utils/familySchool');
   const classId = await createClass({ familyId, className: 'CSV Class', description: null, createdByAccountId: null });
   await assignClassToStudents(classId, [studentA.memberId]);
+  await saveFamilySchoolSettings({ familyId, schoolName: 'The CSV Family Academy', ncHomeschoolId: '555555', homeschooledSince: '2026-08-23' });
 
   const summaryCsv = await request(app).get('/parent/family-school/export.csv').set('Cookie', parent.cookie);
   assert.equal(summaryCsv.status, 200);
@@ -499,14 +502,19 @@ test('Overview: Export/Download CSV buttons and the Filter checkbox set', async 
   assert.equal(detailPdf.headers['content-type'], 'application/pdf');
   assert.equal(detailPdf.body.slice(0, 5).toString(), '%PDF-');
 
-  // The Filter checkbox set narrows the Overview page's own cards (not
-  // the CSV downloads, which always cover the whole family). Student B
-  // still appears once, as an unchecked option inside the Filter
-  // popover itself - only its own card (the fs-overview-name heading)
-  // must be gone.
-  const filtered = await request(app).get(`/parent/family-school?studentId=${studentA.memberId}`).set('Cookie', parent.cookie);
-  assert.match(filtered.text, /CSV Student A/);
-  assert.doesNotMatch(filtered.text, /class="fs-overview-name">CSV Student B</);
+  const overview = await request(app).get('/parent/family-school').set('Cookie', parent.cookie);
+  assert.equal(overview.status, 200);
+  // Both students always show - there's no Filter to narrow them anymore.
+  assert.match(overview.text, /class="fs-overview-name">CSV Student A</);
+  assert.match(overview.text, /class="fs-overview-name">CSV Student B</);
+  assert.doesNotMatch(overview.text, /class="filter-details"/);
+  assert.doesNotMatch(overview.text, />Filter</);
+  assert.doesNotMatch(overview.text, /btn-secondary" href="\/parent\/family-school\/classes"/);
+
+  // The new school-info header (school name/ID/homeschooled-since).
+  assert.match(overview.text, /class="fs-school-header-name"[^>]*>The CSV Family Academy</);
+  assert.match(overview.text, /NC Homeschool ID: 555555/);
+  assert.match(overview.text, /Homeschooling since August 23, 2026/);
 });
 
 test('Grades/Attendance/Journal: Export (one student) and Download (whole family) CSV buttons', async () => {
@@ -578,4 +586,61 @@ test('Grades/Attendance/Journal: Export (one student) and Download (whole family
   const otherGradesDownload = await getPdf('/parent/family-school/grades/download.pdf', otherParent.cookie);
   assert.equal(otherGradesDownload.status, 200);
   assert.equal(otherGradesDownload.body.slice(0, 5).toString(), '%PDF-');
+});
+
+// A real request: "Add a button that says +preplanned class" - "Pick
+// from built-in curriculum templates."
+test('Family Classes: the +Preplanned Class button lists built-in templates, and picking one creates the class with its starter lessons already added', async () => {
+  const familyId = await createFamily('Preplanned Class Family');
+  const parent = await createPortalMember({ name: 'Preplanned Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+
+  const page = await request(app).get('/parent/family-school/classes').set('Cookie', parent.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /\+ Preplanned Class/);
+  assert.match(page.text, /<option value="math">Math<\/option>/);
+  assert.match(page.text, /<option value="language_arts">Language Arts<\/option>/);
+
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/classes');
+  const res = await request(app)
+    .post('/parent/family-school/classes/from-template')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ templateKey: 'math', _csrf: csrf });
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /notice=/);
+
+  const classRow = await db.prepare("SELECT * FROM family_school_classes WHERE family_id = ? AND class_name = 'Math'").get(familyId);
+  assert.ok(classRow, 'expected a class named after the template');
+  const lessons = await db.prepare('SELECT title FROM family_school_lessons WHERE class_id = ? ORDER BY position').all(classRow.id);
+  assert.deepEqual(lessons.map((l) => l.title), ['Numbers & Operations', 'Fractions & Decimals', 'Geometry Basics', 'Word Problems']);
+});
+
+test('Family Classes: an unknown template key is rejected without creating a class', async () => {
+  const familyId = await createFamily('Preplanned Class Invalid Family');
+  const parent = await createPortalMember({ name: 'Preplanned Invalid Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/classes');
+  const res = await request(app)
+    .post('/parent/family-school/classes/from-template')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ templateKey: 'not-a-real-template', _csrf: csrf });
+  assert.match(res.headers.location, /error=/);
+  const classCount = (await db.prepare('SELECT COUNT(*) AS n FROM family_school_classes WHERE family_id = ?').get(familyId)).n;
+  assert.equal(Number(classCount), 0);
+});
+
+// A real request: "Content should say content/assignments. Button
+// should say add new content/assignment."
+test('Lesson Manage: the Content section is labeled Content/Assignments, with an Add New Content/Assignment button', async () => {
+  const familyId = await createFamily('Content Label Family');
+  const parent = await createPortalMember({ name: 'Content Label Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const { createClass, createLesson } = require('../utils/familySchool');
+  const classId = await createClass({ familyId, className: 'Content Label Class', description: null, createdByAccountId: null });
+  const lessonId = await createLesson({ classId, title: 'Content Label Lesson', description: null, createdByAccountId: null });
+
+  const page = await request(app).get(`/parent/family-school/lessons/${lessonId}`).set('Cookie', parent.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<h2>Content\/Assignments \(0\)<\/h2>/);
+  assert.match(page.text, /\+ Add New Content\/Assignment/);
+  assert.match(page.text, /<h3>Add New Content\/Assignment<\/h3>/);
 });

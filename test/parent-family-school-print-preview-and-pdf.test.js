@@ -168,14 +168,17 @@ test('Daily Learning Log: Print links to a dedicated preview page, and Download 
   assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
 });
 
-test('Family School Management overview: Print links to a dedicated preview page carrying the current Filter, and Download is a real PDF', async () => {
-  const { parent, student } = await setupFamily();
+// A later real request ("remove filter button and feature") removed
+// the Overview page's own Filter entirely - Print/Download always
+// cover every family student now, with no studentId carried over.
+test('Family School Management overview: Print links to a dedicated preview page, and Download is a real PDF', async () => {
+  const { parent } = await setupFamily();
 
-  const liveRes = await request(app).get(`/parent/family-school?studentId=${student.memberId}`).set('Cookie', parent.cookie);
-  assert.match(liveRes.text, new RegExp(`href="/parent/family-school/print\\?studentId=${student.memberId}" target="_blank" aria-label="Print"`));
+  const liveRes = await request(app).get('/parent/family-school').set('Cookie', parent.cookie);
+  assert.match(liveRes.text, /href="\/parent\/family-school\/print" target="_blank" aria-label="Print"/);
   assert.match(liveRes.text, /href="\/parent\/family-school\/download\.pdf" aria-label="Download PDF"/);
 
-  const previewRes = await request(app).get(`/parent/family-school/print?studentId=${student.memberId}`).set('Cookie', parent.cookie);
+  const previewRes = await request(app).get('/parent/family-school/print').set('Cookie', parent.cookie);
   assert.equal(previewRes.status, 200);
   assert.match(previewRes.text, /onclick="window\.print\(\)"/);
   assert.match(previewRes.text, /Print PDF Student/);

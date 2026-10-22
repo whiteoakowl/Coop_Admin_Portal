@@ -12,14 +12,17 @@
       <h1>Volunteer Hours</h1>
     </div>
 
-    <%# Same Export/Filter toolbar convention as Daily Learning Log's own
-        page (see that view's comment) - no Print/Download PDF here,
-        this is a plain log table with nothing worth a dedicated print
-        page of its own yet. %>
+    <%# A real request: "All one row filter button, icons, add hours
+        button. Shrink to fit mobile." One single roster-btn-row-fit-
+        text row, Filter first, then icons, then Add Hours, same order
+        every other Family School Management toolbar now follows. The
+        Filter <details> carries data-filter-details so public/js/
+        filter-details-dismiss.js (loaded below) actually closes it on
+        an outside click - a real bug report: "when you select filter no
+        matter what you do the filter stays open." %>
     <% if (familyStudents.length > 0) { %>
       <div class="roster-btn-row roster-btn-row-fit-text no-print">
-        <a class="icon-btn" href="/parent/family-school/volunteer-hours/export.csv?studentId=<%= selectedStudentId %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-        <details class="filter-details">
+        <details class="filter-details" data-filter-details>
           <summary class="roster-action-btn">Filter</summary>
           <form method="GET" action="/parent/family-school/volunteer-hours" class="filter-panel">
             <label for="volunteer-hours-student-select">Student</label>
@@ -30,6 +33,9 @@
             </select>
           </form>
         </details>
+        <a class="icon-btn" href="/parent/family-school/volunteer-hours/export.csv?studentId=<%= selectedStudentId %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/volunteer-hours/print?studentId=<%= selectedStudentId %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/volunteer-hours/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-volunteer-hours-dialog').showModal()">+ Add Hours</button>
       </div>
     <% } %>
@@ -40,13 +46,6 @@
     <% if (familyStudents.length === 0) { %>
       <p class="roster-empty">No students in your family yet.</p>
     <% } else { %>
-      <div class="fs-overview-stats">
-        <div class="fs-overview-stat">
-          <span class="fs-overview-stat-label">Total Hours</span>
-          <span class="fs-overview-stat-value"><%= totalHours %></span>
-        </div>
-      </div>
-
       <%# "Then a log below showing all entries." Newest first
           (volunteerHoursForStudent's own ORDER BY). %>
       <div class="roster-scroll">
@@ -79,6 +78,10 @@
           </tbody>
         </table>
       </div>
+      <%# A real request: "Volunteer hours total should be at the
+          bottom right of the table" - same right-aligned totals-row
+          convention Accounting's own tables already use. %>
+      <p class="accounting-section-total">Total Hours: <%= totalHours %></p>
 
       <dialog id="add-volunteer-hours-dialog" class="class-form-dialog">
         <form method="POST" action="/parent/family-school/volunteer-hours" class="stack-form">
@@ -104,5 +107,6 @@
       </dialog>
     <% } %>
   </main>
+  <script src="/js/filter-details-dismiss.js"></script>
 </body>
 </html>

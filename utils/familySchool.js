@@ -98,6 +98,36 @@ async function createClass({ familyId, className, description, createdByAccountI
   return info.lastInsertRowid;
 }
 
+// A real request: "Add a button that says +preplanned class" - "Pick
+// from built-in curriculum templates." A small, fixed, app-provided
+// starter set (not a parent- or admin-authored template library, which
+// would be a whole separate feature) - each one a common homeschool
+// subject with a few starter lesson titles, a quick way to get a new
+// class off the ground rather than starting from a blank Class Name/
+// Description form every time.
+const PREPLANNED_CLASS_TEMPLATES = [
+  { key: 'math', name: 'Math', description: 'Core math skills and problem solving.', lessons: ['Numbers & Operations', 'Fractions & Decimals', 'Geometry Basics', 'Word Problems'] },
+  { key: 'language_arts', name: 'Language Arts', description: 'Reading comprehension, grammar, and writing.', lessons: ['Reading Comprehension', 'Grammar & Punctuation', 'Creative Writing', 'Vocabulary Building'] },
+  { key: 'science', name: 'Science', description: 'Hands-on exploration of the natural world.', lessons: ['Scientific Method', 'Life Science', 'Earth & Space', 'Simple Experiments'] },
+  { key: 'history', name: 'History & Social Studies', description: 'People, places, and events through time.', lessons: ['World Geography', 'Early Civilizations', 'American History', 'Civics & Government'] },
+  { key: 'art', name: 'Art', description: 'Drawing, painting, and creative expression.', lessons: ['Drawing Fundamentals', 'Color Theory', 'Mixed Media Projects', 'Art History'] },
+  { key: 'pe_health', name: 'PE & Health', description: 'Physical activity and healthy habits.', lessons: ['Fitness Basics', 'Nutrition', 'Team Sports', 'Mindfulness & Wellness'] },
+];
+
+function preplannedClassTemplates() {
+  return PREPLANNED_CLASS_TEMPLATES;
+}
+
+async function createClassFromTemplate(templateKey, familyId, createdByAccountId) {
+  const template = PREPLANNED_CLASS_TEMPLATES.find((t) => t.key === templateKey);
+  if (!template) return null;
+  const classId = await createClass({ familyId, className: template.name, description: template.description, createdByAccountId });
+  for (const lessonTitle of template.lessons) {
+    await createLesson({ classId, title: lessonTitle, description: null, createdByAccountId });
+  }
+  return classId;
+}
+
 async function updateClass(id, { className, description }) {
   await db
     .prepare("UPDATE family_school_classes SET class_name = ?, description = ?, updated_at = now_text() WHERE id = ?")
@@ -1065,24 +1095,24 @@ async function getFamilySchoolSettings(familyId) {
   return { ...row, logoUrl: attachmentUrl(row.logo_key) };
 }
 
-async function saveFamilySchoolSettings({ familyId, schoolName, colorPrimary, colorSecondary, ncHomeschoolId, logoKey }) {
+async function saveFamilySchoolSettings({ familyId, schoolName, colorPrimary, colorSecondary, ncHomeschoolId, homeschooledSince, logoKey }) {
   const existing = await db.prepare('SELECT logo_key FROM family_school_settings WHERE family_id = ?').get(familyId);
   const resolvedLogoKey = typeof logoKey !== 'undefined' ? logoKey : existing ? existing.logo_key : null;
   if (existing) {
     await db
       .prepare(
         `UPDATE family_school_settings
-         SET school_name = ?, color_primary = ?, color_secondary = ?, nc_homeschool_id = ?, logo_key = ?, updated_at = now_text()
+         SET school_name = ?, color_primary = ?, color_secondary = ?, nc_homeschool_id = ?, homeschooled_since = ?, logo_key = ?, updated_at = now_text()
          WHERE family_id = ?`
       )
-      .run(schoolName || null, colorPrimary || null, colorSecondary || null, ncHomeschoolId || null, resolvedLogoKey, familyId);
+      .run(schoolName || null, colorPrimary || null, colorSecondary || null, ncHomeschoolId || null, homeschooledSince || null, resolvedLogoKey, familyId);
   } else {
     await db
       .prepare(
-        `INSERT INTO family_school_settings (family_id, school_name, color_primary, color_secondary, nc_homeschool_id, logo_key)
-         VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO family_school_settings (family_id, school_name, color_primary, color_secondary, nc_homeschool_id, homeschooled_since, logo_key)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(familyId, schoolName || null, colorPrimary || null, colorSecondary || null, ncHomeschoolId || null, resolvedLogoKey);
+      .run(familyId, schoolName || null, colorPrimary || null, colorSecondary || null, ncHomeschoolId || null, homeschooledSince || null, resolvedLogoKey);
   }
 }
 
@@ -1093,6 +1123,8 @@ module.exports = {
   classesForFamily,
   getClass,
   createClass,
+  preplannedClassTemplates,
+  createClassFromTemplate,
   updateClass,
   deleteClass,
   studentsForClass,

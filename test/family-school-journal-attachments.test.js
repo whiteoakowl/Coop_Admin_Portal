@@ -65,6 +65,26 @@ const PNG_1X1 = Buffer.from(
   'base64'
 );
 
+// A real bug report: "I wrote an entry and clicked save. It then said
+// write something first and didn't save." Root cause: this page's own
+// rich-text editor (data-forum-editor/data-forum-editable) never
+// included its backing public/js/forum-editor.js script - every other
+// page using that same editor (e.g. views/forums-new-thread.ejs) adds
+// this tag itself, since partials/forum-editor-toolbar.ejs deliberately
+// doesn't load it for every caller. Without it, nothing ever synced the
+// typed text into the hidden #body input the form actually submits, so
+// the server always saw an empty body. A plain markup check, not a
+// browser-driven typing simulation (this whole test suite is
+// supertest-only, no client JS execution) - this regresses the exact
+// missing <script> tag that caused the bug.
+test('Daily Learning Log includes forum-editor.js, so typed text actually syncs into the submitted body', async () => {
+  const familyId = await createFamily('Journal Editor Script Family');
+  const parent = await createPortalMember({ name: 'Journal Editor Script Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const page = await request(app).get('/parent/family-school/journal').set('Cookie', parent.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<script src="\/js\/forum-editor\.js"><\/script>/);
+});
+
 test('a parent can attach an image and a document to a new journal entry, and both show up on the log', async () => {
   const familyId = await createFamily('Journal Attachments Family');
   const parent = await createPortalMember({ name: 'Journal Parent', familyId, memberType: 'parent', roleKey: 'parent' });

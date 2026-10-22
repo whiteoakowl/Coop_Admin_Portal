@@ -92,9 +92,11 @@ test('the description, legend row, month navigation, and orange buttons render i
   assert.match(res.text, /class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left">\s*<span class="badge-pill fs-attendance-legend-present"/);
   assert.match(res.text, /class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left fs-attendance-nav-row"/);
 
-  // "The blue arrow buttons that should be shrunk a lot."
-  assert.match(res.text, /class="btn-secondary fs-attendance-nav-btn" href="\?studentId=\d+&year=2026&month=2" aria-label="Previous month">&larr; Prev</);
-  assert.match(res.text, /class="btn-secondary fs-attendance-nav-btn" href="\?studentId=\d+&year=2026&month=4" aria-label="Next month">Next &rarr;</);
+  // A later real request: "Erase the words prev and next, it should
+  // just be an arrow in a box, fit to text." - plain .icon-btn squares,
+  // just the arrow glyph, no "Prev"/"Next" text.
+  assert.match(res.text, /class="icon-btn" href="\?studentId=\d+&year=2026&month=2" aria-label="Previous month" title="Previous month">&larr;</);
+  assert.match(res.text, /class="icon-btn" href="\?studentId=\d+&year=2026&month=4" aria-label="Next month" title="Next month">&rarr;</);
 
   // "The month should be a drop down choice of months/years."
   assert.match(res.text, /<select name="month" aria-label="Month" onchange="this\.form\.submit\(\)">/);
@@ -108,6 +110,14 @@ test('the description, legend row, month navigation, and orange buttons render i
   // icon-download, Download gets its own distinct icon-pdf.
   assert.match(res.text, /aria-label="Export CSV"[^>]*><svg class="icon"><use href="#icon-download"\/>/);
   assert.match(res.text, /aria-label="Download PDF"[^>]*><svg class="icon"><use href="#icon-pdf"\/>/);
+
+  // A real bug report ("when you select filter no matter what you do
+  // the filter stays open") elsewhere in Family School Management -
+  // the same fix applies here: data-filter-details is the markup
+  // contract public/js/filter-details-dismiss.js looks for to close
+  // the popover on an outside click.
+  assert.match(res.text, /<details class="filter-details" data-filter-details>/);
+  assert.match(res.text, /<script src="\/js\/filter-details-dismiss\.js"><\/script>/);
 });
 
 test('the year dropdown always includes the currently selected year, even an old one outside the default window', async () => {

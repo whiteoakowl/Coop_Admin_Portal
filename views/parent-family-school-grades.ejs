@@ -24,12 +24,12 @@
         button" - Download is now a real PDF (see parent-family-school-
         grades-print.ejs) and Print opens that same preview page in a new
         tab instead of calling window.print() directly here. %>
+    <%# A real request: "all pages filter button first, all import,
+        export, pdf and print icons should be in a row next to each
+        other... placed to the left above the tables/lists." %>
     <% if (familyStudents.length > 0) { %>
       <div class="roster-btn-row roster-btn-row-fit-text no-print">
-        <a class="icon-btn" href="/parent/family-school/grades/export.csv?studentId=<%= selectedStudentId %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-        <a class="icon-btn" href="/parent/family-school/grades/print?studentId=<%= selectedStudentId %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
-        <a class="icon-btn" href="/parent/family-school/grades/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
-        <details class="filter-details">
+        <details class="filter-details" data-filter-details>
           <summary class="roster-action-btn">Filter</summary>
           <form method="GET" action="/parent/family-school/grades" class="filter-panel">
             <label for="grades-student-select">Student</label>
@@ -40,6 +40,9 @@
             </select>
           </form>
         </details>
+        <a class="icon-btn" href="/parent/family-school/grades/export.csv?studentId=<%= selectedStudentId %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/grades/print?studentId=<%= selectedStudentId %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/grades/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
       </div>
     <% } %>
 
@@ -91,5 +94,6 @@
       </div>
     <% } %>
   </main>
+  <script src="/js/filter-details-dismiss.js"></script>
 </body>
 </html>

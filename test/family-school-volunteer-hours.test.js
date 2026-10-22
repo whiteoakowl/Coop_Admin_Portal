@@ -87,7 +87,9 @@ test('adding two volunteer-hour entries for a student creates both rows and the 
 
   const page = await request(app).get(`/parent/family-school/volunteer-hours?studentId=${student.memberId}`).set('Cookie', parent.cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /<span class="fs-overview-stat-value">4<\/span>/);
+  // A real request moved this total "to the bottom right of the
+  // table" - same right-aligned convention Accounting's own totals use.
+  assert.match(page.text, /class="accounting-section-total">Total Hours: 4</);
   // Log lists both entries - newest first.
   assert.match(page.text, /2026-06-05[\s\S]*Library shelving[\s\S]*2026-06-01[\s\S]*Food pantry/);
 
@@ -128,7 +130,7 @@ test('deleting an entry removes it from the log and recalculates the total', asy
   assert.equal(remaining.length, 1);
 
   const page = await request(app).get(`/parent/family-school/volunteer-hours?studentId=${student.memberId}`).set('Cookie', parent.cookie);
-  assert.match(page.text, /<span class="fs-overview-stat-value">3<\/span>/);
+  assert.match(page.text, /class="accounting-section-total">Total Hours: 3</);
 });
 
 test('a parent from a different family cannot delete another family\'s volunteer-hour entry', async () => {
@@ -181,4 +183,69 @@ test('invalid input (zero hours, or a non-date) is rejected without creating a r
 
   const rows = await db.prepare('SELECT * FROM family_school_volunteer_hours WHERE student_id = ?').all(student.memberId);
   assert.equal(rows.length, 0, 'neither invalid submission should have created a row');
+});
+
+// A real request: "Add export, pdf and print icons. All one row filter
+// button, icons, add hours button." Plus a real bug report: "when you
+// select filter no matter what you do the filter stays open" - fixed by
+// giving the Filter <details> data-filter-details (the markup contract
+// public/js/filter-details-dismiss.js, now loaded on this page, looks
+// for to close it on an outside click).
+test('Volunteer Hours: one toolbar row has Filter, Export/Print/PDF icons, and Add Hours in that order, and the Filter popover is wired to the outside-click dismiss script', async () => {
+  const familyId = await createFamily('Volunteer Hours Toolbar Family');
+  const parent = await createPortalMember({ name: 'Toolbar Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  await createPortalMember({ name: 'Toolbar Student', familyId, memberType: 'student', roleKey: 'student' });
+
+  const page = await request(app).get('/parent/family-school/volunteer-hours').set('Cookie', parent.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<script src="\/js\/filter-details-dismiss\.js"><\/script>/);
+
+  const toolbarMatch = /<div class="roster-btn-row roster-btn-row-fit-text no-print">[\s\S]*?<\/div>/.exec(page.text);
+  assert.ok(toolbarMatch, 'expected one single toolbar row');
+  const toolbarHtml = toolbarMatch[0];
+  assert.match(toolbarHtml, /<details class="filter-details" data-filter-details>/);
+  assert.match(toolbarHtml, /aria-label="Export CSV"/);
+  assert.match(toolbarHtml, /aria-label="Print"/);
+  assert.match(toolbarHtml, /aria-label="Download PDF"/);
+  assert.match(toolbarHtml, /\+ Add Hours/);
+
+  const filterIndex = page.text.indexOf('data-filter-details');
+  const exportIndex = page.text.indexOf('aria-label="Export CSV"');
+  const addHoursIndex = page.text.indexOf('+ Add Hours');
+  assert.ok(filterIndex < exportIndex && exportIndex < addHoursIndex, 'expected Filter, then the icons, then Add Hours');
+});
+
+test('Volunteer Hours: Print preview and Download PDF both render, scoped to one student vs. the whole family', async () => {
+  const familyId = await createFamily('Volunteer Hours Print Family');
+  const parent = await createPortalMember({ name: 'Print Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const studentA = await createPortalMember({ name: 'Print Student A', familyId, memberType: 'student', roleKey: 'student' });
+  const studentB = await createPortalMember({ name: 'Print Student B', familyId, memberType: 'student', roleKey: 'student' });
+
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/volunteer-hours');
+  await request(app)
+    .post('/parent/family-school/volunteer-hours')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: String(studentA.memberId), hourDate: '2026-10-01', hours: '2', activityDescription: 'Bake sale', _csrf: csrf });
+
+  const previewRes = await request(app).get(`/parent/family-school/volunteer-hours/print?studentId=${studentA.memberId}`).set('Cookie', parent.cookie);
+  assert.equal(previewRes.status, 200);
+  assert.match(previewRes.text, /onclick="window\.print\(\)"/);
+  assert.match(previewRes.text, /Print Student A/);
+  assert.match(previewRes.text, /Bake sale/);
+  assert.doesNotMatch(previewRes.text, /Print Student B/);
+  void studentB;
+
+  const pdfRes = await request(app)
+    .get('/parent/family-school/volunteer-hours/download.pdf')
+    .set('Cookie', parent.cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
 });

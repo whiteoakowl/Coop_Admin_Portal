@@ -1369,6 +1369,21 @@ body.public-page .roster-empty {
 }
 
 .stack-form label { font-weight: 600; margin-top: 0.75rem; font-size: 0.9rem; }
+/* A real bug report: "Add new lesson, title should [be] spaced from
+   text bar... Add a new class, title should be spaced from text bar."
+   .stack-form's own flex-column (above) already stacks one label-row
+   below the next, but a bare <label> is still display: inline by
+   default, so its OWN label text and input/textarea/select sat side by
+   side on the same line with no real gap - cramped for a short one-word
+   label like "Title" especially. Same display:flex; flex-direction:
+   column; gap fix .member-form-grid label already uses elsewhere.
+   :not(.checkbox-option):not(.radio-option) excludes a checkbox/radio
+   label (e.g. the Assigned Students picker right on this same Family
+   Classes feature) - those rely on .checkbox-option's/.radio-option's
+   own row layout (the checkbox/radio beside its question text, not
+   stacked above it), and neither class alone has enough specificity to
+   beat a plain `.stack-form label` without this exclusion. */
+.stack-form label:not(.checkbox-option):not(.radio-option) { display: flex; flex-direction: column; gap: 0.3rem; }
 
 .stack-form input[type="date"] { width: 192px; }
 
@@ -13945,6 +13960,25 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    total count of attendance days... 1/180." .fs-overview-avatar reuses
    .member-avatar (Members list's own photo-or-initials circle) at a
    larger size since it's the card's own header, not a table row. */
+/* A real request: "Family school management, homepage... At the top of
+   the page show family school information from family school
+   management settings. School name, ID, logo with colors and
+   homeschooled since date." A live, on-screen counterpart to
+   partials/family-school-print-header.ejs's own print-only header (that
+   one's own .print-header is display:none outside @media print, so it
+   can't be reused here as-is). */
+.fs-school-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.25rem 0;
+  padding-bottom: 0.85rem;
+  border-bottom: 2px solid var(--border);
+}
+.fs-school-header img { height: 56px; width: 56px; border-radius: 50%; object-fit: cover; }
+.fs-school-header-name { font-size: 1.3rem; font-weight: 800; margin: 0; color: var(--ink); }
+.fs-school-header-meta { margin: 0.15rem 0 0; }
+
 .fs-overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
 .fs-overview-card {
   display: flex;
@@ -14072,11 +14106,6 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    Present/Absent legend and the month navigation below it) stay left-
    aligned at every width instead of only on desktop. */
 .roster-btn-row-fit-text.fs-attendance-row-left { justify-content: flex-start; }
-/* "Then the blue arrow buttons that should be shrunk a lot." Well below
-   .btn-secondary's own default padding/font-size - a small, compact
-   prev/next pair now that the two <select>s between them are the
-   primary way to jump to a specific month, not just the arrows. */
-.fs-attendance-nav-btn { padding: 0.3rem 0.55rem; font-size: 0.8rem; }
 .fs-attendance-nav-row { align-items: center; }
 .fs-attendance-nav-row select { width: auto; }
 

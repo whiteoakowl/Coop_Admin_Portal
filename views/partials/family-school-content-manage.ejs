@@ -24,8 +24,8 @@
 
 <div class="manage-section">
   <div class="grid-box-header">
-    <h2>Content (<%= contentItems.length %>)</h2>
-    <button type="button" class="roster-action-btn" onclick="document.getElementById('add-content-dialog').showModal()">+ Add Content</button>
+    <h2>Content/Assignments (<%= contentItems.length %>)</h2>
+    <button type="button" class="roster-action-btn" onclick="document.getElementById('add-content-dialog').showModal()">+ Add New Content/Assignment</button>
   </div>
   <% if (contentItems.length === 0) { %>
     <p class="roster-empty">No content added yet.</p>
@@ -137,7 +137,7 @@
 
   <dialog id="add-content-dialog" class="member-picker-dialog dialog-label-stack">
     <form method="POST" action="<%= basePath %>/lessons/<%= lesson.id %>/content" enctype="multipart/form-data" class="member-form-grid" data-toggle-form>
-      <h3>Add Content</h3>
+      <h3>Add New Content/Assignment</h3>
       <label class="member-form-full">Type
         <select name="type" data-toggle-select>
           <option value="video">Link to Video</option>

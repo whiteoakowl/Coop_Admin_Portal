@@ -4,7 +4,7 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
-  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+  <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Transcripts</h1>
@@ -72,7 +72,14 @@
       </div>
 
       <dialog id="add-entry-dialog-<%= rec.child.id %>" class="class-form-dialog">
-        <form method="POST" action="/parent/academics/transcripts">
+        <%# A real bug report: "Add a class to transcript. There
+            should be proper spacing between titles and text boxes.
+            And should line up nicely with each other." This form had
+            no .stack-form at all (unlike every other dialog on this
+            feature), so it got none of that class's own row-spacing/
+            label-to-input stacking - a bare browser-default inline
+            flow instead. %>
+        <form method="POST" action="/parent/academics/transcripts" class="stack-form">
           <input type="hidden" name="studentId" value="<%= rec.child.id %>" />
           <div class="class-form-dialog-header">
             <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>

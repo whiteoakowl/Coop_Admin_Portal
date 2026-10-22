@@ -97,6 +97,15 @@ test('Annual Planner: organized by student, a parent can add and delete curricul
   assert.equal(createRes.status, 302);
   assert.match(createRes.headers.location, /notice=/);
 
+  // A real request: "Annual planner, add a total for curriculum cost
+  // next to each student name." A second item for the same student
+  // confirms the total is a real sum, not just echoing one item's price.
+  await request(app)
+    .post('/parent/family-school/annual-planner')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: studentA.memberId, name: 'Science Kit', price: '20.01', _csrf: csrf });
+
   const page = await request(app).get('/parent/family-school/annual-planner').set('Cookie', parent.cookie);
   assert.equal(page.status, 200);
   const studentAIndex = page.text.indexOf('Curriculum Student A');
@@ -107,12 +116,23 @@ test('Annual Planner: organized by student, a parent can add and delete curricul
   assert.match(page.text, /Saxon/);
   assert.match(page.text, /5th Grade/);
   assert.match(page.text, /\$79\.99/);
+  // 79.99 + 20.01 = 100.00, shown next to Student A's own name, before
+  // Student B's section (which has no items at all, so its own total is
+  // $0.00).
+  const totalAIndex = page.text.indexOf('Total: $100.00');
+  assert.ok(totalAIndex !== -1 && totalAIndex > studentAIndex && totalAIndex < studentBIndex, "expected Student A's own curriculum total to sum both items");
+  assert.match(page.text, /Total: \$0\.00/, "a student with no curriculum items yet still shows a $0.00 total");
 
-  const item = await db.prepare('SELECT id FROM family_school_curriculum_items WHERE student_id = ?').get(studentA.memberId);
+  const item = await db.prepare('SELECT id FROM family_school_curriculum_items WHERE student_id = ? AND name = ?').get(studentA.memberId, 'Saxon Math 5');
   // A real request: "No refresh page when delete, it simple disappears"
   // - JSON in/out now, same shape as the Weekly Planner move route.
   const deleteRes = await request(app).post(`/parent/family-school/annual-planner/${item.id}/delete`).set('Cookie', parent.cookie).type('form').send({ _csrf: csrf });
   assert.equal(deleteRes.status, 200);
+
+  // The total recomputes on the next full page load too (not just the
+  // in-place client-side subtraction after the AJAX delete above).
+  const afterDeletePage = await request(app).get('/parent/family-school/annual-planner').set('Cookie', parent.cookie);
+  assert.match(afterDeletePage.text, /Total: \$20\.01/);
   assert.equal(deleteRes.body.ok, true);
   assert.equal(await db.prepare('SELECT 1 FROM family_school_curriculum_items WHERE id = ?').get(item.id), undefined);
 });

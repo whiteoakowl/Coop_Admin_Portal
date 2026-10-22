@@ -67,7 +67,7 @@ const PNG_1X1 = Buffer.from(
   'base64'
 );
 
-test('saving school name/colors/NC ID on the Settings page persists and shows back pre-filled', async () => {
+test('saving school name/colors/NC ID/homeschooled-since on the Settings page persists and shows back pre-filled', async () => {
   const familyId = await createFamily('Settings Family');
   const parent = await createParent(familyId);
 
@@ -79,6 +79,7 @@ test('saving school name/colors/NC ID on the Settings page persists and shows ba
     .field('colorPrimary', '#123456')
     .field('colorSecondary', '#abcdef')
     .field('ncHomeschoolId', '987654')
+    .field('homeschooledSince', '2026-08-23')
     .field('_csrf', csrf);
   assert.equal(res.status, 302);
   assert.match(res.headers.location, /notice=/);
@@ -89,6 +90,7 @@ test('saving school name/colors/NC ID on the Settings page persists and shows ba
   assert.match(page.text, /value="#123456"/);
   assert.match(page.text, /value="#abcdef"/);
   assert.match(page.text, /value="987654"/);
+  assert.match(page.text, /name="homeschooledSince" value="2026-08-23"/);
 });
 
 test('uploading a logo stores it and the preview/header both show it', async () => {

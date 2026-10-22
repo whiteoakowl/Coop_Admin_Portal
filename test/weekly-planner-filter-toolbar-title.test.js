@@ -72,21 +72,29 @@ test('the old standalone "Plan for" dropdown is gone - the Filter popover has St
   assert.match(page.text, /id="weekly-planner-week-select"/);
 });
 
-test('Filter + Add Week sit together on one row, right of the Print/PDF/Export icons', async () => {
+// A later real request ("all pages filter button first, all import,
+// export, pdf and print icons should be in a row next to each other...
+// placed to the left") reordered this toolbar: Filter now comes first,
+// then the icons, then + Add Week, all in one single row.
+test('Filter, the Print/PDF/Export icons, and + Add Week all sit together on one row, in that order', async () => {
   const familyId = await createFamily('Toolbar Order Family');
   const parent = await createParent(familyId);
   const weekId = await createWeek({ familyId, ownerType: 'parent', studentId: null, title: 'Order Week', dates: ['2026-11-02'], createdByAccountId: null });
 
   const page = await request(app).get(`/parent/family-school/weekly-planner?owner=parent&weekId=${weekId}`).set('Cookie', parent.cookie);
   assert.equal(page.status, 200);
+  const filterIndex = page.text.indexOf('<summary class="roster-action-btn">Filter</summary>');
   const exportIndex = page.text.indexOf('aria-label="Export CSV"');
   const printIndex = page.text.indexOf('aria-label="Print"');
   const pdfIndex = page.text.indexOf('aria-label="Download PDF"');
-  const filterIndex = page.text.indexOf('<summary class="roster-action-btn">Filter</summary>');
   const addWeekIndex = page.text.indexOf('+ Add Week');
-  assert.ok(exportIndex > -1 && printIndex > exportIndex && pdfIndex > printIndex, 'expected Export, then Print, then PDF');
-  assert.ok(filterIndex > pdfIndex, 'expected Filter to come after the icons');
-  assert.ok(addWeekIndex > filterIndex, 'expected + Add Week after Filter, both on the right');
+  assert.ok(filterIndex > -1 && exportIndex > filterIndex, 'expected Filter before the icons');
+  assert.ok(printIndex > exportIndex && pdfIndex > printIndex, 'expected Export, then Print, then PDF');
+  assert.ok(addWeekIndex > pdfIndex, 'expected + Add Week after the icons');
+
+  // A real request: "Weeks are blue buttons. Delete the blue buttons."
+  assert.doesNotMatch(page.text, /class="btn-secondary active"/);
+  assert.doesNotMatch(page.text, /class="btn-secondary" href="\?owner=/);
 });
 
 test('the selected week\'s own title shows in the page title bar', async () => {
@@ -101,7 +109,7 @@ test('the selected week\'s own title shows in the page title bar', async () => {
   assert.match(weekPage.text, /<h1>Weekly Planner &mdash; Week 1<\/h1>/);
 });
 
-test('the School Year filter narrows which weeks show as tabs and in the Filter\'s own Week dropdown', async () => {
+test('the School Year filter narrows which weeks show in the Filter\'s own Week dropdown', async () => {
   const familyId = await createFamily('School Year Filter Family');
   const parent = await createParent(familyId);
   const fallWeekId = await createWeek({ familyId, ownerType: 'parent', studentId: null, title: 'Fall Week', dates: ['2026-09-07'], createdByAccountId: null });

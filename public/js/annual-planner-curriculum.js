@@ -11,6 +11,22 @@
   const editDialog = document.getElementById('edit-curriculum-dialog');
   const editForm = document.getElementById('edit-curriculum-form');
 
+  // A real request: "Annual planner, add a total for curriculum cost
+  // next to each student name." The server renders the initial total,
+  // but an in-place delete (no page reload) needs to recompute it from
+  // whatever Price cells are still left in that student's own table.
+  function recomputeTotal(section) {
+    const totalEl = section.querySelector('[data-curriculum-total]');
+    if (!totalEl) return;
+    const priceCells = section.querySelectorAll('td[data-label="Price"]');
+    let total = 0;
+    priceCells.forEach((cell) => {
+      const value = parseFloat((cell.textContent || '').replace(/[^0-9.-]/g, ''));
+      if (!isNaN(value)) total += value;
+    });
+    totalEl.textContent = `Total: $${total.toFixed(2)}`;
+  }
+
   document.addEventListener('click', async (e) => {
     const editBtn = e.target.closest('[data-edit-curriculum]');
     if (editBtn && editDialog && editForm) {
@@ -58,6 +74,7 @@
           scroll.hidden = true;
           emptyMessage.hidden = false;
         }
+        recomputeTotal(section);
       }
     } catch (err) {
       deleteBtn.disabled = false;

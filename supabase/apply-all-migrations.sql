@@ -5427,3 +5427,7 @@ create table if not exists family_school_settings (
 -- Portal picker: Teacher Portal renamed to Co-op Teacher Portal. See
 -- the rename_teacher_role_label migration's own header comment.
 UPDATE roles SET label = 'Co-op Teacher' WHERE key = 'teacher';
+
+-- Family School Management > Settings: homeschooled-since date. See
+-- the family_school_homeschooled_since migration's own header comment.
+alter table family_school_settings add column if not exists homeschooled_since text;

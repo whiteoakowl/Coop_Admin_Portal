@@ -173,6 +173,16 @@ function formatDateLong(iso) {
   return `${WEEKDAY_SHORT[d.getDay()]}, ${MONTHS_LONG[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
+// "August 23, 2026" - a real request for Family School Management's own
+// "Homeschooled since <date>" header line - full month name like
+// formatDateLong, but no weekday prefix (this is a one-time anniversary
+// date, not a specific day of a specific week someone needs to place on
+// a calendar).
+function formatDateLongNoWeekday(iso) {
+  const d = parseISO(iso);
+  return `${MONTHS_LONG[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
 // "Apr 29, 2025" - the Co-op Admin dashboard's own date-picker label (a
 // real request to match a provided design), short-month + year but no
 // weekday, unlike formatDateLabel ("Wed 4/29", no year) and formatDateLong
@@ -467,6 +477,7 @@ module.exports = {
   isValidISODate,
   formatDateLabel,
   formatDateLong,
+  formatDateLongNoWeekday,
   formatShortDateLabel,
   formatDateNumeric,
   formatDateShort,

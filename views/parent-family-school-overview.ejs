@@ -9,53 +9,36 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="roster-toolbar no-print">
       <h1>Family School Management</h1>
-      <div class="roster-btn-row roster-btn-row-fit-text">
-        <a class="btn-secondary" href="/parent/family-school/classes">Family Classes</a>
-        <a class="btn-secondary" href="/parent/family-school/grades">Family Grades</a>
-        <a class="btn-secondary" href="/parent/family-school/attendance">Family Attendance</a>
-        <a class="btn-secondary" href="/parent/family-school/volunteer-hours">Volunteer Hours</a>
-        <a class="btn-secondary" href="/parent/family-school/annual-planner">Annual Planner</a>
-        <a class="btn-secondary" href="/parent/family-school/weekly-planner">Weekly Planner</a>
-        <a class="btn-secondary" href="/parent/family-school/portfolio">Portfolio</a>
+    </div>
+
+    <%# A real request: "At the top of the page show family school
+        information from family school management settings. School
+        name, ID, logo with colors and homeschooled since date." A live
+        on-screen counterpart to partials/family-school-print-header.ejs
+        (that one is print-only, display:none otherwise). %>
+    <div class="fs-school-header no-print"<% if (familySettings && familySettings.color_secondary) { %> style="border-color: <%= familySettings.color_secondary %>;"<% } %>>
+      <img src="<%= (familySettings && familySettings.logoUrl) || '/img/logo.png' %>" alt="" />
+      <div>
+        <p class="fs-school-header-name"<% if (familySettings && familySettings.color_primary) { %> style="color: <%= familySettings.color_primary %>;"<% } %>><%= (familySettings && familySettings.school_name) || 'Family School Management' %></p>
+        <% if (familySettings && familySettings.nc_homeschool_id) { %><p class="hint fs-school-header-meta">NC Homeschool ID: <%= familySettings.nc_homeschool_id %></p><% } %>
+        <% if (homeschooledSinceLabel) { %><p class="hint fs-school-header-meta">Homeschooling since <%= homeschooledSinceLabel %></p><% } %>
       </div>
     </div>
 
-    <%# "Add the following buttons to each page. Export, print, download,
-        filter. Make sure they are the similar size, same height, fit to
-        text." Export is the summary CSV (one row per student, same
-        numbers the cards below show); Download is the fuller one row
-        per student per class detail - see routes/parent-family-
-        school.js's own /export.csv and /download.pdf comment. Filter is
-        the same <details>/<summary> popover idiom admin-rosters.ejs's
-        own Filter button already uses, here a plain checkbox-per-student
-        set (this page has no single-student selector the way Attendance/
-        Grades/Journal do, since it normally shows every student at once).
-        A further real request: "the download should be a pdf of exactly
-        how it would also look when printing" / "All print button should
-        show a print preview full real page on a page with a print
-        button" - Download is now a real PDF (see parent-family-school-
-        overview-print.ejs) and Print opens that same preview page (with
-        the current Filter selection carried over as repeated studentId
-        params) in a new tab instead of calling window.print() directly
-        here. %>
+    <%# "Add the following buttons to each page. Export, print,
+        download." A real later request removed Filter from this page
+        entirely ("Remove filter button and feature") - every family
+        student always shows. Export is the summary CSV (one row per
+        student, same numbers the cards below show); Download is the
+        fuller one row per student per class detail - see routes/parent-
+        family-school.js's own /export.csv and /download.pdf comment.
+        Download is a real PDF (see parent-family-school-overview-
+        print.ejs) and Print opens that same preview page in a new tab
+        instead of calling window.print() directly here. %>
     <div class="roster-btn-row roster-btn-row-fit-text no-print">
       <a class="icon-btn" href="/parent/family-school/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-      <a class="icon-btn" href="/parent/family-school/print<% if (filterStudentIds.length) { %>?<% filterStudentIds.forEach(function(id, i) { %><%= i > 0 ? '&' : '' %>studentId=<%= id %><% }); %><% } %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+      <a class="icon-btn" href="/parent/family-school/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
       <a class="icon-btn" href="/parent/family-school/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
-      <% if (allStudents.length > 0) { %>
-        <details class="filter-details">
-          <summary class="roster-action-btn">Filter</summary>
-          <form method="GET" action="/parent/family-school" class="filter-panel">
-            <% allStudents.forEach(function(s) { %>
-              <label class="checkbox-option">
-                <input type="checkbox" name="studentId" value="<%= s.id %>" <%= filterStudentIds.includes(s.id) ? 'checked' : '' %> />
-                <%= s.name %>
-              </label>
-            <% }); %>
-            <button type="submit" class="primary-btn">Apply</button>
-          </form>
-        </details>
-      <% } %>
     </div>
 
     <%

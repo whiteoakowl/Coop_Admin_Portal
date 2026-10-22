@@ -27,6 +27,8 @@ const {
   overviewForFamily,
   getClass,
   createClass,
+  preplannedClassTemplates,
+  createClassFromTemplate,
   updateClass,
   deleteClass,
   studentsForClass,
@@ -95,7 +97,7 @@ const {
   getFamilySchoolSettings,
   saveFamilySchoolSettings,
 } = require('../utils/familySchool');
-const { isValidISODate, formatDateLabel } = require('../utils/dates');
+const { isValidISODate, formatDateLabel, formatDateLongNoWeekday } = require('../utils/dates');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { renderViewToPdf } = require('../utils/pdfRender');
 
@@ -188,20 +190,14 @@ async function requireOwnLesson(req, lessonId) {
 router.get('/family-school', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const students = await overviewForFamily(familyId);
-  // The Filter popover's own student checkbox list - a real request:
-  // "Make sure they are similar size, same height, fit to text" (for
-  // the Export/Print/Download/Filter row) meant this page needed a
-  // Filter control too, even though it has no existing per-student
-  // selector the way Attendance/Grades/Journal do. Narrows which cards
-  // render; an empty/missing selection means "show everyone" rather
-  // than "show no one".
-  const filterStudentIds = [].concat(req.query.studentId || []).map((v) => parseInt(v, 10));
+  // A real request: "Remove filter button and feature" - the Overview
+  // page always shows every family student now, no per-student narrowing.
+  const settings = res.locals.familySettings;
   res.render('parent-family-school-overview', {
     title: 'Family School Management',
-    students: filterStudentIds.length ? students.filter((s) => filterStudentIds.includes(s.id)) : students,
-    allStudents: students,
-    filterStudentIds,
+    students,
     avatarColorFor,
+    homeschooledSinceLabel: settings && settings.homeschooled_since ? formatDateLongNoWeekday(settings.homeschooled_since) : null,
   });
 });
 
@@ -240,16 +236,15 @@ router.get('/family-school/download.pdf', async (req, res) => {
 
 // A real request: "All print button should show a print preview full
 // real page on a page with a print button." Mirrors the live page's
-// own (filtered) card grid, not the full unfiltered detail Download
-// above covers.
+// own card grid - every family student, same as Download above (the
+// Overview page's own Filter feature was removed - a real request).
 router.get('/family-school/print', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const students = await overviewForFamily(familyId);
-  const filterStudentIds = [].concat(req.query.studentId || []).map((v) => parseInt(v, 10));
   res.render('parent-family-school-overview-print', {
     title: 'Family School Management',
     mode: 'single',
-    students: filterStudentIds.length ? students.filter((s) => filterStudentIds.includes(s.id)) : students,
+    students,
     avatarColorFor,
   });
 });
@@ -259,6 +254,7 @@ router.get('/family-school/classes', async (req, res) => {
   res.render('parent-family-school-classes', {
     title: 'Family Classes',
     classes: await classesForFamily(familyId),
+    preplannedTemplates: preplannedClassTemplates(),
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
@@ -270,6 +266,18 @@ router.post('/family-school/classes', async (req, res) => {
   if (!className) return res.redirect('/parent/family-school/classes?error=' + encodeURIComponent('A class name is required.'));
   const id = await createClass({ familyId, className, description: (req.body.description || '').trim(), createdByAccountId: req.portalAccount.id });
   res.redirect(`/parent/family-school/classes/${id}?notice=` + encodeURIComponent('Class created.'));
+});
+
+// A real request: "Add a button that says +preplanned class" - "Pick
+// from built-in curriculum templates." See utils/familySchool.js's own
+// PREPLANNED_CLASS_TEMPLATES comment for why this is a small, fixed,
+// app-provided set rather than a new admin-authored template library.
+router.post('/family-school/classes/from-template', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const templateKey = (req.body.templateKey || '').trim();
+  const id = await createClassFromTemplate(templateKey, familyId, req.portalAccount.id);
+  if (!id) return res.redirect('/parent/family-school/classes?error=' + encodeURIComponent('Choose a template.'));
+  res.redirect(`/parent/family-school/classes/${id}?notice=` + encodeURIComponent('Class created from template.'));
 });
 
 router.post('/family-school/classes/:id/delete', async (req, res) => {
@@ -927,6 +935,39 @@ router.get('/family-school/volunteer-hours/export.csv', async (req, res) => {
   sendCsv(res, 'volunteer-hours.csv', lines);
 });
 
+// A real request: "Volunteer hours... Add export, pdf and print icons."
+// Same single-student-preview/whole-family-download split as every
+// other Family School Management page's own Print/Download pair.
+router.get('/family-school/volunteer-hours/print', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
+  const student = familyStudents.find((s) => s.id === selectedStudentId);
+  res.render('parent-family-school-volunteer-hours-print', {
+    title: 'Volunteer Hours',
+    mode: 'single',
+    studentLabel: student ? student.name : '',
+    entries: student ? await volunteerHoursForStudent(student.id) : [],
+    totalHours: student ? await totalVolunteerHoursForStudent(student.id) : 0,
+  });
+});
+
+router.get('/family-school/volunteer-hours/download.pdf', async (req, res) => {
+  const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const familyRows = [];
+  for (const student of familyStudents) {
+    familyRows.push({ student, entries: await volunteerHoursForStudent(student.id), totalHours: await totalVolunteerHoursForStudent(student.id) });
+  }
+  const pdf = await renderViewToPdf(req, 'parent-family-school-volunteer-hours-print', {
+    title: 'Volunteer Hours',
+    mode: 'family',
+    familyRows,
+    familySettings: res.locals.familySettings,
+  });
+  sendPdf(res, 'volunteer-hours-all.pdf', pdf);
+});
+
 router.post('/family-school/volunteer-hours', async (req, res) => {
   const studentId = parseInt(req.body.studentId, 10);
   if (!(await requireOwnStudent(req, studentId))) return res.status(404).send('Not found');
@@ -1455,6 +1496,7 @@ router.post('/family-school/settings', uploadSchoolLogo, async (req, res) => {
     colorPrimary: (req.body.colorPrimary || '').trim(),
     colorSecondary: (req.body.colorSecondary || '').trim(),
     ncHomeschoolId: (req.body.ncHomeschoolId || '').trim(),
+    homeschooledSince: (req.body.homeschooledSince || '').trim(),
     logoKey,
   });
   res.redirect('/parent/family-school/settings?notice=' + encodeURIComponent('Settings saved.'));

@@ -30,6 +30,13 @@
           <input type="text" name="ncHomeschoolId" value="<%= settings.nc_homeschool_id || '' %>" placeholder="e.g. 123456" />
         </label>
 
+        <%# A real request: "Add to settings the date picker for when
+            did you started homeschooling." Shown on the Overview page's
+            own school-info header as "Homeschooled since <date>". %>
+        <label>Homeschooling Since
+          <input type="date" name="homeschooledSince" value="<%= settings.homeschooled_since || '' %>" />
+        </label>
+
         <% if (settings.logoUrl) { %>
           <div class="fs-settings-logo-preview">
             <img src="<%= settings.logoUrl %>" alt="Current school logo" />

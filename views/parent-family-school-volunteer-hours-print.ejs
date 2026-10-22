@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.5in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Volunteer Hours</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+    <%- include('partials/family-school-print-header', { familySettings, subtitle: 'Volunteer Hours' }) %>
+
+    <% if (mode === 'single') { %>
+      <h2><%= studentLabel %> &mdash; <%= totalHours %> hour<%= totalHours === 1 ? '' : 's' %> total</h2>
+      <% if (entries.length === 0) { %>
+        <p class="roster-empty">No volunteer hours logged yet.</p>
+      <% } else { %>
+        <table class="roster-table">
+          <thead><tr><th>Date</th><th>Hours</th><th>Activity</th></tr></thead>
+          <tbody>
+            <% entries.forEach(function(e) { %>
+              <tr>
+                <td><%= e.hour_date %></td>
+                <td><%= e.hours %></td>
+                <td><%= e.activity_description || '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    <% } else { %>
+      <%# Download PDF mode - every family student's own volunteer
+          hours log, same whole-family scope every other Family School
+          Management Download button uses. %>
+      <% familyRows.forEach(function(group) { %>
+        <div class="fs-print-family-section">
+          <h2><%= group.student.name %> &mdash; <%= group.totalHours %> hour<%= group.totalHours === 1 ? '' : 's' %> total</h2>
+          <% if (group.entries.length === 0) { %>
+            <p class="roster-empty">No volunteer hours logged yet.</p>
+          <% } else { %>
+            <table class="roster-table">
+              <thead><tr><th>Date</th><th>Hours</th><th>Activity</th></tr></thead>
+              <tbody>
+                <% group.entries.forEach(function(e) { %>
+                  <tr>
+                    <td><%= e.hour_date %></td>
+                    <td><%= e.hours %></td>
+                    <td><%= e.activity_description || '—' %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+      <% }); %>
+    <% } %>
+  </main>
+</body>
+</html>

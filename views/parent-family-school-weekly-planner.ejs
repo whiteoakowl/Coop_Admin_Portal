@@ -16,26 +16,19 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <%# A real request: "add a filter button. Choose student, choose
-        school year and choose week. Remove plan for dropdown of
-        student choice... Print, pdf and export icon to the left,
-        adequate space between rows. Orange filter and add week button
-        on same row to the right." One combined toolbar row - icons on
-        the left (only meaningful once a week is selected - nothing yet
-        to print/export otherwise), the Filter popover (replacing the
-        old standalone "Plan for" select entirely) and + Add Week
-        (both .roster-action-btn, this app's own orange button class) on
-        the right. %>
+    <%# A real request: "Weeks are blue buttons. Delete the blue
+        buttons. The filter button changes students and week view."
+        The old quick week-switching tabs row (a .btn-secondary per
+        week) is gone - the Filter popover below already picks the
+        student/year/week, so it was pure duplication of that same
+        choice. A further real request: "all pages filter button
+        first, all import, export, pdf and print icons should be in a
+        row next to each other... placed to the left above the
+        tables/lists" - one single toolbar row: Filter, then the icons
+        (only meaningful once a week is selected), then + Add Week. %>
     <div class="roster-toolbar no-print">
       <div class="roster-btn-row roster-btn-row-fit-text">
-        <% if (selectedWeek) { %>
-          <a class="icon-btn" href="/parent/family-school/weekly-planner/export.csv?weekId=<%= selectedWeek.id %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-          <a class="icon-btn" href="/parent/family-school/weekly-planner/print?weekId=<%= selectedWeek.id %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
-          <a class="icon-btn" href="/parent/family-school/weekly-planner/download.pdf?weekId=<%= selectedWeek.id %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
-        <% } %>
-      </div>
-      <div class="roster-btn-row roster-btn-row-fit-text">
-        <details class="filter-details">
+        <details class="filter-details" data-filter-details>
           <summary class="roster-action-btn">Filter</summary>
           <form method="GET" action="/parent/family-school/weekly-planner" class="filter-panel">
             <label for="weekly-planner-owner-select">Student
@@ -66,16 +59,13 @@
             <button type="submit" class="primary-btn">Apply</button>
           </form>
         </details>
+        <% if (selectedWeek) { %>
+          <a class="icon-btn" href="/parent/family-school/weekly-planner/export.csv?weekId=<%= selectedWeek.id %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+          <a class="icon-btn" href="/parent/family-school/weekly-planner/print?weekId=<%= selectedWeek.id %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+          <a class="icon-btn" href="/parent/family-school/weekly-planner/download.pdf?weekId=<%= selectedWeek.id %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+        <% } %>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-week-dialog').showModal()">+ Add Week</button>
       </div>
-    </div>
-
-    <%# Quick week-switching tabs - still here alongside the Filter
-        above, now scoped to whichever School Year the filter picked. %>
-    <div class="roster-btn-row roster-btn-row-fit-text no-print fs-weekly-plan-row-spaced">
-      <% weeks.forEach(function(w) { %>
-        <a class="btn-secondary<% if (selectedWeek && selectedWeek.id === w.id) { %> active<% } %>" href="?owner=<%= encodeURIComponent(ownerParam) %>&schoolYear=<%= encodeURIComponent(schoolYearFilter) %>&weekId=<%= w.id %>"><%= w.title %></a>
-      <% }); %>
     </div>
 
     <% if (!selectedWeek) { %>
@@ -322,5 +312,6 @@
   </main>
   <script src="/js/weekly-planner-dragdrop.js"></script>
   <script src="/js/weekly-planner-assignment-edit.js"></script>
+  <script src="/js/filter-details-dismiss.js"></script>
 </body>
 </html>
