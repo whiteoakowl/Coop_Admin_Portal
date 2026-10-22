@@ -1,6 +1,12 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <%# utils/pdfRender.js renders this exact view off-request for the
+      Download PDF button - pdfBaseUrl is only ever set for that render,
+      so Chromium has something to resolve this page's own relative asset
+      URLs against (see parent-family-school-attendance-print.ejs's own
+      copy of this same <base> tag for the full story). %>
+  <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
   <%- include('partials/head', { title }) %>
   <style>@page { size: letter; margin: 0; }</style>
 </head>
