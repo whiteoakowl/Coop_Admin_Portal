@@ -205,6 +205,37 @@ test('GET /main-admin/admins/print renders a read-only preview with the same row
   assert.match(res.text, /Print Preview Position/);
 });
 
+// A real follow-up request: "PDF download icons should be added to every
+// page across the app that has a print icon/button." Mirrors the Print
+// preview test just above, but for the real PDF its sibling Download
+// button now produces (utils/pdfRender.js), same as every other *-print
+// page's own Download route.
+test('GET /main-admin/admins/download.pdf returns a real PDF with the same rows as the page', async () => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+  await request(app)
+    .post('/main-admin/admins/positions/bulk-save')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ newPositionTitle: 'Download PDF Position', _csrf: csrfToken });
+
+  const liveRes = await request(app).get('/main-admin/admins').set('Cookie', cookie);
+  assert.match(liveRes.text, /href="\/main-admin\/admins\/download\.pdf" aria-label="Download PDF"/);
+
+  const res = await request(app)
+    .get('/main-admin/admins/download.pdf')
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers['content-type'], 'application/pdf');
+  assert.match(res.headers['content-disposition'], /attachment; filename="admins\.pdf"/);
+  assert.equal(res.body.slice(0, 5).toString(), '%PDF-');
+});
+
 test('a position with no one assigned yet still shows its own row, and permissions are shared by every current holder', async () => {
   const { cookie, csrfToken } = await loginAsMainAdmin();
   await request(app)
