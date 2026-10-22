@@ -88,12 +88,14 @@
               "Manage" text button and the edit page's own Delete
               button (moved here instead). Main Admin only - the parent/
               student view (views/photos-list.ejs) has no icon row at all. %>
-          <div class="roster-btn-row photo-album-card-icons">
-            <% if (activeTab === 'archive') { %>
+          <% if (activeTab === 'archive') { %>
+            <div class="roster-btn-row photo-album-card-icons">
               <form method="POST" action="/main-admin/photos/<%= a.id %>/unarchive" class="inline-block-form">
                 <button type="submit" class="roster-action-btn roster-action-btn-fit">Restore</button>
               </form>
-            <% } %>
+            </div>
+          <% } %>
+          <div class="roster-btn-row photo-album-card-icons">
             <a class="icon-btn" href="/main-admin/photos/<%= a.id %>/edit" aria-label="Edit <%= a.title %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></a>
             <a class="icon-btn" href="/photos/<%= a.id %>/download" aria-label="Export <%= a.title %>" title="Export"><svg class="icon"><use href="#icon-download"/></svg></a>
             <form method="POST" action="/main-admin/photos/<%= a.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= a.title %>&quot; and all its photos? This cannot be undone.">
