@@ -56,10 +56,39 @@ test('public Events calendar: Export and Print are icon buttons, Export download
   assert.equal(page.status, 200);
   assert.match(page.text, /<a class="icon-btn" href="\/events\/export\.csv" aria-label="Export CSV"/);
   assert.match(page.text, /<a class="icon-btn" href="\/events\/print" target="_blank" aria-label="Print"/);
+  assert.match(page.text, /<a class="icon-btn" href="\/events\/download\.pdf" aria-label="Download PDF"/);
 
   const csv = await request(app).get('/events/export.csv');
   assert.equal(csv.status, 200);
   assert.match(csv.headers['content-type'], /text\/csv/);
   assert.match(csv.text, /Title.*Starts At.*Ends At.*Location.*Category.*Visibility.*Capacity.*Description/);
   assert.match(csv.text, /Export Test Carnival/);
+});
+
+test('public Events calendar: Download PDF is a real PDF of the same print preview', async () => {
+  const admin = await loginAsMainAdmin();
+  const createRes = await request(app)
+    .post('/main-admin/events')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Download PDF Carnival', startsAt: '2099-01-01T10:00', visibility: 'public', _csrf: admin.csrfToken });
+  const eventId = Number(/\/main-admin\/events\/(\d+)\/builder/.exec(createRes.headers.location)[1]);
+  await request(app).post(`/main-admin/events/${eventId}/status`).set('Cookie', admin.cookie).type('form').send({ status: 'published', _csrf: admin.csrfToken });
+
+  const printRes = await request(app).get('/events/print');
+  assert.equal(printRes.status, 200);
+  assert.match(printRes.text, /Download PDF Carnival/);
+
+  const pdfRes = await request(app)
+    .get('/events/download.pdf')
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.match(pdfRes.headers['content-disposition'], /attachment; filename="events\.pdf"/);
+  assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
 });

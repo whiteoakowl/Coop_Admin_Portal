@@ -39,6 +39,7 @@
                   registration's own ticket type has that turned on. %>
               <% if (r.status === 'confirmed' && r.includesPhysicalTicket) { %>
                 <a class="roster-action-btn" href="/events/<%= r.event_id %>/ticket?memberId=<%= r.member_id %>" target="_blank">Print Ticket</a>
+                <a class="icon-btn" href="/events/<%= r.event_id %>/ticket/download.pdf?memberId=<%= r.member_id %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
               <% } %>
               <% if (r.allowCancel) { %>
                 <form method="POST" action="/events/<%= r.event_id %>/unregister" class="inline-block-form">

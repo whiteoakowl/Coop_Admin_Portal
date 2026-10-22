@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
   <%- include('partials/head', { title }) %>
 </head>
 <body>
