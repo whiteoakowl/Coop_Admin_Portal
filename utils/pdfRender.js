@@ -34,18 +34,29 @@ function localChromiumPath() {
 async function launchBrowser() {
   const puppeteer = require('puppeteer-core');
   if (process.env.LAMBDA_TASK_ROOT) {
-    // A real production bug: "all pdf buttons in family school management
-    // say something went wrong" - confirmed by actually requiring this
-    // package and calling its API the way this file used to
-    // (TypeError: chromium.executablePath is not a function). @sparticuz/
-    // chromium ships as an ES module; a plain require() here returns the
-    // module's whole namespace object (__esModule: true, default: <the
-    // real chromium object>, ...), not the chromium object itself, so
-    // chromium.args/.executablePath()/.headless were all reading
-    // properties off the wrong object. .default unwraps it - confirmed by
-    // actually launching a real browser and rendering a PDF this way,
-    // not just by inspecting the exports.
-    const chromiumModule = require('@sparticuz/chromium');
+    // A real production bug: "all pdf buttons... say something went
+    // wrong" - a real Netlify Function log confirmed the actual error:
+    // "Error [ERR_REQUIRE_ESM]: require() of ES Module .../@sparticuz/
+    // chromium/build/index.js ... not supported. Instead change the
+    // require of index.js ... to a dynamic import()." @sparticuz/
+    // chromium ships as a pure ES module; esbuild's own external-module
+    // handling for this package (netlify.toml's external_node_modules)
+    // bakes in a require() of its resolved build/index.js path directly,
+    // bypassing the package's own package.json "exports" map that would
+    // otherwise route a plain `require('@sparticuz/chromium')` through a
+    // CJS-safe entry point - Node's require() refuses outright to load
+    // real ESM, no matter what shape the result would otherwise be. A
+    // plain node -e script run directly against this package (not
+    // through esbuild's bundling) never hits this, which is exactly why
+    // the earlier fix here (unwrapping require()'s return value at
+    // .default) looked right locally but never actually ran this code
+    // path in the real deployed bundle. A dynamic import() is what the
+    // error message itself says to use, and unlike require(), Node can
+    // always import() a real ES module - from inside this already-async
+    // function, with no top-level-await needed. The resulting module
+    // namespace object is the exact same shape the old .default unwrap
+    // already expected, so that part needs no further change.
+    const chromiumModule = await import('@sparticuz/chromium');
     const chromium = chromiumModule.default || chromiumModule;
     return puppeteer.launch({
       args: chromium.args,

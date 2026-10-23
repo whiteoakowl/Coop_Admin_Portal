@@ -44,6 +44,25 @@ test('logger', async (t) => {
     assert.match(content, /two/);
   });
 
+  // A real Netlify Function log: every single error was followed by its
+  // own "Failed to write to error.log: ENOENT... mkdir '/var/task/
+  // netlify/data'" - Lambda's filesystem is read-only outside /tmp, so
+  // this file write was always doomed there and just added noise on top
+  // of the real error (which every caller already console.error()s
+  // before calling logError() - see server.js).
+  await t.test('no-ops instead of attempting a doomed file write when LAMBDA_TASK_ROOT is set', () => {
+    fs.rmSync(testLogPath, { force: true });
+    const previousLambdaTaskRoot = process.env.LAMBDA_TASK_ROOT;
+    process.env.LAMBDA_TASK_ROOT = '/var/task';
+    try {
+      assert.doesNotThrow(() => logError('GET /some/route', new Error('boom')));
+    } finally {
+      if (previousLambdaTaskRoot === undefined) delete process.env.LAMBDA_TASK_ROOT;
+      else process.env.LAMBDA_TASK_ROOT = previousLambdaTaskRoot;
+    }
+    assert.equal(fs.existsSync(testLogPath), false, 'should never have attempted to create the log file at all');
+  });
+
   await t.test('trims the file once it exceeds the size cap, keeping it well under the cap', () => {
     fs.rmSync(testLogPath, { force: true });
     // Each call appends a few hundred bytes; enough calls crosses the

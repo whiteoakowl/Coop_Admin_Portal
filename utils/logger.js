@@ -19,6 +19,20 @@ const LOG_PATH = process.env.ERROR_LOG_PATH || path.join(DATA_DIR, 'error.log');
 const MAX_LOG_BYTES = 2 * 1024 * 1024; // 2MB
 
 function logError(context, err) {
+  // A real Netlify Function log: every single error entry was followed
+  // by its own "Failed to write to error.log: ENOENT... mkdir '/var/
+  // task/netlify/data'" - a Lambda's filesystem is read-only outside
+  // /tmp, same reasoning utils/pdfRender.js/utils/familySchool.js's own
+  // local-disk fallbacks already gate on LAMBDA_TASK_ROOT for. This file
+  // exists purely so someone can open data/error.log after the fact on
+  // a real local/LAN install (see this file's own header comment) -
+  // there's no local disk to persist it to on Netlify at all, and every
+  // caller already console.error()s the same error right before calling
+  // this, which Netlify's own Function log already captures (exactly
+  // how the real error above was found) - so this just no-ops there
+  // instead of cluttering that same log with a second, confusing,
+  // always-failing write attempt on top of the real error.
+  if (process.env.LAMBDA_TASK_ROOT) return;
   try {
     const dir = path.dirname(LOG_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });

@@ -1,31 +1,37 @@
-// Regression coverage for a real production bug: "all pdf buttons in
-// family school management say something went wrong." Confirmed to be
-// a dependency API-shape mismatch in utils/pdfRender.js's Netlify
-// (LAMBDA_TASK_ROOT) code path, not an infra/deploy problem: @sparticuz/
-// chromium ships as an ES module, so require('@sparticuz/chromium')
-// returns the module's whole namespace object ({ __esModule: true,
-// default: <the real chromium object>, ... }), not the chromium object
-// itself. The old code read .args/.executablePath()/.headless straight
-// off that namespace object, which has none of those, throwing
-// "TypeError: chromium.executablePath is not a function" on every
-// Download PDF click in production. This test exercises the exact same
-// require()'d package and launch path the Netlify Function uses (by
-// setting LAMBDA_TASK_ROOT, the same flag server.js/utils/spreadsheet.js
-// already use to detect a real Function invocation), so it fails
-// against the old unwrapped-require code and passes against the fix.
+// Regression coverage for a real production bug: "all pdf buttons...
+// say something went wrong." A real Netlify Function log eventually
+// showed the actual error: "Error [ERR_REQUIRE_ESM]: require() of ES
+// Module .../@sparticuz/chromium/build/index.js ... not supported.
+// Instead change the require of index.js ... to a dynamic import()."
+// @sparticuz/chromium ships as a pure ES module; esbuild's own
+// external-module handling for this package (netlify.toml's
+// external_node_modules) bakes a require() of its resolved build/
+// index.js path directly into the deployed function bundle, bypassing
+// the package's own package.json "exports" map that a plain
+// require('@sparticuz/chromium') would otherwise route through a
+// CJS-safe entry - Node's require() refuses outright to load real ESM,
+// no matter what shape the result would otherwise be.
+//
+// This is the reason an EARLIER fix here (unwrapping require()'s
+// return value at .default, based on a passing local node -e test)
+// still crashed in production: running require('@sparticuz/chromium')
+// directly under plain Node (not through esbuild's bundling) resolves
+// the package by name through its own exports map and never hits
+// build/index.js directly, so it never reproduces the real failure -
+// there is no way to make a plain `node --test` run reproduce an
+// esbuild-bundling-specific resolution difference. What IS testable
+// locally, and is the actual fix, is that this code now uses a dynamic
+// import() instead of require() (exactly what the real error message
+// says to do) and that doing so still produces a real, working PDF.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { renderHtmlToPdf } = require('../utils/pdfRender.js');
 
-test('@sparticuz/chromium exports the real chromium object at .default, not at the top level', () => {
-  // Pins down the exact shape that broke the old code, independent of
-  // actually launching a browser - a namespace object has no .args/
-  // .executablePath of its own.
-  const chromiumModule = require('@sparticuz/chromium');
-  assert.equal(typeof chromiumModule.executablePath, 'undefined', 'the require()\'d module itself has no executablePath - it is an ESM namespace object');
-  assert.equal(typeof chromiumModule.default.executablePath, 'function', 'the real chromium object lives at .default');
-  assert.ok(Array.isArray(chromiumModule.default.args), 'the real chromium object exposes .args');
+test('@sparticuz/chromium\'s default export has the shape launchBrowser() depends on', async () => {
+  const chromiumModule = await import('@sparticuz/chromium');
+  assert.equal(typeof chromiumModule.default.executablePath, 'function');
+  assert.ok(Array.isArray(chromiumModule.default.args));
 });
 
 test('renderHtmlToPdf() produces a real PDF on the Netlify (LAMBDA_TASK_ROOT) code path', async (t) => {
