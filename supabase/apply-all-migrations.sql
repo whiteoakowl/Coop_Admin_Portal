@@ -5431,3 +5431,10 @@ UPDATE roles SET label = 'Co-op Teacher' WHERE key = 'teacher';
 -- Family School Management > Settings: homeschooled-since date. See
 -- the family_school_homeschooled_since migration's own header comment.
 alter table family_school_settings add column if not exists homeschooled_since text;
+
+-- Family School Management attachments bucket going private - see the
+-- family_school_attachments_private migration's own header comment.
+alter table family_school_content_items add column if not exists attachment_mime text;
+alter table family_school_assignment_submissions add column if not exists file_mime text;
+alter table family_school_week_assignments add column if not exists file_mime text;
+alter table family_school_settings add column if not exists logo_mime text;

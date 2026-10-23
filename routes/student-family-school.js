@@ -145,7 +145,7 @@ router.post('/family-school/content/:id/submit', uploadSubmission.single('submis
   if (!found || found.contentItem.type !== 'assignment_submission') return res.status(404).render('404', { title: 'Not Found' });
   if (!req.file) return res.redirect(`/student/family-school/classes/${found.cls.id}?error=` + encodeURIComponent('Choose a file to upload.'));
   const fileKey = await saveAttachment(req.file);
-  await submitAssignment({ contentItemId: found.contentItem.id, studentId: found.member.id, fileUrl: fileKey, fileName: req.file.originalname });
+  await submitAssignment({ contentItemId: found.contentItem.id, studentId: found.member.id, fileUrl: fileKey, fileName: req.file.originalname, fileMime: req.file.mimetype });
   res.redirect(`/student/family-school/classes/${found.cls.id}?notice=` + encodeURIComponent('Assignment submitted.'));
 });
 

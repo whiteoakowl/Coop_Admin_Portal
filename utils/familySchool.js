@@ -23,7 +23,7 @@ const fs = require('fs');
 const path = require('path');
 const { todayISO, formatDateLabel, formatDateLong } = require('./dates');
 const { byLastName } = require('./members');
-const { createStorageClient, uploadFile, deleteFile, generateKey, publicUrl } = require('./storage');
+const { createStorageClient, uploadFile, deleteFile, downloadFile, generateKey } = require('./storage');
 const { urlForUpload } = require('./uploadBackend');
 
 // Same bucket/local-dir convention routes/admin-members.js/routes/member-
@@ -48,9 +48,19 @@ if (!createStorageClient() && !fs.existsSync(ATTACHMENT_DIR)) {
   }
 }
 
+// A real decision: this bucket is private (personal, family-owned
+// content - logos, lesson attachments, journal attachments, weekly
+// planner files - no reason any of it needs a stable public URL). A
+// private bucket has no publicUrl() of its own to hand back, so this
+// instead points at this app's own proxy-download route (GET below),
+// same "download the bytes server-side and stream them through the
+// app" pattern routes/admin-documents.js already uses for its own
+// private `documents` bucket. Every call site already just drops this
+// string straight into an <a href>/<img src> unchanged, so swapping
+// what it points to needed no view changes.
 function attachmentUrl(key) {
   if (!key) return null;
-  return createStorageClient() ? publicUrl(ATTACHMENTS_BUCKET, key) : `/uploads/family-school-attachments/${key}`;
+  return `/family-school/files/${encodeURIComponent(key)}`;
 }
 
 async function saveAttachment(file, existingKey) {
@@ -70,6 +80,76 @@ async function saveAttachment(file, existingKey) {
     }
   }
   return key;
+}
+
+// The raw bytes behind a saveAttachment() key - the other half of the
+// private-bucket proxy-download route (attachmentUrl() above builds the
+// link to it; attachmentAccessForFamily() below is the authorization
+// check that must pass before this is ever called).
+async function attachmentBuffer(key) {
+  if (!key) return null;
+  const client = createStorageClient();
+  if (client) return downloadFile(client, ATTACHMENTS_BUCKET, key);
+  const filePath = path.join(ATTACHMENT_DIR, key);
+  return fs.existsSync(filePath) ? fs.readFileSync(filePath) : null;
+}
+
+// Confirms `familyId` actually owns the attachment at `key` before the
+// proxy-download route streams anything back - checked against every
+// table that can hold a family-school-attachments key (a logo, a lesson
+// content attachment, a student's assignment submission, a journal
+// attachment, or a weekly planner assignment's file), each joined back
+// to the owning family. Returns the stored mimetype (possibly null - a
+// handful of these columns are new backfills with nothing to fill in
+// for already-existing rows) on a real match, or null for "not found"
+// and "not yours" alike - the route never distinguishes the two, so a
+// wrong guess at someone else's key can't even confirm the key exists.
+async function attachmentAccessForFamily(familyId, key) {
+  if (!familyId || !key) return null;
+
+  const settingsRow = await db.prepare('SELECT logo_mime FROM family_school_settings WHERE family_id = ? AND logo_key = ?').get(familyId, key);
+  if (settingsRow) return { mimeType: settingsRow.logo_mime };
+
+  const contentItemRow = await db
+    .prepare(
+      `SELECT ci.attachment_mime FROM family_school_content_items ci
+       JOIN family_school_lessons l ON l.id = ci.lesson_id
+       JOIN family_school_classes c ON c.id = l.class_id
+       WHERE c.family_id = ? AND ci.attachment_url = ?`
+    )
+    .get(familyId, key);
+  if (contentItemRow) return { mimeType: contentItemRow.attachment_mime };
+
+  const submissionRow = await db
+    .prepare(
+      `SELECT s.file_mime FROM family_school_assignment_submissions s
+       JOIN members m ON m.id = s.student_id
+       WHERE m.family_id = ? AND s.file_url = ?`
+    )
+    .get(familyId, key);
+  if (submissionRow) return { mimeType: submissionRow.file_mime };
+
+  const journalRow = await db
+    .prepare(
+      `SELECT a.content_type FROM family_school_journal_attachments a
+       JOIN family_school_journal_entries e ON e.id = a.journal_entry_id
+       JOIN members m ON m.id = e.student_id
+       WHERE m.family_id = ? AND a.file_key = ?`
+    )
+    .get(familyId, key);
+  if (journalRow) return { mimeType: journalRow.content_type };
+
+  const weekAssignmentRow = await db
+    .prepare(
+      `SELECT wa.file_mime FROM family_school_week_assignments wa
+       JOIN family_school_week_dates wd ON wd.id = wa.week_date_id
+       JOIN family_school_weeks w ON w.id = wd.week_id
+       WHERE w.family_id = ? AND wa.file_key = ?`
+    )
+    .get(familyId, key);
+  if (weekAssignmentRow) return { mimeType: weekAssignmentRow.file_mime };
+
+  return null;
 }
 
 // --- Classes ---
@@ -223,30 +303,30 @@ async function contentItemsForLesson(lessonId) {
   return items.map((item) => ({ ...item, attachmentUrl: attachmentUrl(item.attachment_url) }));
 }
 
-async function createContentItem({ lessonId, type, title, videoUrl, body, fileUrl, description, attachmentUrl: attachmentKey, attachmentName, pointsPossible, dueDate }) {
+async function createContentItem({ lessonId, type, title, videoUrl, body, fileUrl, description, attachmentUrl: attachmentKey, attachmentName, attachmentMime, pointsPossible, dueDate }) {
   const { next_position: nextPosition } = await db
     .prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM family_school_content_items WHERE lesson_id = ?')
     .get(lessonId);
   const info = await db
     .prepare(
-      `INSERT INTO family_school_content_items (lesson_id, type, position, title, video_url, body, file_url, description, attachment_url, attachment_name, points_possible, due_date)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO family_school_content_items (lesson_id, type, position, title, video_url, body, file_url, description, attachment_url, attachment_name, attachment_mime, points_possible, due_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       lessonId, type, nextPosition, title || null, videoUrl || null, body || null, fileUrl || null,
-      description || null, attachmentKey || null, attachmentName || null, pointsPossible != null ? pointsPossible : null, dueDate || null
+      description || null, attachmentKey || null, attachmentName || null, attachmentMime || null, pointsPossible != null ? pointsPossible : null, dueDate || null
     );
   return info.lastInsertRowid;
 }
 
-async function updateContentItem(id, { title, videoUrl, body, fileUrl, description, attachmentUrl: attachmentKey, attachmentName, pointsPossible, dueDate }) {
+async function updateContentItem(id, { title, videoUrl, body, fileUrl, description, attachmentUrl: attachmentKey, attachmentName, attachmentMime, pointsPossible, dueDate }) {
   await db
     .prepare(
-      `UPDATE family_school_content_items SET title = ?, video_url = ?, body = ?, file_url = ?, description = ?, attachment_url = ?, attachment_name = ?, points_possible = ?, due_date = ? WHERE id = ?`
+      `UPDATE family_school_content_items SET title = ?, video_url = ?, body = ?, file_url = ?, description = ?, attachment_url = ?, attachment_name = ?, attachment_mime = ?, points_possible = ?, due_date = ? WHERE id = ?`
     )
     .run(
       title || null, videoUrl || null, body || null, fileUrl || null, description || null,
-      attachmentKey || null, attachmentName || null, pointsPossible != null ? pointsPossible : null, dueDate || null, id
+      attachmentKey || null, attachmentName || null, attachmentMime || null, pointsPossible != null ? pointsPossible : null, dueDate || null, id
     );
 }
 
@@ -283,16 +363,16 @@ async function getAssignmentSubmission(contentItemId, studentId) {
   return db.prepare('SELECT * FROM family_school_assignment_submissions WHERE content_item_id = ? AND student_id = ?').get(contentItemId, studentId);
 }
 
-async function submitAssignment({ contentItemId, studentId, fileUrl, fileName }) {
+async function submitAssignment({ contentItemId, studentId, fileUrl, fileName, fileMime }) {
   await db
     .prepare(
-      `INSERT INTO family_school_assignment_submissions (content_item_id, student_id, file_url, file_name, submitted_at, status, points_earned, grade_letter, feedback, graded_at)
-       VALUES (?, ?, ?, ?, now_text(), 'submitted', NULL, NULL, NULL, NULL)
+      `INSERT INTO family_school_assignment_submissions (content_item_id, student_id, file_url, file_name, file_mime, submitted_at, status, points_earned, grade_letter, feedback, graded_at)
+       VALUES (?, ?, ?, ?, ?, now_text(), 'submitted', NULL, NULL, NULL, NULL)
        ON CONFLICT (content_item_id, student_id) DO UPDATE SET
-         file_url = excluded.file_url, file_name = excluded.file_name, submitted_at = now_text(),
+         file_url = excluded.file_url, file_name = excluded.file_name, file_mime = excluded.file_mime, submitted_at = now_text(),
          status = 'submitted', points_earned = NULL, grade_letter = NULL, feedback = NULL, graded_at = NULL`
     )
-    .run(contentItemId, studentId, fileUrl, fileName);
+    .run(contentItemId, studentId, fileUrl, fileName, fileMime || null);
 }
 
 async function gradeAssignmentSubmission({ contentItemId, studentId, pointsEarned, gradeLetter, feedback }) {
@@ -961,17 +1041,17 @@ function subjectBreakdownForGrid(grid) {
 // subject." description/linkUrl/fileKey/fileName/grade are only ever
 // set by that "Add New Assignment" dialog - "Add Class Assignment"
 // (contentItemId set) leaves them all null, same as before.
-async function createWeekAssignment({ weekDateId, subject, title, contentItemId, description, linkUrl, fileKey, fileName, grade }) {
+async function createWeekAssignment({ weekDateId, subject, title, contentItemId, description, linkUrl, fileKey, fileName, fileMime, grade }) {
   const { next_position: nextPosition } = await db
     .prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM family_school_week_assignments WHERE week_date_id = ?')
     .get(weekDateId);
   const assignment = await db
     .prepare(
       `INSERT INTO family_school_week_assignments
-       (week_date_id, subject, title, content_item_id, position, description, link_url, file_key, file_name, grade)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+       (week_date_id, subject, title, content_item_id, position, description, link_url, file_key, file_name, file_mime, grade)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
     )
-    .get(weekDateId, subject || null, title, contentItemId || null, nextPosition, description || null, linkUrl || null, fileKey || null, fileName || null, grade || null);
+    .get(weekDateId, subject || null, title, contentItemId || null, nextPosition, description || null, linkUrl || null, fileKey || null, fileName || null, fileMime || null, grade || null);
   return assignment.id;
 }
 
@@ -1095,24 +1175,25 @@ async function getFamilySchoolSettings(familyId) {
   return { ...row, logoUrl: attachmentUrl(row.logo_key) };
 }
 
-async function saveFamilySchoolSettings({ familyId, schoolName, colorPrimary, colorSecondary, ncHomeschoolId, homeschooledSince, logoKey }) {
-  const existing = await db.prepare('SELECT logo_key FROM family_school_settings WHERE family_id = ?').get(familyId);
+async function saveFamilySchoolSettings({ familyId, schoolName, colorPrimary, colorSecondary, ncHomeschoolId, homeschooledSince, logoKey, logoMime }) {
+  const existing = await db.prepare('SELECT logo_key, logo_mime FROM family_school_settings WHERE family_id = ?').get(familyId);
   const resolvedLogoKey = typeof logoKey !== 'undefined' ? logoKey : existing ? existing.logo_key : null;
+  const resolvedLogoMime = typeof logoKey !== 'undefined' ? logoMime || null : existing ? existing.logo_mime : null;
   if (existing) {
     await db
       .prepare(
         `UPDATE family_school_settings
-         SET school_name = ?, color_primary = ?, color_secondary = ?, nc_homeschool_id = ?, homeschooled_since = ?, logo_key = ?, updated_at = now_text()
+         SET school_name = ?, color_primary = ?, color_secondary = ?, nc_homeschool_id = ?, homeschooled_since = ?, logo_key = ?, logo_mime = ?, updated_at = now_text()
          WHERE family_id = ?`
       )
-      .run(schoolName || null, colorPrimary || null, colorSecondary || null, ncHomeschoolId || null, homeschooledSince || null, resolvedLogoKey, familyId);
+      .run(schoolName || null, colorPrimary || null, colorSecondary || null, ncHomeschoolId || null, homeschooledSince || null, resolvedLogoKey, resolvedLogoMime, familyId);
   } else {
     await db
       .prepare(
-        `INSERT INTO family_school_settings (family_id, school_name, color_primary, color_secondary, nc_homeschool_id, homeschooled_since, logo_key)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO family_school_settings (family_id, school_name, color_primary, color_secondary, nc_homeschool_id, homeschooled_since, logo_key, logo_mime)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(familyId, schoolName || null, colorPrimary || null, colorSecondary || null, ncHomeschoolId || null, homeschooledSince || null, resolvedLogoKey);
+      .run(familyId, schoolName || null, colorPrimary || null, colorSecondary || null, ncHomeschoolId || null, homeschooledSince || null, resolvedLogoKey, resolvedLogoMime);
   }
 }
 
@@ -1120,6 +1201,8 @@ module.exports = {
   CONTENT_ITEM_TYPES,
   attachmentUrl,
   saveAttachment,
+  attachmentBuffer,
+  attachmentAccessForFamily,
   classesForFamily,
   getClass,
   createClass,

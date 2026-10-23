@@ -415,9 +415,11 @@ router.post('/family-school/lessons/:id/content', uploadAttachment, async (req, 
 
   let attachmentKey = null;
   let attachmentName = null;
+  let attachmentMime = null;
   if (type === 'assignment_upload' && req.file) {
     attachmentKey = await saveAttachment(req.file);
     attachmentName = req.file.originalname;
+    attachmentMime = req.file.mimetype;
   }
 
   await createContentItem({
@@ -437,6 +439,7 @@ router.post('/family-school/lessons/:id/content', uploadAttachment, async (req, 
     description: type === 'video' ? (req.body.description || '').trim() : type === 'file' ? (req.body.fileDescription || '').trim() : null,
     attachmentUrl: attachmentKey,
     attachmentName,
+    attachmentMime,
     pointsPossible: type === 'assignment_submission' && req.body.submissionPointsPossible ? parseInt(req.body.submissionPointsPossible, 10) : null,
     dueDate: (req.body.contentDueDate || '').trim() || null,
   });
@@ -462,9 +465,11 @@ router.post('/family-school/content/:id/edit', uploadAttachment, async (req, res
 
   let attachmentKey = contentItem.attachment_url;
   let attachmentName = contentItem.attachment_name;
+  let attachmentMime = contentItem.attachment_mime;
   if (type === 'assignment_upload' && req.file) {
     attachmentKey = await saveAttachment(req.file);
     attachmentName = req.file.originalname;
+    attachmentMime = req.file.mimetype;
   }
 
   await updateContentItem(contentItem.id, {
@@ -482,6 +487,7 @@ router.post('/family-school/content/:id/edit', uploadAttachment, async (req, res
     description: type === 'video' ? (req.body.description || '').trim() : type === 'file' ? (req.body.fileDescription || '').trim() : contentItem.description,
     attachmentUrl: attachmentKey,
     attachmentName,
+    attachmentMime,
     pointsPossible: type === 'assignment_submission' && req.body.submissionPointsPossible ? parseInt(req.body.submissionPointsPossible, 10) : null,
     dueDate: (req.body.contentDueDate || '').trim() || null,
   });
@@ -1281,11 +1287,13 @@ router.post('/family-school/weekly-planner/dates/:dateId/assignments', uploadWee
   if (!title) return res.redirect(`${backUrl}&error=` + encodeURIComponent('A title is required.'));
   let fileKey = null;
   let fileName = null;
+  let fileMime = null;
   if (req.file) {
     fileKey = await saveAttachment(req.file);
     fileName = req.file.originalname;
+    fileMime = req.file.mimetype;
   }
-  await createWeekAssignment({ weekDateId: weekDate.id, subject, title, contentItemId, description, linkUrl, fileKey, fileName, grade });
+  await createWeekAssignment({ weekDateId: weekDate.id, subject, title, contentItemId, description, linkUrl, fileKey, fileName, fileMime, grade });
   res.redirect(`${backUrl}&notice=` + encodeURIComponent('Assignment added.'));
 });
 
@@ -1489,7 +1497,11 @@ router.get('/family-school/settings', async (req, res) => {
 router.post('/family-school/settings', uploadSchoolLogo, async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   let logoKey;
-  if (req.file) logoKey = await saveAttachment(req.file);
+  let logoMime;
+  if (req.file) {
+    logoKey = await saveAttachment(req.file);
+    logoMime = req.file.mimetype;
+  }
   await saveFamilySchoolSettings({
     familyId,
     schoolName: (req.body.schoolName || '').trim(),
@@ -1498,6 +1510,7 @@ router.post('/family-school/settings', uploadSchoolLogo, async (req, res) => {
     ncHomeschoolId: (req.body.ncHomeschoolId || '').trim(),
     homeschooledSince: (req.body.homeschooledSince || '').trim(),
     logoKey,
+    logoMime,
   });
   res.redirect('/parent/family-school/settings?notice=' + encodeURIComponent('Settings saved.'));
 });

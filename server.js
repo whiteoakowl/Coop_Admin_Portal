@@ -127,6 +127,7 @@ const publicSiteRouter = require('./routes/public-site');
 const portalAuthRouter = require('./routes/portal-auth');
 const parentPortalRouter = require('./routes/parent-portal');
 const parentFamilySchoolRouter = require('./routes/parent-family-school');
+const familySchoolFilesRouter = require('./routes/family-school-files');
 const mainAdminRouter = require('./routes/main-admin');
 const mainAdminFamilySchoolRouter = require('./routes/main-admin-family-school');
 // Member/family roster management, natively inside Main Admin - a sibling
@@ -446,6 +447,10 @@ app.use('/', require('./middleware/csrfProtection'));
 app.use('/', portalAuthRouter);
 app.use('/parent', parentPortalRouter);
 app.use('/parent', parentFamilySchoolRouter);
+// Mounted at the bare root, not under /parent or /student - see
+// routes/family-school-files.js's own header comment for why a parent
+// and a student can both legitimately need the exact same URL.
+app.use('/', familySchoolFilesRouter);
 // Registered before the generic '/main-admin' mounts below (Express
 // tries mounted routers in registration order for matching prefixes,
 // and '/main-admin/events' is otherwise just a prefix match away from
