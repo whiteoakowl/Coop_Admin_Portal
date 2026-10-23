@@ -101,7 +101,7 @@ test('toggling Whole Family marks every family student present on the same date'
   // child/student" - each child's own single-student calendar shows the
   // same present mark the family toggle just wrote.
   const childView = await request(app)
-    .get(`/parent/family-school/attendance?studentId=${studentA.memberId}&year=2026&month=3`)
+    .get(`/parent/family-school/attendance?studentId=${studentA.memberId}&schoolYear=2025-2026`)
     .set('Cookie', parent.cookie);
   assert.match(childView.text, /fs-attendance-day-present" data-fs-attendance-cell data-date="2026-03-10"/);
 });
@@ -146,21 +146,22 @@ test('the Whole Family calendar only shows a date as marked when every family st
   await db.prepare("INSERT INTO family_school_attendance (student_id, attendance_date, status) VALUES (?, ?, 'absent')").run(studentB.memberId, '2026-05-05');
 
   const res = await request(app)
-    .get('/parent/family-school/attendance?studentId=family&year=2026&month=5')
+    .get('/parent/family-school/attendance?studentId=family&schoolYear=2025-2026')
     .set('Cookie', parent.cookie);
   assert.equal(res.status, 200);
   assert.match(res.text, /fs-attendance-day-unmarked" data-fs-attendance-cell data-date="2026-05-05"/);
 });
 
-test('the Whole Family calendar toggles via the family-wide endpoint, and the month nav/export links carry studentId=family', async () => {
+test('the Whole Family calendar toggles via the family-wide endpoint, and the export/print/PDF links carry studentId=family', async () => {
   const { parent } = await setupFamilyOfTwo('Family Mode Links Family');
   const res = await request(app)
-    .get('/parent/family-school/attendance?studentId=family&year=2026&month=6')
+    .get('/parent/family-school/attendance?studentId=family&schoolYear=2025-2026')
     .set('Cookie', parent.cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /data-toggle-url="\/parent\/family-school\/attendance\/family\/toggle"/);
-  assert.match(res.text, /href="\?studentId=family&year=2026&month=7"/);
+  assert.match(res.text, /data-fs-attendance-calendar data-student-id="family" data-toggle-url="\/parent\/family-school\/attendance\/family\/toggle"/);
   assert.match(res.text, /href="\/parent\/family-school\/attendance\/export\.csv\?studentId=family"/);
+  assert.match(res.text, /href="\/parent\/family-school\/attendance\/print\?studentId=family&schoolYear=2025-2026"/);
+  assert.match(res.text, /href="\/parent\/family-school\/attendance\/download\.pdf\?studentId=family&schoolYear=2025-2026"/);
 });
 
 test('Export CSV with studentId=family falls back to every family student\'s rows, same as Download CSV', async () => {

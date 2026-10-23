@@ -74,8 +74,12 @@ test('schoolYearOptions always includes 2030-2031 through 2049-2050 (20 school y
 // dropdown and add curriculum button to the same row as the print
 // icons. Shrink to fit." Replaced the old two-flex-group toolbar (which
 // wrapped onto two lines on mobile) with one single roster-btn-row-fit-
-// text row holding every control, and dropped the "School Year" label.
-test('Annual Planner: one single toolbar row has Add Curriculum, the (unlabeled) School Year select, and Export/Print/PDF icons, in that order', async () => {
+// text row holding every control. A further real request ("Filter
+// buttons should have student dropdown choice and school year choice")
+// moved the School Year select (now labeled again, visible inside its
+// own Filter popover same as every other Family School Management
+// page's Filter) ahead of Add Curriculum in that row's own order.
+test('Annual Planner: one single toolbar row has the Filter (Student/School Year), Add Curriculum, and Export/Print/PDF icons, in that order', async () => {
   const familyId = await createFamily('Toolbar Family');
   const parent = await createParent(familyId);
   await db.prepare("INSERT INTO members (name, barcode, member_type, family_id, active) VALUES ('Toolbar Student', 'toolbar-student-barcode', 'student', ?, 1)").run(familyId);
@@ -83,22 +87,25 @@ test('Annual Planner: one single toolbar row has Add Curriculum, the (unlabeled)
   const page = await request(app).get('/parent/family-school/annual-planner').set('Cookie', parent.cookie);
   assert.equal(page.status, 200);
 
-  const toolbarMatch = /<div class="roster-btn-row roster-btn-row-fit-text">[\s\S]*?<\/div>/.exec(page.text);
-  assert.ok(toolbarMatch, 'expected one single toolbar row');
-  const toolbarHtml = toolbarMatch[0];
-  assert.match(toolbarHtml, /\+ Add Curriculum/);
-  assert.match(toolbarHtml, /annual-planner-school-year/);
-  assert.match(toolbarHtml, /aria-label="Export CSV"/);
-  assert.match(toolbarHtml, /aria-label="Print"/);
-  assert.match(toolbarHtml, /aria-label="Download PDF"/);
-  assert.doesNotMatch(toolbarHtml, />School Year</, 'the "School Year" label text is gone - the select carries an aria-label instead');
+  assert.match(page.text, /<div class="roster-btn-row roster-btn-row-fit-text fs-toolbar-row-spaced">/, 'expected one single toolbar row');
+  assert.match(page.text, /<details class="filter-details" data-filter-details>/);
+  assert.match(page.text, /annual-planner-school-year/);
+  assert.match(page.text, />School Year</, 'the School Year select is labeled again, inside the Filter popover');
+  assert.match(page.text, /\+ Add Curriculum/);
+  assert.match(page.text, /aria-label="Export CSV"/);
+  assert.match(page.text, /aria-label="Print"/);
+  assert.match(page.text, /aria-label="Download PDF"/);
 
-  // Add Curriculum, then the year select, then the three icons, all in
-  // that document order inside the one row.
-  const addCurriculumIndex = page.text.indexOf('+ Add Curriculum');
+  // The Filter (holding the year select), then Add Curriculum, then
+  // the three icons, all in that document order inside the one row.
+  const filterIndex = page.text.indexOf('data-filter-details');
   const yearSelectIndex = page.text.indexOf('annual-planner-school-year');
+  const addCurriculumIndex = page.text.indexOf('+ Add Curriculum');
   const exportIconIndex = page.text.indexOf('aria-label="Export CSV"');
-  assert.ok(addCurriculumIndex < yearSelectIndex && yearSelectIndex < exportIconIndex, 'expected Add Curriculum, then the year picker, then the Export/Print/PDF icons');
+  assert.ok(
+    filterIndex < yearSelectIndex && yearSelectIndex < addCurriculumIndex && addCurriculumIndex < exportIconIndex,
+    'expected the Filter (with the year picker inside), then Add Curriculum, then the Export/Print/PDF icons'
+  );
 
   const option2030 = /<option value="2030-2031"[^>]*>2030-2031<\/option>/.exec(page.text);
   assert.ok(option2030, 'expected 2030-2031 as a selectable year option');

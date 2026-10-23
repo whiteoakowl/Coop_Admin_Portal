@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="roster-toolbar no-print">
+      <h1>Annual Calendar</h1>
+    </div>
+
+    <% if (notice) { %><p class="notice-banner"><%= notice %></p><% } %>
+    <% if (error) { %><p class="notice-banner notice-banner-error"><%= error %></p><% } %>
+
+    <%# A real request: "Dropdown menu for each fiscal year created in
+        the system. Can create a calendar for each fiscal year." %>
+    <% if (fiscalYears.length === 0) { %>
+      <p class="roster-empty">No fiscal years yet. Add one under <a href="/main-admin/accounting/categories">Accounting &rarr; Category/Fiscal Year</a>, then come back here to create its calendar.</p>
+    <% } else { %>
+      <form method="GET" action="/main-admin/annual-calendar" class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left no-print">
+        <select name="fiscalYearId" aria-label="Fiscal Year" onchange="this.form.submit()">
+          <% fiscalYears.forEach(function(fy) { %>
+            <option value="<%= fy.id %>" <%= selectedFiscalYearId === fy.id ? 'selected' : '' %>><%= fy.label %></option>
+          <% }); %>
+        </select>
+        <% if (calendar) { %>
+          <a class="icon-btn" href="/main-admin/annual-calendar/print?fiscalYearId=<%= selectedFiscalYearId %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+          <a class="icon-btn" href="/main-admin/annual-calendar/download.pdf?fiscalYearId=<%= selectedFiscalYearId %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+        <% } %>
+      </form>
+
+      <% if (!calendar) { %>
+        <form method="POST" action="/main-admin/annual-calendar/create" class="inline-block-form no-print">
+          <input type="hidden" name="fiscalYearId" value="<%= selectedFiscalYearId %>" />
+          <button type="submit" class="primary-btn">+ Create Calendar for <%= selectedFiscalYear.label %></button>
+        </form>
+      <% } else { %>
+        <%# A real request: "Create key button. Be able to add a label
+            and color for each key item. Key shows on page. Be able to
+            click each key then click on the calendar dates to color/key
+            each one that particular key. Click on a new key and repeat
+            the process." data-annual-calendar-key-bar tracks which key
+            button is currently "active" (public/js/annual-calendar.js) -
+            the calendar grid click handler below reads that to decide
+            which key a date click should apply. %>
+        <div class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left no-print" data-annual-calendar-key-bar>
+          <% keys.forEach(function(k) { %>
+            <button type="button" class="annual-calendar-key-btn" data-annual-calendar-key-btn data-key-id="<%= k.id %>" data-key-label="<%= k.label %>" style="--key-color: <%= k.color %>;" title="Click, then click calendar dates to apply &ldquo;<%= k.label %>&rdquo;">
+              <span class="annual-calendar-key-swatch"></span><%= k.label %>
+            </button>
+          <% }); %>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('annual-calendar-keys-dialog').showModal()">+ Create Key</button>
+        </div>
+        <p class="hint no-print">Click a key above to select it, then click calendar dates to apply that key's color. Click the same key on a date again to clear it.</p>
+
+        <div class="annual-calendar-months-grid" data-annual-calendar-grid data-calendar-id="<%= calendar.id %>" data-toggle-url="/main-admin/annual-calendar/days/toggle">
+          <% months.forEach(function(m) { %>
+            <div class="annual-calendar-month">
+              <h3><%= MONTH_NAMES[m.month - 1] %> <%= m.year %></h3>
+              <table class="fs-attendance-calendar annual-calendar-table">
+                <thead>
+                  <tr><th>Su</th><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th></tr>
+                </thead>
+                <tbody>
+                  <% m.weeks.forEach(function(week) { %>
+                    <tr>
+                      <% week.forEach(function(d) { %>
+                        <% if (!d) { %>
+                          <td class="fs-attendance-day fs-attendance-day-empty"></td>
+                        <% } else {
+                          var keyed = m.keyByDate[d.date];
+                        %>
+                          <td class="fs-attendance-day" data-annual-calendar-day data-date="<%= d.date %>" <%- keyed ? `style="background-color: ${keyed.color};"` : '' %>><%= d.day %></td>
+                        <% } %>
+                      <% }); %>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% }); %>
+        </div>
+
+        <dialog id="annual-calendar-keys-dialog" class="member-picker-dialog">
+          <h3>Keys</h3>
+          <p class="hint">Add a label and color for each key, then close this and click it on the page to start coloring dates with it.</p>
+          <form method="POST" action="/main-admin/annual-calendar/keys" class="stack-form">
+            <input type="hidden" name="calendarId" value="<%= calendar.id %>" />
+            <input type="hidden" name="fiscalYearId" value="<%= selectedFiscalYearId %>" />
+            <div class="member-form-grid">
+              <label>Label
+                <input type="text" name="label" placeholder="e.g. Holiday" required />
+              </label>
+              <label>Color
+                <input type="color" name="color" value="#EE9A4D" />
+              </label>
+            </div>
+            <div class="member-form-footer">
+              <div class="member-form-footer-edit">
+                <button type="submit" class="primary-btn">+ Add Key</button>
+              </div>
+            </div>
+          </form>
+
+          <% if (keys.length > 0) { %>
+            <div class="table-shrink-wrap">
+              <table class="admin-table">
+                <thead><tr><th>Label</th><th>Color</th><th></th></tr></thead>
+                <tbody>
+                  <% keys.forEach(function(k) { %>
+                    <tr>
+                      <td>
+                        <form method="POST" action="/main-admin/annual-calendar/keys/<%= k.id %>/update" class="inline-block-form">
+                          <input type="hidden" name="fiscalYearId" value="<%= selectedFiscalYearId %>" />
+                          <input type="hidden" name="color" value="<%= k.color %>" />
+                          <input type="text" name="label" value="<%= k.label %>" onchange="this.form.submit()" aria-label="Label for <%= k.label %>" />
+                        </form>
+                      </td>
+                      <td>
+                        <form method="POST" action="/main-admin/annual-calendar/keys/<%= k.id %>/update" class="inline-block-form">
+                          <input type="hidden" name="fiscalYearId" value="<%= selectedFiscalYearId %>" />
+                          <input type="hidden" name="label" value="<%= k.label %>" />
+                          <input type="color" name="color" value="<%= k.color %>" onchange="this.form.submit()" aria-label="Color for <%= k.label %>" />
+                        </form>
+                      </td>
+                      <td>
+                        <form method="POST" action="/main-admin/annual-calendar/keys/<%= k.id %>/delete" class="inline-block-form" data-confirm="Delete this key? Dates colored with it will go back to unmarked.">
+                          <input type="hidden" name="fiscalYearId" value="<%= selectedFiscalYearId %>" />
+                          <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                        </form>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+          </div>
+        </dialog>
+      <% } %>
+    <% } %>
+  </main>
+  <script src="/js/annual-calendar.js"></script>
+</body>
+</html>

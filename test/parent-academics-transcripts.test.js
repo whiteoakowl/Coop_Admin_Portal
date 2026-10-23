@@ -170,12 +170,21 @@ test('a missing school year or class name is rejected, and another family cannot
   assert.ok(await db.prepare('SELECT 1 FROM parent_transcript_entries WHERE id = ?').get(entryId), "another family's parent must not be able to touch this entry");
 });
 
-test('the Add Class dialog offers quick-fill options from both co-op classes and family management classes', async () => {
+// A real request: "Add class should have dropdown or year choices.
+// Choose year and semester, then it will have three buttons saying,
+// add co-op class, add family class, add manual class. If choosing
+// co-op class it will then show a list of that students co-op classes
+// for that school year. Choose family class and it will show you the
+// family classes that were assigned to that student to choose from.
+// Manual class allows you to add class name, credits and grade."
+test('the Add Class dialog offers a Year/Semester picker, then Co-op/Family/Manual class choices', async () => {
   const familyId = await createFamily('Transcript Quickfill Family');
   const parent = await createPortalMember({ name: 'Transcript Quickfill Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const student = await createPortalMember({ name: 'Transcript Quickfill Student', familyId, memberType: 'student', roleKey: 'student' });
 
-  const classInfo = await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, 'Co-op Art Class') RETURNING id").get();
+  const { createSemester } = require('../utils/classSchedule');
+  const semester = await createSemester('Fall 2026');
+  const classInfo = await db.prepare("INSERT INTO classes (day, hour_position, class_name, semester_id) VALUES ('monday', 1, 'Co-op Art Class', ?) RETURNING id").get(semester.id);
   await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classInfo.id, student.memberId);
 
   const { createClass, assignClassToStudents } = require('../utils/familySchool');
@@ -184,8 +193,23 @@ test('the Add Class dialog offers quick-fill options from both co-op classes and
 
   const page = await request(app).get('/parent/academics').set('Cookie', parent.cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /Co-op Art Class/);
-  assert.match(page.text, /Family Science Class/);
+  // Year and Semester pickers, then the three mode buttons.
+  assert.match(page.text, /<select name="schoolYear" required>/);
+  assert.match(page.text, /<select data-transcript-semester-select>/);
+  assert.match(page.text, /<option value="\d+">Fall 2026<\/option>/);
+  assert.match(page.text, /data-transcript-mode="coop">Add Co-op Class<\/button>/);
+  assert.match(page.text, /data-transcript-mode="family">Add Family Class<\/button>/);
+  assert.match(page.text, /data-transcript-mode="manual">Add Manual Class<\/button>/);
+  // Family classes assigned to this student render directly into the
+  // Family Class panel's own select.
+  assert.match(page.text, /<select data-transcript-family-select>[\s\S]*?Family Science Class[\s\S]*?<\/select>/);
+  // Co-op classes are scoped per semester (coopClassesBySemester) and
+  // read by public/js/transcript-add-class.js from this embedded JSON
+  // block, keyed by that semester's own id.
+  const coopDataMatch = /<script type="application\/json" data-transcript-coop-data>([^<]*)<\/script>/.exec(page.text);
+  assert.ok(coopDataMatch, 'expected the embedded co-op classes JSON block');
+  const coopClassesBySemester = JSON.parse(coopDataMatch[1]);
+  assert.deepEqual(coopClassesBySemester[semester.id], ['Co-op Art Class']);
 });
 
 test('Print full page view: the transcript print page shows the per-year and cumulative GPA, scoped to one\'s own child', async () => {
@@ -221,4 +245,34 @@ test('Print full page view: the transcript print page shows the per-year and cum
 
   const hijackDownload = await request(app).get(`/parent/academics/transcripts/${student.memberId}/download.pdf`).set('Cookie', otherParent.cookie);
   assert.equal(hijackDownload.status, 404);
+});
+
+// A real request: "Header for pdf and print should be the family
+// school management settings for header/school information." Same
+// shared partials/family-school-print-header.ejs every other Family
+// School Management print page uses.
+test('Print and Download PDF show the family\'s own school name/branding as the header, not the generic fallback', async () => {
+  const familyId = await createFamily('Transcript Header Family');
+  const parent = await createPortalMember({ name: 'Transcript Header Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Transcript Header Student', familyId, memberType: 'student', roleKey: 'student' });
+  const { createTranscriptEntry } = require('../utils/academics');
+  await createTranscriptEntry({ studentId: student.memberId, schoolYear: 'Year 1', className: 'History', creditHours: 1, gradeLetter: 'A', createdByAccountId: null });
+
+  const { saveFamilySchoolSettings } = require('../utils/familySchool');
+  await saveFamilySchoolSettings({ familyId, schoolName: 'Transcript Branding Academy', colorPrimary: '#ff00aa' });
+
+  const printPage = await request(app).get(`/parent/academics/transcripts/${student.memberId}/print`).set('Cookie', parent.cookie);
+  assert.equal(printPage.status, 200);
+  // The site's own <title>/nav brand (always "Sanford Homeschoolers")
+  // is untouched - only the print-header block itself, which this
+  // family's own settings now drive, needs to NOT be the generic
+  // fallback.
+  const printHeaderMatch = /<div class="print-header family-school-print-header">[\s\S]*?<\/div>\s*<\/div>/.exec(printPage.text);
+  assert.ok(printHeaderMatch, 'expected a print-header block');
+  assert.match(printHeaderMatch[0], /Transcript Branding Academy/);
+  assert.doesNotMatch(printHeaderMatch[0], /Sanford Homeschoolers/);
+
+  const pdfRes = await getBuffer(`/parent/academics/transcripts/${student.memberId}/download.pdf`, parent.cookie);
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
 });

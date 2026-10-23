@@ -7,7 +7,6 @@
   <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
     <div class="roster-toolbar no-print">
       <h1>Portfolio</h1>
     </div>
@@ -21,22 +20,37 @@
     <% if (familyStudents.length === 0) { %>
       <p class="roster-empty">No students in your family yet.</p>
     <% } else { %>
-      <form method="GET" action="/parent/family-school/portfolio" class="category-filter no-print">
-        <label for="portfolio-student-select">Student</label>
-        <select id="portfolio-student-select" name="studentId" onchange="this.form.submit()">
-          <% familyStudents.forEach(function(s) { %>
-            <option value="<%= s.id %>" <%= studentId === s.id ? 'selected' : '' %>><%= s.name %></option>
-          <% }); %>
-        </select>
-      </form>
-
-      <div class="roster-btn-row roster-btn-row-fit-text no-print">
-        <a class="icon-btn" href="/parent/family-school/portfolio/print?studentId=<%= studentId %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
-        <a class="icon-btn" href="/parent/family-school/portfolio/download.pdf?studentId=<%= studentId %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+      <%# A real request: "Filter buttons should have student dropdown
+          choice and school year choice." The Student select moves into
+          a Filter popover alongside a new School Year select, same
+          convention every other Family School Management page's own
+          Filter button uses. %>
+      <div class="roster-btn-row roster-btn-row-fit-text fs-toolbar-row-spaced no-print">
+        <details class="filter-details" data-filter-details>
+          <summary class="roster-action-btn">Filter</summary>
+          <form method="GET" action="/parent/family-school/portfolio" class="filter-panel">
+            <label for="portfolio-student-select">Student</label>
+            <select id="portfolio-student-select" name="studentId" onchange="this.form.submit()">
+              <% familyStudents.forEach(function(s) { %>
+                <option value="<%= s.id %>" <%= studentId === s.id ? 'selected' : '' %>><%= s.name %></option>
+              <% }); %>
+            </select>
+            <label for="portfolio-school-year-select">School Year</label>
+            <select id="portfolio-school-year-select" name="schoolYear" onchange="this.form.submit()">
+              <option value="all" <%= schoolYear === 'all' ? 'selected' : '' %>>All Years</option>
+              <% yearOptions.forEach(function(y) { %>
+                <option value="<%= y %>" <%= schoolYear === y ? 'selected' : '' %>><%= y %></option>
+              <% }); %>
+            </select>
+          </form>
+        </details>
+        <a class="icon-btn" href="/parent/family-school/portfolio/print?studentId=<%= studentId %>&schoolYear=<%= schoolYear %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/portfolio/download.pdf?studentId=<%= studentId %>&schoolYear=<%= schoolYear %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
       </div>
 
       <%- include('partials/family-school-portfolio-body', { portfolio }) %>
     <% } %>
   </main>
+  <script src="/js/filter-details-dismiss.js"></script>
 </body>
 </html>

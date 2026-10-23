@@ -211,6 +211,7 @@ const adminCustomFormsRouter = require('./routes/admin-custom-forms');
 // admin at /main-admin/accounting.
 const accountingRouter = require('./routes/accounting');
 const adminAccountingRouter = require('./routes/admin-accounting');
+const mainAdminAnnualCalendarRouter = require('./routes/main-admin-annual-calendar');
 // Item 8: Store at /store (members-only online checkout, wired through
 // the payment abstraction above), admin at /main-admin/store (also
 // records in-person sales, recorded distinctly from an online order).
@@ -495,6 +496,7 @@ app.use('/forms', customFormsRouter);
 app.use('/main-admin/forms', adminCustomFormsRouter);
 app.use('/accounting', accountingRouter);
 app.use('/main-admin/accounting', adminAccountingRouter);
+app.use('/main-admin/annual-calendar', mainAdminAnnualCalendarRouter);
 app.use('/store', storeRouter);
 app.use('/main-admin/store', adminStoreRouter);
 app.use('/newsletter', newsletterRouter);

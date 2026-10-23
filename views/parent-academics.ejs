@@ -20,14 +20,16 @@
         transcript for each student. You can add classes from co-op
         classes or family management classes or manually add an
         entirely new class. Then calculate the GPA per school year and
-        for the entire 4 years. Print full page view of transcript." %>
+        for the entire 4 years. Print full page view of transcript." A
+        later real request: "add class button, print should be an icon
+        and pdf icons should all be on the same row." %>
     <% transcripts.forEach(function(rec) { %>
       <div class="manage-section">
         <div class="grid-box-header">
           <h2><%= rec.child.name %></h2>
           <div class="roster-btn-row no-print">
             <button type="button" class="roster-action-btn" onclick="document.getElementById('add-entry-dialog-<%= rec.child.id %>').showModal()">+ Add Class</button>
-            <a class="btn-secondary" href="/parent/academics/transcripts/<%= rec.child.id %>/print" target="_blank">Print</a>
+            <a class="icon-btn" href="/parent/academics/transcripts/<%= rec.child.id %>/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
             <a class="icon-btn" href="/parent/academics/transcripts/<%= rec.child.id %>/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
           </div>
         </div>
@@ -80,39 +82,69 @@
             feature), so it got none of that class's own row-spacing/
             label-to-input stacking - a bare browser-default inline
             flow instead. %>
-        <form method="POST" action="/parent/academics/transcripts" class="stack-form">
+        <%# A later real request reworked this whole dialog: "Add class
+            should have dropdown or year choices. Choose year and
+            semester, then it will have three buttons saying, add co-op
+            class, add family class, add manual class. If choosing
+            co-op class it will then show a list of that students co-op
+            classes for that school year. Choose family class and it
+            will show you the family classes that were assigned to that
+            student to choose from. Manual class allows you to add
+            class name, credits and grade." public/js/transcript-add-
+            class.js drives the 3-button mode switch and the semester-
+            scoped co-op class list (coopClassesBySemester, keyed by
+            semester id) - whichever path is picked, its chosen class
+            name ends up in the one shared hidden className input the
+            form actually submits, same "quick-fill the real field"
+            idea the old two quick-fill selects already used, just
+            gated behind picking a path first instead of showing all
+            three inputs loose on the page at once. %>
+        <form method="POST" action="/parent/academics/transcripts" class="stack-form" data-transcript-add-form>
           <input type="hidden" name="studentId" value="<%= rec.child.id %>" />
           <div class="class-form-dialog-header">
             <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
             <h3>Add Class to <%= rec.child.name %>&apos;s Transcript</h3>
           </div>
           <label>School Year
-            <input type="text" name="schoolYear" placeholder="e.g. 2024-2025 or 9th Grade" required />
+            <select name="schoolYear" required>
+              <% yearOptions.forEach(function(y) { %><option value="<%= y %>" <%= y === currentSchoolYearValue ? 'selected' : '' %>><%= y %></option><% }); %>
+            </select>
           </label>
-          <%# "Add classes from co-op classes or family management
-              classes or manually add an entirely new class" - these two
-              selects are pure quick-fill convenience for the Class Name
-              field right below; picking one just fills it in, still
-              freely editable (or left alone for a fully manual entry). %>
-          <% if (rec.coopClasses.length > 0) { %>
-            <label>Quick-fill from Co-op Classes
-              <select onchange="this.closest('form').querySelector('input[name=className]').value = this.value;">
-                <option value="">&mdash; choose a co-op class &mdash;</option>
-                <% rec.coopClasses.forEach(function(name) { %><option value="<%= name %>"><%= name %></option><% }); %>
+          <% if (semesters.length > 0) { %>
+            <label>Semester
+              <select data-transcript-semester-select>
+                <option value="">&mdash; choose a semester &mdash;</option>
+                <% semesters.forEach(function(s) { %><option value="<%= s.id %>"><%= s.title %></option><% }); %>
               </select>
             </label>
           <% } %>
+
+          <div class="roster-btn-row" data-transcript-mode-buttons>
+            <button type="button" class="roster-action-btn" data-transcript-mode="coop">Add Co-op Class</button>
+            <% if (rec.familyClasses.length > 0) { %>
+              <button type="button" class="roster-action-btn" data-transcript-mode="family">Add Family Class</button>
+            <% } %>
+            <button type="button" class="roster-action-btn" data-transcript-mode="manual">Add Manual Class</button>
+          </div>
+
+          <label data-transcript-panel="coop" hidden>Co-op Class
+            <select data-transcript-coop-select>
+              <option value="">&mdash; choose a semester first &mdash;</option>
+            </select>
+          </label>
           <% if (rec.familyClasses.length > 0) { %>
-            <label>Quick-fill from Family Classes
-              <select onchange="this.closest('form').querySelector('input[name=className]').value = this.value;">
+            <label data-transcript-panel="family" hidden>Family Class
+              <select data-transcript-family-select>
                 <option value="">&mdash; choose a family class &mdash;</option>
                 <% rec.familyClasses.forEach(function(name) { %><option value="<%= name %>"><%= name %></option><% }); %>
               </select>
             </label>
           <% } %>
-          <label>Class Name
-            <input type="text" name="className" required />
+          <label data-transcript-panel="manual" hidden>Class Name
+            <input type="text" data-transcript-manual-input />
           </label>
+          <input type="hidden" name="className" data-transcript-class-name />
+
           <label>Credit Hours
             <input type="number" name="creditHours" value="1" min="0" step="0.25" />
           </label>
@@ -126,9 +158,11 @@
             <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
             <button type="submit" class="primary-btn">Add Class</button>
           </div>
+          <script type="application/json" data-transcript-coop-data><%- JSON.stringify(rec.coopClassesBySemester).replace(/</g, '\\u003c') %></script>
         </form>
       </dialog>
     <% }); %>
   </main>
+  <script src="/js/transcript-add-class.js"></script>
 </body>
 </html>

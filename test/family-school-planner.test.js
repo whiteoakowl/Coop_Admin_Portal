@@ -108,9 +108,15 @@ test('Annual Planner: organized by student, a parent can add and delete curricul
 
   const page = await request(app).get('/parent/family-school/annual-planner').set('Cookie', parent.cookie);
   assert.equal(page.status, 200);
-  const studentAIndex = page.text.indexOf('Curriculum Student A');
+  // Each student's own name also now appears earlier on the page, in
+  // the new Filter popover's Student dropdown (a real request:
+  // "Filter buttons should have student dropdown choice and school
+  // year choice") - the actual per-student section heading is this
+  // more specific string, so the dropdown's own <option> text doesn't
+  // throw off this ordering check.
+  const studentAIndex = page.text.indexOf('<span class="fs-annual-planner-student-name">Curriculum Student A</span>');
   const curriculumIndex = page.text.indexOf('Saxon Math 5');
-  const studentBIndex = page.text.indexOf('Curriculum Student B');
+  const studentBIndex = page.text.indexOf('<span class="fs-annual-planner-student-name">Curriculum Student B</span>');
   assert.ok(studentAIndex !== -1 && curriculumIndex !== -1 && studentBIndex !== -1, 'both students and the curriculum item must render');
   assert.ok(studentAIndex < curriculumIndex && curriculumIndex < studentBIndex, "the curriculum item must render under student A's own section, before student B's");
   assert.match(page.text, /Saxon/);
@@ -268,6 +274,41 @@ test('Annual Planner: a curriculum item carries a Subject and a School Year, and
   assert.equal(item.school_year, '2026-2027');
 });
 
+// A real request: "Family school management. Filter buttons should
+// have student dropdown choice and school year choice." Annual
+// Planner already had School Year inline with no Filter button and
+// no Student choice - this is the new half of that.
+test('Annual Planner: the Filter popover offers a Student dropdown that narrows the page, export, print, and PDF to one student', async () => {
+  const familyId = await createFamily('Planner Student Filter Family');
+  const parent = await createPortalMember({ name: 'Planner Student Filter Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const studentA = await createPortalMember({ name: 'Planner Filter Student A', familyId, memberType: 'student', roleKey: 'student' });
+  const studentB = await createPortalMember({ name: 'Planner Filter Student B', familyId, memberType: 'student', roleKey: 'student' });
+  const { createCurriculumItem } = require('../utils/familySchool');
+  await createCurriculumItem({ studentId: studentA.memberId, name: 'Student A Curriculum', subject: 'Math', brand: null, level: null, price: 10, schoolYear: '2026-2027', createdByAccountId: null });
+  await createCurriculumItem({ studentId: studentB.memberId, name: 'Student B Curriculum', subject: 'Science', brand: null, level: null, price: 20, schoolYear: '2026-2027', createdByAccountId: null });
+
+  const allPage = await request(app).get('/parent/family-school/annual-planner').set('Cookie', parent.cookie);
+  assert.equal(allPage.status, 200);
+  assert.match(allPage.text, /<select id="annual-planner-student-select" name="studentId" onchange="this\.form\.submit\(\)">/);
+  assert.match(allPage.text, /<option value="all" selected>All Students<\/option>/);
+  assert.match(allPage.text, /Student A Curriculum/);
+  assert.match(allPage.text, /Student B Curriculum/);
+
+  const filteredPage = await request(app).get(`/parent/family-school/annual-planner?studentId=${studentA.memberId}`).set('Cookie', parent.cookie);
+  assert.match(filteredPage.text, new RegExp(`<option value="${studentA.memberId}" selected>`));
+  assert.match(filteredPage.text, /Student A Curriculum/);
+  assert.doesNotMatch(filteredPage.text, /Student B Curriculum/);
+
+  const filteredExport = await request(app).get(`/parent/family-school/annual-planner/export.csv?studentId=${studentA.memberId}`).set('Cookie', parent.cookie);
+  assert.match(filteredExport.text, /Student A Curriculum/);
+  assert.doesNotMatch(filteredExport.text, /Student B Curriculum/);
+
+  const filteredPrint = await request(app).get(`/parent/family-school/annual-planner/print?studentId=${studentA.memberId}`).set('Cookie', parent.cookie);
+  assert.equal(filteredPrint.status, 200);
+  assert.match(filteredPrint.text, /Student A Curriculum/);
+  assert.doesNotMatch(filteredPrint.text, /Student B Curriculum/);
+});
+
 // A real request: "add a print, pdf and export icons."
 test('Annual Planner: Export CSV, Print preview, and Download PDF all respect the selected school year', async () => {
   const familyId = await createFamily('Planner Buttons Family');
@@ -277,9 +318,9 @@ test('Annual Planner: Export CSV, Print preview, and Download PDF all respect th
   await createCurriculumItem({ studentId: student.memberId, name: 'Button Curriculum', subject: 'Science', brand: null, level: null, price: 20, schoolYear: '2026-2027', createdByAccountId: null });
 
   const liveRes = await request(app).get('/parent/family-school/annual-planner').set('Cookie', parent.cookie);
-  assert.match(liveRes.text, /href="\/parent\/family-school\/annual-planner\/export\.csv\?schoolYear=/);
-  assert.match(liveRes.text, /href="\/parent\/family-school\/annual-planner\/print\?schoolYear=[^"]*" target="_blank" aria-label="Print"/);
-  assert.match(liveRes.text, /href="\/parent\/family-school\/annual-planner\/download\.pdf\?schoolYear=/);
+  assert.match(liveRes.text, /href="\/parent\/family-school\/annual-planner\/export\.csv\?studentId=all&schoolYear=/);
+  assert.match(liveRes.text, /href="\/parent\/family-school\/annual-planner\/print\?studentId=all&schoolYear=[^"]*" target="_blank" aria-label="Print"/);
+  assert.match(liveRes.text, /href="\/parent\/family-school\/annual-planner\/download\.pdf\?studentId=all&schoolYear=/);
 
   const csvRes = await request(app).get('/parent/family-school/annual-planner/export.csv?schoolYear=2026-2027').set('Cookie', parent.cookie);
   assert.equal(csvRes.status, 200);
@@ -463,6 +504,9 @@ test('Weekly Planner: the week title shows with an Edit icon (no bare trash butt
   assert.doesNotMatch(page.text, /aria-label="Delete week"/, 'the old bare trash button should be gone');
   assert.match(page.text, /aria-label="Edit week"/);
   assert.match(page.text, /id="edit-week-dialog"/);
+  // A real request: "Weekly planner, week title and edit icon should
+  // be in a blue button looking box to the left."
+  assert.match(page.text, /<div class="roster-btn-row roster-btn-row-fit-text no-print fs-weekly-plan-row-spaced fs-weekly-plan-week-title-row">\s*<span class="fs-weekly-plan-week-title">Week 1<\/span>/);
   // Pre-filled straight from the week's own current data.
   assert.match(page.text, /name="title" value="Week 1"/);
   assert.match(page.text, /name="date" value="2026-11-02"/);

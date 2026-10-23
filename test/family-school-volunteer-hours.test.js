@@ -200,7 +200,7 @@ test('Volunteer Hours: one toolbar row has Filter, Export/Print/PDF icons, and A
   assert.equal(page.status, 200);
   assert.match(page.text, /<script src="\/js\/filter-details-dismiss\.js"><\/script>/);
 
-  const toolbarMatch = /<div class="roster-btn-row roster-btn-row-fit-text no-print">[\s\S]*?<\/div>/.exec(page.text);
+  const toolbarMatch = /<div class="roster-btn-row roster-btn-row-fit-text fs-toolbar-row-spaced no-print">[\s\S]*?<\/div>/.exec(page.text);
   assert.ok(toolbarMatch, 'expected one single toolbar row');
   const toolbarHtml = toolbarMatch[0];
   assert.match(toolbarHtml, /<details class="filter-details" data-filter-details>/);
@@ -213,6 +213,51 @@ test('Volunteer Hours: one toolbar row has Filter, Export/Print/PDF icons, and A
   const exportIndex = page.text.indexOf('aria-label="Export CSV"');
   const addHoursIndex = page.text.indexOf('+ Add Hours');
   assert.ok(filterIndex < exportIndex && exportIndex < addHoursIndex, 'expected Filter, then the icons, then Add Hours');
+});
+
+// A real request: "Family school management. Filter buttons should
+// have student dropdown choice and school year choice." Same shape
+// as the Daily Learning Log / Grades school-year filter tests,
+// applied here to hour_date.
+test('Volunteer Hours: the Filter popover offers a School Year dropdown that filters the log, total, export, and PDF', async () => {
+  const familyId = await createFamily('Volunteer Hours School Year Family');
+  const parent = await createPortalMember({ name: 'Volunteer Year Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Volunteer Year Student', familyId, memberType: 'student', roleKey: 'student' });
+
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/volunteer-hours');
+  await request(app)
+    .post('/parent/family-school/volunteer-hours')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: String(student.memberId), hourDate: '2024-10-01', hours: '2', activityDescription: 'Fall bake sale', _csrf: csrf });
+  await request(app)
+    .post('/parent/family-school/volunteer-hours')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: String(student.memberId), hourDate: '2026-04-02', hours: '3', activityDescription: 'Spring car wash', _csrf: csrf });
+
+  const allPage = await request(app).get(`/parent/family-school/volunteer-hours?studentId=${student.memberId}`).set('Cookie', parent.cookie);
+  assert.equal(allPage.status, 200);
+  assert.match(allPage.text, /<select id="volunteer-hours-school-year-select" name="schoolYear" onchange="this\.form\.submit\(\)">/);
+  assert.match(allPage.text, /<option value="all" selected>All Years<\/option>/);
+  assert.match(allPage.text, /Fall bake sale/);
+  assert.match(allPage.text, /Spring car wash/);
+  assert.match(allPage.text, /Total Hours: 5/);
+
+  const filteredPage = await request(app).get(`/parent/family-school/volunteer-hours?studentId=${student.memberId}&schoolYear=2024-2025`).set('Cookie', parent.cookie);
+  assert.match(filteredPage.text, /<option value="2024-2025" selected>2024-2025<\/option>/);
+  assert.match(filteredPage.text, /Fall bake sale/);
+  assert.doesNotMatch(filteredPage.text, /Spring car wash/);
+  assert.match(filteredPage.text, /Total Hours: 2/);
+
+  const filteredExport = await request(app).get(`/parent/family-school/volunteer-hours/export.csv?studentId=${student.memberId}&schoolYear=2024-2025`).set('Cookie', parent.cookie);
+  assert.match(filteredExport.text, /Fall bake sale/);
+  assert.doesNotMatch(filteredExport.text, /Spring car wash/);
+
+  const filteredPrint = await request(app).get(`/parent/family-school/volunteer-hours/print?studentId=${student.memberId}&schoolYear=2024-2025`).set('Cookie', parent.cookie);
+  assert.equal(filteredPrint.status, 200);
+  assert.match(filteredPrint.text, /Fall bake sale/);
+  assert.doesNotMatch(filteredPrint.text, /Spring car wash/);
 });
 
 test('Volunteer Hours: Print preview and Download PDF both render, scoped to one student vs. the whole family', async () => {

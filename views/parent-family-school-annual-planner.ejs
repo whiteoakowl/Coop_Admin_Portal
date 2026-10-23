@@ -7,7 +7,6 @@
   <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
     <div class="roster-toolbar no-print">
       <h1>Annual Planner</h1>
     </div>
@@ -17,23 +16,39 @@
         icons. Shrink to fit." One single roster-btn-row-fit-text row
         (not two separate flex groups under a space-between
         .roster-toolbar, which wrapped onto two lines on mobile) - every
-        control sized to its own content instead. %>
+        control sized to its own content instead. A further real
+        request: "Filter buttons should have student dropdown choice
+        and school year choice." - School Year moves into a Filter
+        popover alongside a new Student choice (default "All
+        Students", same as today; picking one narrows the page to just
+        their section). %>
     <div class="roster-toolbar no-print">
-      <div class="roster-btn-row roster-btn-row-fit-text">
+      <div class="roster-btn-row roster-btn-row-fit-text fs-toolbar-row-spaced">
         <% if (familyStudents.length > 0) { %>
+          <details class="filter-details" data-filter-details>
+            <summary class="roster-action-btn">Filter</summary>
+            <form method="GET" action="/parent/family-school/annual-planner" class="filter-panel">
+              <label for="annual-planner-student-select">Student</label>
+              <select id="annual-planner-student-select" name="studentId" onchange="this.form.submit()">
+                <option value="all" <%= selectedStudentId === 'all' ? 'selected' : '' %>>All Students</option>
+                <% familyStudents.forEach(function(s) { %>
+                  <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
+                <% }); %>
+              </select>
+              <label for="annual-planner-school-year">School Year</label>
+              <select id="annual-planner-school-year" name="schoolYear" onchange="this.form.submit()">
+                <option value="all" <%= schoolYear === 'all' ? 'selected' : '' %>>All Years</option>
+                <% yearOptions.forEach(function(y) { %>
+                  <option value="<%= y %>" <%= schoolYear === y ? 'selected' : '' %>><%= y %></option>
+                <% }); %>
+              </select>
+            </form>
+          </details>
           <button type="button" class="roster-action-btn fs-annual-planner-add-btn" onclick="document.getElementById('add-curriculum-dialog').showModal()">+ Add Curriculum</button>
         <% } %>
-        <form method="GET" action="/parent/family-school/annual-planner" class="inline-block-form">
-          <select id="annual-planner-school-year" name="schoolYear" onchange="this.form.submit()" aria-label="School Year">
-            <option value="all" <%= schoolYear === 'all' ? 'selected' : '' %>>All Years</option>
-            <% yearOptions.forEach(function(y) { %>
-              <option value="<%= y %>" <%= schoolYear === y ? 'selected' : '' %>><%= y %></option>
-            <% }); %>
-          </select>
-        </form>
-        <a class="icon-btn" href="/parent/family-school/annual-planner/export.csv?schoolYear=<%= schoolYear %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-        <a class="icon-btn" href="/parent/family-school/annual-planner/print?schoolYear=<%= schoolYear %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
-        <a class="icon-btn" href="/parent/family-school/annual-planner/download.pdf?schoolYear=<%= schoolYear %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/annual-planner/export.csv?studentId=<%= selectedStudentId %>&schoolYear=<%= schoolYear %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/annual-planner/print?studentId=<%= selectedStudentId %>&schoolYear=<%= schoolYear %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/annual-planner/download.pdf?studentId=<%= selectedStudentId %>&schoolYear=<%= schoolYear %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
       </div>
     </div>
 
@@ -47,7 +62,7 @@
     <% if (familyStudents.length === 0) { %>
       <p class="roster-empty">No students in your family yet.</p>
     <% } else { %>
-      <% familyStudents.forEach(function(s) { %>
+      <% displayedStudents.forEach(function(s) { %>
         <% var items = curriculumByStudent[s.id]; %>
         <% var studentTotal = items.reduce(function(sum, item) { return sum + (item.price != null ? Number(item.price) : 0); }, 0); %>
         <div class="manage-section" data-curriculum-section>
@@ -193,6 +208,7 @@
     </dialog>
   <% } %>
 
+  <script src="/js/filter-details-dismiss.js"></script>
   <script src="/js/annual-planner-curriculum.js"></script>
 </body>
 </html>

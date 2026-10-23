@@ -50,6 +50,7 @@ const { familyOf, byLastName } = require('../utils/members');
 const { libraryActivityForMemberIds, allItems: allLibraryItems, allLibraryTypes } = require('../utils/library');
 const resourceLinks = require('../utils/resourceLinks');
 const trainingModule = require('../utils/training');
+const annualCalendar = require('../utils/annualCalendar');
 const {
   assignmentsForStudentInClass,
   diplomaForStudent,
@@ -70,11 +71,17 @@ const {
   getTranscriptEntry,
   updateTranscriptEntry,
   deleteTranscriptEntry,
-  coopClassNamesForStudent,
+  coopClassesForStudentAndSemester,
   DIPLOMA_TEMPLATES,
 } = require('../utils/academics');
 const { renderViewToPdf } = require('../utils/pdfRender');
-const { classesForStudent: familySchoolClassesForStudent } = require('../utils/familySchool');
+const {
+  classesForStudent: familySchoolClassesForStudent,
+  getFamilySchoolSettings,
+  familySettingsForPdf,
+  schoolYearOptions,
+  currentSchoolYear,
+} = require('../utils/familySchool');
 const notifications = require('../utils/notifications');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('../utils/sections');
 const { registerForClass, unregisterFromClass, joinClassAsStaff, leaveClassAsStaff } = require('../utils/classRegistration');
@@ -1208,10 +1215,27 @@ function sendPdf(res, filename, pdfBuffer) {
 // this - transcriptForStudent/student_academic_history above are still
 // used elsewhere (generateTranscriptsForEndedClasses's own backfill),
 // just no longer this page's own data source.
+// A later real request reworked the Add Class dialog: "Add class
+// should have dropdown or year choices. Choose year and semester,
+// then it will have three buttons saying, add co-op class, add family
+// class, add manual class. If choosing co-op class it will then show
+// a list of that students co-op classes for that school year. Choose
+// family class and it will show you the family classes that were
+// assigned to that student to choose from. Manual class allows you to
+// add class name, credits and grade." Semester only ever narrows
+// WHICH co-op classes the dialog offers to pick from - it isn't
+// itself stored on the saved transcript entry (parent_transcript_
+// entries has no semester column of its own, only school_year).
 router.get('/academics', async (req, res) => {
   const children = await childrenForAccount(req.portalAccount);
+  const semesters = await listSemesters();
+  const yearOptions = schoolYearOptions(currentSchoolYear());
   const transcripts = [];
   for (const child of children) {
+    const coopClassesBySemester = {};
+    for (const semester of semesters) {
+      coopClassesBySemester[semester.id] = await coopClassesForStudentAndSemester(child.id, semester.id);
+    }
     transcripts.push({
       child,
       builder: await transcriptBuilderForStudent(child.id),
@@ -1219,13 +1243,16 @@ router.get('/academics', async (req, res) => {
       // or manually add" - precomputed per child here (each list is
       // small - a family's own classes) rather than a second fetch()
       // round trip from the Add Entry dialog.
-      coopClasses: await coopClassNamesForStudent(child.id),
+      coopClassesBySemester,
       familyClasses: (await familySchoolClassesForStudent(child.id)).map((c) => c.class_name),
     });
   }
   res.render('parent-academics', {
     title: 'Transcripts',
     transcripts,
+    semesters,
+    yearOptions,
+    currentSchoolYearValue: currentSchoolYear(),
     gradeLetters: TRANSCRIPT_GRADE_LETTERS,
     notice: req.query.notice || null,
     error: req.query.error || null,
@@ -1279,6 +1306,18 @@ router.post('/academics/transcripts/:id/delete', async (req, res) => {
   res.redirect('/parent/academics?notice=' + encodeURIComponent('Entry removed.'));
 });
 
+// A real request: "Header for pdf and print should be the family
+// school management settings for header/school information." Same
+// school name/logo/colors header every other Family School Management
+// print page shows (partials/family-school-print-header.ejs) - this
+// router has no equivalent of routes/parent-family-school.js's own
+// router.use() that stashes it on res.locals, so it's fetched fresh
+// here off this account's own family_id.
+async function familySettingsForAccount(account) {
+  const member = await memberForAccount(account.id);
+  return getFamilySchoolSettings(member ? member.family_id : null);
+}
+
 // "Print full page view of transcript" - a dedicated full-page print
 // route, same no-nav/no-chrome/window.print() shape the Diploma print
 // page below already uses.
@@ -1287,7 +1326,12 @@ router.get('/academics/transcripts/:studentId/print', async (req, res) => {
   if (!(await requireOwnChild(req, studentId))) return res.status(404).send('Not found');
   const children = await childrenForAccount(req.portalAccount);
   const child = children.find((c) => c.id === studentId);
-  res.render('parent-academics-transcript-print', { title: 'Transcript', member: child, builder: await transcriptBuilderForStudent(studentId) });
+  res.render('parent-academics-transcript-print', {
+    title: 'Transcript',
+    member: child,
+    builder: await transcriptBuilderForStudent(studentId),
+    familySettings: await familySettingsForAccount(req.portalAccount),
+  });
 });
 
 // A real request: "the download should be a pdf of exactly how it
@@ -1299,7 +1343,12 @@ router.get('/academics/transcripts/:studentId/download.pdf', async (req, res) =>
   if (!(await requireOwnChild(req, studentId))) return res.status(404).send('Not found');
   const children = await childrenForAccount(req.portalAccount);
   const child = children.find((c) => c.id === studentId);
-  const pdf = await renderViewToPdf(req, 'parent-academics-transcript-print', { title: 'Transcript', member: child, builder: await transcriptBuilderForStudent(studentId) });
+  const pdf = await renderViewToPdf(req, 'parent-academics-transcript-print', {
+    title: 'Transcript',
+    member: child,
+    builder: await transcriptBuilderForStudent(studentId),
+    familySettings: await familySettingsForPdf(await familySettingsForAccount(req.portalAccount)),
+  });
   sendPdf(res, `${child.name.replace(/[^a-z0-9]+/gi, '-')}-transcript.pdf`, pdf);
 });
 
@@ -1561,6 +1610,30 @@ router.post('/reading/goal', async (req, res) => {
   const result = await reading.setWeeklyGoal(member.id, hours);
   if (!result.ok) return res.redirect('/parent/reading?error=' + encodeURIComponent(result.error));
   res.redirect('/parent/reading?notice=' + encodeURIComponent(`Weekly goal updated to ${result.hours} hours.`));
+});
+
+// A real request: "This will also be a quick links on parent portal" -
+// a read-only view of whichever fiscal-year calendar Main Admin built
+// (routes/main-admin-annual-calendar.js). No click-to-color here, just
+// the same 12-month grid + key legend a parent can look at.
+router.get('/annual-calendar', async (req, res) => {
+  const fiscalYears = (await annualCalendar.listFiscalYears()).map((fy) => ({ ...fy, label: annualCalendar.fiscalYearLabel(fy) }));
+  const selectedFiscalYearId = req.query.fiscalYearId ? parseInt(req.query.fiscalYearId, 10) : fiscalYears[0] ? fiscalYears[0].id : null;
+  const selectedFiscalYear = fiscalYears.find((fy) => fy.id === selectedFiscalYearId) || null;
+  const calendar = selectedFiscalYear ? await annualCalendar.calendarForFiscalYear(selectedFiscalYear.id) : null;
+  const keys = calendar ? await annualCalendar.keysForCalendar(calendar.id) : [];
+  const keyByDate = calendar ? await annualCalendar.keyByDateForCalendar(calendar.id) : {};
+  const months = selectedFiscalYear ? annualCalendar.monthsForFiscalYear(selectedFiscalYear, keyByDate) : [];
+  res.render('parent-annual-calendar', {
+    title: 'Annual Calendar',
+    MONTH_NAMES: annualCalendar.MONTH_NAMES,
+    fiscalYears,
+    selectedFiscalYearId,
+    selectedFiscalYear,
+    calendar,
+    keys,
+    months,
+  });
 });
 
 module.exports = router;

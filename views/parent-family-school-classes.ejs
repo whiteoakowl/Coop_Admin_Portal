@@ -7,10 +7,28 @@
   <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
     <div class="roster-toolbar no-print">
       <h1>Family Classes</h1>
       <div class="roster-btn-row">
+        <%# A real request: "Filter buttons should have student
+            dropdown choice and school year choice." Classes have no
+            school-year field of their own (they're ongoing, not tied
+            to a term) - just a Student choice here, default "All
+            Students". %>
+        <% if (familyStudents.length > 0) { %>
+          <details class="filter-details" data-filter-details>
+            <summary class="roster-action-btn">Filter</summary>
+            <form method="GET" action="/parent/family-school/classes" class="filter-panel">
+              <label for="classes-student-select">Student</label>
+              <select id="classes-student-select" name="studentId" onchange="this.form.submit()">
+                <option value="all" <%= selectedStudentId === 'all' ? 'selected' : '' %>>All Students</option>
+                <% familyStudents.forEach(function(s) { %>
+                  <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
+                <% }); %>
+              </select>
+            </form>
+          </details>
+        <% } %>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog').showModal()">+ New Class</button>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-preplanned-class-dialog').showModal()">+ Preplanned Class</button>
       </div>
@@ -100,5 +118,6 @@
       </div>
     </form>
   </dialog>
+  <script src="/js/filter-details-dismiss.js"></script>
 </body>
 </html>

@@ -3504,10 +3504,38 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 
 /* "Adequate space between buttons and features on page and popups." */
 .fs-weekly-plan-row-spaced { margin-bottom: 1rem; }
+/* A real request: "Family school management pages, the buttons and
+   icons should be well balanced and spaced between the page title and
+   tables." .roster-btn-row/.roster-btn-row-fit-text carry no margin of
+   their own by design (most of their other callers are a single row
+   with nothing stacked directly below), so the Filter/icons row most
+   Family School Management pages place right above their own table
+   had a generous 1.25rem above it (from .roster-toolbar's own h1
+   wrapper) but 0 below - the same imbalance the Accounting page's own
+   .accounting-list-toolbar/.accounting-accounts-toolbar-2 fix already
+   addressed for its own toolbar rows. */
+.fs-toolbar-row-spaced { margin-bottom: 0.75rem; }
 /* A real request: "a label that says the week title with an edit icon
    on it." - the week's own title, next to its new Edit icon button
    (styles.css's own .icon-btn already sizes that part). */
 .fs-weekly-plan-week-title { font-weight: 700; font-size: 1.05rem; }
+/* A later real request: "Weekly planner, week title and edit icon
+   should be in a blue button looking box to the left." Two classes
+   (beating the plain .roster-btn-row's own display:flex, which would
+   otherwise stretch this row - and its new background - the full
+   width of the page) so the box shrinks to fit just the title+icon,
+   same var(--btn-blue) fill .btn-secondary already uses elsewhere. */
+.roster-btn-row.fs-weekly-plan-week-title-row {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  background: var(--btn-blue);
+  border-radius: var(--control-radius);
+  padding: 0.4rem 0.75rem;
+}
+.fs-weekly-plan-week-title-row .fs-weekly-plan-week-title { color: #fff; }
+.fs-weekly-plan-week-title-row .icon-btn { border-color: rgba(255, 255, 255, 0.6); color: #fff; }
+.fs-weekly-plan-week-title-row .icon-btn:hover { background: rgba(255, 255, 255, 0.18); border-color: #fff; color: #fff; }
 
 /* "Each day should be stacked vertically for easier view on mobile.
    Everything is currently overlapping such as text, buttons etc." The
@@ -10227,6 +10255,24 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
   .admin-main:has(.family-school-print-header) {
     padding-top: 1in;
   }
+  /* A real bug report: "the 2nd and 3rd pages print out all over the
+     header" - padding-top on a box that spans several PHYSICAL pages
+     only reserves that space on the box's own first page (CSS
+     fragmentation's default box-decoration-break: slice - every later
+     page of that same continuous box gets none of it), so the
+     fixed-position header above was only ever being cleared on page 1;
+     every family student past the first (each one forced onto its own
+     fresh page by .fs-print-family-section's own page-break-after)
+     started flush against the physical page's top edge, directly under
+     the repeating header. Each later section getting this SAME padding
+     on itself (not just the shared outer container) reserves the
+     header's own space again at the top of ITS own page too, since
+     each one really is the first thing on its own page by design. The
+     first section is excluded - it already benefits from admin-main's
+     own first-fragment padding above and would otherwise double it. */
+  .admin-main:has(.family-school-print-header) .fs-print-family-section:not(:first-child) {
+    padding-top: 1in;
+  }
 
   /* Data-bearing text inputs read as plain values, not editable boxes.
      team-info-title/-desc-input already render border-less by default
@@ -14357,9 +14403,11 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .fs-attendance-print-month:not(:first-child) { margin-top: 2rem; }
 .fs-attendance-print-month h3 { margin: 0 0 0.5rem; }
 @media print {
+  /* A later real request: "it should be 3 columns of 4 months evenly
+     balanced on one page" - 12 months split evenly 3x4 (was 4x3). */
   .fs-attendance-print-months-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 0.3rem;
   }
   .fs-attendance-print-month { margin-top: 0 !important; }
@@ -14368,6 +14416,48 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
   .fs-attendance-print-month .fs-attendance-calendar th { font-size: 0.45rem; padding: 0.05rem; }
   .fs-attendance-print-month .fs-attendance-day { padding: 0.12rem 0.05rem; font-size: 0.5rem; font-weight: 500; }
 }
+
+/* Main Admin Annual Calendar - a real request: "Mobile and desktop view
+   should show the full 12 month calendar, shrink to fit." Unlike Family
+   Attendance's own live view (one month at a time, see
+   .fs-attendance-calendar above), this feature shows all 12 months at
+   once on screen too, so this compact grid applies unconditionally, not
+   just under @media print. */
+.annual-calendar-months-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+.annual-calendar-month h3 { margin: 0 0 0.3rem; font-size: 0.8rem; text-align: center; }
+.annual-calendar-table { max-width: none; margin-top: 0; }
+.annual-calendar-table th { font-size: 0.55rem; padding: 0.1rem; }
+.annual-calendar-table .fs-attendance-day { padding: 0.2rem 0.1rem; font-size: 0.6rem; font-weight: 500; cursor: pointer; }
+.annual-calendar-table .fs-attendance-day-empty { cursor: default; }
+@media (max-width: 900px) {
+  .annual-calendar-months-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+  .annual-calendar-table th { font-size: 0.45rem; padding: 0.05rem; }
+  .annual-calendar-table .fs-attendance-day { padding: 0.12rem 0.05rem; font-size: 0.5rem; }
+}
+
+/* Key bar - a plain colored-swatch toggle button per key (utils/
+   annualCalendar.js), one active at a time (public/js/annual-
+   calendar.js). --key-color is set inline per-button since keys are
+   admin-created with arbitrary colors. */
+.annual-calendar-key-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.annual-calendar-key-btn.active { border-color: var(--key-color); box-shadow: 0 0 0 2px var(--key-color); font-weight: 600; }
+.annual-calendar-key-swatch { width: 0.9rem; height: 0.9rem; border-radius: 50%; background: var(--key-color); display: inline-block; }
+.annual-calendar-key-legend-pill { color: #1a1a1a; }
 
 /* A real request: "Present and absent keys should be to the left, not
    centered and just under the title... Move this row to the left.
@@ -14379,8 +14469,6 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    Present/Absent legend and the month navigation below it) stay left-
    aligned at every width instead of only on desktop. */
 .roster-btn-row-fit-text.fs-attendance-row-left { justify-content: flex-start; }
-.fs-attendance-nav-row { align-items: center; }
-.fs-attendance-nav-row select { width: auto; }
 
 /* A later real request: "filter button should be dropdown to choose a
    student... Shrink this to fit neatly next to the icons on the same
@@ -14393,6 +14481,14 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    isn't a fit-to-text icon/select, so it's the one that should absorb
    the row's own leftover space instead of spreading evenly). */
 .fs-attendance-legend-row { display: flex; gap: 0.35rem; margin-left: auto; }
+/* A real request: "Family school management pages, the buttons and
+   icons should be well balanced and spaced between the page title and
+   tables." .roster-btn-row carries no margin of its own by design
+   (most of its other callers are a single row with nothing stacked
+   directly below) - the Attendance toolbar row now sits with its own
+   gap before the 12-month grid, same shape as .fs-toolbar-row-spaced's
+   own comment below. */
+.fs-attendance-toolbar-row { margin-bottom: 0.75rem; }
 @media (max-width: 640px) {
   .fs-attendance-toolbar-row #attendance-student-select {
     font-size: 0.72rem;

@@ -125,6 +125,50 @@ test('Portfolio summarizes grades/GPA, attendance, volunteer hours, curriculum, 
   assert.match(print.text, /Saxon Math 5/);
 });
 
+// A real request: "Family school management. Filter buttons should
+// have student dropdown choice and school year choice." Portfolio's
+// own School Year select narrows GPA (assignment due_date), present
+// days (attendance_date), and curriculum (already year-tagged) to
+// one Aug-Jul span.
+test('Portfolio: the Filter popover offers a School Year dropdown that narrows GPA, attendance, and curriculum to that year', async () => {
+  const familyId = await createFamily('Portfolio School Year Family');
+  const parent = await createPortalMember({ name: 'Portfolio Year Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Portfolio Year Student', familyId, memberType: 'student', roleKey: 'student' });
+
+  const classId = await createClass({ familyId, className: 'Portfolio Year Class', description: null, createdByAccountId: null });
+  await assignClassToStudents(classId, [student.memberId]);
+  const lessonId = await createLesson({ classId, title: 'Lesson', description: null, createdByAccountId: null });
+  const fallItemId = await createContentItem({ lessonId, type: 'assignment_submission', title: 'Fall Quiz', pointsPossible: 10, dueDate: '2024-10-01' });
+  const springItemId = await createContentItem({ lessonId, type: 'assignment_submission', title: 'Spring Quiz', pointsPossible: 10, dueDate: '2026-04-02' });
+  await submitAssignment({ contentItemId: fallItemId, studentId: student.memberId, fileUrl: 'key', fileName: 'fall.pdf' });
+  await submitAssignment({ contentItemId: springItemId, studentId: student.memberId, fileUrl: 'key', fileName: 'spring.pdf' });
+  const csrf = await request(app).get('/parent/family-school').set('Cookie', parent.cookie).then((r) => /name="csrf-token" content="([^"]*)"/.exec(r.text)[1]);
+  await request(app).post(`/parent/family-school/grades/${fallItemId}/${student.memberId}`).set('Cookie', parent.cookie).type('form').send({ pointsEarned: '10', gradeLetter: '', feedback: '', _csrf: csrf });
+  await request(app).post(`/parent/family-school/grades/${springItemId}/${student.memberId}`).set('Cookie', parent.cookie).type('form').send({ pointsEarned: '0', gradeLetter: '', feedback: '', _csrf: csrf });
+
+  await toggleAttendance(student.memberId, '2024-10-05');
+  await toggleAttendance(student.memberId, '2026-04-05');
+
+  await createCurriculumItem({ studentId: student.memberId, name: 'Fall Curriculum', subject: 'Math', brand: null, level: null, price: 10, schoolYear: '2024-2025', createdByAccountId: parent.accountId });
+  await createCurriculumItem({ studentId: student.memberId, name: 'Spring Curriculum', subject: 'Science', brand: null, level: null, price: 10, schoolYear: '2026-2027', createdByAccountId: parent.accountId });
+
+  const allYears = await request(app).get(`/parent/family-school/portfolio?studentId=${student.memberId}`).set('Cookie', parent.cookie);
+  assert.equal(allYears.status, 200);
+  assert.match(allYears.text, /<select id="portfolio-school-year-select" name="schoolYear" onchange="this\.form\.submit\(\)">/);
+  assert.match(allYears.text, /<option value="all" selected>All Years<\/option>/);
+  assert.match(allYears.text, /2\/180/, '10/10 + 0/10 graded, but both present days count with no year filter');
+  assert.match(allYears.text, /Fall Curriculum/);
+  assert.match(allYears.text, /Spring Curriculum/);
+
+  const filtered = await request(app).get(`/parent/family-school/portfolio?studentId=${student.memberId}&schoolYear=2024-2025`).set('Cookie', parent.cookie);
+  assert.equal(filtered.status, 200);
+  assert.match(filtered.text, /<option value="2024-2025" selected>2024-2025<\/option>/);
+  assert.match(filtered.text, /4\.00/, 'only the Fall Quiz (10\\/10 = 100%) counts within 2024-2025, an A/4.00 GPA');
+  assert.match(filtered.text, /1\/180/, 'only the 2024-10-05 present day falls within 2024-2025');
+  assert.match(filtered.text, /Fall Curriculum/);
+  assert.doesNotMatch(filtered.text, /Spring Curriculum/);
+});
+
 test('a parent from a different family cannot load another family\'s student portfolio', async () => {
   const familyId = await createFamily('Portfolio Family Owner');
   const owner = await createPortalMember({ name: 'Portfolio Owner Parent', familyId, memberType: 'parent', roleKey: 'parent' });

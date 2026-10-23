@@ -84,10 +84,10 @@ test('Family Attendance: Print links to a dedicated preview page, and Download i
   const { parent, student } = await setupFamily();
 
   const liveRes = await request(app).get(`/parent/family-school/attendance?studentId=${student.memberId}`).set('Cookie', parent.cookie);
-  assert.match(liveRes.text, /href="\/parent\/family-school\/attendance\/print\?studentId=\d+&year=\d+&month=\d+" target="_blank" aria-label="Print"/);
-  assert.match(liveRes.text, /href="\/parent\/family-school\/attendance\/download\.pdf" aria-label="Download PDF"/);
+  assert.match(liveRes.text, /href="\/parent\/family-school\/attendance\/print\?studentId=\d+&schoolYear=\d{4}-\d{4}" target="_blank" aria-label="Print"/);
+  assert.match(liveRes.text, /href="\/parent\/family-school\/attendance\/download\.pdf\?studentId=\d+&schoolYear=\d{4}-\d{4}" aria-label="Download PDF"/);
 
-  const previewRes = await request(app).get(`/parent/family-school/attendance/print?studentId=${student.memberId}&year=2026&month=3`).set('Cookie', parent.cookie);
+  const previewRes = await request(app).get(`/parent/family-school/attendance/print?studentId=${student.memberId}&schoolYear=2025-2026`).set('Cookie', parent.cookie);
   assert.equal(previewRes.status, 200);
   assert.match(previewRes.text, /class="print-preview-header no-print"/);
   assert.match(previewRes.text, /onclick="window\.print\(\)"/);
@@ -137,8 +137,8 @@ test('Family Grades: Print links to a dedicated preview page, and Download is a 
   const { parent, student } = await setupFamily();
 
   const liveRes = await request(app).get(`/parent/family-school/grades?studentId=${student.memberId}`).set('Cookie', parent.cookie);
-  assert.match(liveRes.text, /href="\/parent\/family-school\/grades\/print\?studentId=\d+" target="_blank" aria-label="Print"/);
-  assert.match(liveRes.text, /href="\/parent\/family-school\/grades\/download\.pdf" aria-label="Download PDF"/);
+  assert.match(liveRes.text, /href="\/parent\/family-school\/grades\/print\?studentId=\d+&schoolYear=all" target="_blank" aria-label="Print"/);
+  assert.match(liveRes.text, /href="\/parent\/family-school\/grades\/download\.pdf\?schoolYear=all" aria-label="Download PDF"/);
 
   const previewRes = await request(app).get(`/parent/family-school/grades/print?studentId=${student.memberId}`).set('Cookie', parent.cookie);
   assert.equal(previewRes.status, 200);
@@ -177,8 +177,8 @@ test('Family School Management overview: Print links to a dedicated preview page
   const { parent } = await setupFamily();
 
   const liveRes = await request(app).get('/parent/family-school').set('Cookie', parent.cookie);
-  assert.match(liveRes.text, /href="\/parent\/family-school\/print" target="_blank" aria-label="Print"/);
-  assert.match(liveRes.text, /href="\/parent\/family-school\/download\.pdf" aria-label="Download PDF"/);
+  assert.match(liveRes.text, /href="\/parent\/family-school\/print\?studentId=all&schoolYear=all" target="_blank" aria-label="Print"/);
+  assert.match(liveRes.text, /href="\/parent\/family-school\/download\.pdf\?studentId=all&schoolYear=all" aria-label="Download PDF"/);
 
   const previewRes = await request(app).get('/parent/family-school/print').set('Cookie', parent.cookie);
   assert.equal(previewRes.status, 200);

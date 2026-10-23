@@ -23,7 +23,7 @@
         <div class="fs-journal-log">
           <% entries.forEach(function(e) { %>
             <div class="fs-journal-entry">
-              <div class="fs-journal-entry-header"><strong><%= e.entry_date %></strong></div>
+              <div class="fs-journal-entry-header"><strong><%= e.entryDateLabel %></strong></div>
               <div class="forum-editable-display"><%- e.body %></div>
               <% if (e.attachments && e.attachments.length > 0) { %>
                 <div class="fs-journal-attachments">

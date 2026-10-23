@@ -7,7 +7,6 @@
   <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
     <%# A real request: "Teacher journal should be called daily learning
         log." %>
     <div class="roster-toolbar no-print">
@@ -107,7 +106,7 @@
             <% entries.forEach(function(e) { %>
               <div class="fs-journal-entry">
                 <div class="fs-journal-entry-header">
-                  <strong><%= e.entry_date %></strong>
+                  <strong><%= e.entryDateLabel %></strong>
                   <form method="POST" action="/parent/family-school/journal/<%= e.id %>/delete" onsubmit="return confirm('Remove this journal entry?');" class="inline-block-form">
                     <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete entry" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                   </form>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%# A real request: "the download should be a pdf of exactly how it
+      would also look when printing." utils/pdfRender.js renders this
+      exact view (via req.app.render(), never through a real HTTP
+      request) to build the Download PDF - pdfBaseUrl is only ever set
+      for that internal render. %>
+  <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.5in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Annual Calendar</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <% if (!selectedFiscalYear || !calendar) { %>
+      <p class="roster-empty">No calendar created for this fiscal year yet.</p>
+    <% } else { %>
+      <h2><%= selectedFiscalYear.label %></h2>
+
+      <%# A real request: "Create key button... Key shows on page." Same
+          legend-row convention the live view's key bar uses, just plain
+          swatches here since there's nothing to click on a printed
+          page. %>
+      <% if (keys.length > 0) { %>
+        <div class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left">
+          <% keys.forEach(function(k) { %>
+            <span class="badge-pill annual-calendar-key-legend-pill" style="background-color: <%= k.color %>;"><%= k.label %></span>
+          <% }); %>
+        </div>
+      <% } %>
+
+      <%# Same 3-columns-of-4-months-evenly-balanced-on-one-page grid
+          Family Attendance's own print view uses (.fs-attendance-print-
+          months-grid, public/css/styles.css) - reused verbatim here so
+          a full 12-month fiscal-year calendar also fits one printed
+          page/PDF. %>
+      <div class="fs-attendance-print-months-grid">
+        <% months.forEach(function(m) { %>
+          <div class="fs-attendance-print-month">
+            <h3><%= MONTH_NAMES[m.month - 1] %> <%= m.year %></h3>
+            <table class="fs-attendance-calendar">
+              <thead>
+                <tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr>
+              </thead>
+              <tbody>
+                <% m.weeks.forEach(function(week) { %>
+                  <tr>
+                    <% week.forEach(function(d) { %>
+                      <% if (!d) { %>
+                        <td class="fs-attendance-day fs-attendance-day-empty"></td>
+                      <% } else {
+                        var keyed = m.keyByDate[d.date];
+                      %>
+                        <td class="fs-attendance-day" <%- keyed ? `style="background-color: ${keyed.color};"` : '' %>><%= d.day %></td>
+                      <% } %>
+                    <% }); %>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

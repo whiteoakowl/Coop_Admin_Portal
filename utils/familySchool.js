@@ -508,8 +508,15 @@ const ATTENDANCE_TARGET_DAYS = 180;
 // a subpage called portfolio... summarize all family school management
 // features for each student") can build the exact same numbers for ONE
 // student without re-deriving this logic a second, possibly-drifting
-// way.
-async function statsForStudent(student) {
+// way. A later real request ("Filter buttons should have student
+// dropdown choice and school year choice") added the optional
+// schoolYear ("YYYY-YYYY") - when given, GPA only counts assignments
+// due in that Aug-Jul span and presentDays only counts attendance
+// marked in it, same boundary attendanceForSchoolYear above already
+// uses; omitted (the Overview page's own long-standing default), both
+// stay all-time, same as before this filter existed.
+async function statsForStudent(student, schoolYear) {
+  const range = schoolYear ? (([startYear]) => [`${startYear}-08-01`, `${Number(startYear) + 1}-07-31`])(schoolYear.split('-')) : null;
   const classes = await classesForStudent(student.id);
   const classesWithGrades = await Promise.all(
     classes.map(async (cls) => {
@@ -519,9 +526,9 @@ async function statsForStudent(student) {
            FROM family_school_lessons l
            JOIN family_school_content_items ci ON ci.lesson_id = l.id AND ci.type = 'assignment_submission'
            JOIN family_school_assignment_submissions s ON s.content_item_id = ci.id AND s.student_id = ? AND s.status = 'graded'
-           WHERE l.class_id = ?`
+           WHERE l.class_id = ?${range ? ' AND ci.due_date BETWEEN ? AND ?' : ''}`
         )
-        .get(student.id, cls.id);
+        .get(...(range ? [student.id, cls.id, range[0], range[1]] : [student.id, cls.id]));
       const possible = Number(totals.possible);
       const percent = possible > 0 ? (Number(totals.earned) / possible) * 100 : null;
       return { ...cls, gradePercent: percent, gradeLetter: percentToLetterGrade(percent) };
@@ -533,7 +540,11 @@ async function statsForStudent(student) {
       ? gradedClasses.reduce((sum, c) => sum + LETTER_GRADE_GPA_POINTS[c.gradeLetter], 0) / gradedClasses.length
       : null;
   const presentDays = Number(
-    (await db.prepare("SELECT COUNT(*) AS n FROM family_school_attendance WHERE student_id = ? AND status = 'present'").get(student.id)).n
+    (
+      await db
+        .prepare(`SELECT COUNT(*) AS n FROM family_school_attendance WHERE student_id = ? AND status = 'present'${range ? ' AND attendance_date BETWEEN ? AND ?' : ''}`)
+        .get(...(range ? [student.id, range[0], range[1]] : [student.id]))
+    ).n
   );
   return {
     ...student,
@@ -545,11 +556,11 @@ async function statsForStudent(student) {
   };
 }
 
-async function overviewForFamily(familyId) {
+async function overviewForFamily(familyId, schoolYear) {
   const students = await db
     .prepare("SELECT * FROM members WHERE family_id = ? AND member_type = 'student' AND active = 1 ORDER BY name COLLATE \"C\"")
     .all(familyId);
-  return Promise.all(students.map(statsForStudent));
+  return Promise.all(students.map((s) => statsForStudent(s, schoolYear)));
 }
 
 // --- Attendance (the Attendance subpage - a real request: "View a
@@ -1159,11 +1170,17 @@ async function assignmentOptionsForFamily(familyId) {
 // page unbounded, and "a visual profile" reads as a snapshot, not a
 // full history dump (the Weekly Planner subpage itself is still where
 // every week lives). ---
-async function portfolioForStudent(studentId) {
+// A real request: "Filter buttons should have student dropdown choice
+// and school year choice." schoolYear ("YYYY-YYYY", or falsy for the
+// portfolio's own long-standing all-time default) narrows the GPA/
+// attendance stats (statsForStudent above) and the curriculum list
+// (curriculumForStudent already supports this) to that one Aug-Jul
+// span.
+async function portfolioForStudent(studentId, schoolYear) {
   const student = await db.prepare("SELECT * FROM members WHERE id = ? AND member_type = 'student'").get(studentId);
   if (!student) return null;
-  const stats = await statsForStudent(student);
-  const curriculum = await curriculumForStudent(studentId);
+  const stats = await statsForStudent(student, schoolYear);
+  const curriculum = await curriculumForStudent(studentId, schoolYear);
   const totalVolunteerHours = await totalVolunteerHoursForStudent(studentId);
   const journalEntries = (await journalEntriesForStudent(studentId)).slice(0, 5);
   const weeks = await weeksForOwner(student.family_id, 'student', studentId);

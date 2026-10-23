@@ -48,14 +48,11 @@ const {
   saveAttachment,
   gradeAssignmentSubmission,
   gradesForStudent,
-  attendanceForStudent,
   allAttendanceForStudent,
   attendanceForSchoolYear,
   toggleAttendance,
-  familyAttendanceForMonth,
   familyAttendanceForSchoolYear,
   toggleFamilyAttendance,
-  monthGridDays,
   journalEntriesForStudent,
   schoolYearForDate,
   createJournalEntry,
@@ -190,15 +187,33 @@ async function requireOwnLesson(req, lessonId) {
 // (utils/familySchool.js) does the per-student grade/GPA/attendance
 // aggregation; the actual class list moved to its own /classes subpage
 // below.
-router.get('/family-school', async (req, res) => {
+// A real request: "Family school management. Filter buttons should
+// have student dropdown choice and school year choice." A later
+// request than the one that removed Overview's own Filter entirely
+// ("Remove filter button and feature") - the Filter button is back,
+// with Student (default "All Students", same as every card showing
+// today) and School Year (narrows each shown card's GPA/attendance via
+// overviewForFamily/statsForStudent's own optional schoolYear).
+async function resolveOverviewFilter(req) {
   const familyId = await familyIdForAccount(req.portalAccount);
-  const students = await overviewForFamily(familyId);
-  // A real request: "Remove filter button and feature" - the Overview
-  // page always shows every family student now, no per-student narrowing.
+  const familyStudents = await studentsForFamily(familyId);
+  const selectedStudentId = resolveStudentOrAllFilter(req, familyStudents);
+  const schoolYear = req.query.schoolYear && req.query.schoolYear !== 'all' ? req.query.schoolYear : 'all';
+  const students = await overviewForFamily(familyId, schoolYear === 'all' ? null : schoolYear);
+  const displayedStudents = selectedStudentId === 'all' ? students : students.filter((s) => s.id === selectedStudentId);
+  return { familyStudents, selectedStudentId, schoolYear, yearOptions: schoolYearOptions(schoolYear === 'all' ? null : schoolYear), displayedStudents };
+}
+
+router.get('/family-school', async (req, res) => {
+  const { familyStudents, selectedStudentId, schoolYear, yearOptions, displayedStudents } = await resolveOverviewFilter(req);
   const settings = res.locals.familySettings;
   res.render('parent-family-school-overview', {
     title: 'Family School Management',
-    students,
+    familyStudents,
+    selectedStudentId,
+    schoolYear,
+    yearOptions,
+    students: displayedStudents,
     avatarColorFor,
     homeschooledSinceLabel: settings && settings.homeschooled_since ? formatDateLongNoWeekday(settings.homeschooled_since) : null,
   });
@@ -211,11 +226,10 @@ router.get('/family-school', async (req, res) => {
 // class breakdown - the same "current view vs. everything" split these
 // buttons use on every Family School Management page below.
 router.get('/family-school/export.csv', async (req, res) => {
-  const familyId = await familyIdForAccount(req.portalAccount);
-  const students = await overviewForFamily(familyId);
+  const { displayedStudents } = await resolveOverviewFilter(req);
   const lines = [
     toCsvRow(['Student', 'Grade Level', 'GPA', 'Attendance']),
-    ...students.map((s) => toCsvRow([s.name, s.grade_level || '', s.gpa != null ? s.gpa.toFixed(2) : '', `${s.presentDays}/${s.attendanceTargetDays}`])),
+    ...displayedStudents.map((s) => toCsvRow([s.name, s.grade_level || '', s.gpa != null ? s.gpa.toFixed(2) : '', `${s.presentDays}/${s.attendanceTargetDays}`])),
   ];
   sendCsv(res, 'family-school-management.csv', lines);
 });
@@ -226,12 +240,11 @@ router.get('/family-school/export.csv', async (req, res) => {
 // used, now a PDF built from the exact same -print.ejs view the Print
 // button opens.
 router.get('/family-school/download.pdf', async (req, res) => {
-  const familyId = await familyIdForAccount(req.portalAccount);
-  const students = await overviewForFamily(familyId);
+  const { displayedStudents } = await resolveOverviewFilter(req);
   const pdf = await renderViewToPdf(req, 'parent-family-school-overview-print', {
     title: 'Family School Management',
     mode: 'family',
-    students,
+    students: displayedStudents,
     familySettings: await familySettingsForPdf(res.locals.familySettings),
   });
   sendPdf(res, 'family-school-management-detail.pdf', pdf);
@@ -239,24 +252,35 @@ router.get('/family-school/download.pdf', async (req, res) => {
 
 // A real request: "All print button should show a print preview full
 // real page on a page with a print button." Mirrors the live page's
-// own card grid - every family student, same as Download above (the
-// Overview page's own Filter feature was removed - a real request).
+// own card grid, respecting the same Student/School Year filter.
 router.get('/family-school/print', async (req, res) => {
-  const familyId = await familyIdForAccount(req.portalAccount);
-  const students = await overviewForFamily(familyId);
+  const { displayedStudents } = await resolveOverviewFilter(req);
   res.render('parent-family-school-overview-print', {
     title: 'Family School Management',
     mode: 'single',
-    students,
+    students: displayedStudents,
     avatarColorFor,
   });
 });
 
+// A real request: "Family school management. Filter buttons should
+// have student dropdown choice and school year choice." Classes have
+// no school-year field of their own (they're ongoing, not tied to a
+// term, unlike curriculum/attendance/grades) - only Student applies
+// here, narrowing the card grid to classes that student is actually
+// assigned to; 'all' (the default) keeps today's "every family class"
+// view.
 router.get('/family-school/classes', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
+  const familyStudents = await studentsForFamily(familyId);
+  const selectedStudentId = resolveStudentOrAllFilter(req, familyStudents);
+  const allClasses = await classesForFamily(familyId);
+  const classes = selectedStudentId === 'all' ? allClasses : allClasses.filter((c) => c.students.some((s) => s.id === selectedStudentId));
   res.render('parent-family-school-classes', {
     title: 'Family Classes',
-    classes: await classesForFamily(familyId),
+    familyStudents,
+    selectedStudentId,
+    classes,
     preplannedTemplates: preplannedClassTemplates(),
     notice: req.query.notice || null,
     error: req.query.error || null,
@@ -519,16 +543,30 @@ router.post('/family-school/lessons/:id/content/reorder', async (req, res) => {
 // feedback) happens right here too - "parents can edit, track and view
 // all of it" in one place, not a second page per assignment. ---
 
+// A real request: "Family school management. Filter buttons should
+// have student dropdown choice and school year choice." Same
+// due_date-bucketing shape Journal's own filterJournalEntriesBySchoolYear
+// uses for entry_date - 'all' (the default) skips the filter entirely.
+function filterGradesBySchoolYear(grades, schoolYearFilter) {
+  if (!schoolYearFilter || schoolYearFilter === 'all') return grades;
+  return grades.filter((g) => schoolYearForDate(g.due_date) === schoolYearFilter);
+}
+
 router.get('/family-school/grades', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
   const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
   const isOwnStudent = selectedStudentId && familyStudents.some((s) => s.id === selectedStudentId);
+  const allGrades = isOwnStudent ? await gradesForStudent(selectedStudentId) : [];
+  const gradesSchoolYearOptions = [...new Set(allGrades.map((g) => schoolYearForDate(g.due_date)).filter(Boolean))].sort();
+  const schoolYearFilter = req.query.schoolYear || 'all';
   res.render('parent-family-school-grades', {
     title: 'Family Grades',
     familyStudents,
     selectedStudentId: isOwnStudent ? selectedStudentId : null,
-    grades: isOwnStudent ? await gradesForStudent(selectedStudentId) : [],
+    grades: filterGradesBySchoolYear(allGrades, schoolYearFilter),
+    gradesSchoolYearOptions,
+    schoolYearFilter,
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
@@ -539,7 +577,7 @@ router.get('/family-school/grades/export.csv', async (req, res) => {
   const familyStudents = await studentsForFamily(familyId);
   const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
   const student = familyStudents.find((s) => s.id === selectedStudentId);
-  const grades = student ? await gradesForStudent(student.id) : [];
+  const grades = student ? filterGradesBySchoolYear(await gradesForStudent(student.id), req.query.schoolYear || 'all') : [];
   const lines = [
     toCsvRow(['Student', 'Class', 'Lesson', 'Assignment', 'Due', 'Submitted', 'Points Earned', 'Points Possible', 'Grade Letter']),
     ...grades.map((g) =>
@@ -556,8 +594,9 @@ router.get('/family-school/grades/export.csv', async (req, res) => {
 router.get('/family-school/grades/download.pdf', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
+  const schoolYearFilter = req.query.schoolYear || 'all';
   const familyRows = [];
-  for (const student of familyStudents) familyRows.push({ student, grades: await gradesForStudent(student.id) });
+  for (const student of familyStudents) familyRows.push({ student, grades: filterGradesBySchoolYear(await gradesForStudent(student.id), schoolYearFilter) });
   const pdf = await renderViewToPdf(req, 'parent-family-school-grades-print', {
     title: 'Family Grades',
     mode: 'family',
@@ -578,7 +617,7 @@ router.get('/family-school/grades/print', async (req, res) => {
     title: 'Family Grades',
     mode: 'single',
     studentLabel: student ? student.name : '',
-    grades: student ? await gradesForStudent(student.id) : [],
+    grades: student ? filterGradesBySchoolYear(await gradesForStudent(student.id), req.query.schoolYear || 'all') : [],
   });
 });
 
@@ -609,6 +648,15 @@ router.post('/family-school/grades/:contentItemId/:studentId', async (req, res) 
 // present for school by clicking on the date and it highlights gren. If
 // you click again it becomes red for didn't do school." ---
 
+// A real request: "Family attendance should have a filter button to
+// choose student, family and school year. When viewing student or
+// family it should show all 12 calendar months for that school year.
+// Get rid of the month dropdown, name dropdown, everything on one
+// row, shrink to fit." Replaces the old single-month-at-a-time view
+// (and its separate month/year nav row) entirely - the live page now
+// shows the exact same 12-month grid the Print/Download routes below
+// already build via attendanceForSchoolYear/familyAttendanceForSchoolYear,
+// just clickable instead of static.
 router.get('/family-school/attendance', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
@@ -628,35 +676,24 @@ router.get('/family-school/attendance', async (req, res) => {
         ? familyStudents[0].id
         : null;
   const isOwnStudent = selectedStudentId && familyStudents.some((s) => s.id === selectedStudentId);
-  const now = new Date();
-  const year = req.query.year ? parseInt(req.query.year, 10) : now.getUTCFullYear();
-  const month = req.query.month ? parseInt(req.query.month, 10) : now.getUTCMonth() + 1;
-  // A real request: "the month should be a drop down choice of months/
-  // years." currentYear is always included in the range regardless of
-  // which year is actually selected, so jumping to an old year (e.g. via
-  // a bookmarked/shared link) never drops that year's own option out of
-  // its own <select>.
-  const currentYear = now.getUTCFullYear();
-  const yearRangeStart = Math.min(year, currentYear - 2);
-  const yearRangeEnd = Math.max(year, currentYear + 1);
-  const yearOptions = [];
-  for (let y = yearRangeStart; y <= yearRangeEnd; y++) yearOptions.push(y);
-  let attendanceByDate = {};
+  const schoolYear = req.query.schoolYear && /^\d{4}-\d{4}$/.test(req.query.schoolYear) ? req.query.schoolYear : currentSchoolYear();
+  const schoolYearStart = parseInt(schoolYear.slice(0, 4), 10);
+  const attendanceSchoolYearOptions = schoolYearOptions(schoolYear);
+  let months = [];
   if (isFamilyMode) {
-    attendanceByDate = await familyAttendanceForMonth(familyStudents.map((s) => s.id), year, month);
+    months = await familyAttendanceForSchoolYear(familyStudents.map((s) => s.id), schoolYearStart);
   } else if (isOwnStudent) {
-    attendanceByDate = await attendanceForStudent(selectedStudentId, year, month);
+    months = await attendanceForSchoolYear(selectedStudentId, schoolYearStart);
   }
   res.render('parent-family-school-attendance', {
     title: 'Family Attendance',
     familyStudents,
     selectedStudentId: isOwnStudent ? selectedStudentId : null,
     isFamilyMode,
-    year,
-    month,
-    yearOptions,
-    weeks: monthGridDays(year, month),
-    attendanceByDate,
+    schoolYear,
+    attendanceSchoolYearOptions,
+    MONTH_NAMES,
+    months,
   });
 });
 
@@ -716,6 +753,14 @@ router.get('/family-school/attendance/export.csv', async (req, res) => {
 // cover the school year the person was actually looking at); with
 // neither given, the school year containing today.
 function schoolYearStartFromQuery(req) {
+  // The live calendar now carries its own schoolYear param directly
+  // (it no longer navigates by year/month at all - a real request:
+  // "get rid of the month dropdown"); year/month is kept as a fallback
+  // only for any old bookmarked/shared print links from before that
+  // change.
+  if (req.query.schoolYear && /^\d{4}-\d{4}$/.test(req.query.schoolYear)) {
+    return parseInt(req.query.schoolYear.slice(0, 4), 10);
+  }
   if (req.query.year && req.query.month) {
     const year = parseInt(req.query.year, 10);
     const month = parseInt(req.query.month, 10);
@@ -813,7 +858,13 @@ router.get('/family-school/journal', async (req, res) => {
   const journalSchoolYearOptions = [...new Set(allEntries.map((e) => schoolYearForDate(e.entry_date)).filter(Boolean))].sort();
   const schoolYearFilter = req.query.schoolYear || 'all';
   const entries = filterJournalEntriesBySchoolYear(allEntries, schoolYearFilter);
-  for (const e of entries) e.attachments = await attachmentsForJournalEntry(e.id);
+  // A real request: "Daily learning log, date format should be August
+  // 12, 2026." formatDateLongNoWeekday already produces exactly that
+  // shape (it's the same helper homeschooledSinceLabel above uses).
+  for (const e of entries) {
+    e.attachments = await attachmentsForJournalEntry(e.id);
+    e.entryDateLabel = formatDateLongNoWeekday(e.entry_date);
+  }
   res.render('parent-family-school-journal', {
     title: 'Daily Learning Log',
     familyStudents,
@@ -848,7 +899,10 @@ router.get('/family-school/journal/download.pdf', async (req, res) => {
   const familyRows = [];
   for (const student of familyStudents) {
     const entries = filterJournalEntriesBySchoolYear(await journalEntriesForStudent(student.id), schoolYearFilter);
-    for (const e of entries) e.attachments = await attachmentsForJournalEntry(e.id);
+    for (const e of entries) {
+      e.attachments = await attachmentsForJournalEntry(e.id);
+      e.entryDateLabel = formatDateLongNoWeekday(e.entry_date);
+    }
     familyRows.push({ student, entries });
   }
   const pdf = await renderViewToPdf(req, 'parent-family-school-journal-print', {
@@ -869,7 +923,10 @@ router.get('/family-school/journal/print', async (req, res) => {
   const student = familyStudents.find((s) => s.id === selectedStudentId);
   const allEntries = student ? await journalEntriesForStudent(student.id) : [];
   const entries = filterJournalEntriesBySchoolYear(allEntries, req.query.schoolYear || 'all');
-  for (const e of entries) e.attachments = await attachmentsForJournalEntry(e.id);
+  for (const e of entries) {
+    e.attachments = await attachmentsForJournalEntry(e.id);
+    e.entryDateLabel = formatDateLongNoWeekday(e.entry_date);
+  }
   res.render('parent-family-school-journal-print', {
     title: 'Daily Learning Log',
     mode: 'single',
@@ -936,19 +993,33 @@ router.post('/family-school/journal/:id/attachments/:attachmentId/delete', async
 // add volunteer hours per student and have a log." Same per-student
 // owner-select UX as Attendance/Journal above. ---
 
+// A real request: "Family school management. Filter buttons should
+// have student dropdown choice and school year choice." Same
+// due_date/entry_date-bucketing shape Journal's own
+// filterJournalEntriesBySchoolYear uses, applied here to hour_date.
+function filterVolunteerHoursBySchoolYear(entries, schoolYearFilter) {
+  if (!schoolYearFilter || schoolYearFilter === 'all') return entries;
+  return entries.filter((e) => schoolYearForDate(e.hour_date) === schoolYearFilter);
+}
+
 router.get('/family-school/volunteer-hours', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
   const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
   const isOwnStudent = selectedStudentId && familyStudents.some((s) => s.id === selectedStudentId);
-  const entries = isOwnStudent ? await volunteerHoursForStudent(selectedStudentId) : [];
-  const totalHours = isOwnStudent ? await totalVolunteerHoursForStudent(selectedStudentId) : 0;
+  const allEntries = isOwnStudent ? await volunteerHoursForStudent(selectedStudentId) : [];
+  const volunteerHoursSchoolYearOptions = [...new Set(allEntries.map((e) => schoolYearForDate(e.hour_date)).filter(Boolean))].sort();
+  const schoolYearFilter = req.query.schoolYear || 'all';
+  const entries = filterVolunteerHoursBySchoolYear(allEntries, schoolYearFilter);
+  const totalHours = entries.reduce((sum, e) => sum + Number(e.hours || 0), 0);
   res.render('parent-family-school-volunteer-hours', {
     title: 'Volunteer Hours',
     familyStudents,
     selectedStudentId: isOwnStudent ? selectedStudentId : null,
     entries,
     totalHours,
+    volunteerHoursSchoolYearOptions,
+    schoolYearFilter,
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
@@ -959,7 +1030,7 @@ router.get('/family-school/volunteer-hours/export.csv', async (req, res) => {
   const familyStudents = await studentsForFamily(familyId);
   const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
   const student = familyStudents.find((s) => s.id === selectedStudentId);
-  const entries = student ? await volunteerHoursForStudent(student.id) : [];
+  const entries = student ? filterVolunteerHoursBySchoolYear(await volunteerHoursForStudent(student.id), req.query.schoolYear || 'all') : [];
   const lines = [toCsvRow(['Student', 'Date', 'Hours', 'Activity']), ...entries.map((e) => toCsvRow([student.name, e.hour_date, e.hours, e.activity_description || '']))];
   sendCsv(res, 'volunteer-hours.csv', lines);
 });
@@ -972,21 +1043,24 @@ router.get('/family-school/volunteer-hours/print', async (req, res) => {
   const familyStudents = await studentsForFamily(familyId);
   const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
   const student = familyStudents.find((s) => s.id === selectedStudentId);
+  const entries = student ? filterVolunteerHoursBySchoolYear(await volunteerHoursForStudent(student.id), req.query.schoolYear || 'all') : [];
   res.render('parent-family-school-volunteer-hours-print', {
     title: 'Volunteer Hours',
     mode: 'single',
     studentLabel: student ? student.name : '',
-    entries: student ? await volunteerHoursForStudent(student.id) : [],
-    totalHours: student ? await totalVolunteerHoursForStudent(student.id) : 0,
+    entries,
+    totalHours: entries.reduce((sum, e) => sum + Number(e.hours || 0), 0),
   });
 });
 
 router.get('/family-school/volunteer-hours/download.pdf', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
+  const schoolYearFilter = req.query.schoolYear || 'all';
   const familyRows = [];
   for (const student of familyStudents) {
-    familyRows.push({ student, entries: await volunteerHoursForStudent(student.id), totalHours: await totalVolunteerHoursForStudent(student.id) });
+    const entries = filterVolunteerHoursBySchoolYear(await volunteerHoursForStudent(student.id), schoolYearFilter);
+    familyRows.push({ student, entries, totalHours: entries.reduce((sum, e) => sum + Number(e.hours || 0), 0) });
   }
   const pdf = await renderViewToPdf(req, 'parent-family-school-volunteer-hours-print', {
     title: 'Volunteer Hours',
@@ -1036,13 +1110,31 @@ async function curriculumByStudentFor(familyStudents, schoolYear) {
   return curriculumByStudent;
 }
 
+// A real request: "Family school management. Filter buttons should
+// have student dropdown choice and school year choice." Shared by
+// every FSM page whose Student choice is "all family students at
+// once, or narrow to one" (Annual Planner, Overview) rather than the
+// "pick exactly one, defaulting to the first" shape Grades/Attendance/
+// Journal/Volunteer Hours/Portfolio already use - 'all' (the default)
+// keeps each page's own existing "show everyone" behavior.
+function resolveStudentOrAllFilter(req, familyStudents) {
+  const raw = req.query.studentId;
+  if (!raw || raw === 'all') return 'all';
+  const id = parseInt(raw, 10);
+  return familyStudents.some((s) => s.id === id) ? id : 'all';
+}
+
 router.get('/family-school/annual-planner', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
   const schoolYear = resolveSchoolYearFilter(req);
+  const selectedStudentId = resolveStudentOrAllFilter(req, familyStudents);
+  const displayedStudents = selectedStudentId === 'all' ? familyStudents : familyStudents.filter((s) => s.id === selectedStudentId);
   res.render('parent-family-school-annual-planner', {
     title: 'Annual Planner',
     familyStudents,
+    displayedStudents,
+    selectedStudentId,
     curriculumByStudent: await curriculumByStudentFor(familyStudents, schoolYear),
     schoolYear: schoolYear || 'all',
     currentSchoolYearValue: currentSchoolYear(),
@@ -1121,16 +1213,20 @@ router.get('/family-school/annual-planner/export.csv', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
   const schoolYear = resolveSchoolYearFilter(req);
-  sendCsv(res, 'annual-planner.csv', curriculumCsvRows(await curriculumByStudentFor(familyStudents, schoolYear), familyStudents));
+  const selectedStudentId = resolveStudentOrAllFilter(req, familyStudents);
+  const displayedStudents = selectedStudentId === 'all' ? familyStudents : familyStudents.filter((s) => s.id === selectedStudentId);
+  sendCsv(res, 'annual-planner.csv', curriculumCsvRows(await curriculumByStudentFor(familyStudents, schoolYear), displayedStudents));
 });
 
 router.get('/family-school/annual-planner/download.pdf', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
   const schoolYear = resolveSchoolYearFilter(req);
+  const selectedStudentId = resolveStudentOrAllFilter(req, familyStudents);
+  const displayedStudents = selectedStudentId === 'all' ? familyStudents : familyStudents.filter((s) => s.id === selectedStudentId);
   const pdf = await renderViewToPdf(req, 'parent-family-school-annual-planner-print', {
     title: 'Annual Planner',
-    familyStudents,
+    familyStudents: displayedStudents,
     curriculumByStudent: await curriculumByStudentFor(familyStudents, schoolYear),
     schoolYear: schoolYear || 'All Years',
     familySettings: await familySettingsForPdf(res.locals.familySettings),
@@ -1142,9 +1238,11 @@ router.get('/family-school/annual-planner/print', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
   const schoolYear = resolveSchoolYearFilter(req);
+  const selectedStudentId = resolveStudentOrAllFilter(req, familyStudents);
+  const displayedStudents = selectedStudentId === 'all' ? familyStudents : familyStudents.filter((s) => s.id === selectedStudentId);
   res.render('parent-family-school-annual-planner-print', {
     title: 'Annual Planner',
-    familyStudents,
+    familyStudents: displayedStudents,
     curriculumByStudent: await curriculumByStudentFor(familyStudents, schoolYear),
     schoolYear: schoolYear || 'All Years',
   });
@@ -1477,23 +1575,31 @@ router.get('/family-school/weekly-planner/download.pdf', async (req, res) => {
 // family-wide summary page (that's what the bare Overview page already
 // is). portfolioForStudent (utils/familySchool.js) does all the
 // aggregation; this route is just picking which student and loading it.
+// A real request: "Family school management. Filter buttons should
+// have student dropdown choice and school year choice." schoolYear
+// ('all', the default, or a specific 'YYYY-YYYY') narrows the GPA/
+// attendance stats and curriculum list (portfolioForStudent/
+// statsForStudent above) to that one Aug-Jul span.
 async function resolvePortfolioStudent(req) {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
-  if (familyStudents.length === 0) return { familyStudents, studentId: null, portfolio: null };
+  if (familyStudents.length === 0) return { familyStudents, studentId: null, portfolio: null, schoolYear: 'all', yearOptions: [] };
   const requestedId = req.query.studentId ? parseInt(req.query.studentId, 10) : null;
   const studentId = requestedId && familyStudents.some((s) => s.id === requestedId) ? requestedId : familyStudents[0].id;
-  const portfolio = await portfolioForStudent(studentId);
-  return { familyStudents, studentId, portfolio };
+  const schoolYear = req.query.schoolYear && req.query.schoolYear !== 'all' ? req.query.schoolYear : 'all';
+  const portfolio = await portfolioForStudent(studentId, schoolYear === 'all' ? null : schoolYear);
+  return { familyStudents, studentId, portfolio, schoolYear, yearOptions: schoolYearOptions(schoolYear === 'all' ? null : schoolYear) };
 }
 
 router.get('/family-school/portfolio', async (req, res) => {
-  const { familyStudents, studentId, portfolio } = await resolvePortfolioStudent(req);
+  const { familyStudents, studentId, portfolio, schoolYear, yearOptions } = await resolvePortfolioStudent(req);
   res.render('parent-family-school-portfolio', {
     title: 'Portfolio',
     familyStudents,
     studentId,
     portfolio,
+    schoolYear,
+    yearOptions,
     avatarColorFor,
   });
 });

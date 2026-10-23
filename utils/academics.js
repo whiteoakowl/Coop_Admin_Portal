@@ -337,24 +337,30 @@ async function deleteTranscriptEntry(id) {
   await db.prepare('DELETE FROM parent_transcript_entries WHERE id = ?').run(id);
 }
 
-// Plain class-name lists for the Add Entry dialog's own "quick-fill
-// from Co-op Classes" dropdown - "add classes from co-op classes... or
-// manually add" - current enrollments plus past (student_academic_
-// history) ones, since a transcript reasonably draws on a student's
-// whole co-op record, not just what they're in right now. No
-// grades/credits here (co-op classes don't track either) - the parent
-// still fills those in by hand regardless of which class they picked.
-async function coopClassNamesForStudent(studentId) {
+// A real request: "Add class should have dropdown or year choices.
+// Choose year and semester, then it will have three buttons saying,
+// add co-op class, add family class, add manual class. If choosing
+// co-op class it will then show a list of that students co-op classes
+// for that school year." Scoped to a specific semester (utils/
+// classSchedule.js's own semesters table, already the only "term"
+// concept a co-op class carries - classes.semester_id) rather than
+// coopClassNamesForStudent's own all-time list above. Only currently-
+// enrolled classes can be scoped this way - student_academic_history's
+// own class_id goes null the moment its class is archived/deleted (see
+// that table's own migration comment), so a past, ended class's
+// semester can't be recovered here.
+async function coopClassesForStudentAndSemester(studentId, semesterId) {
+  if (!semesterId) return [];
   const rows = await db
     .prepare(
       `SELECT class_name FROM (
-         SELECT DISTINCT c.class_name FROM class_enrollments ce JOIN classes c ON c.id = ce.class_id WHERE ce.student_id = ?
-         UNION
-         SELECT DISTINCT h.class_name FROM student_academic_history h WHERE h.student_id = ?
+         SELECT DISTINCT c.class_name FROM class_enrollments ce
+         JOIN classes c ON c.id = ce.class_id
+         WHERE ce.student_id = ? AND c.semester_id = ?
        ) combined
        ORDER BY class_name COLLATE "C"`
     )
-    .all(studentId, studentId);
+    .all(studentId, semesterId);
   return rows.map((r) => r.class_name);
 }
 
@@ -900,7 +906,7 @@ module.exports = {
   getTranscriptEntry,
   updateTranscriptEntry,
   deleteTranscriptEntry,
-  coopClassNamesForStudent,
+  coopClassesForStudentAndSemester,
   getContentItem,
   contentItemsForAssignment,
   createContentItem,

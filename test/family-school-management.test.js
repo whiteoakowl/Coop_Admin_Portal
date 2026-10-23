@@ -300,20 +300,59 @@ test('Grades: a parent can grade a submitted assignment, and grading is scoped t
   assert.equal(unchanged.grade_letter, 'A-', "another family's parent must not be able to overwrite this grade");
 });
 
+// A real request: "Family school management. Filter buttons should
+// have student dropdown choice and school year choice." Same shape
+// as the Daily Learning Log's own School Year filter test above,
+// applied to Grades (bucketed by each content item's own due_date).
+test('Grades: the Filter popover offers a School Year dropdown that filters grades, export, print, and PDF', async () => {
+  const familyId = await createFamily('Grades School Year Family');
+  const parent = await createPortalMember({ name: 'Grades Year Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Grades Year Student', familyId, memberType: 'student', roleKey: 'student' });
+
+  const { createClass, assignClassToStudents, createLesson, createContentItem } = require('../utils/familySchool');
+  const classId = await createClass({ familyId, className: 'Grades Year Class', description: null, createdByAccountId: null });
+  await assignClassToStudents(classId, [student.memberId]);
+  const lessonId = await createLesson({ classId, title: 'Lesson', description: null, createdByAccountId: null });
+  await createContentItem({ lessonId, type: 'assignment_submission', title: 'Fall Essay', pointsPossible: 20, dueDate: '2024-10-01' });
+  await createContentItem({ lessonId, type: 'assignment_submission', title: 'Spring Essay', pointsPossible: 20, dueDate: '2026-04-02' });
+
+  const allPage = await request(app).get(`/parent/family-school/grades?studentId=${student.memberId}`).set('Cookie', parent.cookie);
+  assert.equal(allPage.status, 200);
+  assert.match(allPage.text, /<select id="grades-school-year-select" name="schoolYear" onchange="this\.form\.submit\(\)">/);
+  assert.match(allPage.text, /<option value="all" selected>All Years<\/option>/);
+  assert.match(allPage.text, /<option value="2024-2025"[^>]*>2024-2025<\/option>/);
+  assert.match(allPage.text, /<option value="2025-2026"[^>]*>2025-2026<\/option>/);
+  assert.match(allPage.text, /Fall Essay/);
+  assert.match(allPage.text, /Spring Essay/);
+
+  const filteredPage = await request(app).get(`/parent/family-school/grades?studentId=${student.memberId}&schoolYear=2024-2025`).set('Cookie', parent.cookie);
+  assert.match(filteredPage.text, /<option value="2024-2025" selected>2024-2025<\/option>/);
+  assert.match(filteredPage.text, /Fall Essay/);
+  assert.doesNotMatch(filteredPage.text, /Spring Essay/);
+
+  const filteredExport = await request(app).get(`/parent/family-school/grades/export.csv?studentId=${student.memberId}&schoolYear=2024-2025`).set('Cookie', parent.cookie);
+  assert.match(filteredExport.text, /Fall Essay/);
+  assert.doesNotMatch(filteredExport.text, /Spring Essay/);
+
+  const filteredPrint = await request(app).get(`/parent/family-school/grades/print?studentId=${student.memberId}&schoolYear=2024-2025`).set('Cookie', parent.cookie);
+  assert.equal(filteredPrint.status, 200);
+  assert.match(filteredPrint.text, /Fall Essay/);
+  assert.doesNotMatch(filteredPrint.text, /Spring Essay/);
+});
+
 test('Attendance: clicking a date cycles present (green) -> absent (red) -> unmarked, scoped to one student', async () => {
   const familyId = await createFamily('Attendance Family');
   const parent = await createPortalMember({ name: 'Attendance Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const student = await createPortalMember({ name: 'Attendance Student', familyId, memberType: 'student', roleKey: 'student' });
 
-  const page = await request(app).get(`/parent/family-school/attendance?studentId=${student.memberId}&year=2026&month=3`).set('Cookie', parent.cookie);
+  const page = await request(app).get(`/parent/family-school/attendance?studentId=${student.memberId}&schoolYear=2025-2026`).set('Cookie', parent.cookie);
   assert.equal(page.status, 200);
-  // A later real request ("the month should be a drop down choice of
-  // months/years") replaced the old static "March 2026" text label with
-  // month/year <select>s - see test/parent-family-attendance-layout.
-  // test.js for full coverage of that; this test only needs to confirm
-  // the right month/year is still selected.
-  assert.match(page.text, /<option value="3" selected>March<\/option>/);
-  assert.match(page.text, /<option value="2026" selected>2026<\/option>/);
+  // A later real request ("it should show all 12 calendar months for
+  // that school year") replaced the old single-month view with a
+  // 12-month grid - see test/parent-family-attendance-layout.test.js
+  // for full coverage of that; this test only needs to confirm March
+  // 2026 (inside the 2025-2026 school year) actually renders.
+  assert.match(page.text, /<h3>March 2026<\/h3>/);
   const csrf = await csrfFrom(parent.cookie, `/parent/family-school/attendance?studentId=${student.memberId}`);
 
   const toggle1 = await request(app).post(`/parent/family-school/attendance/${student.memberId}/toggle`).set('Cookie', parent.cookie).type('form').send({ date: '2026-03-10', _csrf: csrf });
@@ -334,6 +373,28 @@ test('Attendance: clicking a date cycles present (green) -> absent (red) -> unma
   assert.equal(hijackAttempt.status, 404);
 });
 
+// A real request: "Family attendance should have a filter button to
+// choose student, family and school year. When viewing student or
+// family it should show all 12 calendar months for that school
+// year." Picking a different School Year reloads the whole 12-month
+// grid for that year instead of jumping a single month view.
+test('Attendance: the Filter popover offers a School Year dropdown that reloads the whole 12-month grid for that year', async () => {
+  const familyId = await createFamily('Attendance School Year Family');
+  const parent = await createPortalMember({ name: 'Attendance Year Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Attendance Year Student', familyId, memberType: 'student', roleKey: 'student' });
+
+  const defaultPage = await request(app).get(`/parent/family-school/attendance?studentId=${student.memberId}`).set('Cookie', parent.cookie);
+  assert.equal(defaultPage.status, 200);
+  assert.match(defaultPage.text, /<select id="attendance-school-year-select" name="schoolYear" onchange="this\.form\.submit\(\)">/);
+
+  const jumped = await request(app).get(`/parent/family-school/attendance?studentId=${student.memberId}&schoolYear=2024-2025`).set('Cookie', parent.cookie);
+  assert.equal(jumped.status, 200);
+  assert.match(jumped.text, /<option value="2024-2025" selected>2024-2025<\/option>/);
+  assert.match(jumped.text, /<h3>August 2024<\/h3>/);
+  assert.match(jumped.text, /<h3>July 2025<\/h3>/);
+  assert.doesNotMatch(jumped.text, /<h3>August 2023<\/h3>/);
+});
+
 test('Daily Learning Log (Teacher Journal): add an entry by date and student, it shows in the log below, and entries are scoped to one family', async () => {
   const familyId = await createFamily('Journal Family');
   const parent = await createPortalMember({ name: 'Journal Parent', familyId, memberType: 'parent', roleKey: 'parent' });
@@ -348,7 +409,9 @@ test('Daily Learning Log (Teacher Journal): add an entry by date and student, it
   assert.equal(createRes.status, 302);
 
   const logPage = await request(app).get(`/parent/family-school/journal?studentId=${student.memberId}`).set('Cookie', parent.cookie);
-  assert.match(logPage.text, /2026-04-02/);
+  // A real request: "Daily learning log, date format should be August
+  // 12, 2026." - the raw YYYY-MM-DD database value is no longer shown.
+  assert.match(logPage.text, /April 2, 2026/);
   assert.match(logPage.text, /Worked hard on fractions today\./);
 
   const entry = await db.prepare('SELECT id FROM family_school_journal_entries WHERE student_id = ?').get(student.memberId);
@@ -516,7 +579,7 @@ test('Overview: the bare /parent/family-school page shows a card per student wit
 // the old Family Classes/Grades/.../Portfolio quick-link row too (those
 // pages are now direct top-level nav tabs instead - test/family-school-
 // management.test.js's own nav test already covers that).
-test('Overview: Export/Download CSV buttons cover the whole family, the old quick-link buttons and Filter are gone, and the school info header renders', async () => {
+test('Overview: Export/Download CSV buttons cover the whole family, the old quick-link buttons are gone, and the school info header renders', async () => {
   const familyId = await createFamily('CSV Family');
   const parent = await createPortalMember({ name: 'CSV Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const studentA = await createPortalMember({ name: 'CSV Student A', familyId, memberType: 'student', roleKey: 'student' });
@@ -553,17 +616,53 @@ test('Overview: Export/Download CSV buttons cover the whole family, the old quic
 
   const overview = await request(app).get('/parent/family-school').set('Cookie', parent.cookie);
   assert.equal(overview.status, 200);
-  // Both students always show - there's no Filter to narrow them anymore.
+  // Both students show by default ("All Students" in the Filter's own
+  // Student select - a later real request: "Filter buttons should
+  // have student dropdown choice and school year choice" - brought the
+  // Filter button itself back after it had been removed entirely).
   assert.match(overview.text, /class="fs-overview-name">CSV Student A</);
   assert.match(overview.text, /class="fs-overview-name">CSV Student B</);
-  assert.doesNotMatch(overview.text, /class="filter-details"/);
-  assert.doesNotMatch(overview.text, />Filter</);
+  assert.match(overview.text, /<details class="filter-details" data-filter-details>/);
   assert.doesNotMatch(overview.text, /btn-secondary" href="\/parent\/family-school\/classes"/);
 
   // The new school-info header (school name/ID/homeschooled-since).
   assert.match(overview.text, /class="fs-school-header-name"[^>]*>The CSV Family Academy</);
   assert.match(overview.text, /NC Homeschool ID: 555555/);
   assert.match(overview.text, /Homeschooling since August 23, 2026/);
+});
+
+// A real request: "Family school management. Filter buttons should
+// have student dropdown choice and school year choice." Overview's
+// Filter had been removed entirely by an earlier request ("Remove
+// filter button and feature") - it's back now with both choices:
+// Student narrows which card(s) show, School Year narrows each
+// shown card's own GPA/attendance (statsForStudent's own schoolYear).
+test('Overview: the Filter popover offers Student and School Year dropdowns that narrow which cards show and their stats', async () => {
+  const familyId = await createFamily('Overview Filter Family');
+  const parent = await createPortalMember({ name: 'Overview Filter Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const studentA = await createPortalMember({ name: 'Overview Filter Student A', familyId, memberType: 'student', roleKey: 'student' });
+  const studentB = await createPortalMember({ name: 'Overview Filter Student B', familyId, memberType: 'student', roleKey: 'student' });
+
+  const { toggleAttendance } = require('../utils/familySchool');
+  await toggleAttendance(studentA.memberId, '2024-10-05');
+  await toggleAttendance(studentA.memberId, '2026-04-05');
+
+  const allPage = await request(app).get('/parent/family-school').set('Cookie', parent.cookie);
+  assert.equal(allPage.status, 200);
+  assert.match(allPage.text, /<select id="overview-student-select" name="studentId" onchange="this\.form\.submit\(\)">/);
+  assert.match(allPage.text, /<option value="all" selected>All Students<\/option>/);
+  assert.match(allPage.text, /class="fs-overview-name">Overview Filter Student A</);
+  assert.match(allPage.text, /class="fs-overview-name">Overview Filter Student B</);
+  assert.match(allPage.text, /2\/180/, 'both present days count with no year filter');
+
+  const oneStudent = await request(app).get(`/parent/family-school?studentId=${studentA.memberId}`).set('Cookie', parent.cookie);
+  assert.match(oneStudent.text, new RegExp(`<option value="${studentA.memberId}" selected>`));
+  assert.match(oneStudent.text, /class="fs-overview-name">Overview Filter Student A</);
+  assert.doesNotMatch(oneStudent.text, /class="fs-overview-name">Overview Filter Student B</);
+
+  const oneYear = await request(app).get(`/parent/family-school?studentId=${studentA.memberId}&schoolYear=2024-2025`).set('Cookie', parent.cookie);
+  assert.match(oneYear.text, /<option value="2024-2025" selected>2024-2025<\/option>/);
+  assert.match(oneYear.text, /1\/180/, 'only the 2024-10-05 present day falls within 2024-2025');
 });
 
 test('Grades/Attendance/Journal: Export (one student) and Download (whole family) CSV buttons', async () => {
@@ -639,6 +738,36 @@ test('Grades/Attendance/Journal: Export (one student) and Download (whole family
 
 // A real request: "Add a button that says +preplanned class" - "Pick
 // from built-in curriculum templates."
+// A real request: "Family school management. Filter buttons should
+// have student dropdown choice and school year choice." Classes have
+// no school-year field of their own (ongoing, not tied to a term) -
+// just a Student choice, narrowing the card grid to classes that
+// student is actually assigned to.
+test('Family Classes: the Filter popover offers a Student dropdown that narrows the card grid to that student\'s own classes', async () => {
+  const familyId = await createFamily('Classes Student Filter Family');
+  const parent = await createPortalMember({ name: 'Classes Filter Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const studentA = await createPortalMember({ name: 'Classes Filter Student A', familyId, memberType: 'student', roleKey: 'student' });
+  const studentB = await createPortalMember({ name: 'Classes Filter Student B', familyId, memberType: 'student', roleKey: 'student' });
+
+  const { createClass, assignClassToStudents } = require('../utils/familySchool');
+  const classAId = await createClass({ familyId, className: 'Student A Class', description: null, createdByAccountId: null });
+  await assignClassToStudents(classAId, [studentA.memberId]);
+  const classBId = await createClass({ familyId, className: 'Student B Class', description: null, createdByAccountId: null });
+  await assignClassToStudents(classBId, [studentB.memberId]);
+
+  const allPage = await request(app).get('/parent/family-school/classes').set('Cookie', parent.cookie);
+  assert.equal(allPage.status, 200);
+  assert.match(allPage.text, /<select id="classes-student-select" name="studentId" onchange="this\.form\.submit\(\)">/);
+  assert.match(allPage.text, /<option value="all" selected>All Students<\/option>/);
+  assert.match(allPage.text, /Student A Class/);
+  assert.match(allPage.text, /Student B Class/);
+
+  const filteredPage = await request(app).get(`/parent/family-school/classes?studentId=${studentA.memberId}`).set('Cookie', parent.cookie);
+  assert.match(filteredPage.text, new RegExp(`<option value="${studentA.memberId}" selected>`));
+  assert.match(filteredPage.text, /Student A Class/);
+  assert.doesNotMatch(filteredPage.text, /Student B Class/);
+});
+
 test('Family Classes: the +Preplanned Class button lists built-in templates, and picking one creates the class with its starter lessons already added', async () => {
   const familyId = await createFamily('Preplanned Class Family');
   const parent = await createPortalMember({ name: 'Preplanned Parent', familyId, memberType: 'parent', roleKey: 'parent' });
@@ -692,4 +821,25 @@ test('Lesson Manage: the Content section is labeled Content/Assignments, with an
   assert.match(page.text, /<h2>Content\/Assignments \(0\)<\/h2>/);
   assert.match(page.text, /\+ Add New Content\/Assignment/);
   assert.match(page.text, /<h3>Add New Content\/Assignment<\/h3>/);
+});
+
+// A real request: "Family school management pages, the buttons and
+// icons should be well balanced and spaced between the page title and
+// tables." The Filter/icons row most of these pages place right above
+// their own table had 1.25rem of space above it (from .roster-toolbar's
+// own h1 wrapper) but 0 below - .fs-toolbar-row-spaced adds that
+// missing margin-bottom. Attendance gets the same treatment via its
+// own already-scoped .fs-attendance-toolbar-row class instead (see
+// test/parent-family-attendance-layout.test.js).
+test('Grades/Volunteer Hours/Portfolio/Overview/Annual Planner: the Filter/icons row carries its own spacing before the table below it', async () => {
+  const familyId = await createFamily('Toolbar Spacing Family');
+  const parent = await createPortalMember({ name: 'Toolbar Spacing Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  await createPortalMember({ name: 'Toolbar Spacing Student', familyId, memberType: 'student', roleKey: 'student' });
+
+  const pages = ['/parent/family-school/grades', '/parent/family-school/volunteer-hours', '/parent/family-school/portfolio', '/parent/family-school', '/parent/family-school/annual-planner'];
+  for (const url of pages) {
+    const res = await request(app).get(url).set('Cookie', parent.cookie);
+    assert.equal(res.status, 200, `expected 200 from ${url}`);
+    assert.match(res.text, /fs-toolbar-row-spaced/, `expected fs-toolbar-row-spaced on ${url}`);
+  }
 });

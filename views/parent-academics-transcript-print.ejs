@@ -21,8 +21,9 @@
     <p class="no-print"><a href="/parent/academics">&larr; Transcripts</a></p>
     <button type="button" class="roster-action-btn print-action-btn no-print" onclick="window.print()">Print</button>
 
+    <%- include('partials/family-school-print-header', { familySettings, subtitle: 'Official Transcript' }) %>
+
     <section class="portal-dashboard-card portal-dashboard-card-wide">
-      <h1>Official Transcript</h1>
       <h2><%= member.name %></h2>
 
       <% if (builder.schoolYears.length === 0) { %>

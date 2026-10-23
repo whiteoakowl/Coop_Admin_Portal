@@ -165,6 +165,7 @@ const PORTAL_PERMISSIONS = [
   { key: 'manage_sections', label: 'Manage Sections', description: 'Create sections and assign members to them, for restricting events/classes to specific groups.' },
   { key: 'manage_name_tags', label: 'Manage Name Tags', description: 'Design and print name tags, schedule cards, badges, and barcode sheets for any member.' },
   { key: 'register_guests', label: 'Register Guests', description: 'Register a non-member guest for an event.' },
+  { key: 'manage_annual_calendar', label: 'Manage Annual Calendar', description: 'Create fiscal-year calendars, keys, and color-code calendar dates.' },
 ];
 
 async function seedPortalPlatform(db) {

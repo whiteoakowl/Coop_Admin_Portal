@@ -193,6 +193,13 @@ const MAIN_ADMIN_NAV_LINKS = [
     { href: '/main-admin/babysitters?tab=settings', label: 'Settings' },
   ] },
   { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
+  // A real request: "Main admin portal, add a tab called annual
+  // calendar... Dropdown menu for each fiscal year created in the
+  // system." routes/main-admin-annual-calendar.js - no subpages, the
+  // fiscal year picker lives on the page itself (same ?fiscalYearId=
+  // query param convention Accounting's own Category/Fiscal Year
+  // subpage already reads fiscal years from).
+  { href: '/main-admin/annual-calendar', icon: 'calendar-check', label: 'Annual Calendar' },
   // A real request: "Main admin portal, remove academics tab and
   // features. Only parent portal has those pages and admin doesn't need
   // to control them with any settings." Diplomas/transcripts are entirely

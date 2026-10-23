@@ -7,7 +7,6 @@
   <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
     <%# "Week 1 title on the title bar of week schedule." %>
     <div class="roster-toolbar no-print">
       <h1>Weekly Planner<% if (selectedWeek) { %> &mdash; <%= selectedWeek.title %><% } %></h1>
@@ -81,8 +80,12 @@
           delete the week completely. Remove the trash button on
           weekly planner view." Replaces the old bare trash-icon row -
           editing (including deleting) now all happens through the one
-          Edit Week dialog below. %>
-      <div class="roster-btn-row roster-btn-row-fit-text no-print fs-weekly-plan-row-spaced">
+          Edit Week dialog below. A later real request: "Weekly
+          planner, week title and edit icon should be in a blue button
+          looking box to the left." - fs-weekly-plan-week-title-row
+          turns this same row into that solid blue box instead of a
+          plain row (it already sits at the left by default). %>
+      <div class="roster-btn-row roster-btn-row-fit-text no-print fs-weekly-plan-row-spaced fs-weekly-plan-week-title-row">
         <span class="fs-weekly-plan-week-title"><%= selectedWeek.title %></span>
         <button type="button" class="icon-btn" aria-label="Edit week" title="Edit week" onclick="document.getElementById('edit-week-dialog').showModal()"><svg class="icon"><use href="#icon-edit"/></svg></button>
       </div>

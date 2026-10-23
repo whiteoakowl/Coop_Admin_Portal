@@ -7,7 +7,6 @@
   <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
     <div class="roster-toolbar no-print">
       <h1>Family Attendance</h1>
     </div>
@@ -16,121 +15,94 @@
       <p class="roster-empty">No students in your family yet.</p>
     <% } else { %>
       <%
-        var prevMonth = month === 1 ? 12 : month - 1;
-        var prevYear = month === 1 ? year - 1 : year;
-        var nextMonth = month === 12 ? 1 : month + 1;
-        var nextYear = month === 12 ? year + 1 : year;
-        var MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
         // A real request: "attendance drop down to choose one of your
         // children or family." studentIdParam carries the literal
         // "family" string through every link/form below instead of
         // selectedStudentId (which is null in family mode).
         var studentIdParam = isFamilyMode ? 'family' : selectedStudentId;
       %>
-      <%# A real request: "Click a date description should be under
-          title. Green and red bubble key under the description on the
-          next row. Next row prev arrow button, month, year, and next
-          button, all on the same row. Export, download and print icons
-          on the last row." Reordered from the old description-last
-          layout to: description, legend, month nav, then the toolbar
-          icons right before the calendar. %>
       <p class="hint">Click a date to mark present, click again for absent, a third time to clear it.</p>
 
-      <%# "View a calendar and mark days student is present for school by
-          clicking on the date and it highlights gren. If you click again
-          it becomes red for didn't do school." Click cycles unmarked ->
-          present (green) -> absent (red) -> unmarked (public/js/family-
-          school-attendance.js), one fetch() per click against this
-          student's own toggle endpoint - no full page reload. %>
-      <%# A real request: "Prev arrow, month, year, next button should
-          all be on the same row. Erase the words prev and next, it
-          should just be an arrow in a box, fit to text." Plain
-          .icon-btn squares (the same fit-to-text icon-only convention
-          every other icon button in this app already uses) instead of
-          the old text-bearing .btn-secondary - just the arrow glyph,
-          with the "Previous/Next month" label moved to aria-label/title
-          for accessibility. The two <select>s (auto-submitting the same
-          GET this page already reads year/month from) sit between them
-          as a direct jump-to-month/year alternative to stepping one
-          month at a time. fs-attendance-row-left is the same left-
-          alignment override the Present/Absent row above uses. %>
-      <form method="GET" action="/parent/family-school/attendance" class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left fs-attendance-nav-row">
-        <input type="hidden" name="studentId" value="<%= studentIdParam %>" />
-        <a class="icon-btn" href="?studentId=<%= studentIdParam %>&year=<%= prevYear %>&month=<%= prevMonth %>" aria-label="Previous month" title="Previous month">&larr;</a>
-        <select name="month" aria-label="Month" onchange="this.form.submit()">
-          <% MONTH_NAMES.forEach(function(name, i) { %>
-            <option value="<%= i + 1 %>" <%= month === i + 1 ? 'selected' : '' %>><%= name %></option>
-          <% }); %>
-        </select>
-        <select name="year" aria-label="Year" onchange="this.form.submit()">
-          <% yearOptions.forEach(function(y) { %>
-            <option value="<%= y %>" <%= year === y ? 'selected' : '' %>><%= y %></option>
-          <% }); %>
-        </select>
-        <a class="icon-btn" href="?studentId=<%= studentIdParam %>&year=<%= nextYear %>&month=<%= nextMonth %>" aria-label="Next month" title="Next month">&rarr;</a>
-      </form>
-
-      <%# A real request: "Family attendance, filter button should be
-          dropdown to choose a student. It should say choose student in
-          the menu bar. Shrink this to fit neatly next to the icons on
-          the same row. Present and absent keys should move to the same
-          row, far right, shrink them to fit on the same row." The old
-          Filter <details>/<summary> popover (which only ever held this
-          one Student select) is gone - the select sits directly in the
-          toolbar row now, shrunk via fs-attendance-toolbar-row's own
-          mobile CSS, with a disabled leading "Choose Student" option
-          instead of a separate label. The Present/Absent legend (used
-          to be its own row above the month-nav row) moves to the far
-          right of this same row via margin-left: auto. Export is this
-          one selected student's attendance; Download is every family
-          student's - see routes/parent-family-school.js's own
-          /attendance/export.csv and /attendance/download.pdf. %>
+      <%# A real request: "Family attendance should have a filter
+          button to choose student, family and school year. When
+          viewing student or family it should show all 12 calendar
+          months for that school year. Get rid of the month dropdown,
+          name dropdown, everything on one row, shrink to fit." The old
+          separate month-nav row (prev/next arrows + Month/Year
+          selects) is gone entirely - Choose Student/Family and School
+          Year both now live in one Filter popover, on the same row as
+          the Export/Print/PDF icons and the Present/Absent legend. %>
       <div class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left fs-attendance-toolbar-row no-print">
-        <form method="GET" action="/parent/family-school/attendance" class="inline-block-form">
-          <%# A real request: "attendance drop down to choose one of
-              your children or family. Can take attendance by
-              individual child or select family and take attendance
-              that will appear on all individual attendance calendars
-              for each child/student." %>
-          <select id="attendance-student-select" name="studentId" aria-label="Choose Student" onchange="this.form.submit()">
-            <option value="" disabled>Choose Student</option>
-            <% familyStudents.forEach(function(s) { %>
-              <option value="<%= s.id %>" <%= !isFamilyMode && selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
-            <% }); %>
-            <option value="family" <%= isFamilyMode ? 'selected' : '' %>>Whole Family</option>
-          </select>
-        </form>
+        <details class="filter-details" data-filter-details>
+          <summary class="roster-action-btn">Filter</summary>
+          <form method="GET" action="/parent/family-school/attendance" class="filter-panel">
+            <label for="attendance-student-select">Choose Student</label>
+            <select id="attendance-student-select" name="studentId" onchange="this.form.submit()">
+              <option value="" disabled>Choose Student</option>
+              <% familyStudents.forEach(function(s) { %>
+                <option value="<%= s.id %>" <%= !isFamilyMode && selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
+              <% }); %>
+              <option value="family" <%= isFamilyMode ? 'selected' : '' %>>Whole Family</option>
+            </select>
+            <label for="attendance-school-year-select">School Year</label>
+            <select id="attendance-school-year-select" name="schoolYear" onchange="this.form.submit()">
+              <% attendanceSchoolYearOptions.forEach(function(y) { %>
+                <option value="<%= y %>" <%= schoolYear === y ? 'selected' : '' %>><%= y %></option>
+              <% }); %>
+            </select>
+          </form>
+        </details>
         <a class="icon-btn" href="/parent/family-school/attendance/export.csv?studentId=<%= studentIdParam %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-        <a class="icon-btn" href="/parent/family-school/attendance/print?studentId=<%= studentIdParam %>&year=<%= year %>&month=<%= month %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
-        <a class="icon-btn" href="/parent/family-school/attendance/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/attendance/print?studentId=<%= studentIdParam %>&schoolYear=<%= schoolYear %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/attendance/download.pdf?studentId=<%= studentIdParam %>&schoolYear=<%= schoolYear %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         <span class="fs-attendance-legend-row">
           <span class="badge-pill fs-attendance-legend-present">Present</span>
           <span class="badge-pill fs-attendance-legend-absent">Absent</span>
         </span>
       </div>
 
-      <table class="fs-attendance-calendar" data-fs-attendance-calendar data-student-id="<%= studentIdParam %>" data-toggle-url="<%= isFamilyMode ? '/parent/family-school/attendance/family/toggle' : '/parent/family-school/attendance/' + selectedStudentId + '/toggle' %>">
-        <thead>
-          <tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr>
-        </thead>
-        <tbody>
-          <% weeks.forEach(function(week) { %>
-            <tr>
-              <% week.forEach(function(d) { %>
-                <% if (!d) { %>
-                  <td class="fs-attendance-day fs-attendance-day-empty"></td>
-                <% } else {
-                  var status = attendanceByDate[d.date] || '';
-                %>
-                  <td class="fs-attendance-day fs-attendance-day-<%= status || 'unmarked' %>" data-fs-attendance-cell data-date="<%= d.date %>"><%= d.day %></td>
-                <% } %>
-              <% }); %>
-            </tr>
-          <% }); %>
-        </tbody>
-      </table>
+      <%# "View a calendar and mark days student is present for school by
+          clicking on the date and it highlights gren. If you click again
+          it becomes red for didn't do school." Click cycles unmarked ->
+          present (green) -> absent (red) -> unmarked (public/js/family-
+          school-attendance.js), one fetch() per click against this
+          student's own toggle endpoint - no full page reload. The outer
+          grid (not each month's own table) carries data-fs-attendance-
+          calendar/data-toggle-url now, since that script already does
+          event delegation down to whichever [data-fs-attendance-cell]
+          was actually clicked - the same .annual-calendar-months-grid/
+          .annual-calendar-month/.annual-calendar-table shrink-to-fit
+          CSS the Main Admin Annual Calendar's own live view uses. %>
+      <div class="annual-calendar-months-grid" data-fs-attendance-calendar data-student-id="<%= studentIdParam %>" data-toggle-url="<%= isFamilyMode ? '/parent/family-school/attendance/family/toggle' : '/parent/family-school/attendance/' + selectedStudentId + '/toggle' %>">
+        <% months.forEach(function(m) { %>
+          <div class="annual-calendar-month">
+            <h3><%= MONTH_NAMES[m.month - 1] %> <%= m.year %></h3>
+            <table class="fs-attendance-calendar annual-calendar-table">
+              <thead>
+                <tr><th>Su</th><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th></tr>
+              </thead>
+              <tbody>
+                <% m.weeks.forEach(function(week) { %>
+                  <tr>
+                    <% week.forEach(function(d) { %>
+                      <% if (!d) { %>
+                        <td class="fs-attendance-day fs-attendance-day-empty"></td>
+                      <% } else {
+                        var status = m.attendanceByDate[d.date] || '';
+                      %>
+                        <td class="fs-attendance-day fs-attendance-day-<%= status || 'unmarked' %>" data-fs-attendance-cell data-date="<%= d.date %>"><%= d.day %></td>
+                      <% } %>
+                    <% }); %>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% }); %>
+      </div>
     <% } %>
   </main>
+  <script src="/js/filter-details-dismiss.js"></script>
   <script src="/js/family-school-attendance.js"></script>
 </body>
 </html>

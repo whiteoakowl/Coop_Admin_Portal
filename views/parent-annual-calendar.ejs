@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="roster-toolbar no-print">
+      <h1>Annual Calendar</h1>
+    </div>
+
+    <% if (fiscalYears.length === 0) { %>
+      <p class="roster-empty">No calendar has been set up yet.</p>
+    <% } else { %>
+      <form method="GET" action="/parent/annual-calendar" class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left no-print">
+        <select name="fiscalYearId" aria-label="Fiscal Year" onchange="this.form.submit()">
+          <% fiscalYears.forEach(function(fy) { %>
+            <option value="<%= fy.id %>" <%= selectedFiscalYearId === fy.id ? 'selected' : '' %>><%= fy.label %></option>
+          <% }); %>
+        </select>
+      </form>
+
+      <% if (!calendar) { %>
+        <p class="roster-empty">No calendar has been created for this fiscal year yet.</p>
+      <% } else { %>
+        <% if (keys.length > 0) { %>
+          <div class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left no-print">
+            <% keys.forEach(function(k) { %>
+              <span class="badge-pill annual-calendar-key-legend-pill" style="background-color: <%= k.color %>;"><%= k.label %></span>
+            <% }); %>
+          </div>
+        <% } %>
+
+        <div class="annual-calendar-months-grid">
+          <% months.forEach(function(m) { %>
+            <div class="annual-calendar-month">
+              <h3><%= MONTH_NAMES[m.month - 1] %> <%= m.year %></h3>
+              <table class="fs-attendance-calendar annual-calendar-table">
+                <thead>
+                  <tr><th>Su</th><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th></tr>
+                </thead>
+                <tbody>
+                  <% m.weeks.forEach(function(week) { %>
+                    <tr>
+                      <% week.forEach(function(d) { %>
+                        <% if (!d) { %>
+                          <td class="fs-attendance-day fs-attendance-day-empty"></td>
+                        <% } else {
+                          var keyed = m.keyByDate[d.date];
+                        %>
+                          <td class="fs-attendance-day" <%- keyed ? `style="background-color: ${keyed.color};"` : '' %>><%= d.day %></td>
+                        <% } %>
+                      <% }); %>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    <% } %>
+  </main>
+</body>
+</html>
