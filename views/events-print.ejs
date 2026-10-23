@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
   <%- include('partials/head', { title }) %>
   <style>@page { size: letter; margin: 0.4in; }</style>
 </head>

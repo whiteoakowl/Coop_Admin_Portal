@@ -49,6 +49,23 @@ function nextMonday() {
   return d.toISOString().slice(0, 10);
 }
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - buffers the binary response so the
+// PDF bytes can actually be checked, the same way test/parent-family-
+// school-print-preview-and-pdf.test.js does for its own download.pdf
+// routes.
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
 test('Floater Assignments manage page: Print button links to a dedicated preview page instead of calling window.print() directly', async () => {
   const cookie = await loginAsAdmin();
   const day = 'monday';
@@ -62,6 +79,42 @@ test('Floater Assignments manage page: Print button links to a dedicated preview
   assert.equal(manage.status, 200);
   assert.match(manage.text, new RegExp(`href="/admin/volunteers/${day}/manage/print\\?date=${date}&semesterId=[^"]*" target="_blank"`), 'Print button should link to the preview page, carrying the same selected date');
   assert.doesNotMatch(manage.text, /icon-btn" onclick="window\.print\(\)" aria-label="Print"/, 'the old direct-to-print-dialog button should be gone');
+  assert.match(manage.text, new RegExp(`href="/admin/volunteers/${day}/manage/download\\.pdf\\?date=${date}&semesterId=[^"]*" aria-label="Download PDF"`), 'Download PDF button should sit next to Print');
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - same selected-date chart the print
+// preview shows, as a real PDF from routes/admin-volunteers.js's own
+// GET /volunteers/:day/manage/download.pdf.
+test('Floater Assignments manage page: Download PDF is a real PDF of the same selected-date chart the print preview shows', async () => {
+  const cookie = await loginAsAdmin();
+  const day = 'monday';
+  const classId = await createClass({ day, hourPosition: 2, className: 'Download PDF Class', room: 'Room 9', assistantSlots: 1 });
+  const { lastInsertRowid: memberId } = await db
+    .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Download PDF Floater', 'download-pdf-floater-1', 'parent')")
+    .run();
+  const date = nextMonday();
+  const slotId = classVacancySlotId(classId, 'assistant', 1);
+
+  const page = await request(app).get(`/admin/volunteers/${day}/manage?date=${date}`).set('Cookie', cookie);
+  const csrfToken = extractCsrf(page.text);
+  await request(app).post(`/admin/volunteers/${day}/dates/add?dialog=dates`).set('Cookie', cookie).type('form').send({ dates: date, _csrf: csrfToken });
+  await request(app)
+    .post(`/admin/volunteers/${day}/substitutes/assign`)
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ date, slotType: 'vacancy', slotId: String(slotId), memberId: String(memberId), isOverride: '1', _csrf: csrfToken });
+
+  const pdfRes = await getBuffer(`/admin/volunteers/${day}/manage/download.pdf?date=${date}`, cookie);
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.match(pdfRes.headers['content-disposition'], /attachment; filename="monday-floater-assignments\.pdf"/);
+  assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
+});
+
+test('Floater Assignments manage download.pdf requires admin login, same as the manage page it mirrors', async () => {
+  const res = await request(app).get('/admin/volunteers/monday/manage/download.pdf');
+  assert.equal(res.status, 302, 'unauthenticated request should redirect to login');
 });
 
 test('Floater Assignments manage print preview: shows the same selected-date chart, read-only, with its own Print button', async () => {

@@ -45,6 +45,7 @@ const {
 const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
 const { comboSemesterId, qsSemester, appendSemester, findComboId } = require('../utils/scheduleComboLinks');
 const { notify } = require('../utils/notifications');
+const { renderViewToPdf } = require('../utils/pdfRender');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
@@ -286,6 +287,42 @@ router.get('/volunteers/:day/manage/print', requireAdmin, requireClassDay, async
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - same selected-date chart the print
+// preview above shows, as a real PDF instead of just a preview page.
+router.get('/volunteers/:day/manage/download.pdf', requireAdmin, requireClassDay, async (req, res) => {
+  const day = req.params.day;
+  const semesterId = comboSemesterId(req);
+  const list = await getListByDay(day, semesterId);
+  if (!list) return res.status(404).render('404', { title: 'Not Found' });
+  const dates = await datesForList(list.id);
+  const archivedSet = new Set(await archivedDatesForList(list.id));
+  const today = todayISO();
+  const activeDates = dates.filter((d) => !archivedSet.has(d));
+  const upcomingActiveDates = activeDates.filter((d) => d >= today);
+  const defaultDate = upcomingActiveDates[0] || activeDates[activeDates.length - 1] || null;
+  const selectedDate = activeDates.includes(req.query.date) ? req.query.date : defaultDate;
+  const hourSections = selectedDate ? await buildHourSections(day, selectedDate, list.semester_id) : [];
+
+  const pdf = await renderViewToPdf(req, 'admin-volunteers-print', {
+    title: `${DAY_LABELS[day]} Floater Assignments Print Preview`,
+    day,
+    dayLabel: DAY_LABELS[day],
+    selectedDate,
+    selectedDateLabel: selectedDate ? formatDateLabel(selectedDate) : null,
+    hourSections,
+    // partials/admin-nav normally gets this off res.locals (see
+    // server.js) - req.app.render() never touches res, so it has to be
+    // passed explicitly here. requireAdmin above already gates this
+    // whole route on the single master Admin session, same as
+    // res.locals.isFullAdmin itself, so it's always true here.
+    isFullAdmin: true,
+  });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${day}-floater-assignments.pdf"`);
+  res.send(pdf);
+});
+
 // A real request: "make it to where the page doesn't refresh every time
 // you click assign or unassigned - it should simply assign and allow you
 // to continue clicking assignment until you're done." routes/admin-
@@ -444,6 +481,29 @@ router.get('/volunteers/:day/risk/print', requireAdmin, requireClassDay, async (
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - same classesAtRiskForDay data the
+// print preview above shows, as a real PDF.
+router.get('/volunteers/:day/risk/download.pdf', requireAdmin, requireClassDay, async (req, res) => {
+  const day = req.params.day;
+  const today = todayISO();
+  const alertDate = weekdayOf(today) === CLASS_DAY_WEEKDAY_FULL[day] ? today : null;
+  const resolvedSemesterId = await resolveSemesterId(comboSemesterId(req));
+
+  const pdf = await renderViewToPdf(req, 'admin-volunteer-risk-print', {
+    title: `${DAY_LABELS[day]} Class Cancellation Risk Print Preview`,
+    day,
+    dayLabel: DAY_LABELS[day],
+    classesAtRisk: await classesAtRiskForDay(day, alertDate, undefined, resolvedSemesterId),
+    // See the manage/download.pdf route above for why this has to be
+    // passed explicitly here.
+    isFullAdmin: true,
+  });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${day}-class-cancellation-risk.pdf"`);
+  res.send(pdf);
+});
+
 // A real request: "all pages/subpages with print, export, import, or
 // download buttons should be changed to icons... and have all four" -
 // this tab only had Print; same classesAtRiskForDay data as the page
@@ -543,6 +603,43 @@ router.get('/volunteers/:day/teams/print', requireAdmin, requireClassDay, async 
     dayLabel: DAY_LABELS[day],
     teams,
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - same team rosters the print
+// preview above shows, as a real PDF.
+router.get('/volunteers/:day/teams/download.pdf', requireAdmin, requireClassDay, async (req, res) => {
+  const day = req.params.day;
+  const list = await getListByDay(day, comboSemesterId(req));
+  if (!list) return res.status(404).render('404', { title: 'Not Found' });
+  const sections = await sectionsForList(list.id);
+  const hours = await hoursForDay(day);
+  const hourLabelByPosition = {};
+  hours.forEach((h) => { hourLabelByPosition[h.position] = h.label; });
+
+  const teams = [];
+  for (const section of sections) {
+    const sectionMembers = [];
+    for (const m of await membersForSection(list.id, section.id)) sectionMembers.push({ ...m, infant: await hasInfantChild(m.id) });
+    teams.push({
+      section,
+      hourLabel: hourLabelByPosition[section.position] || section.label,
+      members: sectionMembers,
+    });
+  }
+
+  const pdf = await renderViewToPdf(req, 'admin-volunteer-teams-print', {
+    title: `${DAY_LABELS[day]} Floater Teams`,
+    day,
+    dayLabel: DAY_LABELS[day],
+    teams,
+    // See the manage/download.pdf route above for why this has to be
+    // passed explicitly here.
+    isFullAdmin: true,
+  });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${day}-floater-teams.pdf"`);
+  res.send(pdf);
 });
 
 // Explicit, admin-triggered cleanup for floater team membership that

@@ -37,6 +37,21 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
+// Same buffer-a-binary-response shape as test/parent-family-school-print-
+// preview-and-pdf.test.js's own getBuffer - supertest's default text
+// parser corrupts a real PDF's binary body.
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
 let seedCounter = 0;
 
 // Co-op Admin's own Members list only shows members whose family has an
@@ -97,6 +112,12 @@ test('GET /admin/members', async (t) => {
     assert.equal(res.status, 200);
     assert.match(res.text, /href="\/admin\/members\/print\?type=student"/);
   });
+
+  await t.test('the Download PDF button sits right beside Print', async () => {
+    const res = await request(app).get('/admin/members').set('Cookie', cookie);
+    assert.equal(res.status, 200);
+    assert.match(res.text, /href="\/admin\/members\/download\.pdf" aria-label="Download PDF"/);
+  });
 });
 
 test('GET /admin/members/print', async (t) => {
@@ -120,5 +141,22 @@ test('GET /admin/members/print', async (t) => {
     assert.equal(res.status, 200);
     assert.match(res.text, /Filtered Preview Student/);
     assert.doesNotMatch(res.text, /Filtered Preview Parent/);
+  });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - a real PDF built from the exact same
+// admin-members-print.ejs view the Print button opens.
+test('GET /admin/members/download.pdf', async (t) => {
+  const cookie = await loginAsAdmin();
+
+  await t.test('returns a real PDF', async () => {
+    await createEnrolledStudent('Download PDF Coop Student');
+
+    const res = await getBuffer('/admin/members/download.pdf', cookie);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers['content-type'], 'application/pdf');
+    assert.match(res.headers['content-disposition'], /attachment; filename="members\.pdf"/);
+    assert.equal(res.body.slice(0, 5).toString(), '%PDF-');
   });
 });

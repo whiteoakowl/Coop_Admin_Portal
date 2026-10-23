@@ -13,6 +13,7 @@ const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexP
 const { buildCardPairs } = require('../utils/cardPairs');
 const { formatDateLabel, formatTimestamp } = require('../utils/dates');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { renderViewToPdf } = require('../utils/pdfRender');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 const { allClassesList, UNASSIGNED_ROOM, HOUR_POSITIONS, listActiveClassDays, CLASS_DAY_LABELS_FULL, listSemesters } = require('../utils/classSchedule');
 const { allSetupTeamsEverySemester } = require('../utils/setup');
@@ -20,6 +21,16 @@ const { playgroundHourLabel } = require('../utils/playground');
 const { allItems: allLibraryItems, allLibraryTypes } = require('../utils/library');
 
 router.use(requireFullAdmin);
+
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - sends a headless-Chromium-rendered PDF of
+// viewName (one of this router's own *-print.ejs views), same helper
+// shape as routes/parent-family-school.js's own sendPdf.
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
 
 const DESIGN_TYPES = ['student', 'parent', 'admin', 'scheduleCard', 'setupCleanup', 'custom'];
 const TABS = ['design', 'print', 'requests'];
@@ -247,6 +258,34 @@ router.get('/design/requests/print', async (req, res) => {
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - the exact same (unarchived/archived,
+// date-filtered) list the Print preview above renders, now a PDF built
+// from that same -print.ejs view instead of a second, independent copy.
+router.get('/design/requests/download.pdf', async (req, res) => {
+  const showArchived = req.query.archived === '1';
+  const dateFilter = req.query.date || '';
+  const allSubmissions = (await nameTagSubmissions(showArchived, dateFilter)).map((r) => ({
+    timestamp: formatTimestamp(r.createdAt),
+    memberName: r.memberName,
+    requestTypeLabel: REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
+    dayLabel: NAME_TAG_DAY_LABELS[r.day] || r.day,
+    description: r.description || '—',
+  }));
+  const pdf = await renderViewToPdf(req, 'admin-design-requests-print', {
+    title: `${showArchived ? 'Archived ' : ''}Name Tag Requests Print Preview`,
+    allSubmissions,
+    showArchived,
+    // req.app.render() (what renderViewToPdf renders through) never runs
+    // the res.locals-populating middleware a normal request goes through
+    // (server.js's own isFullAdmin), so partials/admin-nav needs it
+    // passed explicitly here - always true, since requireFullAdmin above
+    // already gates every route in this file to the master Admin session.
+    isFullAdmin: true,
+  });
+  sendPdf(res, `name-tag-${showArchived ? 'archived' : 'requests'}.pdf`, pdf);
+});
+
 router.post('/design/requests/:id/archive', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   await db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(id);
@@ -285,6 +324,38 @@ router.post('/design/print-duplex', async (req, res) => {
     cardHeight: CARD_HEIGHT,
     SCHEDULE_CARD_SAFE_INSET,
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - the same selection the Print route above
+// builds, now a PDF built from the exact same -print.ejs view.
+// isFullAdmin is passed explicitly since renderViewToPdf renders through
+// req.app.render(), which never sees this request's own res.locals
+// (where partials/admin-nav normally finds it) - this whole router is
+// already requireFullAdmin-gated, so it's always true here.
+router.post('/design/download-duplex.pdf', async (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));
+  }
+
+  const placeholders = memberIds.map(() => '?').join(',');
+  const members = (await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders})`).all(...memberIds)).sort(byLastName);
+
+  const { frontPages, backPages } = buildDuplexPages(await buildCardPairs(members));
+
+  const pdf = await renderViewToPdf(req, 'admin-cards-duplex-print', {
+    title: 'Print Name Tags + Schedule Cards (Front & Back)',
+    frontPages,
+    backPages,
+    badgeWidth: BADGE_WIDTH,
+    badgeHeight: BADGE_HEIGHT,
+    cardWidth: CARD_WIDTH,
+    cardHeight: CARD_HEIGHT,
+    SCHEDULE_CARD_SAFE_INSET,
+    isFullAdmin: true,
+  });
+  sendPdf(res, 'name-tags-and-schedule-cards.pdf', pdf);
 });
 
 // Class Check-In QR Codes: a real request - "add printing QR sheets to
@@ -353,6 +424,55 @@ router.post('/design/print-classcheckin-qr', async (req, res) => {
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - the same selection/grouping the Print route
+// above builds, now rendered through headless Chromium instead of the
+// browser's own print preview. classIds travels as a GET query string
+// here (the live picker's Download button submits this same form with
+// formmethod="GET" instead of POST) since a PDF download has to be a
+// plain navigable URL, not a form-only POST. isFullAdmin is passed
+// explicitly since renderViewToPdf renders through req.app.render(),
+// which never sees this request's own res.locals (where partials/admin-
+// nav normally finds it) - this whole router is already requireFullAdmin-
+// gated, so it's always true here.
+router.get('/design/print-classcheckin-qr/download.pdf', async (req, res) => {
+  const classIds = [].concat(req.query.classIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const allClasses = await allClassesList();
+  const idSet = new Set(classIds);
+  const classes = allClasses.filter((c) => idSet.has(c.id));
+
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const groups = new Map();
+  for (const c of classes) {
+    const room = c.room && c.room.trim() ? c.room.trim() : UNASSIGNED_ROOM;
+    const key = `${c.day}|${room}`;
+    if (!groups.has(key)) groups.set(key, { day: c.day, dayLabel: c.dayLabel, room, classes: [] });
+    groups.get(key).classes.push(c);
+  }
+
+  const pages = Array.from(groups.values())
+    .sort((a, b) => a.day.localeCompare(b.day) || a.room.localeCompare(b.room))
+    .map((g) => ({
+      dayLabel: g.dayLabel,
+      room: g.room,
+      classes: g.classes
+        .sort((a, b) => a.hour_position - b.hour_position)
+        .map((c) => ({
+          className: c.class_name,
+          dayLabel: c.dayLabel,
+          timeLabel: c.timeLabel,
+          checkInUrl: `${origin}/kiosk/class-checkin/classes/${c.id}/attendance`,
+        })),
+    }));
+
+  const pdf = await renderViewToPdf(req, 'admin-classcheckin-qr-print', {
+    title: 'Print Class Check-In QR Codes',
+    pages,
+    isFullAdmin: true,
+  });
+  sendPdf(res, 'class-checkin-qr-codes.pdf', pdf);
+});
+
 // Playground Check-In QR Codes: a real request - "create qr codes for the
 // playground check in link." Unlike Class Check-In QR Codes above, there's
 // nothing to pick - the playground always has exactly the same 8
@@ -388,6 +508,33 @@ router.get('/design/print-playground-qr', async (req, res) => {
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - same always-every-slot data as the Print
+// route above, rendered through headless Chromium instead. isFullAdmin
+// is passed explicitly - see the download.pdf route above this one for
+// why.
+router.get('/design/print-playground-qr/download.pdf', async (req, res) => {
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const pages = await Promise.all(
+    (await listActiveClassDays()).map(async (day) => {
+      const hours = await Promise.all(
+        HOUR_POSITIONS.map(async (hour) => ({
+          hourLabel: await playgroundHourLabel(day, hour),
+          checkInUrl: `${origin}/kiosk/class-checkin/playground/${day}/${hour}/attendance`,
+        }))
+      );
+      return { dayLabel: CLASS_DAY_LABELS_FULL[day], hours };
+    })
+  );
+
+  const pdf = await renderViewToPdf(req, 'admin-playground-qr-print', {
+    title: 'Print Playground Check-In QR Codes',
+    pages,
+    isFullAdmin: true,
+  });
+  sendPdf(res, 'playground-qr-codes.pdf', pdf);
+});
+
 // Library Barcodes: a real request - "Under printing add printing library
 // barcodes. Drop down menu shows category choices. After selecting a
 // category it shows a list of library catalog items in that category to
@@ -411,6 +558,30 @@ router.post('/design/print-library-barcodes', async (req, res) => {
     title: 'Print Library Barcodes',
     items,
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - same selection the Print route above
+// renders, now through headless Chromium. itemIds travels as a GET query
+// string here (the live picker's Download button submits this same form
+// with formmethod="GET" instead of POST) since a PDF download has to be
+// a plain navigable URL, not a form-only POST. isFullAdmin is passed
+// explicitly - see the first download.pdf route in this file for why.
+router.get('/design/print-library-barcodes/download.pdf', async (req, res) => {
+  const itemIds = [].concat(req.query.itemIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const placeholders = itemIds.map(() => '?').join(',');
+  const items = itemIds.length
+    ? (await db.prepare(`SELECT * FROM library_items WHERE id IN (${placeholders})`).all(...itemIds)).sort((a, b) =>
+        a.title.toLowerCase().localeCompare(b.title.toLowerCase())
+      )
+    : [];
+
+  const pdf = await renderViewToPdf(req, 'admin-library-barcodes-print', {
+    title: 'Print Library Barcodes',
+    items,
+    isFullAdmin: true,
+  });
+  sendPdf(res, 'library-barcodes.pdf', pdf);
 });
 
 module.exports = router;

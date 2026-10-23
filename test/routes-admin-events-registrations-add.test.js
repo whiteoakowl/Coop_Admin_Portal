@@ -198,6 +198,7 @@ test('Print, Export, and Import buttons/routes exist and work', async () => {
 
   const page = await request(app).get(`/main-admin/events/${eventId}/registrations`).set('Cookie', admin.cookie);
   assert.match(page.text, new RegExp(`href="/main-admin/events/${eventId}/registrations/print"`));
+  assert.match(page.text, new RegExp(`href="/main-admin/events/${eventId}/registrations/download\\.pdf" aria-label="Download PDF"`));
   assert.match(page.text, new RegExp(`href="/main-admin/events/${eventId}/registrations/export.csv"`));
   assert.match(page.text, /Import/);
 
@@ -205,6 +206,20 @@ test('Print, Export, and Import buttons/routes exist and work', async () => {
   assert.equal(printPage.status, 200);
   assert.match(printPage.text, /size: letter landscape/);
   assert.match(printPage.text, /ExportImport Parent/);
+
+  const pdfRes = await request(app)
+    .get(`/main-admin/events/${eventId}/registrations/download.pdf`)
+    .set('Cookie', admin.cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.match(pdfRes.headers['content-disposition'], new RegExp(`attachment; filename="registrations-${eventId}\\.pdf"`));
+  assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
 
   const csvRes = await request(app).get(`/main-admin/events/${eventId}/registrations/export.csv`).set('Cookie', admin.cookie);
   assert.equal(csvRes.status, 200);

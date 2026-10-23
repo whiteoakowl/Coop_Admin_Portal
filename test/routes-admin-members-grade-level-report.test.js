@@ -39,6 +39,21 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
+// Same buffer-a-binary-response shape as test/parent-family-school-print-
+// preview-and-pdf.test.js's own getBuffer - supertest's default text
+// parser corrupts a real PDF's binary body.
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
 let seedCounter = 0;
 async function createStudent({ name, gradeLevel, birthday }) {
   seedCounter += 1;
@@ -85,6 +100,9 @@ test('Co-op Admin Grade Level Report: groups students by grade level with ages, 
   // on this live, editable page directly.
   assert.match(res.text, /<a class="icon-btn" href="\/admin\/members\/grade-level-report\/print[^"]*" target="_blank" aria-label="Print"/);
   assert.doesNotMatch(res.text, /onclick="window\.print\(\)" aria-label="Print"/);
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - Download PDF sits right beside Print.
+  assert.match(res.text, /<a class="icon-btn" href="\/admin\/members\/grade-level-report\/download\.pdf[^"]*" aria-label="Download PDF"/);
 
   const csv = await request(app).get('/admin/members/grade-level-report/export.csv').set('Cookie', cookie);
   assert.equal(csv.status, 200);
@@ -106,4 +124,19 @@ test('GET /admin/members/grade-level-report/print renders a read-only preview wi
   assert.match(res.text, /onclick="window\.print\(\)"/);
   assert.match(res.text, /Coop Preview Kinder/);
   assert.match(res.text, /Coop Preview Third/);
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - a real PDF built from the exact
+// same admin-members-grade-level-report-print.ejs view the Print
+// button opens.
+test('GET /admin/members/grade-level-report/download.pdf returns a real PDF', async () => {
+  const cookie = await loginAsAdmin();
+  await createStudent({ name: 'Coop Download Kinder', gradeLevel: 'Kindergarten', birthday: '2020-01-01' });
+
+  const res = await getBuffer('/admin/members/grade-level-report/download.pdf', cookie);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers['content-type'], 'application/pdf');
+  assert.match(res.headers['content-disposition'], /attachment; filename="grade-level-report\.pdf"/);
+  assert.equal(res.body.slice(0, 5).toString(), '%PDF-');
 });

@@ -13,6 +13,13 @@ const { requirePortalAuth, blockTeacherOnlyAccounts } = require('../middleware/p
 const { memberForAccount } = require('../utils/portalAuth');
 const { primaryParentForBilling } = require('../utils/members');
 const payments = require('../utils/payments');
+const { renderViewToPdf } = require('../utils/pdfRender');
+
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
 
 router.use(requirePortalAuth);
 // A real request: "Teacher portal... remove ... accounting..." - see
@@ -66,6 +73,29 @@ router.get('/print', async (req, res) => {
     adjustmentsTotalCents: overview ? sumCents(overview.refundRows, 'amount_cents') + sumCents(overview.cancelledCharges, 'amount_cents') : 0,
     formatCents: payments.formatCents,
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - a PDF built from the exact same
+// -print.ejs view the Print button above opens. sharedPortalTitle is
+// passed explicitly since renderViewToPdf renders through
+// req.app.render(), which never sees this request's own res.locals
+// (where loadPortalSession normally puts it).
+router.get('/download.pdf', async (req, res) => {
+  const self = await memberForAccount(req.portalAccount.id);
+  const member = self ? await db.prepare('SELECT * FROM members WHERE id = ?').get(await primaryParentForBilling(self.id)) : null;
+  const overview = member ? await payments.accountOverviewForMember(member.id, req.query.year || 'current') : null;
+  const pdf = await renderViewToPdf(req, 'accounting-home-print', {
+    title: 'Accounting Print Preview',
+    member,
+    ...(overview || {}),
+    invoicesTotalCents: overview ? sumCents(overview.invoices, 'amount_cents') : 0,
+    paymentsTotalCents: overview ? sumCents(overview.paymentRows, 'amount_cents') : 0,
+    adjustmentsTotalCents: overview ? sumCents(overview.refundRows, 'amount_cents') + sumCents(overview.cancelledCharges, 'amount_cents') : 0,
+    formatCents: payments.formatCents,
+    sharedPortalTitle: res.locals.sharedPortalTitle,
+  });
+  sendPdf(res, 'accounting-statement.pdf', pdf);
 });
 
 module.exports = router;

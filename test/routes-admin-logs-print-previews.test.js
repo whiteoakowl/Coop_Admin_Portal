@@ -43,6 +43,27 @@ function assertIsPrintPreview(text) {
   assert.match(text, /onclick="window\.print\(\)"/);
 }
 
+// Same "buffer the binary response body" pattern as test/parent-family-
+// school-print-preview-and-pdf.test.js's own getBuffer - supertest's
+// default .text/.body handling isn't meant for a real PDF buffer.
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
+function assertIsRealPdf(res) {
+  assert.equal(res.status, 200);
+  assert.equal(res.headers['content-type'], 'application/pdf');
+  assert.equal(res.body.slice(0, 5).toString(), '%PDF-');
+}
+
 test('Logs tabs: every Print button links to its own dedicated preview route instead of calling window.print() directly', async (t) => {
   const cookie = await loginAsAdmin();
 
@@ -160,4 +181,88 @@ test('GET /admin/logs/substitutes/print renders a read-only preview for the requ
   assert.equal(res.status, 200);
   assertIsPrintPreview(res.text);
   assert.match(res.text, /Monday, 2026-03-02/);
+});
+
+// A real follow-up request: "PDF download icons should be added to every
+// page across the app that has a print icon/button." Every Logs tab's
+// Print button above now has a sibling Download PDF button next to it,
+// backed by a real headless-Chromium render of that same *-print.ejs view
+// (utils/pdfRender.js) rather than another CSV.
+test('Logs tabs: every Print button has a sibling Download PDF button right next to it', async (t) => {
+  const cookie = await loginAsAdmin();
+
+  const tabs = [
+    { tab: 'absence', pdfHref: '/admin/logs/absence/download.pdf' },
+    { tab: 'checkinout', pdfHref: '/admin/logs/checkinout/download.pdf' },
+    { tab: 'classcheckinout', pdfHref: '/admin/logs/classcheckinout/download.pdf' },
+    { tab: 'nametag', pdfHref: '/admin/logs/nametag/download.pdf?archived=0' },
+    { tab: 'classrisk', pdfHref: '/admin/logs/classrisk/download.pdf?filterBy=date' },
+    { tab: 'missedduty', pdfHref: '/admin/logs/missedduty/download.pdf' },
+    { tab: 'classregistration', pdfHref: '/admin/logs/classregistration/download.pdf' },
+    { tab: 'allergies', pdfHref: '/admin/logs/allergies/download.pdf' },
+  ];
+
+  for (const { tab, pdfHref } of tabs) {
+    await t.test(`${tab} tab has a Download PDF button linking to ${pdfHref}`, async () => {
+      const page = await request(app).get(`/admin/logs?tab=${tab}`).set('Cookie', cookie);
+      assert.equal(page.status, 200);
+      assert.match(page.text, new RegExp(`href="${pdfHref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" aria-label="Download PDF"`));
+    });
+  }
+
+  await t.test("substitutes tab's Download PDF button links to its own route", async () => {
+    const page = await request(app).get('/admin/logs?tab=substitutes').set('Cookie', cookie);
+    assert.equal(page.status, 200);
+    assert.match(page.text, /href="\/admin\/logs\/substitutes\/download\.pdf\?day=\w+" aria-label="Download PDF"/);
+  });
+});
+
+test('GET /admin/logs/absence/download.pdf returns a real PDF of the absence/late log', async () => {
+  const cookie = await loginAsAdmin();
+  const res = await getBuffer('/admin/logs/absence/download.pdf', cookie);
+  assertIsRealPdf(res);
+});
+
+test('GET /admin/logs/checkinout/download.pdf and /admin/logs/classcheckinout/download.pdf each return a real PDF', async () => {
+  const cookie = await loginAsAdmin();
+
+  const coopRes = await getBuffer('/admin/logs/checkinout/download.pdf', cookie);
+  assertIsRealPdf(coopRes);
+
+  const classRes = await getBuffer('/admin/logs/classcheckinout/download.pdf', cookie);
+  assertIsRealPdf(classRes);
+});
+
+test('GET /admin/logs/nametag/download.pdf returns a real PDF of the name tag request list', async () => {
+  const cookie = await loginAsAdmin();
+  const res = await getBuffer('/admin/logs/nametag/download.pdf', cookie);
+  assertIsRealPdf(res);
+});
+
+test('GET /admin/logs/classregistration/download.pdf returns a real PDF reflecting the real filtered data', async () => {
+  const cookie = await loginAsAdmin();
+  const res = await getBuffer('/admin/logs/classregistration/download.pdf', cookie);
+  assertIsRealPdf(res);
+});
+
+test('GET /admin/logs/missedduty/download.pdf and /admin/logs/classrisk/download.pdf each return a real PDF (empty-state safe)', async () => {
+  const cookie = await loginAsAdmin();
+
+  const missedRes = await getBuffer('/admin/logs/missedduty/download.pdf', cookie);
+  assertIsRealPdf(missedRes);
+
+  const riskRes = await getBuffer('/admin/logs/classrisk/download.pdf?filterBy=date', cookie);
+  assertIsRealPdf(riskRes);
+});
+
+test('GET /admin/logs/substitutes/download.pdf returns a real PDF for the requested day/date', async () => {
+  const cookie = await loginAsAdmin();
+  const res = await getBuffer('/admin/logs/substitutes/download.pdf?day=monday&date=2026-03-02', cookie);
+  assertIsRealPdf(res);
+});
+
+test('GET /admin/logs/allergies/download.pdf returns a real PDF of the allergies/medical log', async () => {
+  const cookie = await loginAsAdmin();
+  const res = await getBuffer('/admin/logs/allergies/download.pdf', cookie);
+  assertIsRealPdf(res);
 });

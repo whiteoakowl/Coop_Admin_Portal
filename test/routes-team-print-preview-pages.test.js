@@ -40,6 +40,23 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - buffers the binary response so the
+// PDF bytes can actually be checked, the same way test/parent-family-
+// school-print-preview-and-pdf.test.js does for its own download.pdf
+// routes.
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
 test('Setup/Cleanup Teams: Print button links to a dedicated preview page instead of calling window.print() directly', async () => {
   const cookie = await loginAsAdmin();
   await db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'Preview Test Team')").run();
@@ -67,12 +84,22 @@ test('Floater Teams: Print button links to a dedicated preview page instead of c
   const manage = await request(app).get('/admin/volunteers/monday/teams').set('Cookie', cookie);
   assert.equal(manage.status, 200);
   assert.match(manage.text, /href="\/admin\/volunteers\/monday\/teams\/print\?semesterId=[^"]*"[^>]*target="_blank"/, 'Print button should link to the preview page, not call window.print() on itself');
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - Download PDF sits right next to
+  // Print.
+  assert.match(manage.text, /href="\/admin\/volunteers\/monday\/teams\/download\.pdf\?semesterId=[^"]*" aria-label="Download PDF"/);
 
   const preview = await request(app).get('/admin/volunteers/monday/teams/print').set('Cookie', cookie);
   assert.equal(preview.status, 200);
   assert.match(preview.text, /Preview Floater/);
   assert.match(preview.text, /class="print-preview-header no-print"/, 'the preview page should have its own no-print header');
   assert.match(preview.text, /roster-action-btn print-action-btn" onclick="window\.print\(\)"/, 'the preview page itself should have the real Print button');
+
+  const pdfRes = await getBuffer('/admin/volunteers/monday/teams/download.pdf', cookie);
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.match(pdfRes.headers['content-disposition'], /attachment; filename="monday-floater-teams\.pdf"/);
+  assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
 });
 
 // A real bug report: "the mobile print button for setup cleanup teams...
@@ -107,4 +134,9 @@ test('print preview pages require admin login, same as the manage pages they mir
   assert.equal(res1.status, 302, 'unauthenticated request should redirect to login');
   const res2 = await request(app).get('/admin/volunteers/monday/teams/print');
   assert.equal(res2.status, 302, 'unauthenticated request should redirect to login');
+});
+
+test('Floater Teams download.pdf requires admin login, same as the preview page it mirrors', async () => {
+  const res = await request(app).get('/admin/volunteers/monday/teams/download.pdf');
+  assert.equal(res.status, 302, 'unauthenticated request should redirect to login');
 });

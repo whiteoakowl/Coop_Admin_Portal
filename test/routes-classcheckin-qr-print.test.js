@@ -37,6 +37,18 @@ test.after(() => {
   fs.rmSync(testUploadsDir, { recursive: true, force: true });
 });
 
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
 async function loginAsAdmin() {
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   const cookie = loginRes.headers['set-cookie'];
@@ -73,6 +85,11 @@ test('Class Check-In QR Codes picker lists every class, with no description text
   assert.match(res.text, new RegExp(`class="qr-picker-row" data-day="monday" data-room="Room 1"[\\s\\S]*?value="${classId}"`));
   // Room column in the picker table itself, alongside Class/Day/Time.
   assert.match(res.text, /<th>Room<\/th>/);
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - a second submit button right next
+  // to Print, posting the exact same checked classIds but as a GET to
+  // routes/admin-design.js's download.pdf route.
+  assert.match(res.text, /formaction="\/admin\/design\/print-classcheckin-qr\/download\.pdf" formmethod="GET"[^>]*aria-label="Download PDF"/);
 });
 
 test('printing with no classes selected redirects with an error', async () => {
@@ -150,4 +167,26 @@ test('the print sheet groups classes into one page per (day, room), sorted by ho
   await t.test('@page has no margin of its own - only .qr-sheet-page\'s own padding provides one', async () => {
     assert.match(res.text, /@page\s*\{\s*size:\s*letter portrait;\s*margin:\s*0;\s*\}/);
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - routes/admin-design.js's new GET
+// /design/print-classcheckin-qr/download.pdf route renders the exact
+// same admin-classcheckin-qr-print.ejs view through headless Chromium
+// (see utils/pdfRender.js), with the selected classIds carried as a
+// query string instead of a POST body. PDF generation via real headless
+// Chromium is slow (~1-2s) - expected, not a bug.
+test('downloading the QR sheet as a PDF renders a real, non-trivial PDF', async (t) => {
+  const { cookie } = await loginAsAdmin();
+  const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'QR Download Class', room: 'Room 1' });
+
+  const res = await getBuffer(`/admin/design/print-classcheckin-qr/download.pdf?classIds=${classId}`, cookie);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers['content-type'], 'application/pdf');
+  assert.match(res.headers['content-disposition'], /attachment; filename="class-checkin-qr-codes\.pdf"/);
+  assert.equal(res.body.slice(0, 5).toString(), '%PDF-');
+  // A broken QR render would still return 200 with a near-blank page -
+  // a real one-page sheet with a rendered QR code comes back well into
+  // the tens of KB, not a trivial handful of bytes.
+  assert.ok(res.body.length > 5000, `expected a non-trivial PDF, got ${res.body.length} bytes`);
 });

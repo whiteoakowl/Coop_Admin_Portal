@@ -36,6 +36,7 @@ const {
   markLessonItemComplete,
   generateTranscriptsForEndedClasses,
 } = require('../utils/academics');
+const { renderViewToPdf } = require('../utils/pdfRender');
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
 const forums = require('../utils/forums');
 const { sectionIdsForMember, classSectionIdsForClasses, memberSatisfiesRestriction } = require('../utils/sections');
@@ -462,6 +463,16 @@ router.get('/transcript', async (req, res) => {
   res.render('student-transcript', { title: 'Transcript', member, current, history, dayLabels: CLASS_DAY_LABELS_FULL });
 });
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - sends a headless-Chromium-rendered
+// PDF of viewName (this router's own *-print.ejs view), same helper
+// shape as routes/parent-family-school.js's own sendPdf.
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
+
 router.get('/diploma', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const diploma = member ? await diplomaForStudent(member.id) : null;
@@ -480,6 +491,17 @@ router.get('/diploma/print', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const diploma = member ? await diplomaForStudent(member.id) : null;
   res.render('student-diploma-print', { title: 'Diploma', member, diploma });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - this signed-in student's own
+// diploma (memberForAccount already scopes it, same as the Print
+// preview above), now a PDF built from that same -print.ejs view.
+router.get('/diploma/download.pdf', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const diploma = member ? await diplomaForStudent(member.id) : null;
+  const pdf = await renderViewToPdf(req, 'student-diploma-print', { title: 'Diploma', member, diploma });
+  sendPdf(res, `${(member ? member.name : 'diploma').replace(/[^a-z0-9]+/gi, '-')}-diploma.pdf`, pdf);
 });
 
 // Resource Links - a real request: Student Portal should have "resource

@@ -74,6 +74,20 @@ function futureMonday() {
   return d;
 }
 
+// Same buffered-binary-response idiom test/parent-family-school-print-
+// preview-and-pdf.test.js already uses to check a real PDF body.
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
 test('Co-op Admin Name Tag Requests: Print is now a target="_blank" link to a dedicated preview page', async () => {
   const cookie = await loginAsAdmin();
   const { lastInsertRowid: memberId } = await db
@@ -126,6 +140,7 @@ test('Student Portal Diploma: Print is now a target="_blank" link to a dedicated
   const live = await request(app).get('/student/diploma').set('Cookie', student.cookie);
   assert.equal(live.status, 200);
   assert.match(live.text, /<a class="roster-action-btn print-action-btn no-print" href="\/student\/diploma\/print" target="_blank">Print<\/a>/);
+  assert.match(live.text, /<a class="icon-btn no-print" href="\/student\/diploma\/download\.pdf" aria-label="Download PDF"/);
   assert.doesNotMatch(live.text, /onclick="window\.print\(\)"/);
 
   const preview = await request(app).get('/student/diploma/print').set('Cookie', student.cookie);
@@ -134,6 +149,14 @@ test('Student Portal Diploma: Print is now a target="_blank" link to a dedicated
   assert.match(preview.text, /onclick="window\.print\(\)"/);
   assert.match(preview.text, /diploma-cert-name/);
   assert.match(preview.text, /Diploma Print Preview Kid/);
+
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - this same diploma, now a real PDF.
+  const pdfRes = await getBuffer('/student/diploma/download.pdf', student.cookie);
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.match(pdfRes.headers['content-disposition'], /attachment; filename="Diploma-Print-Preview-Kid-diploma\.pdf"/);
+  assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
 });
 
 test('Setup/Cleanup Assignments: Print is now a target="_blank" link to a dedicated preview page', async () => {

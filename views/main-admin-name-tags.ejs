@@ -39,8 +39,11 @@
               class="roster-action-btn archived-toggle-btn<%= showArchived ? ' active' : '' %>"
               href="/main-admin/name-tags?tab=requests<%= showArchived ? '' : '&archived=1' %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>"
             >Archived</a>
+          </div>
+          <div class="roster-btn-row">
             <a class="icon-btn" href="/main-admin/name-tags/requests/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
             <a class="icon-btn" href="/main-admin/name-tags/requests/print?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+            <a class="icon-btn" href="/main-admin/name-tags/requests/download.pdf?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
           </div>
         </div>
 
@@ -285,7 +288,9 @@
                 Select None
               </label>
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+              <button type="submit" formaction="/main-admin/name-tags/print/download.pdf" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
               <button type="submit" formaction="/main-admin/name-tags/print-plain-parent" class="btn-secondary name-tag-bulk-submit" title="Selected parents only, no schedule or setup/cleanup team">Print Plain Parent Tags</button>
+              <button type="submit" formaction="/main-admin/name-tags/print-plain-parent/download.pdf" class="icon-btn" aria-label="Download PDF" title="Download Plain Parent Tags PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
             </div>
             <div class="roster-scroll print-picker-scroll">
               <%- include('partials/print-picker-table', { members: members, listId: 'name-tag-bulk-list', skipRows: true }) %>
@@ -307,6 +312,7 @@
                 Select None
               </label>
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+              <button type="submit" formaction="/main-admin/name-tags/print-duplex/download.pdf" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
             </div>
             <div class="roster-scroll print-picker-scroll">
               <%- include('partials/print-picker-table', { members: members, listId: 'cards-duplex-bulk-list', skipRows: true }) %>
@@ -327,6 +333,7 @@
                 Select None
               </label>
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+              <button type="submit" formaction="/main-admin/name-tags/print-barcodes/download.pdf" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
             </div>
             <div class="roster-scroll print-picker-scroll">
               <%- include('partials/print-picker-table', { members: members, listId: 'barcodes-bulk-list', skipRows: true }) %>
@@ -348,6 +355,7 @@
                 Select None
               </label>
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+              <button type="submit" formaction="/main-admin/name-tags/print-barcode-labels/download.pdf" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
             </div>
             <div class="roster-scroll print-picker-scroll">
               <%- include('partials/print-picker-table', { members: members, listId: 'barcode-labels-bulk-list', skipRows: true }) %>
@@ -356,7 +364,7 @@
         </div>
 
         <div id="print-setupCleanupBadges-section" hidden>
-          <%- include('partials/misc-badge-print-panel', { type: 'setupCleanup', label: 'Setup/Cleanup', badges: setupCleanupBadges, setupTeams, semesters, basePath: '/main-admin/name-tags' }) %>
+          <%- include('partials/misc-badge-print-panel', { type: 'setupCleanup', label: 'Setup/Cleanup', badges: setupCleanupBadges, setupTeams, semesters, basePath: '/main-admin/name-tags', downloadPdf: true }) %>
         </div>
 
         <%
@@ -387,12 +395,15 @@
               <div class="roster-btn-row">
                 <button type="submit" class="primary-btn">Print</button>
               </div>
+              <div class="roster-btn-row">
+                <button type="submit" formaction="/main-admin/name-tags/badges/bypass/download.pdf" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
+              </div>
             </form>
           <% } %>
         </div>
 
         <div id="print-customBadges-section" hidden>
-          <%- include('partials/misc-badge-print-panel', { type: 'custom', label: 'Custom', badges: customBadges, basePath: '/main-admin/name-tags' }) %>
+          <%- include('partials/misc-badge-print-panel', { type: 'custom', label: 'Custom', badges: customBadges, basePath: '/main-admin/name-tags', downloadPdf: true }) %>
         </div>
 
         <div id="print-classCheckinQr-section" hidden>
@@ -409,6 +420,13 @@
               <button type="button" class="roster-action-btn" id="classcheckin-qr-filter-btn">Filter</button>
               <% if (classesForQr.length > 0) { %>
                 <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+                <%# A real request: "the download should be a pdf of exactly
+                    how it would also look when printing" - this button
+                    submits the exact same checked classIds, as a GET so
+                    the browser can navigate straight to the PDF instead of
+                    just posting a form (routes/main-admin-name-tags.js's
+                    download.pdf route). %>
+                <button type="submit" class="icon-btn" formaction="/main-admin/name-tags/print-classcheckin-qr/download.pdf" formmethod="GET" formtarget="_self" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
               <% } %>
             </div>
             <% if (classesForQr.length === 0) { %>
@@ -462,6 +480,7 @@
         <div id="print-playgroundQr-section" hidden>
           <p class="hint">Prints one QR code per playground hour, 4 to a page (one page per day) - anybody can scan one to check in or out, no roster required.</p>
           <a class="primary-btn" href="/main-admin/name-tags/print-playground-qr" target="_blank">Print Playground Check-In QR Codes</a>
+          <a class="icon-btn" href="/main-admin/name-tags/print-playground-qr/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         </div>
 
         <div id="print-libraryBarcodes-section" hidden>
@@ -483,6 +502,13 @@
               </label>
               <% if (libraryItems.length > 0) { %>
                 <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+                <%# A real request: "the download should be a pdf of exactly
+                    how it would also look when printing" - this button
+                    submits the exact same checked itemIds, as a GET so the
+                    browser can navigate straight to the PDF instead of just
+                    posting a form (routes/main-admin-name-tags.js's
+                    download.pdf route). %>
+                <button type="submit" class="icon-btn" formaction="/main-admin/name-tags/print-library-barcodes/download.pdf" formmethod="GET" formtarget="_self" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
               <% } %>
             </div>
             <% if (libraryItems.length === 0) { %>

@@ -68,6 +68,20 @@ async function csrfFrom(cookie, url) {
   return /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
 }
 
+// Same buffered-binary-response idiom test/parent-family-school-print-
+// preview-and-pdf.test.js already uses to check a real PDF body.
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
 async function loginAsMainAdmin() {
   const loginRes = await request(app).post('/login').type('form').send({ email: process.env.MAIN_ADMIN_EMAIL, password: process.env.MAIN_ADMIN_PASSWORD, next: '/main-admin' });
   return loginRes.headers['set-cookie'];
@@ -137,6 +151,24 @@ test('a parent can design a diploma with a template, color, display name, and tw
   assert.match(print.text, /Designed Student Full Legal Name/);
   assert.match(print.text, /John Smith/);
   assert.match(print.text, /Having completed all requirements\./);
+
+  assert.match(list.text, /<a class="icon-btn" href="\/parent\/academics\/diplomas\/\d+\/download\.pdf" aria-label="Download PDF"/);
+
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - this same diploma, now a real PDF.
+  const pdfRes = await getBuffer(`/parent/academics/diplomas/${student.memberId}/download.pdf`, parent.cookie);
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.match(pdfRes.headers['content-disposition'], /attachment; filename="Design-Student-diploma\.pdf"/);
+  assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
+
+  // Another family's parent cannot download this child's diploma by
+  // guessing the studentId - scoped to childrenForAccount exactly like
+  // the Print preview above.
+  const otherFamilyId = await createFamily('Diploma Download Snooping Family');
+  const otherParent = await createPortalMember({ name: 'Diploma Download Snooping Parent', familyId: otherFamilyId, memberType: 'parent', roleKey: 'parent' });
+  const hijackRes = await request(app).get(`/parent/academics/diplomas/${student.memberId}/download.pdf`).set('Cookie', otherParent.cookie);
+  assert.equal(hijackRes.status, 404);
 });
 
 test('a brand new diploma design defaults to the classic template and the site brand color', async () => {

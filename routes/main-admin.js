@@ -16,6 +16,7 @@ const photos = require('../utils/photos');
 const directory = require('../utils/directory');
 const classifieds = require('../utils/classifieds');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { renderViewToPdf } = require('../utils/pdfRender');
 const {
   listAdminPositions,
   addAdminPosition,
@@ -237,6 +238,14 @@ router.get('/admins/export.csv', requirePortalPermission('manage_users'), async 
 router.get('/admins/print', requirePortalPermission('manage_users'), async (req, res) => {
   const { rows } = await buildAdminRows();
   res.render('main-admin-admins-print', { title: 'Admins', rows });
+});
+
+router.get('/admins/download.pdf', requirePortalPermission('manage_users'), async (req, res) => {
+  const { rows } = await buildAdminRows();
+  const pdf = await renderViewToPdf(req, 'main-admin-admins-print', { title: 'Admins', rows });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', 'attachment; filename="admins.pdf"');
+  res.send(pdf);
 });
 
 // "Add/Edit Admin Position" button - one popup listing every existing

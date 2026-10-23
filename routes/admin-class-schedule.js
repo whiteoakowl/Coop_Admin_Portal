@@ -38,6 +38,7 @@ const { primaryParentsFor } = require('../utils/scheduleCardData');
 // (utils/events.js) rather than standing up a second, parallel list.
 const { listAccountingCategories } = require('../utils/events');
 const { adminRemoveStudentFromClass } = require('../utils/classRegistration');
+const { renderViewToPdf } = require('../utils/pdfRender');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter, imageFileFilter, lessonAttachmentFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = require('../utils/storage');
@@ -1368,6 +1369,28 @@ router.get('/class-schedule/classes/:id/roster/print', requireFullAdmin, async (
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - same data the Print preview above renders,
+// now a PDF built from the exact same -print.ejs view.
+router.get('/class-schedule/classes/:id/roster/download.pdf', requireFullAdmin, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const cls = await getClass(id);
+  if (!cls) return res.status(404).send('Not found');
+  const pdf = await renderViewToPdf(req, 'class-schedule-roster-print', {
+    title: `${cls.class_name} Roster`,
+    cls: { ...cls, students: cls.students.map((s) => ({ ...s, age: ageFromBirthday(s.birthday) })) },
+    dayLabel: CLASS_DAY_LABELS_FULL[cls.day],
+    // partials/admin-nav reads isFullAdmin straight off res.locals on a
+    // normal res.render() - req.app.render() (what renderViewToPdf uses
+    // under the hood) never sees res.locals at all, so it has to be
+    // passed through explicitly here or the nav partial throws.
+    isFullAdmin: res.locals.isFullAdmin,
+  });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${cls.class_name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-roster.pdf"`);
+  res.send(pdf);
+});
+
 router.get('/class-schedule/classes/:id/roster/import-template.xlsx', requireFullAdmin, (req, res) => {
   const buffer = buildTemplateWorkbook(['Student First Name', 'Student Last Name'], [['Jane', 'Smith'], ['John', 'Smith']]);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -1646,6 +1669,24 @@ router.get('/class-schedule/:day/print', requireAdmin, requireClassDay, async (r
     // grid column instead of just a line of text inside each card.
     roomGrid: await roomGridForDay(day),
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - same data the Print preview above renders,
+// now a PDF built from the exact same -print.ejs view.
+router.get('/class-schedule/:day/download.pdf', requireAdmin, requireClassDay, async (req, res) => {
+  const day = req.params.day;
+  const pdf = await renderViewToPdf(req, 'admin-class-schedule-print', {
+    title: `${CLASS_DAY_LABELS_FULL[day]} Schedule`,
+    dayLabel: CLASS_DAY_LABELS_FULL[day],
+    roomGrid: await roomGridForDay(day),
+    // See the roster/download.pdf route's own comment above on why this
+    // has to be passed through by hand for req.app.render().
+    isFullAdmin: res.locals.isFullAdmin,
+  });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${day}-class-schedule.pdf"`);
+  res.send(pdf);
 });
 
 module.exports = router;

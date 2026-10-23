@@ -38,6 +38,7 @@ const { mapWithConcurrency } = require('../utils/concurrency');
 const auditLog = require('../utils/auditLog');
 const { findMemberByBarcodeOrName } = require('../utils/memberLookup');
 const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/spreadsheet');
+const { renderViewToPdf } = require('../utils/pdfRender');
 
 // A real request: "If a member is added as an organizer for an event, on
 // parent portal when they click on the event it will show an edit event
@@ -490,6 +491,15 @@ router.get('/', async (req, res) => {
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - sends a headless-Chromium-rendered
+// PDF of viewName (one of this router's own *-print.ejs views).
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
+
 // "All print button should show a print preview full real page on a page
 // with a print button" - the Calendar tab's own window.print() button
 // used to jump straight to the browser's own print dialog on the live
@@ -517,6 +527,27 @@ router.get('/print', async (req, res) => {
   });
 });
 
+router.get('/download.pdf', async (req, res) => {
+  const published = await events.listEvents({ status: ['published', 'cancelled'] });
+  const calendar = events.monthGrid(req.query.month, published);
+  const calendarView = req.query.view === 'list' ? 'list' : 'calendar';
+  const calendarList =
+    calendarView === 'list'
+      ? calendar.weeks
+          .flat()
+          .filter((day) => day.inMonth)
+          .flatMap((day) => day.events)
+          .map((e) => ({ ...e, startsLabel: formatFriendlyTimestamp(e.starts_at) }))
+      : [];
+  const pdf = await renderViewToPdf(req, 'admin-events-calendar-print', {
+    title: 'Events Calendar Print Preview',
+    calendar,
+    calendarView,
+    calendarList,
+  });
+  sendPdf(res, 'events-calendar.pdf', pdf);
+});
+
 router.get('/registrationlog/print', async (req, res) => {
   const dateFilter = req.query.date || '';
   const allActions = await events.allEventRegistrationActions();
@@ -526,6 +557,18 @@ router.get('/registrationlog/print', async (req, res) => {
     allSubmissions,
     dateFilter,
   });
+});
+
+router.get('/registrationlog/download.pdf', async (req, res) => {
+  const dateFilter = req.query.date || '';
+  const allActions = await events.allEventRegistrationActions();
+  const allSubmissions = dateFilter ? allActions.filter((a) => a.date === dateFilter) : allActions;
+  const pdf = await renderViewToPdf(req, 'admin-events-registrationlog-print', {
+    title: 'Event Registration Log Print Preview',
+    allSubmissions,
+    dateFilter,
+  });
+  sendPdf(res, 'event-registration-log.pdf', pdf);
 });
 
 router.get('/registrationlog/export.csv', async (req, res) => {
@@ -1433,6 +1476,21 @@ router.get('/:id/registrations/print', async (req, res) => {
     volunteerSignupsByMember,
     isOrganizerView: !!req.isOrganizerView,
   });
+});
+
+router.get('/:id/registrations/download.pdf', async (req, res) => {
+  const event = await events.getEvent(req.params.id);
+  if (!event) return res.status(404).render('404', { title: 'Not Found' });
+  const familyGroups = await events.familyGroupedRegistrationsForEvent(req.params.id);
+  const volunteerSignupsByMember = event.volunteers_enabled ? await events.volunteerSignupsByMemberForEvent(req.params.id) : new Map();
+  const pdf = await renderViewToPdf(req, 'admin-events-registrations-print', {
+    title: `Registrations - ${event.title}`,
+    event,
+    familyGroups,
+    volunteerSignupsByMember,
+    isOrganizerView: !!req.isOrganizerView,
+  });
+  sendPdf(res, `registrations-${event.id}.pdf`, pdf);
 });
 
 // "Add import and export button as well."

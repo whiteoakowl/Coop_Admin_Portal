@@ -13,6 +13,7 @@ const events = require('../utils/events');
 const { listAdminPositions, membersByAdminPosition } = require('../utils/adminPositions');
 const { activeParentAndAdminOptions, activeMemberOptions } = require('../utils/members');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { renderViewToPdf } = require('../utils/pdfRender');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_volunteers'));
 
@@ -111,6 +112,23 @@ router.get('/committees/:id/print', async (req, res) => {
     positions: await volunteers.positionsForCommittee(committee.id),
     members: await volunteers.membersForCommittee(committee.id),
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - same committee the print preview
+// above shows, as a real PDF.
+router.get('/committees/:id/download.pdf', async (req, res) => {
+  const committee = await volunteers.getCommittee(req.params.id);
+  if (!committee) return res.status(404).render('404', { title: 'Not Found' });
+  const pdf = await renderViewToPdf(req, 'main-admin-committee-detail-print', {
+    title: `${committee.name} Print Preview`,
+    committee,
+    positions: await volunteers.positionsForCommittee(committee.id),
+    members: await volunteers.membersForCommittee(committee.id),
+  });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${committee.name.replace(/[^a-z0-9]+/gi, '-')}-committee.pdf"`);
+  res.send(pdf);
 });
 
 router.post('/committees/:id/members', async (req, res) => {
@@ -240,6 +258,22 @@ router.get('/signup-lists/:id/print', async (req, res) => {
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - same list the print preview above
+// shows, as a real PDF.
+router.get('/signup-lists/:id/download.pdf', async (req, res) => {
+  const list = await volunteers.getSignUpList(req.params.id);
+  if (!list) return res.status(404).render('404', { title: 'Not Found' });
+  const pdf = await renderViewToPdf(req, 'main-admin-signup-list-detail-print', {
+    title: `${list.title} Print Preview`,
+    list,
+    items: await volunteers.itemsForSignUpList(list.id),
+  });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${list.title.replace(/[^a-z0-9]+/gi, '-')}-signup-list.pdf"`);
+  res.send(pdf);
+});
+
 // A real request: "signup lists be able to add multiple items to a list
 // in the popup before. Page only refreshes after adding however many
 // needed" - the Add Item dialog (main-admin-signup-list-detail.ejs) now
@@ -343,6 +377,22 @@ router.get('/volunteer-lists/:id/print', async (req, res) => {
     list,
     shifts: await volunteers.shiftsForVolunteerList(list.id),
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - same list the print preview above
+// shows, as a real PDF.
+router.get('/volunteer-lists/:id/download.pdf', async (req, res) => {
+  const list = await volunteers.getVolunteerList(req.params.id);
+  if (!list) return res.status(404).render('404', { title: 'Not Found' });
+  const pdf = await renderViewToPdf(req, 'main-admin-volunteer-list-detail-print', {
+    title: `${list.title} Print Preview`,
+    list,
+    shifts: await volunteers.shiftsForVolunteerList(list.id),
+  });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${list.title.replace(/[^a-z0-9]+/gi, '-')}-volunteer-list.pdf"`);
+  res.send(pdf);
 });
 
 router.post('/volunteer-lists/:id/shifts', async (req, res) => {

@@ -32,8 +32,11 @@
               class="roster-action-btn archived-toggle-btn<%= showArchived ? ' active' : '' %>"
               href="/admin/design?tab=requests<%= showArchived ? '' : '&archived=1' %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>"
             >Archived</a>
+          </div>
+          <div class="roster-btn-row">
             <a class="icon-btn" href="/admin/design/requests/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
             <a class="icon-btn" href="/admin/design/requests/print?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+            <a class="icon-btn" href="/admin/design/requests/download.pdf?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
           </div>
         </div>
 
@@ -303,6 +306,7 @@
                 Select None
               </label>
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+              <button type="submit" formaction="/admin/name-tag/download.pdf" formtarget="_self" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
             </div>
             <div class="roster-scroll print-picker-scroll">
               <%- include('partials/print-picker-table', { members: members, listId: 'name-tag-bulk-list', skipRows: true }) %>
@@ -338,6 +342,7 @@
                   Select None
                 </label>
                 <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+                <button type="submit" formaction="/admin/design/download-duplex.pdf" formtarget="_self" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
               </div>
               <div class="roster-scroll print-picker-scroll">
                 <table class="roster-table members-table condensed-table" id="name-tag-requests-bulk-list">
@@ -373,6 +378,7 @@
                 Select None
               </label>
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+              <button type="submit" formaction="/admin/design/download-duplex.pdf" formtarget="_self" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
             </div>
             <div class="roster-scroll print-picker-scroll">
               <%- include('partials/print-picker-table', { members: members, listId: 'cards-duplex-bulk-list', skipRows: true }) %>
@@ -393,6 +399,7 @@
                 Select None
               </label>
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+              <button type="submit" formaction="/admin/name-tag/download-barcodes.pdf" formtarget="_self" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
             </div>
             <div class="roster-scroll print-picker-scroll">
               <%- include('partials/print-picker-table', { members: members, listId: 'barcodes-bulk-list', skipRows: true }) %>
@@ -414,6 +421,7 @@
                 Select None
               </label>
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+              <button type="submit" formaction="/admin/name-tag/download-barcode-labels.pdf" formtarget="_self" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
             </div>
             <div class="roster-scroll print-picker-scroll">
               <%- include('partials/print-picker-table', { members: members, listId: 'barcode-labels-bulk-list', skipRows: true }) %>
@@ -453,6 +461,9 @@
               <div class="roster-btn-row">
                 <button type="submit" class="primary-btn">Print</button>
               </div>
+              <div class="roster-btn-row">
+                <button type="submit" formaction="/admin/design/badges/bypass/download.pdf" formtarget="_self" class="icon-btn" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
+              </div>
             </form>
           <% } %>
         </div>
@@ -475,6 +486,13 @@
               <button type="button" class="roster-action-btn" id="classcheckin-qr-filter-btn">Filter</button>
               <% if (classesForQr.length > 0) { %>
                 <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+                <%# A real request: "the download should be a pdf of exactly
+                    how it would also look when printing" - this button
+                    submits the exact same checked classIds, as a GET so
+                    the browser can navigate straight to the PDF instead of
+                    just posting a form (routes/admin-design.js's download.pdf
+                    route). %>
+                <button type="submit" class="icon-btn" formaction="/admin/design/print-classcheckin-qr/download.pdf" formmethod="GET" formtarget="_self" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
               <% } %>
             </div>
             <% if (classesForQr.length === 0) { %>
@@ -539,6 +557,7 @@
         <div id="print-playgroundQr-section" hidden>
           <p class="hint">Prints one QR code per playground hour, 4 to a page (one page per day) - anybody can scan one to check in or out, no roster required.</p>
           <a class="primary-btn" href="/admin/design/print-playground-qr" target="_blank">Print Playground Check-In QR Codes</a>
+          <a class="icon-btn" href="/admin/design/print-playground-qr/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         </div>
 
         <%# Library Barcodes: a real request - "Under printing add printing
@@ -571,6 +590,13 @@
               </label>
               <% if (libraryItems.length > 0) { %>
                 <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+                <%# A real request: "the download should be a pdf of exactly
+                    how it would also look when printing" - this button
+                    submits the exact same checked itemIds, as a GET so the
+                    browser can navigate straight to the PDF instead of just
+                    posting a form (routes/admin-design.js's download.pdf
+                    route). %>
+                <button type="submit" class="icon-btn" formaction="/admin/design/print-library-barcodes/download.pdf" formmethod="GET" formtarget="_self" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></button>
               <% } %>
             </div>
             <% if (libraryItems.length === 0) { %>

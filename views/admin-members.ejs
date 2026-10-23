@@ -124,6 +124,9 @@
           <svg class="icon"><use href="#icon-filter"/></svg>
           Filter<% if (filterLabelParts.length > 0) { %>: <%= filterLabelParts.join(', ') %><% } %>
         </button>
+        <a class="roster-action-btn" href="/admin/members/grade-level-report">Grade Level Report</a>
+      </div>
+      <div class="roster-btn-row">
         <%# A real request: "change export and print buttons to icons" -
             same icon-btn + icon-download/icon-printer pattern already
             used elsewhere (e.g. views/admin-accounting-list.ejs's own
@@ -136,7 +139,7 @@
             admin-members.js's own GET /members/print). Carries every
             filter dimension this page has, same as Export CSV above. %>
         <a class="icon-btn" href="/admin/members/print<%= printQs ? '?' + printQs : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
-        <a class="roster-action-btn" href="/admin/members/grade-level-report">Grade Level Report</a>
+        <a class="icon-btn" href="/admin/members/download.pdf<%= printQs ? '?' + printQs : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
       </div>
 
       <%# A real request: "Add a column of check boxes in the first

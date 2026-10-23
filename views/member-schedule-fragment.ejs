@@ -29,4 +29,5 @@
 <div class="notes-dialog-actions">
   <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
   <a class="primary-btn" href="/admin/schedule/print?memberId=<%= member.id %>" target="_blank">Print</a>
+  <a class="icon-btn" href="/admin/schedule/download.pdf?memberId=<%= member.id %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
 </div>

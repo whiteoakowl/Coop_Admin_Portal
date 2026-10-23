@@ -35,6 +35,13 @@ const emailComposer = require('../utils/emailComposer');
 const { appSetting, setAppSetting } = require('../utils/appSettings');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { formatTimestamp, formatDateShort } = require('../utils/dates');
+const { renderViewToPdf } = require('../utils/pdfRender');
+
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_finances'));
 
@@ -120,6 +127,19 @@ router.get('/print', async (req, res) => {
     members: await accountRows(q),
     formatCents: payments.formatCents,
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - a PDF built from the exact same
+// -print.ejs view the Print button above opens.
+router.get('/download.pdf', async (req, res) => {
+  const q = (req.query.q || '').trim().toLowerCase();
+  const pdf = await renderViewToPdf(req, 'admin-accounting-list-print', {
+    title: 'Accounts Print Preview',
+    members: await accountRows(q),
+    formatCents: payments.formatCents,
+  });
+  sendPdf(res, 'accounting-accounts.pdf', pdf);
 });
 
 async function recipientAccountIdsForMembers(memberIds) {
@@ -617,6 +637,25 @@ router.get('/members/:memberId/print', async (req, res) => {
     ...overview,
     formatCents: payments.formatCents,
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - same :memberId/?year= scoping as the
+// print preview above (this whole router is already gated to
+// manage_finances Main Admins only, so no extra ownership check is
+// needed here beyond what every other route in this file already has).
+router.get('/members/:memberId/download.pdf', async (req, res) => {
+  const member = await db.prepare('SELECT id, name, parked FROM members WHERE id = ?').get(req.params.memberId);
+  if (!member) return res.status(404).render('404', { title: 'Not Found' });
+  const overview = await payments.accountOverviewForMember(member.id, req.query.year || 'current');
+
+  const pdf = await renderViewToPdf(req, 'admin-accounting-member-print', {
+    title: `${member.name} Print Preview`,
+    member,
+    ...overview,
+    formatCents: payments.formatCents,
+  });
+  sendPdf(res, `${member.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-account.pdf`, pdf);
 });
 
 router.post('/members/:memberId/charges', async (req, res) => {

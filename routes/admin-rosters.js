@@ -27,6 +27,7 @@ const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
 const { absenceFormSubmissionsForRoster } = require('../utils/alerts');
 const { rosterDates, buildRosterGridData } = require('../utils/rosterGrid');
 const { ensurePlaygroundRoster, playgroundHourLabel, playgroundLogForDate } = require('../utils/playground');
+const { renderViewToPdf } = require('../utils/pdfRender');
 
 // Mirrors routes/admin-schedule.js's own resolveSemesterId - Attendance's
 // Parent/Student rosters, like Classes' own grid, have no single
@@ -375,7 +376,12 @@ router.get('/rosters', requireAdmin, async (req, res) => {
 // .attendance-print-page rule in styles.css) and only shrinks a given
 // 50-row page from there if it still doesn't fit - see the "grid" branch
 // below for how pages are split.
-router.get('/rosters/print', requireAdmin, async (req, res) => {
+// Builds the exact locals admin-rosters-print.ejs needs for whatever tab
+// the request asks for - shared by the print preview route and the
+// Download PDF route right below it, so the two never drift apart on
+// which branch (playground log vs. day/class grid) a given ?tab= maps to.
+// null means "no such tab/class" - the caller decides how to respond.
+async function rostersPrintLocals(req) {
   const requestedTab = req.query.tab || '';
 
   const playgroundMatch = new RegExp(`^playground-(${CLASS_DAYS.join('|')})-([1-4])$`).exec(requestedTab);
@@ -388,7 +394,7 @@ router.get('/rosters/print', requireAdmin, async (req, res) => {
     const today = todayISO();
     const requestedDate = isValidISODate(req.query.date) && pgDates.includes(req.query.date) ? req.query.date : null;
     const selectedDate = requestedDate || [...pgDates].reverse().find((d) => d <= today) || pgDates[pgDates.length - 1] || null;
-    return res.render('admin-rosters-print', {
+    return {
       title: `${CLASS_DAY_LABELS_FULL[pgDay]} Playground Print Preview`,
       view: 'playgroundLog',
       pgDayLabel: CLASS_DAY_LABELS_FULL[pgDay],
@@ -396,7 +402,7 @@ router.get('/rosters/print', requireAdmin, async (req, res) => {
       selectedDate,
       selectedDateLabel: selectedDate ? formatDateLabel(selectedDate) : null,
       log: selectedDate ? await playgroundLogForDate(rosterId, selectedDate) : [],
-    });
+    };
   }
 
   const classId = classIdFromTab(requestedTab);
@@ -405,7 +411,7 @@ router.get('/rosters/print', requireAdmin, async (req, res) => {
   let tabLabel;
   if (classId) {
     const cls = await classRosterInfo(classId);
-    if (!cls) return res.status(404).render('404', { title: 'Not Found' });
+    if (!cls) return null;
     day = cls.day;
     tabLabel = `${cls.class_name} (${cls.hourLabel})`;
   } else {
@@ -419,7 +425,7 @@ router.get('/rosters/print', requireAdmin, async (req, res) => {
 
   const rosterId = await rosterIdForTab(tab);
   const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
-  if (!roster) return res.status(404).render('404', { title: 'Not Found' });
+  if (!roster) return null;
   const dates = classId ? await rosterDates(await ensureDayRoster(day, 'student')) : await rosterDates(rosterId);
 
   // partials/roster-archive-grid-table expects the flattened { name, ... }
@@ -466,13 +472,36 @@ router.get('/rosters/print', requireAdmin, async (req, res) => {
     if (grid.rows.length === 0) break;
   }
 
-  res.render('admin-rosters-print', {
+  return {
     title: `${tabLabel} Print Preview`,
     view: 'grid',
     tabLabel,
     dayLabel: CLASS_DAY_LABELS_FULL[day],
     gridPages,
-  });
+  };
+}
+
+router.get('/rosters/print', requireAdmin, async (req, res) => {
+  const locals = await rostersPrintLocals(req);
+  if (!locals) return res.status(404).render('404', { title: 'Not Found' });
+  res.render('admin-rosters-print', locals);
+});
+
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - same branching (day/class grid vs. a
+// Playground hour's log) as the Print preview above, built from the
+// exact same locals, now a PDF built from the exact same -print.ejs view.
+router.get('/rosters/download.pdf', requireAdmin, async (req, res) => {
+  const locals = await rostersPrintLocals(req);
+  if (!locals) return res.status(404).render('404', { title: 'Not Found' });
+  // partials/admin-nav reads isFullAdmin straight off res.locals on a
+  // normal res.render() - req.app.render() (what renderViewToPdf uses
+  // under the hood) never sees res.locals at all, so it has to be passed
+  // through explicitly here or the nav partial throws.
+  const pdf = await renderViewToPdf(req, 'admin-rosters-print', { ...locals, isFullAdmin: res.locals.isFullAdmin });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', 'attachment; filename="rosters.pdf"');
+  res.send(pdf);
 });
 
 // --- Session dates ---

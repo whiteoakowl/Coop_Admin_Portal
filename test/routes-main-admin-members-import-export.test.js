@@ -45,6 +45,21 @@ async function loginAsMainAdmin() {
   return { cookie, csrfToken };
 }
 
+// Same buffer-a-binary-response shape as test/parent-family-school-print-
+// preview-and-pdf.test.js's own getBuffer - supertest's default text
+// parser corrupts a real PDF's binary body.
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
 // A later real request removed "Edit Permissions" from this toolbar
 // entirely (see test/routes-main-admin-members-cleanup.test.js).
 test('Members page toolbar: Add Member/Import/Export sit above a "Filter" (not "type or family") control', async () => {
@@ -84,6 +99,9 @@ test('Members page toolbar has a Print button linking to a dedicated preview pag
   assert.match(page.text, /<a class="icon-btn" href="\/main-admin\/members\/print"[^>]*target="_blank"[^>]*aria-label="Print"/);
   assert.doesNotMatch(page.text, /onclick="window\.print\(\)"[^>]*aria-label="Print"/);
   assert.match(page.text, /<div class="print-header">[\s\S]*?<p class="print-header-sub">Members<\/p>/);
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - Download PDF sits right beside Print.
+  assert.match(page.text, /<a class="icon-btn" href="\/main-admin\/members\/download\.pdf"[^>]*aria-label="Download PDF"/);
 });
 
 test('GET /main-admin/members/print renders a read-only preview with a Print button and the same filtered members', async () => {
@@ -100,6 +118,20 @@ test('GET /main-admin/members/print renders a read-only preview with a Print but
   const filteredRes = await request(app).get(`/main-admin/members/print?family=${familyId}`).set('Cookie', cookie);
   assert.equal(filteredRes.status, 200);
   assert.match(filteredRes.text, /Print Preview Member/);
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - a real PDF built from the exact
+// same main-admin-members-print.ejs view the Print button opens.
+test('GET /main-admin/members/download.pdf returns a real PDF', async () => {
+  const { cookie } = await loginAsMainAdmin();
+  await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Download PDF Member', 'download-pdf-member-1', 'parent', 1)").run();
+
+  const res = await getBuffer('/main-admin/members/download.pdf', cookie);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers['content-type'], 'application/pdf');
+  assert.match(res.headers['content-disposition'], /attachment; filename="members\.pdf"/);
+  assert.equal(res.body.slice(0, 5).toString(), '%PDF-');
 });
 
 test('GET /main-admin/members/export.csv exports the roster as CSV', async () => {

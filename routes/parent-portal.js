@@ -73,6 +73,7 @@ const {
   coopClassNamesForStudent,
   DIPLOMA_TEMPLATES,
 } = require('../utils/academics');
+const { renderViewToPdf } = require('../utils/pdfRender');
 const { classesForStudent: familySchoolClassesForStudent } = require('../utils/familySchool');
 const notifications = require('../utils/notifications');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('../utils/sections');
@@ -1183,6 +1184,16 @@ router.get('/documents', async (req, res) => {
   res.render('parent-documents', { title: 'Documents', documents });
 });
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - sends a headless-Chromium-rendered
+// PDF of viewName (one of this router's own *-print.ejs views), same
+// helper shape as routes/parent-family-school.js's own sendPdf.
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
+
 // Academics - a real request: "sub pages should be transcripts,
 // diplomas, name tags." Originally purely read-only (current
 // enrollments + student_academic_history, grades/assignments left out
@@ -1279,6 +1290,19 @@ router.get('/academics/transcripts/:studentId/print', async (req, res) => {
   res.render('parent-academics-transcript-print', { title: 'Transcript', member: child, builder: await transcriptBuilderForStudent(studentId) });
 });
 
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - this child's own transcript, scoped
+// by requireOwnChild exactly like the Print preview above, now a PDF
+// built from that same -print.ejs view.
+router.get('/academics/transcripts/:studentId/download.pdf', async (req, res) => {
+  const studentId = parseInt(req.params.studentId, 10);
+  if (!(await requireOwnChild(req, studentId))) return res.status(404).send('Not found');
+  const children = await childrenForAccount(req.portalAccount);
+  const child = children.find((c) => c.id === studentId);
+  const pdf = await renderViewToPdf(req, 'parent-academics-transcript-print', { title: 'Transcript', member: child, builder: await transcriptBuilderForStudent(studentId) });
+  sendPdf(res, `${child.name.replace(/[^a-z0-9]+/gi, '-')}-transcript.pdf`, pdf);
+});
+
 // Diplomas - a real request: "Diplomas allows parents to design and print
 // a diploma for their students." A parent can create/edit (never issue
 // on someone else's behalf) their own child's diploma design/wording and
@@ -1330,6 +1354,20 @@ router.get('/academics/diplomas/:studentId/print', async (req, res) => {
   const diploma = await diplomaForStudent(child.id);
   if (!diploma) return res.redirect('/parent/academics/diplomas?error=' + encodeURIComponent('Design a diploma for this child first.'));
   res.render('parent-academics-diploma-print', { title: 'Diploma', member: child, diploma });
+});
+
+// A real request: "the download should be a pdf of exactly how it
+// would also look when printing" - this child's own diploma, scoped to
+// one's own family exactly like the Print preview above, now a PDF
+// built from that same -print.ejs view.
+router.get('/academics/diplomas/:studentId/download.pdf', async (req, res) => {
+  const children = await childrenForAccount(req.portalAccount);
+  const child = children.find((c) => c.id === parseInt(req.params.studentId, 10));
+  if (!child) return res.status(404).render('404', { title: 'Not Found' });
+  const diploma = await diplomaForStudent(child.id);
+  if (!diploma) return res.redirect('/parent/academics/diplomas?error=' + encodeURIComponent('Design a diploma for this child first.'));
+  const pdf = await renderViewToPdf(req, 'parent-academics-diploma-print', { title: 'Diploma', member: child, diploma });
+  sendPdf(res, `${child.name.replace(/[^a-z0-9]+/gi, '-')}-diploma.pdf`, pdf);
 });
 
 // Name Tags - a real request: parents should be able to print name tags

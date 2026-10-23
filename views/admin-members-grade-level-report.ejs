@@ -27,6 +27,8 @@
           <svg class="icon"><use href="#icon-filter"/></svg>
           Filter<% if (filterLabelParts.length > 0) { %>: <%= filterLabelParts.join(', ') %><% } %>
         </button>
+      </div>
+      <div class="roster-btn-row">
         <%# A real request: "all pages/subpages with print, export,
             import, or download buttons should be changed to icons... and
             have all four" - this page only had Print. %>
@@ -37,6 +39,7 @@
             new tab instead of printing this page in place (see routes/
             admin-members.js's own GET /members/grade-level-report/print). %>
         <a class="icon-btn" href="/admin/members/grade-level-report/print<%= hasActiveFilter ? '?' + ['sectionId=' + (selectedSectionId || ''), 'signup=' + (selectedSignup || ''), 'familyId=' + (selectedFamilyId || '')].join('&') : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        <a class="icon-btn" href="/admin/members/grade-level-report/download.pdf<%= hasActiveFilter ? '?' + ['sectionId=' + (selectedSectionId || ''), 'signup=' + (selectedSignup || ''), 'familyId=' + (selectedFamilyId || '')].join('&') : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
       </div>
     </div>
 

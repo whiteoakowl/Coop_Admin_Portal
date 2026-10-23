@@ -77,6 +77,7 @@ const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexP
 const { buildCardPairs } = require('../utils/cardPairs');
 const { formatDateLabel, formatTimestamp } = require('../utils/dates');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
+const { renderViewToPdf } = require('../utils/pdfRender');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 const { allClassesList, UNASSIGNED_ROOM, HOUR_POSITIONS, listActiveClassDays, CLASS_DAY_LABELS_FULL, listSemesters } = require('../utils/classSchedule');
 const { allSetupTeamsEverySemester } = require('../utils/setup');
@@ -86,6 +87,16 @@ const { schedulesForMembers } = require('../utils/schedule');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_name_tags'));
+
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing," applied to every Print button below - see
+// utils/pdfRender.js and routes/parent-family-school.js's own matching
+// sendPdf for the pattern this mirrors.
+function sendPdf(res, filename, pdfBuffer) {
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
 
 const NAME_TAG_TYPES = ['student', 'parent', 'admin'];
 const DESIGN_TYPES = ['student', 'parent', 'admin', 'scheduleCard', 'setupCleanup', 'custom'];
@@ -292,6 +303,26 @@ router.get('/requests/print', async (req, res) => {
   });
 });
 
+router.get('/requests/download.pdf', async (req, res) => {
+  const showArchived = req.query.archived === '1';
+  const dateFilter = req.query.date || '';
+  const submissions = (await nameTagSubmissions(showArchived, dateFilter)).map((r) => ({
+    id: r.id,
+    timestamp: formatTimestamp(r.createdAt),
+    memberName: r.memberName,
+    requestTypeLabel: REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
+    dayLabel: NAME_TAG_DAY_LABELS[r.day] || r.day,
+    description: r.description || '—',
+  }));
+
+  const pdf = await renderViewToPdf(req, 'main-admin-name-tags-print', {
+    title: `Name Tag ${showArchived ? 'Archived Requests' : 'Requests'}`,
+    showArchived,
+    submissions,
+  });
+  sendPdf(res, `name-tag-${showArchived ? 'archived-requests' : 'requests'}.pdf`, pdf);
+});
+
 router.post('/requests/:id/archive', async (req, res) => {
   await db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(parseInt(req.params.id, 10));
   res.redirect('/main-admin/name-tags?tab=requests');
@@ -425,6 +456,34 @@ router.post('/print', async (req, res) => {
   });
 });
 
+router.post('/print/download.pdf', async (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect('/main-admin/name-tags?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));
+  }
+
+  const placeholders = memberIds.map(() => '?').join(',');
+  const members = (await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders})`).all(...memberIds)).sort(byLastName);
+
+  const templates = { student: await getTemplate('student'), parent: await getTemplate('parent'), admin: await getTemplate('admin') };
+  const dataByMember = await badgeDataForMembers(members);
+  const badges = members.map((m) => {
+    const layout = templates[m.member_type] || templates.student;
+    return {
+      html: NameTagRenderCore.renderBadgeElements(layout.elements, dataByMember[m.id]),
+      bgCss: NameTagRenderCore.backgroundCss(layout.background, layout.backgroundOpacity),
+    };
+  });
+
+  const pdf = await renderViewToPdf(req, 'main-admin-name-tag-bulk-print', {
+    title: 'Print Name Tags',
+    badges,
+    badgeWidth: BADGE_WIDTH,
+    badgeHeight: BADGE_HEIGHT,
+  });
+  sendPdf(res, 'name-tags.pdf', pdf);
+});
+
 router.post('/print-plain-parent', async (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
@@ -453,6 +512,35 @@ router.post('/print-plain-parent', async (req, res) => {
   });
 });
 
+router.post('/print-plain-parent/download.pdf', async (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect('/main-admin/name-tags?tab=print&error=' + encodeURIComponent('Select at least one parent to print a plain parent tag.'));
+  }
+
+  const placeholders = memberIds.map(() => '?').join(',');
+  const members = (await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) AND member_type = 'parent'`).all(...memberIds)).sort(byLastName);
+  if (members.length === 0) {
+    return res.redirect('/main-admin/name-tags?tab=print&error=' + encodeURIComponent('Select at least one parent to print a plain parent tag.'));
+  }
+
+  const template = await getTemplate('parent');
+  const plainElements = template.elements.filter((el) => el.field !== 'setupCleanupDays');
+  const dataByMember = await badgeDataForMembers(members);
+  const badges = members.map((m) => ({
+    html: NameTagRenderCore.renderBadgeElements(plainElements, dataByMember[m.id]),
+    bgCss: NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity),
+  }));
+
+  const pdf = await renderViewToPdf(req, 'main-admin-name-tag-bulk-print', {
+    title: 'Print Plain Parent Name Tags',
+    badges,
+    badgeWidth: BADGE_WIDTH,
+    badgeHeight: BADGE_HEIGHT,
+  });
+  sendPdf(res, 'plain-parent-name-tags.pdf', pdf);
+});
+
 // Barcode-only sheet: the scan code, name, and member ID number, no name
 // tag design - for a cheap, fast-to-print stack of scan cards. A real
 // request: "printing barcodes only, should have the member ID number on
@@ -475,6 +563,24 @@ router.post('/print-barcodes', async (req, res) => {
   });
 });
 
+router.post('/print-barcodes/download.pdf', async (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect('/main-admin/name-tags?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));
+  }
+
+  const placeholders = memberIds.map(() => '?').join(',');
+  const members = (
+    await db.prepare(`SELECT id, name, barcode, member_code FROM members WHERE id IN (${placeholders})`).all(...memberIds)
+  ).sort(byLastName);
+
+  const pdf = await renderViewToPdf(req, 'main-admin-name-tag-barcode-print', {
+    title: 'Print Barcodes',
+    members,
+  });
+  sendPdf(res, 'barcodes.pdf', pdf);
+});
+
 router.post('/print-barcode-labels', async (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
@@ -490,6 +596,30 @@ router.post('/print-barcode-labels', async (req, res) => {
     title: 'Print Barcode Labels',
     members,
   });
+});
+
+router.post('/print-barcode-labels/download.pdf', async (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect('/main-admin/name-tags?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));
+  }
+
+  const placeholders = memberIds.map(() => '?').join(',');
+  const members = (
+    await db.prepare(`SELECT id, name, barcode, member_code FROM members WHERE id IN (${placeholders})`).all(...memberIds)
+  ).sort(byLastName);
+
+  const pdf = await renderViewToPdf(req, 'main-admin-name-tag-barcode-labels-print', {
+    title: 'Print Barcode Labels',
+    members,
+    // req.app.render() (what renderViewToPdf uses) never sees res.locals,
+    // so this page's own partials/admin-nav include - which otherwise
+    // reads isFullAdmin off server.js's own sitewide res.locals.isFullAdmin
+    // - needs it spelled out here instead; always false, since a Main
+    // Admin portal session is never a full Co-op Admin one.
+    isFullAdmin: false,
+  });
+  sendPdf(res, 'barcode-labels.pdf', pdf);
 });
 
 // ---------------------------------------------------------------------
@@ -544,6 +674,32 @@ router.post('/print-duplex', async (req, res) => {
     cardHeight: CARD_HEIGHT,
     SCHEDULE_CARD_SAFE_INSET,
   });
+});
+
+router.post('/print-duplex/download.pdf', async (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect('/main-admin/name-tags?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));
+  }
+
+  const placeholders = memberIds.map(() => '?').join(',');
+  const members = (await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders})`).all(...memberIds)).sort(byLastName);
+
+  const { frontPages, backPages } = buildDuplexPages(await buildCardPairs(members));
+
+  const pdf = await renderViewToPdf(req, 'main-admin-cards-duplex-print', {
+    title: 'Print Name Tags + Schedule Cards (Front & Back)',
+    frontPages,
+    backPages,
+    badgeWidth: BADGE_WIDTH,
+    badgeHeight: BADGE_HEIGHT,
+    cardWidth: CARD_WIDTH,
+    cardHeight: CARD_HEIGHT,
+    SCHEDULE_CARD_SAFE_INSET,
+    // See the matching comment on the barcode-labels download route above.
+    isFullAdmin: false,
+  });
+  sendPdf(res, 'name-tags-schedule-cards-duplex.pdf', pdf);
 });
 
 // ---------------------------------------------------------------------
@@ -643,6 +799,29 @@ router.post('/badges/bypass/print', async (req, res) => {
   });
 });
 
+router.post('/badges/bypass/download.pdf', async (req, res) => {
+  const bypass = await getSetupCleanupBypassBadge();
+  if (!bypass) {
+    return res.redirect('/main-admin/name-tags?tab=print&error=' + encodeURIComponent('No Setup/Cleanup bypass badge found.'));
+  }
+  const quantity = Math.min(50, Math.max(1, parseInt(req.body.quantity, 10) || 1));
+
+  const template = await getMiscTemplate('setupCleanup');
+  const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
+  const html = NameTagRenderCore.renderBadgeElements(template.elements, miscBadgeRowData(bypass));
+  const cards = Array.from({ length: quantity }, () => ({ html, bgCss }));
+
+  const pdf = await renderViewToPdf(req, 'main-admin-misc-badges-print', {
+    title: 'Print Setup/Cleanup Bypass Badges',
+    cards,
+    cardWidth: BADGE_WIDTH,
+    cardHeight: BADGE_HEIGHT,
+    // See the matching comment on the barcode-labels download route above.
+    isFullAdmin: false,
+  });
+  sendPdf(res, 'setup-cleanup-bypass-badges.pdf', pdf);
+});
+
 router.post('/badges/:type/print', requireMiscBadgeType, async (req, res) => {
   const type = req.params.type;
   const requestedIds = [].concat(req.body.badgeIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
@@ -667,6 +846,35 @@ router.post('/badges/:type/print', requireMiscBadgeType, async (req, res) => {
     cardWidth: BADGE_WIDTH,
     cardHeight: BADGE_HEIGHT,
   });
+});
+
+router.post('/badges/:type/download.pdf', requireMiscBadgeType, async (req, res) => {
+  const type = req.params.type;
+  const requestedIds = [].concat(req.body.badgeIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const all = await listMiscBadges(type);
+  const rows = requestedIds.length > 0 ? all.filter((r) => requestedIds.includes(r.id)) : all;
+
+  if (rows.length === 0) {
+    return res.redirect('/main-admin/name-tags?tab=print&error=' + encodeURIComponent('Select at least one badge to print.'));
+  }
+
+  const template = await getMiscTemplate(type);
+  const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
+  const taskNumbers = type === 'setupCleanup' ? await taskNumbersByItemId(rows.map((r) => r.task_item_id)) : {};
+  const cards = rows.map((row) => ({
+    html: NameTagRenderCore.renderBadgeElements(template.elements, miscBadgeRowData(row, taskNumbers[row.task_item_id])),
+    bgCss,
+  }));
+
+  const pdf = await renderViewToPdf(req, 'main-admin-misc-badges-print', {
+    title: `Print ${BADGE_TYPE_LABELS[type]} Badges`,
+    cards,
+    cardWidth: BADGE_WIDTH,
+    cardHeight: BADGE_HEIGHT,
+    // See the matching comment on the barcode-labels download route above.
+    isFullAdmin: false,
+  });
+  sendPdf(res, `${type}-badges.pdf`, pdf);
 });
 
 // ---------------------------------------------------------------------
@@ -713,6 +921,56 @@ router.post('/print-classcheckin-qr', async (req, res) => {
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - the same selection/grouping the Print route
+// above builds, now rendered through headless Chromium instead of the
+// browser's own print preview. classIds travels as a GET query string
+// here (the live picker's Download button submits this same form with
+// formmethod="GET" instead of POST) since a PDF download has to be a
+// plain navigable URL, not a form-only POST. isFullAdmin is passed
+// explicitly since renderViewToPdf renders through req.app.render(),
+// which never sees this request's own res.locals (where partials/admin-
+// nav normally finds it) - always false here, same as a normal Main
+// Admin request (res.locals.isFullAdmin is only ever true for Co-op
+// Admin's own separate adminId session - see server.js).
+router.get('/print-classcheckin-qr/download.pdf', async (req, res) => {
+  const classIds = [].concat(req.query.classIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const allClasses = await allClassesList();
+  const idSet = new Set(classIds);
+  const classes = allClasses.filter((c) => idSet.has(c.id));
+
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const groups = new Map();
+  for (const c of classes) {
+    const room = c.room && c.room.trim() ? c.room.trim() : UNASSIGNED_ROOM;
+    const key = `${c.day}|${room}`;
+    if (!groups.has(key)) groups.set(key, { day: c.day, dayLabel: c.dayLabel, room, classes: [] });
+    groups.get(key).classes.push(c);
+  }
+
+  const pages = Array.from(groups.values())
+    .sort((a, b) => a.day.localeCompare(b.day) || a.room.localeCompare(b.room))
+    .map((g) => ({
+      dayLabel: g.dayLabel,
+      room: g.room,
+      classes: g.classes
+        .sort((a, b) => a.hour_position - b.hour_position)
+        .map((c) => ({
+          className: c.class_name,
+          dayLabel: c.dayLabel,
+          timeLabel: c.timeLabel,
+          checkInUrl: `${origin}/kiosk/class-checkin/classes/${c.id}/attendance`,
+        })),
+    }));
+
+  const pdf = await renderViewToPdf(req, 'main-admin-classcheckin-qr-print', {
+    title: 'Print Class Check-In QR Codes',
+    pages,
+    isFullAdmin: false,
+  });
+  sendPdf(res, 'class-checkin-qr-codes.pdf', pdf);
+});
+
 router.get('/print-playground-qr', async (req, res) => {
   const origin = `${req.protocol}://${req.get('host')}`;
   const pages = [];
@@ -733,6 +991,33 @@ router.get('/print-playground-qr', async (req, res) => {
   });
 });
 
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - same always-every-slot data as the Print
+// route above, rendered through headless Chromium instead. isFullAdmin
+// is passed explicitly - see the download.pdf route above this one for
+// why.
+router.get('/print-playground-qr/download.pdf', async (req, res) => {
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const pages = [];
+  for (const day of await listActiveClassDays()) {
+    const hours = [];
+    for (const hour of HOUR_POSITIONS) {
+      hours.push({
+        hourLabel: await playgroundHourLabel(day, hour),
+        checkInUrl: `${origin}/kiosk/class-checkin/playground/${day}/${hour}/attendance`,
+      });
+    }
+    pages.push({ dayLabel: CLASS_DAY_LABELS_FULL[day], hours });
+  }
+
+  const pdf = await renderViewToPdf(req, 'main-admin-playground-qr-print', {
+    title: 'Print Playground Check-In QR Codes',
+    pages,
+    isFullAdmin: false,
+  });
+  sendPdf(res, 'playground-qr-codes.pdf', pdf);
+});
+
 router.post('/print-library-barcodes', async (req, res) => {
   const itemIds = [].concat(req.body.itemIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (itemIds.length === 0) {
@@ -748,6 +1033,30 @@ router.post('/print-library-barcodes', async (req, res) => {
     title: 'Print Library Barcodes',
     items,
   });
+});
+
+// A real request: "the download should be a pdf of exactly how it would
+// also look when printing" - same selection the Print route above
+// renders, now through headless Chromium. itemIds travels as a GET query
+// string here (the live picker's Download button submits this same form
+// with formmethod="GET" instead of POST) since a PDF download has to be
+// a plain navigable URL, not a form-only POST. isFullAdmin is passed
+// explicitly - see the first download.pdf route in this file for why.
+router.get('/print-library-barcodes/download.pdf', async (req, res) => {
+  const itemIds = [].concat(req.query.itemIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const placeholders = itemIds.map(() => '?').join(',');
+  const items = itemIds.length
+    ? (await db.prepare(`SELECT * FROM library_items WHERE id IN (${placeholders})`).all(...itemIds)).sort((a, b) =>
+        a.title.toLowerCase().localeCompare(b.title.toLowerCase())
+      )
+    : [];
+
+  const pdf = await renderViewToPdf(req, 'main-admin-library-barcodes-print', {
+    title: 'Print Library Barcodes',
+    items,
+    isFullAdmin: false,
+  });
+  sendPdf(res, 'library-barcodes.pdf', pdf);
 });
 
 module.exports = router;

@@ -40,6 +40,21 @@ async function loginAsMainAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
+// Same buffer-a-binary-response shape as test/parent-family-school-print-
+// preview-and-pdf.test.js's own getBuffer - supertest's default text
+// parser corrupts a real PDF's binary body.
+async function getBuffer(url, cookie) {
+  return request(app)
+    .get(url)
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+}
+
 let seedCounter = 0;
 async function createStudent({ name, gradeLevel, birthday, active = 1 }) {
   seedCounter += 1;
@@ -138,6 +153,9 @@ test('Grade Level Report: grouping, ages, bar graph, Ungraded, Print button, non
     assert.match(res.text, /<a class="icon-btn" href="\/main-admin\/members\/grade-level-report\/print[^"]*" target="_blank" aria-label="Print"/);
     assert.doesNotMatch(res.text, /onclick="window\.print\(\)" aria-label="Print"/);
     assert.match(res.text, /aria-label="Export CSV"/);
+    // A real request: "the download should be a pdf of exactly how it
+    // would also look when printing" - Download PDF sits right beside Print.
+    assert.match(res.text, /<a class="icon-btn" href="\/main-admin\/members\/grade-level-report\/download\.pdf[^"]*" aria-label="Download PDF"/);
     assert.match(res.text, /<script src="\/js\/shrink-title-to-fit\.js"><\/script>/);
     assert.match(res.text, /data-shrink-to-fit-on-print/);
   });
@@ -161,6 +179,18 @@ test('Grade Level Report: grouping, ages, bar graph, Ungraded, Print button, non
     assert.match(previewRes.text, /Amy Kinder/);
     assert.match(previewRes.text, /Third Grader/);
     assert.doesNotMatch(previewRes.text, /Inactive Kinder/);
+  });
+
+  // A real request: "the download should be a pdf of exactly how it
+  // would also look when printing" - a real PDF built from the exact
+  // same main-admin-members-grade-level-report-print.ejs view the
+  // Print button opens.
+  await t.test('GET /grade-level-report/download.pdf returns a real PDF', async () => {
+    const pdfRes = await getBuffer('/main-admin/members/grade-level-report/download.pdf', cookie);
+    assert.equal(pdfRes.status, 200);
+    assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+    assert.match(pdfRes.headers['content-disposition'], /attachment; filename="grade-level-report\.pdf"/);
+    assert.equal(pdfRes.body.slice(0, 5).toString(), '%PDF-');
   });
 
   await t.test('a Filter button opens a dialog offering Section/Signup/Family dropdowns', () => {

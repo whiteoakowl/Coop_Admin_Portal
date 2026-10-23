@@ -30,6 +30,7 @@
         <%# A real request: "add print button to member account pages on
             parent portal and main admin portal." %>
         <a class="roster-action-btn print-action-btn no-print" href="/accounting/print<%= yearFilter !== 'current' ? '?year=' + yearFilter : '' %>" target="_blank">Print</a>
+        <a class="icon-btn no-print" href="/accounting/download.pdf<%= yearFilter !== 'current' ? '?year=' + yearFilter : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
       </div>
       <%# Same year filter as the Main Admin Account page - "current,
           all or the individual years for accounting." %>
