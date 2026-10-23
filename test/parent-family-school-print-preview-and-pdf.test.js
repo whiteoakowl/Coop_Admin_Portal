@@ -155,8 +155,10 @@ test('Daily Learning Log: Print links to a dedicated preview page, and Download 
   const { parent, student } = await setupFamily();
 
   const liveRes = await request(app).get(`/parent/family-school/journal?studentId=${student.memberId}`).set('Cookie', parent.cookie);
-  assert.match(liveRes.text, /href="\/parent\/family-school\/journal\/print\?studentId=\d+" target="_blank" aria-label="Print"/);
-  assert.match(liveRes.text, /href="\/parent\/family-school\/journal\/download\.pdf" aria-label="Download PDF"/);
+  // A later real request added a School Year filter to this page -
+  // Print/Download now also carry schoolYear=all alongside studentId.
+  assert.match(liveRes.text, /href="\/parent\/family-school\/journal\/print\?studentId=\d+&schoolYear=all" target="_blank" aria-label="Print"/);
+  assert.match(liveRes.text, /href="\/parent\/family-school\/journal\/download\.pdf\?schoolYear=all" aria-label="Download PDF"/);
 
   const previewRes = await request(app).get(`/parent/family-school/journal/print?studentId=${student.memberId}`).set('Cookie', parent.cookie);
   assert.equal(previewRes.status, 200);

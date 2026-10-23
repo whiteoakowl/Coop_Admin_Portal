@@ -67,7 +67,7 @@ test('GET /main-admin/settings renders a card for every settings-area destinatio
   // under main admin gear settings." (the portal-switcher's own,
   // unrelated "Co-op Admin Portal" link elsewhere in the nav shell is
   // untouched - this only checks the settings hub's own card grid.)
-  const gridMatch = /<div class="team-card-grid">([\s\S]*?)<\/div>\s*<\/main>/.exec(res.text);
+  const gridMatch = /<div class="team-card-grid settings-hub-card-grid">([\s\S]*?)<\/div>\s*<\/main>/.exec(res.text);
   assert.ok(gridMatch, 'expected the settings hub card grid');
   assert.doesNotMatch(gridMatch[1], /Co-op Admin Portal/);
 });

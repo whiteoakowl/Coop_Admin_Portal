@@ -40,7 +40,7 @@ test('GET /admin/settings with no tab renders a card for every settings destinat
   const res = await request(app).get('/admin/settings').set('Cookie', cookie);
   assert.equal(res.status, 200);
   assert.match(res.text, /<h1>Settings<\/h1>/);
-  assert.match(res.text, /<div class="team-card-grid">/);
+  assert.match(res.text, /<div class="team-card-grid settings-hub-card-grid">/);
 
   assert.match(res.text, /href="\/admin\/settings\?tab=account"[^]*?Username\/Password/);
   assert.match(res.text, /href="\/admin\/settings\?tab=classcheckin"[^]*?Class Check-In PIN/);

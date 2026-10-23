@@ -57,6 +57,7 @@ const {
   toggleFamilyAttendance,
   monthGridDays,
   journalEntriesForStudent,
+  schoolYearForDate,
   createJournalEntry,
   updateJournalEntry,
   deleteJournalEntry,
@@ -80,6 +81,7 @@ const {
   weeksForOwner,
   getWeek,
   createWeek,
+  updateWeek,
   deleteWeek,
   getWeekDate,
   weekGrid,
@@ -95,6 +97,7 @@ const {
   assignmentOptionsForFamily,
   portfolioForStudent,
   getFamilySchoolSettings,
+  familySettingsForPdf,
   saveFamilySchoolSettings,
 } = require('../utils/familySchool');
 const { isValidISODate, formatDateLabel, formatDateLongNoWeekday } = require('../utils/dates');
@@ -229,7 +232,7 @@ router.get('/family-school/download.pdf', async (req, res) => {
     title: 'Family School Management',
     mode: 'family',
     students,
-    familySettings: res.locals.familySettings,
+    familySettings: await familySettingsForPdf(res.locals.familySettings),
   });
   sendPdf(res, 'family-school-management-detail.pdf', pdf);
 });
@@ -559,7 +562,7 @@ router.get('/family-school/grades/download.pdf', async (req, res) => {
     title: 'Family Grades',
     mode: 'family',
     familyRows,
-    familySettings: res.locals.familySettings,
+    familySettings: await familySettingsForPdf(res.locals.familySettings),
   });
   sendPdf(res, 'family-grades-all.pdf', pdf);
 });
@@ -738,7 +741,7 @@ router.get('/family-school/attendance/download.pdf', async (req, res) => {
     schoolYearLabel: `${schoolYearStart}-${schoolYearStart + 1}`,
     MONTH_NAMES,
     familyRows,
-    familySettings: res.locals.familySettings,
+    familySettings: await familySettingsForPdf(res.locals.familySettings),
   });
   sendPdf(res, 'family-attendance-all.pdf', pdf);
 });
@@ -789,17 +792,34 @@ router.get('/family-school/attendance/print', async (req, res) => {
 // "journal" (an internal implementation detail, not worth a mechanical
 // rename-everything pass). ---
 
+// A real request: "Daily learning log. Filter button should include
+// choosing a school year." Journal entries are a past-dated log, not
+// forward planning, so this mirrors Weekly Planner's own School Year
+// filter (derived from each entry's own entry_date via
+// schoolYearForDate, only years that actually have entries, plus an
+// 'all' option) rather than Annual Planner's fixed forward-looking
+// range - see routes/parent-family-school.js's own GET /weekly-planner.
+function filterJournalEntriesBySchoolYear(entries, schoolYearFilter) {
+  if (schoolYearFilter === 'all') return entries;
+  return entries.filter((e) => schoolYearForDate(e.entry_date) === schoolYearFilter);
+}
+
 router.get('/family-school/journal', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
   const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
   const isOwnStudent = selectedStudentId && familyStudents.some((s) => s.id === selectedStudentId);
-  const entries = isOwnStudent ? await journalEntriesForStudent(selectedStudentId) : [];
+  const allEntries = isOwnStudent ? await journalEntriesForStudent(selectedStudentId) : [];
+  const journalSchoolYearOptions = [...new Set(allEntries.map((e) => schoolYearForDate(e.entry_date)).filter(Boolean))].sort();
+  const schoolYearFilter = req.query.schoolYear || 'all';
+  const entries = filterJournalEntriesBySchoolYear(allEntries, schoolYearFilter);
   for (const e of entries) e.attachments = await attachmentsForJournalEntry(e.id);
   res.render('parent-family-school-journal', {
     title: 'Daily Learning Log',
     familyStudents,
     selectedStudentId: isOwnStudent ? selectedStudentId : null,
+    journalSchoolYearOptions,
+    schoolYearFilter,
     entries,
     notice: req.query.notice || null,
     error: req.query.error || null,
@@ -811,7 +831,8 @@ router.get('/family-school/journal/export.csv', async (req, res) => {
   const familyStudents = await studentsForFamily(familyId);
   const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
   const student = familyStudents.find((s) => s.id === selectedStudentId);
-  const entries = student ? await journalEntriesForStudent(student.id) : [];
+  const allEntries = student ? await journalEntriesForStudent(student.id) : [];
+  const entries = filterJournalEntriesBySchoolYear(allEntries, req.query.schoolYear || 'all');
   const lines = [toCsvRow(['Student', 'Date', 'Notes']), ...entries.map((e) => toCsvRow([student.name, e.entry_date, plainText(e.body)]))];
   sendCsv(res, 'teacher-journal.csv', lines);
 });
@@ -823,9 +844,10 @@ router.get('/family-school/journal/export.csv', async (req, res) => {
 router.get('/family-school/journal/download.pdf', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
+  const schoolYearFilter = req.query.schoolYear || 'all';
   const familyRows = [];
   for (const student of familyStudents) {
-    const entries = await journalEntriesForStudent(student.id);
+    const entries = filterJournalEntriesBySchoolYear(await journalEntriesForStudent(student.id), schoolYearFilter);
     for (const e of entries) e.attachments = await attachmentsForJournalEntry(e.id);
     familyRows.push({ student, entries });
   }
@@ -833,7 +855,7 @@ router.get('/family-school/journal/download.pdf', async (req, res) => {
     title: 'Daily Learning Log',
     mode: 'family',
     familyRows,
-    familySettings: res.locals.familySettings,
+    familySettings: await familySettingsForPdf(res.locals.familySettings),
   });
   sendPdf(res, 'teacher-journal-all.pdf', pdf);
 });
@@ -845,7 +867,8 @@ router.get('/family-school/journal/print', async (req, res) => {
   const familyStudents = await studentsForFamily(familyId);
   const selectedStudentId = req.query.studentId ? parseInt(req.query.studentId, 10) : familyStudents[0] ? familyStudents[0].id : null;
   const student = familyStudents.find((s) => s.id === selectedStudentId);
-  const entries = student ? await journalEntriesForStudent(student.id) : [];
+  const allEntries = student ? await journalEntriesForStudent(student.id) : [];
+  const entries = filterJournalEntriesBySchoolYear(allEntries, req.query.schoolYear || 'all');
   for (const e of entries) e.attachments = await attachmentsForJournalEntry(e.id);
   res.render('parent-family-school-journal-print', {
     title: 'Daily Learning Log',
@@ -969,7 +992,7 @@ router.get('/family-school/volunteer-hours/download.pdf', async (req, res) => {
     title: 'Volunteer Hours',
     mode: 'family',
     familyRows,
-    familySettings: res.locals.familySettings,
+    familySettings: await familySettingsForPdf(res.locals.familySettings),
   });
   sendPdf(res, 'volunteer-hours-all.pdf', pdf);
 });
@@ -1110,7 +1133,7 @@ router.get('/family-school/annual-planner/download.pdf', async (req, res) => {
     familyStudents,
     curriculumByStudent: await curriculumByStudentFor(familyStudents, schoolYear),
     schoolYear: schoolYear || 'All Years',
-    familySettings: res.locals.familySettings,
+    familySettings: await familySettingsForPdf(res.locals.familySettings),
   });
   sendPdf(res, 'annual-planner.pdf', pdf);
 });
@@ -1236,6 +1259,24 @@ router.post('/family-school/weekly-planner', async (req, res) => {
   if (dates.length === 0) return res.redirect(`${backUrl}&error=` + encodeURIComponent('Choose at least one date.'));
   const weekId = await createWeek({ familyId, ownerType: ownerTypeRaw, studentId, title, dates, createdByAccountId: req.portalAccount.id });
   res.redirect(`/parent/family-school/weekly-planner?owner=${encodeURIComponent(ownerTypeRaw === 'student' ? studentId : ownerTypeRaw)}&weekId=${weekId}&notice=` + encodeURIComponent('Week created.'));
+});
+
+// A real request: "a label that says the week title with an edit icon
+// on it. When you click the edit icon it allows you to edit the week
+// such as the dates, title, description or delete the week completely."
+// Same up-to-7-dates convention as the Add Week dialog this mirrors -
+// blanks are dropped, at least one real date is required.
+router.post('/family-school/weekly-planner/:id/edit', async (req, res) => {
+  const week = await requireOwnWeek(req, parseInt(req.params.id, 10));
+  if (!week) return res.status(404).send('Not found');
+  const owner = week.owner_type === 'student' ? week.student_id : week.owner_type;
+  const backUrl = `/parent/family-school/weekly-planner?owner=${encodeURIComponent(owner)}&weekId=${week.id}`;
+  const title = (req.body.title || '').trim();
+  if (!title) return res.redirect(`${backUrl}&error=` + encodeURIComponent('A title (e.g. "Week 1") is required.'));
+  const dates = [...new Set([].concat(req.body.date || []).map((d) => (d || '').trim()).filter((d) => isValidISODate(d)))].slice(0, 7);
+  if (dates.length === 0) return res.redirect(`${backUrl}&error=` + encodeURIComponent('Choose at least one date.'));
+  await updateWeek(week.id, { title, description: (req.body.description || '').trim(), dates });
+  res.redirect(`${backUrl}&notice=` + encodeURIComponent('Week updated.'));
 });
 
 router.post('/family-school/weekly-planner/:id/delete', async (req, res) => {
@@ -1423,7 +1464,7 @@ router.get('/family-school/weekly-planner/print', async (req, res) => {
 router.get('/family-school/weekly-planner/download.pdf', async (req, res) => {
   const locals = await weeklyPlannerPrintLocals(req);
   if (!locals) return res.status(404).send('Not found');
-  const pdf = await renderViewToPdf(req, 'parent-family-school-weekly-planner-print', { ...locals, familySettings: res.locals.familySettings });
+  const pdf = await renderViewToPdf(req, 'parent-family-school-weekly-planner-print', { ...locals, familySettings: await familySettingsForPdf(res.locals.familySettings) });
   sendPdf(res, 'weekly-planner.pdf', pdf);
 });
 
@@ -1466,7 +1507,7 @@ router.get('/family-school/portfolio/print', async (req, res) => {
 router.get('/family-school/portfolio/download.pdf', async (req, res) => {
   const { familyStudents, studentId, portfolio } = await resolvePortfolioStudent(req);
   if (!portfolio) return res.status(404).send('Not found');
-  const pdf = await renderViewToPdf(req, 'parent-family-school-portfolio-print', { title: 'Portfolio', familyStudents, studentId, portfolio, avatarColorFor, familySettings: res.locals.familySettings });
+  const pdf = await renderViewToPdf(req, 'parent-family-school-portfolio-print', { title: 'Portfolio', familyStudents, studentId, portfolio, avatarColorFor, familySettings: await familySettingsForPdf(res.locals.familySettings) });
   sendPdf(res, `portfolio-${portfolio.name.replace(/[^a-z0-9]+/gi, '-')}.pdf`, pdf);
 });
 
@@ -1484,6 +1525,10 @@ function uploadSchoolLogo(req, res, next) {
     next(err);
   });
 }
+
+router.get('/family-school/settings-hub', (req, res) => {
+  res.render('parent-family-school-settings-hub', { title: 'Settings' });
+});
 
 router.get('/family-school/settings', async (req, res) => {
   res.render('parent-family-school-settings', {
@@ -1507,6 +1552,7 @@ router.post('/family-school/settings', uploadSchoolLogo, async (req, res) => {
     schoolName: (req.body.schoolName || '').trim(),
     colorPrimary: (req.body.colorPrimary || '').trim(),
     colorSecondary: (req.body.colorSecondary || '').trim(),
+    colorText: (req.body.colorText || '').trim(),
     ncHomeschoolId: (req.body.ncHomeschoolId || '').trim(),
     homeschooledSince: (req.body.homeschooledSince || '').trim(),
     logoKey,

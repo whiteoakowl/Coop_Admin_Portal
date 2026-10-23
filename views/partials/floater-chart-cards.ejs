@@ -42,6 +42,17 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
         <div class="floater-card-header">
           <span class="floater-card-icon"><svg class="icon"><use href="#icon-clock"/></svg></span>
           <h3><%= hour.label %></h3>
+          <%# A real request: "click the check boxes on each assignment
+              or the whole card." Only meaningful (and only ever shown)
+              once at least one position this hour is actually assigned
+              - public/js/floater-text-notify.js wires this to check/
+              uncheck every .floater-notify-checkbox in this one card. %>
+          <% if (hour.slots.some(function (s) { return s.assigned; })) { %>
+            <label class="floater-card-select-all no-print">
+              <input type="checkbox" class="floater-card-select-all-checkbox" aria-label="Select all floaters for <%= hour.label %>" />
+              Select All
+            </label>
+          <% } %>
         </div>
         <table class="floater-card-table floater-chart-table">
           <thead><tr><th class="floater-notify-col no-print">Text</th><th>Position</th><th>Room</th><th>Floater</th></tr></thead>

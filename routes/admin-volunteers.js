@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
@@ -6,7 +8,9 @@ const requireAdmin = require('../middleware/requireAdmin');
 const { isValidISODate, formatDateLabel, formatDateLong, todayISO, weekdayOf } = require('../utils/dates');
 const { parseNamesFromUpload, findMemberByName, hasInfantChild, activeParentAndAdminOptions } = require('../utils/members');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
-const { spreadsheetFileFilter } = require('../utils/uploads');
+const { spreadsheetFileFilter, imageFileFilter } = require('../utils/uploads');
+const { createStorageClient } = require('../utils/storage');
+const { saveUpload, urlForUpload } = require('../utils/uploadBackend');
 const {
   CLASS_DAYS,
   CLASS_DAY_LABELS_FULL: DAY_LABELS,
@@ -48,6 +52,26 @@ const { notify } = require('../utils/notifications');
 const { renderViewToPdf } = require('../utils/pdfRender');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
+
+// A real request: "a pop up appears showing an example of the text
+// message that you can edit and add an optional image." The image is
+// optional MMS content Telnyx's own servers have to fetch by URL (see
+// utils/smsProvider.js's own mediaUrl param) - a PRIVATE bucket (the
+// pattern Family School Management attachments use) has no fetchable
+// URL at all, so this one is deliberately public, same as the member-
+// photos bucket. 5MB matches every other image-upload limit in this app
+// (utils/uploads.js's own imageFileFilter).
+const MAX_NOTIFY_IMAGE_BYTES = 5 * 1024 * 1024;
+const FLOATER_NOTIFY_IMAGE_BUCKET = 'floater-notification-images';
+const FLOATER_NOTIFY_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'floater-notification-images');
+if (!createStorageClient() && !fs.existsSync(FLOATER_NOTIFY_IMAGE_DIR)) {
+  try {
+    fs.mkdirSync(FLOATER_NOTIFY_IMAGE_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${FLOATER_NOTIFY_IMAGE_DIR}:`, err.message);
+  }
+}
+const notifyImageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_NOTIFY_IMAGE_BYTES }, fileFilter: imageFileFilter });
 
 const EDIT_DIALOGS = ['dates', 'job', 'temp-job'];
 
@@ -349,15 +373,43 @@ router.get('/volunteers/:day/fragment', requireAdmin, requireClassDay, async (re
 
 // A real request: "Add a button that says text notification. When you
 // click this button a check box appears next to each floater
-// assignment. When you click the check boxes then click text
-// notifications. It send a notification showing the floater position,
-// hour and room number." Routes through notify() (utils/notifications.js)
+// assignment... click send text notification button. A pop up appears
+// showing an example of the text message that you can edit and add an
+// optional image." Routes through notify() (utils/notifications.js)
 // like every other feature in this app, rather than a raw
 // smsProvider.send() - a member's SMS opt-out preference for this type
 // is respected the same way any other notification is, and it also
-// creates a real in-app Notification Center entry.
-router.post('/volunteers/:day/floater-text-notify', requireAdmin, requireClassDay, async (req, res) => {
-  const assignments = Array.isArray(req.body.notify) ? req.body.notify : [];
+// creates a real in-app Notification Center entry. multipart/form-data
+// now (not plain JSON) since the optional image rides along as a real
+// file upload - public/js/floater-text-notify.js's own popup builds the
+// FormData itself; `notify` arrives as a JSON-encoded string field
+// inside that same form body (a plain array field doesn't survive a
+// multipart encode the way it did as a JSON request body).
+router.post('/volunteers/:day/floater-text-notify', requireAdmin, requireClassDay, notifyImageUpload.single('image'), async (req, res) => {
+  let assignments;
+  try {
+    assignments = JSON.parse(req.body.notify || '[]');
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: 'Malformed recipient list.' });
+  }
+  if (!Array.isArray(assignments)) assignments = [];
+  const message = (req.body.message || '').trim();
+  if (!message) return res.status(400).json({ ok: false, error: 'A message is required.' });
+
+  let mediaUrl = null;
+  if (req.file) {
+    const client = createStorageClient();
+    const key = await saveUpload({
+      client,
+      bucket: FLOATER_NOTIFY_IMAGE_BUCKET,
+      localDir: FLOATER_NOTIFY_IMAGE_DIR,
+      buffer: req.file.buffer,
+      originalName: req.file.originalname,
+      contentType: req.file.mimetype,
+    });
+    mediaUrl = urlForUpload({ client, bucket: FLOATER_NOTIFY_IMAGE_BUCKET, webDir: '/uploads/floater-notification-images', key });
+  }
+
   const results = [];
   for (const item of assignments) {
     const memberId = Number(item && item.memberId);
@@ -365,18 +417,13 @@ router.post('/volunteers/:day/floater-text-notify', requireAdmin, requireClassDa
     const member = await db.prepare('SELECT name FROM members WHERE id = ?').get(memberId);
     if (!member) continue;
 
-    const position = (item.position || '').trim();
-    const room = (item.room || '').trim();
-    const hour = (item.hour || '').trim();
-    const body = `You're assigned: ${position}${hour ? ` at ${hour}` : ''}${room ? ` in Room ${room}` : ''}.`;
-
     const account = await db.prepare("SELECT id FROM member_accounts WHERE member_id = ? AND status = 'active'").get(memberId);
     if (!account) {
       results.push({ memberId, name: member.name, status: 'skipped', detail: 'No portal account on file.' });
       continue;
     }
 
-    const notificationId = await notify(account.id, 'floater_assignment', { title: 'Floater Assignment', body });
+    const notificationId = await notify(account.id, 'floater_assignment', { title: 'Floater Assignment', body: message, mediaUrl });
     const delivery = await db.prepare("SELECT status, detail FROM notification_deliveries WHERE notification_id = ? AND channel = 'sms'").get(notificationId);
     results.push({ memberId, name: member.name, status: delivery ? delivery.status : 'skipped', detail: delivery ? delivery.detail : null });
   }

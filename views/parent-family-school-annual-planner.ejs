@@ -21,7 +21,7 @@
     <div class="roster-toolbar no-print">
       <div class="roster-btn-row roster-btn-row-fit-text">
         <% if (familyStudents.length > 0) { %>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-curriculum-dialog').showModal()">+ Add Curriculum</button>
+          <button type="button" class="roster-action-btn fs-annual-planner-add-btn" onclick="document.getElementById('add-curriculum-dialog').showModal()">+ Add Curriculum</button>
         <% } %>
         <form method="GET" action="/parent/family-school/annual-planner" class="inline-block-form">
           <select id="annual-planner-school-year" name="schoolYear" onchange="this.form.submit()" aria-label="School Year">
@@ -52,11 +52,23 @@
         <% var studentTotal = items.reduce(function(sum, item) { return sum + (item.price != null ? Number(item.price) : 0); }, 0); %>
         <div class="manage-section" data-curriculum-section>
           <div class="grid-box-header">
-            <h2><%= s.name %> <span class="hint" data-curriculum-total>Total: $<%= studentTotal.toFixed(2) %></span></h2>
+            <%# A real request: "Student name and cost total should
+                shrink to fit on one line." %>
+            <h2 class="fs-annual-planner-student-header">
+              <span class="fs-annual-planner-student-name"><%= s.name %></span>
+              <span class="hint fs-annual-planner-student-total" data-curriculum-total>Total: $<%= studentTotal.toFixed(2) %></span>
+            </h2>
           </div>
           <p class="roster-empty" data-curriculum-empty <%- items.length > 0 ? 'hidden' : '' %>>No curriculum added yet.</p>
           <div class="roster-scroll" <%- items.length === 0 ? 'hidden' : '' %>>
-            <table class="roster-table members-table condensed-table table-stack-mobile">
+            <%# A real request: "Edit and trash icons on each curriculum
+                card should be on the title row to the right. Shrink
+                cards by height, about half." fs-annual-planner-
+                curriculum-table's own mobile CSS reorders the Subject
+                heading cell and the Edit/Delete icon cell onto one flex
+                row together, and lets Curriculum/Brand/Level/Price wrap
+                inline instead of each taking a full stacked row. %>
+            <table class="roster-table members-table condensed-table table-stack-mobile fs-annual-planner-curriculum-table">
               <thead><tr><th>Subject</th><th>Curriculum</th><th>Brand</th><th>Level</th><th>Price</th><th></th></tr></thead>
               <tbody>
                 <% items.forEach(function(item) { %>

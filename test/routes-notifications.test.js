@@ -199,6 +199,42 @@ test("turning a type's auto-send off stops email/sms but keeps the in-app notifi
   await request(app).post('/main-admin/notifications/event_registration/auto-send').set('Cookie', admin.cookie).type('form').send({ enabled: '1', _csrf: admin.csrfToken });
 });
 
+// A real request: "a notifications settings card to control email,
+// text and push notifications." No real push-delivery mechanism exists
+// yet (utils/notifications.js's own notify() only ever attempts email/
+// sms) - the user explicitly asked for the preference toggle to be
+// added now anyway, ready for whenever a real push channel is wired up.
+test('GET /notifications/preferences shows a Push column, and a saved push preference persists and shows pre-filled', async () => {
+  const parent = await createParentAccount();
+
+  const page = await request(app).get('/notifications/preferences').set('Cookie', parent.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<tr><th>Type<\/th><th>Email<\/th><th>Text<\/th><th>Push<\/th><\/tr>/);
+
+  const types = await notifications.listTypes();
+  const payload = { _csrf: parent.csrfToken };
+  for (const type of types) {
+    payload[`email_${type.key}`] = '1';
+    payload[`sms_${type.key}`] = '1';
+    payload[`push_${type.key}`] = type.key === 'newsletter_sent' ? '0' : '1';
+  }
+  await request(app).post('/notifications/preferences').set('Cookie', parent.cookie).type('form').send(payload);
+
+  const prefs = await notifications.preferencesForAccount(parent.accountId);
+  const newsletterPref = prefs.find((p) => p.type.key === 'newsletter_sent');
+  assert.equal(newsletterPref.push, 0);
+  const otherPref = prefs.find((p) => p.type.key === 'forum_reply');
+  assert.equal(otherPref.push, 1);
+
+  const reloaded = await request(app).get('/notifications/preferences').set('Cookie', parent.cookie);
+  const newsletterRow = /<td>Newsletter Sent<[\s\S]*?<\/tr>/.exec(reloaded.text)[0];
+  assert.doesNotMatch(newsletterRow, /name="push_newsletter_sent" value="1" checked/);
+  // forum_reply's own stable type_key is untouched by the Forums-to-
+  // Chat rename - only its own label column changed to "Chat Reply".
+  const chatReplyRow = /<td>Chat Reply<[\s\S]*?<\/tr>/.exec(reloaded.text)[0];
+  assert.match(chatReplyRow, /name="push_forum_reply" value="1" checked/);
+});
+
 test('sending a newsletter issue notifies every active member account', async () => {
   const parent = await createParentAccount();
 

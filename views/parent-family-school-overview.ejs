@@ -16,12 +16,23 @@
         name, ID, logo with colors and homeschooled since date." A live
         on-screen counterpart to partials/family-school-print-header.ejs
         (that one is print-only, display:none otherwise). %>
-    <div class="fs-school-header no-print"<% if (familySettings && familySettings.color_secondary) { %> style="border-color: <%= familySettings.color_secondary %>;"<% } %>>
+    <%
+      // A real request: "Primary color should say title color.
+      // Secondary color should say background color. Secondary color
+      // should color the card that shows this information on the
+      // homepage. Add another color choice for font color." Title
+      // Color still colors just the school name; Background Color now
+      // fills the whole card (not just its border); Font Color is the
+      // new third choice, for the meta lines below the name.
+      const fsHeaderStyle = familySettings && familySettings.color_secondary ? `background-color: ${familySettings.color_secondary};` : '';
+      const fsHeaderMetaStyle = familySettings && familySettings.color_text ? `color: ${familySettings.color_text};` : '';
+    %>
+    <div class="fs-school-header no-print"<% if (fsHeaderStyle) { %> style="<%= fsHeaderStyle %>"<% } %>>
       <img src="<%= (familySettings && familySettings.logoUrl) || '/img/logo.png' %>" alt="" />
       <div>
         <p class="fs-school-header-name"<% if (familySettings && familySettings.color_primary) { %> style="color: <%= familySettings.color_primary %>;"<% } %>><%= (familySettings && familySettings.school_name) || 'Family School Management' %></p>
-        <% if (familySettings && familySettings.nc_homeschool_id) { %><p class="hint fs-school-header-meta">NC Homeschool ID: <%= familySettings.nc_homeschool_id %></p><% } %>
-        <% if (homeschooledSinceLabel) { %><p class="hint fs-school-header-meta">Homeschooling since <%= homeschooledSinceLabel %></p><% } %>
+        <% if (familySettings && familySettings.nc_homeschool_id) { %><p class="hint fs-school-header-meta"<% if (fsHeaderMetaStyle) { %> style="<%= fsHeaderMetaStyle %>"<% } %>>NC Homeschool ID: <%= familySettings.nc_homeschool_id %></p><% } %>
+        <% if (homeschooledSinceLabel) { %><p class="hint fs-school-header-meta"<% if (fsHeaderMetaStyle) { %> style="<%= fsHeaderMetaStyle %>"<% } %>>Homeschooling since <%= homeschooledSinceLabel %></p><% } %>
       </div>
     </div>
 

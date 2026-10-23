@@ -36,6 +36,7 @@ router.post('/preferences', async (req, res) => {
   for (const type of types) {
     await notifications.setPreference(req.portalAccount.id, type.key, 'email', req.body[`email_${type.key}`] === '1');
     await notifications.setPreference(req.portalAccount.id, type.key, 'sms', req.body[`sms_${type.key}`] === '1');
+    await notifications.setPreference(req.portalAccount.id, type.key, 'push', req.body[`push_${type.key}`] === '1');
   }
   res.redirect('/notifications/preferences?notice=' + encodeURIComponent('Saved.'));
 });

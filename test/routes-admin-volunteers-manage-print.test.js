@@ -144,6 +144,14 @@ test('Floater Assignments manage print preview: shows the same selected-date cha
   assert.match(preview.text, /Room 7/);
   assert.match(preview.text, /Print Preview Floater/, 'should show who is actually assigned, not an editable dropdown');
   assert.doesNotMatch(preview.text, /<select/, 'read-only preview should have no editable assign dropdown');
+
+  // A real request: "each hour should shrink to fit on one page" - the
+  // old page-break-only wrapper is gone, replaced by the same shrink-
+  // to-fit wrapper/script Setup/Cleanup Teams printing already uses.
+  assert.match(preview.text, /<div class="floater-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="9\.2in">/);
+  assert.match(preview.text, /<div class="floater-print-page-inner">/);
+  assert.match(preview.text, /class="admin-page floater-assignments-print-page team-print-preview-page"/);
+  assert.match(preview.text, /<script src="\/js\/print-shrink-to-fit\.js"><\/script>/);
 });
 
 test('Floater Assignments manage print preview requires admin login, same as the manage page it mirrors', async () => {

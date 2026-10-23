@@ -106,7 +106,10 @@ test('Family School Management is its own portal reached from the parent role, a
   // Family School Management group.
   assert.match(fsmHome.text, /href="\/parent\/family-school\/classes"/);
   assert.match(fsmHome.text, /href="\/parent\/family-school\/weekly-planner"/);
-  assert.match(fsmHome.text, /href="\/parent\/family-school\/settings"/);
+  // A later real request moved Settings out of this tab list and behind
+  // the gear icon instead (test/family-school-settings.test.js's own
+  // "Settings gear" test covers the gear's own new destination).
+  assert.doesNotMatch(fsmHome.text, /href="\/parent\/family-school\/settings"/);
 
   // A later real request ("Student portal add a tab that says family
   // homeschooling...") renamed Student Portal's own nav entry for this
@@ -365,6 +368,52 @@ test('Daily Learning Log (Teacher Journal): add an entry by date and student, it
     .send({ _csrf: otherCsrf });
   assert.equal(deleteAttempt.status, 404);
   assert.ok(await db.prepare('SELECT 1 FROM family_school_journal_entries WHERE id = ?').get(entry.id), "another family's parent must not be able to delete this entry");
+});
+
+// A real request: "Daily learning log. Filter button should include
+// choosing a school year." Entries are a past-dated log, so the year
+// options come straight from the entries' own dates (Aug-Jul boundary,
+// utils/familySchool.js's own schoolYearForDate) rather than a fixed
+// forward-looking range.
+test('Daily Learning Log: the Filter popover offers a School Year dropdown that filters the log, export, print, and PDF', async () => {
+  const familyId = await createFamily('Journal School Year Family');
+  const parent = await createPortalMember({ name: 'Journal Year Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Journal Year Student', familyId, memberType: 'student', roleKey: 'student' });
+
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/journal');
+  await request(app)
+    .post('/parent/family-school/journal')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: student.memberId, entryDate: '2024-10-01', body: '<p>Fall year entry</p>', _csrf: csrf });
+  await request(app)
+    .post('/parent/family-school/journal')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: student.memberId, entryDate: '2026-04-02', body: '<p>Spring year entry</p>', _csrf: csrf });
+
+  const allPage = await request(app).get(`/parent/family-school/journal?studentId=${student.memberId}`).set('Cookie', parent.cookie);
+  assert.equal(allPage.status, 200);
+  assert.match(allPage.text, /<select id="journal-school-year-select" name="schoolYear" onchange="this\.form\.submit\(\)">/);
+  assert.match(allPage.text, /<option value="all" selected>All Years<\/option>/);
+  assert.match(allPage.text, /<option value="2024-2025"[^>]*>2024-2025<\/option>/);
+  assert.match(allPage.text, /<option value="2025-2026"[^>]*>2025-2026<\/option>/);
+  assert.match(allPage.text, /Fall year entry/);
+  assert.match(allPage.text, /Spring year entry/);
+
+  const filteredPage = await request(app).get(`/parent/family-school/journal?studentId=${student.memberId}&schoolYear=2024-2025`).set('Cookie', parent.cookie);
+  assert.match(filteredPage.text, /<option value="2024-2025" selected>2024-2025<\/option>/);
+  assert.match(filteredPage.text, /Fall year entry/);
+  assert.doesNotMatch(filteredPage.text, /Spring year entry/);
+
+  const filteredExport = await request(app).get(`/parent/family-school/journal/export.csv?studentId=${student.memberId}&schoolYear=2024-2025`).set('Cookie', parent.cookie);
+  assert.match(filteredExport.text, /Fall year entry/);
+  assert.doesNotMatch(filteredExport.text, /Spring year entry/);
+
+  const filteredPrint = await request(app).get(`/parent/family-school/journal/print?studentId=${student.memberId}&schoolYear=2024-2025`).set('Cookie', parent.cookie);
+  assert.equal(filteredPrint.status, 200);
+  assert.match(filteredPrint.text, /Fall year entry/);
+  assert.doesNotMatch(filteredPrint.text, /Spring year entry/);
 });
 
 // "These classes are completely seperate from co-op classes and

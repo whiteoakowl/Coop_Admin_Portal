@@ -15,19 +15,13 @@
     <%- include('partials/floater-tabs', { day, activeFloaterTab: 'assignments', semesterId }) %>
 
     <div class="view-tab-panel">
-      <div class="roster-toolbar no-print">
-        <div class="roster-toolbar-left">
-          <%- include('partials/schedule-combo-picker', { combos, basePrefix: '/admin/volunteers', pathSuffix: '/manage', selectedComboId }) %>
-        </div>
-      </div>
-
       <div class="grid-box-header">
         <h2><%= dayLabel %> Floater Assignments</h2>
         <%# A real request: "export and print buttons should be in a row
             under the add/edit dates, add/edit position buttons" - same
             .roster-action-btn class/size as those buttons, in the same
             row rather than up in the toolbar with the semester/day picker. %>
-        <div class="roster-btn-row no-print">
+        <div class="roster-btn-row roster-btn-row-fit-text floater-assignments-btn-row no-print">
           <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Add/Edit Dates</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-job-dialog').showModal()">+ Add/Edit Permanent Positions</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-temp-job-dialog').showModal()">+ Add/Edit Temporary Position</button>
@@ -52,8 +46,20 @@
         </div>
       </div>
 
-      <div class="roster-toolbar no-print">
-        <div class="category-filter" style="margin: 0;">
+      <%# A real request: "choose a date and semester/day drop down
+          should be on the same row, shrink to fit... this row should be
+          under the icons." The semester/day combo picker used to sit in
+          its own toolbar row ABOVE the title/buttons/icons block - it
+          now joins Choose Date in this one row instead, which already
+          sat right below the icons. .filter-row is the existing
+          "two or more filter dropdowns that belong together" shared
+          convention (public/css/styles.css) - floater-assignments-
+          filter-row is just this page's own hook for the mobile shrink-
+          to-fit rule, same page-scoped pattern as .fs-annual-planner-
+          add-btn elsewhere. %>
+      <div class="filter-row floater-assignments-filter-row no-print">
+        <%- include('partials/schedule-combo-picker', { combos, basePrefix: '/admin/volunteers', pathSuffix: '/manage', selectedComboId }) %>
+        <div class="category-filter">
           <label for="chart-date-select">Choose Date</label>
           <select id="chart-date-select" onchange="window.fullscreenNavigate('/admin/volunteers/<%= day %>/manage?semesterId=<%= semesterId %>' + (this.value ? '&date=' + this.value : ''))">
             <% if (activeDates.length === 0) { %><option value="">No dates</option><% } %>
@@ -238,6 +244,35 @@
               <% }); %>
             </div>
           </div>
+        </div>
+      </form>
+    </dialog>
+
+    <%# A real request: "click send text notification button. A pop up
+        appears showing an example of the text message that you can
+        edit and add an optional image. Buttons send now or cancel."
+        public/js/floater-text-notify.js builds the recipient list and
+        a starter example message from whichever checkboxes are
+        checked, fills this dialog in, then shows it instead of posting
+        straight away - Send Now is what actually fires the request
+        (multipart/form-data, since the image rides along as a real
+        file). %>
+    <dialog id="floater-text-notify-dialog" class="class-form-dialog">
+      <form id="floater-text-notify-form" class="stack-form">
+        <div class="class-form-dialog-header">
+          <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-mail"/></svg></span>
+          <h3>Send Text Notification</h3>
+        </div>
+        <p class="hint" id="floater-text-notify-recipients-hint"></p>
+        <label>Message
+          <textarea name="message" id="floater-text-notify-message" rows="4" required></textarea>
+        </label>
+        <label>Image (optional)
+          <input type="file" name="image" accept="image/*" />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn" id="floater-text-notify-send-btn">Send Now</button>
         </div>
       </form>
     </dialog>

@@ -32,6 +32,12 @@ async function preferencesForAccount(accountId) {
     type,
     email: overrides.find((o) => o.type_key === type.key && o.channel === 'email')?.enabled ?? 1,
     sms: overrides.find((o) => o.type_key === type.key && o.channel === 'sms')?.enabled ?? 1,
+    // A real request: "a notifications settings card to control email,
+    // text and push notifications." No real push-delivery mechanism
+    // exists yet (see this file's own notify() - only email/sms are
+    // ever attempted) - this preference saves and shows correctly today,
+    // ready for whenever a real push channel is wired up.
+    push: overrides.find((o) => o.type_key === type.key && o.channel === 'push')?.enabled ?? 1,
   }));
 }
 
@@ -60,7 +66,7 @@ async function recordDelivery(notificationId, channel, result) {
 // at all, without touching code. Otherwise email/sms are each attempted
 // only when the recipient hasn't opted out of that channel for this
 // type.
-async function notify(accountId, typeKey, { title, body, linkUrl = null } = {}) {
+async function notify(accountId, typeKey, { title, body, linkUrl = null, mediaUrl = null } = {}) {
   const type = await getType(typeKey);
   if (!type) throw new Error(`Unknown notification type: ${typeKey}`);
 
@@ -78,7 +84,7 @@ async function notify(accountId, typeKey, { title, body, linkUrl = null } = {}) 
     await recordDelivery(notificationId, 'email', { status: 'skipped', detail: 'Recipient opted out of this notification type by email.' });
   }
   if (await accountPrefersChannel(accountId, typeKey, 'sms')) {
-    await recordDelivery(notificationId, 'sms', await smsProvider.send(account?.phone, `${title}: ${body}`));
+    await recordDelivery(notificationId, 'sms', await smsProvider.send(account?.phone, `${title}: ${body}`, mediaUrl));
   } else {
     await recordDelivery(notificationId, 'sms', { status: 'skipped', detail: 'Recipient opted out of this notification type by SMS.' });
   }

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: navPortalTitle }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Settings</h1>
+
+    <%# A real request: "All portals settings gear. [They] are all now
+        the card setup." Student Portal and Co-op Teacher Portal didn't
+        have a card-view gear hub at all before this - their gear just
+        opened the bare generic account-settings page (views/portal-
+        settings.ejs). Same .team-card-grid/.team-info-card component
+        every other portal's own hub already uses - My Privacy is the
+        one thing there is to show today, same as it always was, just
+        presented as a card now instead of a one-row list. %>
+    <div class="team-card-grid settings-hub-card-grid">
+      <div class="team-col">
+        <a class="team-info-card" href="/portal/settings">
+          <span class="team-info-icon"><svg class="icon"><use href="#icon-lock"/></svg></span>
+          <h3 class="team-info-title">My Privacy</h3>
+          <p class="hint">Account-level settings - the same no matter which portal you're signed into.</p>
+        </a>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

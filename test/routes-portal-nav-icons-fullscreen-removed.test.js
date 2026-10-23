@@ -121,3 +121,60 @@ test('Main Admin (portal-nav.ejs, multi-role account): Switch Portal link uses a
   assert.match(page.text, /<summary><svg class="icon"><use href="#icon-monitor"\/><\/svg> Switch Portal<\/summary>/);
   assert.match(page.text, /aria-label="Switch Portal"><svg class="icon"><use href="#icon-monitor"\/>/);
 });
+
+// A later real request: "All portals settings gear. [They] are all now
+// the card setup." Student Portal and Co-op Teacher Portal used to open
+// the bare generic account-settings page directly - they now open the
+// same card-view hub every other portal's own gear already uses.
+test('Student Portal and Co-op Teacher Portal gears open a card-view settings hub, each with a My Privacy card', async () => {
+  const { generateMemberCode } = require('../utils/members');
+  const { hashPassword } = require('../utils/portalAuth');
+  const db = require('../db');
+
+  const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('Hub Gear Family')").run()).lastInsertRowid;
+  const studentCode = await generateMemberCode();
+  const studentInfo = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, active) VALUES ('Hub Gear Student', ?, ?, 'student', ?, 1)")
+    .run(studentCode, studentCode, familyId);
+  await db
+    .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, 'hub-gear-student@example.com', ?, 'active', now_text())")
+    .run(studentInfo.lastInsertRowid, hashPassword('testpassword123'));
+  const studentAcct = await db.prepare('SELECT id FROM member_accounts WHERE email = ?').get('hub-gear-student@example.com');
+  const studentRole = await db.prepare("SELECT id FROM roles WHERE key = 'student'").get();
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(studentAcct.id, studentRole.id);
+
+  const studentLogin = await request(app).post('/login').type('form').send({ email: 'hub-gear-student@example.com', password: 'testpassword123', next: '/student' });
+  const studentCookie = studentLogin.headers['set-cookie'];
+  const studentHome = await request(app).get('/student').set('Cookie', studentCookie);
+  assert.equal(studentHome.status, 200);
+  assert.match(studentHome.text, /class="admin-corner-link" href="\/portal\/settings-hub\?portal=student">\s*<svg class="icon"><use href="#icon-gear"\/>/);
+
+  const studentHub = await request(app).get('/portal/settings-hub?portal=student').set('Cookie', studentCookie);
+  assert.equal(studentHub.status, 200);
+  assert.match(studentHub.text, /class="team-card-grid settings-hub-card-grid"/);
+  assert.match(studentHub.text, /href="\/portal\/settings"[^>]*>[\s\S]*?My Privacy/);
+  // The hub still renders inside Student Portal's own real nav shell -
+  // confirmed by its distinctive nav bar title, not a generic shell.
+  assert.match(studentHub.text, /<p class="portal-nav-title">Student Portal<\/p>/);
+
+  const teacherCode = await generateMemberCode();
+  const teacherInfo = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, active) VALUES ('Hub Gear Teacher', ?, ?, 'parent', ?, 1)")
+    .run(teacherCode, teacherCode, familyId);
+  await db
+    .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, 'hub-gear-teacher@example.com', ?, 'active', now_text())")
+    .run(teacherInfo.lastInsertRowid, hashPassword('testpassword123'));
+  const teacherAcct = await db.prepare('SELECT id FROM member_accounts WHERE email = ?').get('hub-gear-teacher@example.com');
+  const teacherRole = await db.prepare("SELECT id FROM roles WHERE key = 'teacher'").get();
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(teacherAcct.id, teacherRole.id);
+
+  const teacherLogin = await request(app).post('/login').type('form').send({ email: 'hub-gear-teacher@example.com', password: 'testpassword123', next: '/teacher' });
+  const teacherCookie = teacherLogin.headers['set-cookie'];
+  const teacherHome = await request(app).get('/teacher').set('Cookie', teacherCookie);
+  assert.equal(teacherHome.status, 200);
+  assert.match(teacherHome.text, /class="admin-corner-link" href="\/portal\/settings-hub\?portal=teacher">\s*<svg class="icon"><use href="#icon-gear"\/>/);
+
+  const teacherHub = await request(app).get('/portal/settings-hub?portal=teacher').set('Cookie', teacherCookie);
+  assert.equal(teacherHub.status, 200);
+  assert.match(teacherHub.text, /<p class="portal-nav-title">Co-op Teacher Portal<\/p>/);
+});

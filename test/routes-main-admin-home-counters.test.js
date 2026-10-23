@@ -112,7 +112,7 @@ test('GET /main-admin shows Families/Parents/Students counters and a plain setti
   assert.match(res.text, /class="admin-corner-link" href="\/main-admin\/settings">\s*<svg class="icon"><use href="#icon-gear"\/><\/svg>\s*Settings/);
 });
 
-test('a non-Main-Admin portal keeps its plain Settings link, no gear dropdown', async () => {
+test('a non-Main-Admin portal keeps its own Settings link, no gear dropdown', async () => {
   const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('PlainSettingsFamily') RETURNING id").get()).id;
   const code = await generateMemberCode();
   const parentInfo = await db
@@ -136,10 +136,13 @@ test('a non-Main-Admin portal keeps its plain Settings link, no gear dropdown', 
   // account sees the Switch Portal dropdown too, even with one real
   // role - the Settings link below stays a plain link regardless.
   assert.match(res.text, /portal-switcher-details/);
-  // Carries a ?portal=parent tag now (see portal-nav.ejs's own
-  // cornerPortalQuery comment) so a dual-role account's Settings link
-  // stays on whichever portal it's currently viewing.
-  assert.match(res.text, /href="\/portal\/settings\?portal=parent"/);
+  // A later real request moved Parent Portal's own gear to the same
+  // card-view settings hub Family School Management uses (test/family-
+  // school-settings.test.js's own "Settings gear" test covers that hub
+  // in full) - carries the same ?portal=parent tag (portal-nav.ejs's
+  // own cornerPortalQuery comment) so a dual-role account's Settings
+  // link stays on whichever portal it's currently viewing.
+  assert.match(res.text, /href="\/parent\/family-school\/settings-hub\?portal=parent"/);
 });
 
 // A real request: "the teacher count on main admin portal homepage should

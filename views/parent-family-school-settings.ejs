@@ -7,7 +7,7 @@
   <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle"><a href="/parent/family-school">&larr; Family School Management</a></p>
+    <p class="subtitle"><a href="/parent/family-school/settings-hub">&larr; Settings</a></p>
     <div class="roster-toolbar no-print">
       <h1>Settings</h1>
     </div>
@@ -46,11 +46,18 @@
           <input type="file" name="logo" accept="image/*" />
         </label>
 
-        <label>Primary Color
+        <%# A real request: "Primary color should say title color.
+            Secondary color should say background color. Secondary
+            color should color the card that shows this information on
+            the homepage. Add another color choice for font color." %>
+        <label>Title Color
           <input type="color" name="colorPrimary" value="<%= settings.color_primary || '#2e6da4' %>" />
         </label>
-        <label>Secondary Color
+        <label>Background Color
           <input type="color" name="colorSecondary" value="<%= settings.color_secondary || '#2e6da4' %>" />
+        </label>
+        <label>Font Color
+          <input type="color" name="colorText" value="<%= settings.color_text || '#1a1a1a' %>" />
         </label>
 
         <div class="notes-dialog-actions">

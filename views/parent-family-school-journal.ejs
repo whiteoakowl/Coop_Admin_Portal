@@ -41,11 +41,20 @@
                 <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
               <% }); %>
             </select>
+            <%# A real request: "Daily learning log. Filter button should
+                include choosing a school year." %>
+            <label for="journal-school-year-select">School Year</label>
+            <select id="journal-school-year-select" name="schoolYear" onchange="this.form.submit()">
+              <option value="all" <%= schoolYearFilter === 'all' ? 'selected' : '' %>>All Years</option>
+              <% journalSchoolYearOptions.forEach(function(y) { %>
+                <option value="<%= y %>" <%= schoolYearFilter === y ? 'selected' : '' %>><%= y %></option>
+              <% }); %>
+            </select>
           </form>
         </details>
-        <a class="icon-btn" href="/parent/family-school/journal/export.csv?studentId=<%= selectedStudentId %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-        <a class="icon-btn" href="/parent/family-school/journal/print?studentId=<%= selectedStudentId %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
-        <a class="icon-btn" href="/parent/family-school/journal/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/journal/export.csv?studentId=<%= selectedStudentId %>&schoolYear=<%= schoolYearFilter %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/journal/print?studentId=<%= selectedStudentId %>&schoolYear=<%= schoolYearFilter %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        <a class="icon-btn" href="/parent/family-school/journal/download.pdf?schoolYear=<%= schoolYearFilter %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
       </div>
     <% } %>
 

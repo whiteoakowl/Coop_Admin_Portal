@@ -23,7 +23,7 @@
       <div class="roster-scroll">
         <table class="roster-table members-table condensed-table">
           <thead>
-            <tr><th>Type</th><th>Email</th><th>SMS</th></tr>
+            <tr><th>Type</th><th>Email</th><th>Text</th><th>Push</th></tr>
           </thead>
           <tbody>
             <% preferences.forEach(function(p) { %>
@@ -31,6 +31,13 @@
                 <td><%= p.type.label %><br /><span class="hint"><%= p.type.description %></span></td>
                 <td><input type="checkbox" name="email_<%= p.type.key %>" value="1" <%= p.email ? 'checked' : '' %> /></td>
                 <td><input type="checkbox" name="sms_<%= p.type.key %>" value="1" <%= p.sms ? 'checked' : '' %> /></td>
+                <%# A real request: "a notifications settings card to
+                    control email, text and push notifications." No real
+                    push-delivery mechanism exists yet - see utils/
+                    notifications.js's own notify() - this saves and
+                    shows correctly today, ready for whenever a real push
+                    channel is wired up. %>
+                <td><input type="checkbox" name="push_<%= p.type.key %>" value="1" <%= p.push ? 'checked' : '' %> /></td>
               </tr>
             <% }); %>
           </tbody>

@@ -101,6 +101,10 @@ test('GET /manage renders a Text Notification button and a checkbox for an assig
   assert.match(page.text, /id="floater-text-notify-btn"/);
   assert.match(page.text, /floater-notify-checkbox/);
   assert.match(page.text, /data-member-id="\d+"/);
+  // A real request: "click the check boxes on each assignment or the
+  // whole card" - every hour with at least one assigned slot also gets
+  // its own Select All checkbox.
+  assert.match(page.text, /floater-card-select-all-checkbox/);
 });
 
 test('POST /floater-text-notify texts an assigned floater with an active portal account, routed through notify()', async () => {
@@ -112,12 +116,16 @@ test('POST /floater-text-notify texts an assigned floater with an active portal 
   const page = await request(app).get(`/admin/volunteers/${day}/manage`).set('Cookie', cookie);
   const csrfToken = extractCsrf(page.text);
 
+  // multipart/form-data now (not JSON) - the optional image rides along
+  // as a real file upload (public/js/floater-text-notify.js's own
+  // popup), and the message is whatever the admin typed/edited in that
+  // popup, not server-built from position/room/hour any more.
   const res = await request(app)
     .post(`/admin/volunteers/${day}/floater-text-notify`)
     .set('Cookie', cookie)
-    .set('Content-Type', 'application/json')
     .set('X-CSRF-Token', csrfToken)
-    .send({ notify: [{ memberId: String(memberId), position: 'Assistant', room: 'Room 12', hour: '9:00 AM' }] });
+    .field('notify', JSON.stringify([{ memberId: String(memberId) }]))
+    .field('message', "You're assigned: Assistant at 9:00 AM in Room 12.");
 
   assert.equal(res.status, 200);
   assert.equal(res.body.ok, true);
@@ -126,9 +134,27 @@ test('POST /floater-text-notify texts an assigned floater with an active portal 
 
   const notification = await db.prepare("SELECT title, body FROM notifications WHERE type_key = 'floater_assignment' ORDER BY id DESC LIMIT 1").get();
   assert.ok(notification, 'expected a floater_assignment notification row to be created');
-  assert.match(notification.body, /Assistant/);
-  assert.match(notification.body, /9:00 AM/);
-  assert.match(notification.body, /Room 12/);
+  assert.equal(notification.body, "You're assigned: Assistant at 9:00 AM in Room 12.");
+});
+
+test('POST /floater-text-notify requires a message', async () => {
+  const cookie = await loginAsAdmin();
+  const day = 'monday';
+  const { memberId } = await setUpAssignedFloater({ cookie, day, hourPosition: 5, className: 'No Message Class', room: 'Room 5', memberName: 'No Message Floater', barcode: 'notify-no-message-floater', phone: '555-111-2222' });
+  await db.prepare("INSERT INTO member_accounts (member_id, email, password_hash, status) VALUES (?, 'no-message-floater@example.com', 'x', 'active')").run(memberId);
+
+  const page = await request(app).get(`/admin/volunteers/${day}/manage`).set('Cookie', cookie);
+  const csrfToken = extractCsrf(page.text);
+
+  const res = await request(app)
+    .post(`/admin/volunteers/${day}/floater-text-notify`)
+    .set('Cookie', cookie)
+    .set('X-CSRF-Token', csrfToken)
+    .field('notify', JSON.stringify([{ memberId: String(memberId) }]))
+    .field('message', '');
+
+  assert.equal(res.status, 400);
+  assert.equal(res.body.ok, false);
 });
 
 test('POST /floater-text-notify skips a floater with no portal account on file, without erroring the whole batch', async () => {
@@ -142,9 +168,9 @@ test('POST /floater-text-notify skips a floater with no portal account on file, 
   const res = await request(app)
     .post(`/admin/volunteers/${day}/floater-text-notify`)
     .set('Cookie', cookie)
-    .set('Content-Type', 'application/json')
     .set('X-CSRF-Token', csrfToken)
-    .send({ notify: [{ memberId: String(memberId), position: 'Assistant', room: 'Room 3', hour: '10:00 AM' }] });
+    .field('notify', JSON.stringify([{ memberId: String(memberId) }]))
+    .field('message', "You're assigned: Assistant at 10:00 AM in Room 3.");
 
   assert.equal(res.status, 200);
   assert.equal(res.body.ok, true);
@@ -170,9 +196,9 @@ test('POST /floater-text-notify respects a member who opted out of floater_assig
   const res = await request(app)
     .post(`/admin/volunteers/${day}/floater-text-notify`)
     .set('Cookie', cookie)
-    .set('Content-Type', 'application/json')
     .set('X-CSRF-Token', csrfToken)
-    .send({ notify: [{ memberId: String(memberId), position: 'Assistant', room: 'Room 4', hour: '11:00 AM' }] });
+    .field('notify', JSON.stringify([{ memberId: String(memberId) }]))
+    .field('message', "You're assigned: Assistant at 11:00 AM in Room 4.");
 
   assert.equal(res.status, 200);
   assert.equal(res.body.sentCount, 0);

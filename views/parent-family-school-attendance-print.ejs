@@ -31,37 +31,43 @@
 
     <%
       // A real request: "Pdf and print should show all 12 months,
-      // August-July 2026-2027." One calendar grid per month - this
-      // local function renders a single student's own 12 months in
-      // order, reused by both mode='single' (one student/the Whole
-      // Family aggregate) and mode='family' (looped once per student).
+      // August-July 2026-2027" - a later request: "the entire school
+      // year for one student, August-July, should be on one page."
+      // One calendar grid per month, all 12 laid out together in a
+      // compact grid (see .fs-attendance-print-months-grid's own CSS)
+      // instead of one month per printed page - this local function
+      // renders a single student's own 12 months in order, reused by
+      // both mode='single' (one student/the Whole Family aggregate)
+      // and mode='family' (looped once per student).
       function renderMonths(months) {
     %>
-      <% months.forEach(function(m) { %>
-        <div class="fs-attendance-print-month">
-          <h3><%= MONTH_NAMES[m.month - 1] %> <%= m.year %></h3>
-          <table class="fs-attendance-calendar">
-            <thead>
-              <tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr>
-            </thead>
-            <tbody>
-              <% m.weeks.forEach(function(week) { %>
-                <tr>
-                  <% week.forEach(function(d) { %>
-                    <% if (!d) { %>
-                      <td class="fs-attendance-day fs-attendance-day-empty"></td>
-                    <% } else {
-                      var status = m.attendanceByDate[d.date] || '';
-                    %>
-                      <td class="fs-attendance-day fs-attendance-day-<%= status || 'unmarked' %>"><%= d.day %></td>
-                    <% } %>
-                  <% }); %>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
-      <% }); %>
+      <div class="fs-attendance-print-months-grid">
+        <% months.forEach(function(m) { %>
+          <div class="fs-attendance-print-month">
+            <h3><%= MONTH_NAMES[m.month - 1] %> <%= m.year %></h3>
+            <table class="fs-attendance-calendar">
+              <thead>
+                <tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr>
+              </thead>
+              <tbody>
+                <% m.weeks.forEach(function(week) { %>
+                  <tr>
+                    <% week.forEach(function(d) { %>
+                      <% if (!d) { %>
+                        <td class="fs-attendance-day fs-attendance-day-empty"></td>
+                      <% } else {
+                        var status = m.attendanceByDate[d.date] || '';
+                      %>
+                        <td class="fs-attendance-day fs-attendance-day-<%= status || 'unmarked' %>"><%= d.day %></td>
+                      <% } %>
+                    <% }); %>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% }); %>
+      </div>
     <%
       }
     %>

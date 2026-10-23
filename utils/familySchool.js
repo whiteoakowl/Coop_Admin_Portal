@@ -978,6 +978,33 @@ async function deleteWeek(id) {
   await db.prepare('DELETE FROM family_school_weeks WHERE id = ?').run(id);
 }
 
+// A real request: "a label that says the week title with an edit icon
+// on it. When you click the edit icon it allows you to edit the week
+// such as the dates, title, description." Updates each existing
+// family_school_week_dates row IN PLACE by position rather than
+// deleting and recreating all of them - that would sever every date's
+// own id, which is what family_school_week_assignments.week_date_id
+// actually points at, silently orphaning (deleting, via its own ON
+// DELETE CASCADE) every assignment on every day even when that day's
+// own date didn't change. Only dates beyond the new, shorter list
+// (fewer days than before) are genuinely removed - correctly taking
+// their own assignments with them, since those days no longer exist at
+// all. New dates (a longer list than before) get fresh rows appended.
+async function updateWeek(id, { title, description, dates }) {
+  await db.prepare('UPDATE family_school_weeks SET title = ?, description = ?, updated_at = now_text() WHERE id = ?').run(title, description || null, id);
+  const existing = await db.prepare('SELECT * FROM family_school_week_dates WHERE week_id = ? ORDER BY position').all(id);
+  for (let i = 0; i < dates.length; i++) {
+    if (existing[i]) {
+      await db.prepare('UPDATE family_school_week_dates SET date = ? WHERE id = ?').run(dates[i], existing[i].id);
+    } else {
+      await db.prepare('INSERT INTO family_school_week_dates (week_id, date, position) VALUES (?, ?, ?)').run(id, dates[i], i);
+    }
+  }
+  for (let i = dates.length; i < existing.length; i++) {
+    await db.prepare('DELETE FROM family_school_week_dates WHERE id = ?').run(existing[i].id);
+  }
+}
+
 async function getWeekDate(id) {
   return db.prepare('SELECT * FROM family_school_week_dates WHERE id = ?').get(id);
 }
@@ -1175,7 +1202,36 @@ async function getFamilySchoolSettings(familyId) {
   return { ...row, logoUrl: attachmentUrl(row.logo_key) };
 }
 
-async function saveFamilySchoolSettings({ familyId, schoolName, colorPrimary, colorSecondary, ncHomeschoolId, homeschooledSince, logoKey, logoMime }) {
+// A real bug report: "the logo the family uploaded is showing broken on
+// every pdf for family school management portal." utils/pdfRender.js's
+// renderViewToPdf() renders a *-print.ejs view via req.app.render() (no
+// real HTTP request - see its own header comment) and hands the
+// resulting HTML straight to a headless Chromium page via setContent().
+// That page then fetches every relative asset URL - including the
+// logo's own <img src>, which is getFamilySchoolSettings()'s own
+// logoUrl pointing at the private-bucket proxy route (GET /family-
+// school/files/:key) - as a REAL, fresh HTTP request with no session
+// cookie at all, since this headless browser was never logged in as
+// anyone. requirePortalAuth on that route rejects it (a redirect to
+// login, not the image), so the logo always renders broken in a PDF -
+// this never showed up on a live page because a real person's own
+// browser, loading that same print-preview page in a tab, already has
+// their session cookie. Fetches the logo's real bytes here (server-
+// side, same account/request that's already authorized to read
+// family_school_settings in the first place) and inlines them as a
+// data: URI instead, which Chromium can always render with no network
+// request or cookie of its own needed - every /download.pdf route
+// calls this on its own familySettings right before handing it to
+// renderViewToPdf, in place of the live pages' own proxy-URL logoUrl.
+async function familySettingsForPdf(settings) {
+  if (!settings || !settings.logo_key) return settings;
+  const buffer = await attachmentBuffer(settings.logo_key);
+  if (!buffer) return settings;
+  const mimeType = settings.logo_mime || 'image/png';
+  return { ...settings, logoUrl: `data:${mimeType};base64,${Buffer.from(buffer).toString('base64')}` };
+}
+
+async function saveFamilySchoolSettings({ familyId, schoolName, colorPrimary, colorSecondary, colorText, ncHomeschoolId, homeschooledSince, logoKey, logoMime }) {
   const existing = await db.prepare('SELECT logo_key, logo_mime FROM family_school_settings WHERE family_id = ?').get(familyId);
   const resolvedLogoKey = typeof logoKey !== 'undefined' ? logoKey : existing ? existing.logo_key : null;
   const resolvedLogoMime = typeof logoKey !== 'undefined' ? logoMime || null : existing ? existing.logo_mime : null;
@@ -1183,17 +1239,17 @@ async function saveFamilySchoolSettings({ familyId, schoolName, colorPrimary, co
     await db
       .prepare(
         `UPDATE family_school_settings
-         SET school_name = ?, color_primary = ?, color_secondary = ?, nc_homeschool_id = ?, homeschooled_since = ?, logo_key = ?, logo_mime = ?, updated_at = now_text()
+         SET school_name = ?, color_primary = ?, color_secondary = ?, color_text = ?, nc_homeschool_id = ?, homeschooled_since = ?, logo_key = ?, logo_mime = ?, updated_at = now_text()
          WHERE family_id = ?`
       )
-      .run(schoolName || null, colorPrimary || null, colorSecondary || null, ncHomeschoolId || null, homeschooledSince || null, resolvedLogoKey, resolvedLogoMime, familyId);
+      .run(schoolName || null, colorPrimary || null, colorSecondary || null, colorText || null, ncHomeschoolId || null, homeschooledSince || null, resolvedLogoKey, resolvedLogoMime, familyId);
   } else {
     await db
       .prepare(
-        `INSERT INTO family_school_settings (family_id, school_name, color_primary, color_secondary, nc_homeschool_id, homeschooled_since, logo_key, logo_mime)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO family_school_settings (family_id, school_name, color_primary, color_secondary, color_text, nc_homeschool_id, homeschooled_since, logo_key, logo_mime)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(familyId, schoolName || null, colorPrimary || null, colorSecondary || null, ncHomeschoolId || null, homeschooledSince || null, resolvedLogoKey, resolvedLogoMime);
+      .run(familyId, schoolName || null, colorPrimary || null, colorSecondary || null, colorText || null, ncHomeschoolId || null, homeschooledSince || null, resolvedLogoKey, resolvedLogoMime);
   }
 }
 
@@ -1266,6 +1322,7 @@ module.exports = {
   weeksForOwner,
   getWeek,
   createWeek,
+  updateWeek,
   deleteWeek,
   getWeekDate,
   weekGrid,
@@ -1281,6 +1338,7 @@ module.exports = {
   assignmentOptionsForFamily,
   portfolioForStudent,
   getFamilySchoolSettings,
+  familySettingsForPdf,
   saveFamilySchoolSettings,
   schoolYearForDate,
 };

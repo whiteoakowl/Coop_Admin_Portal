@@ -183,6 +183,35 @@ test('Annual Planner: each curriculum row has an Edit icon pre-fillable from its
   assert.equal(stillUpdated.name, 'Saxon Math 6');
 });
 
+// A real request: "Annual planner, student name and cost total should
+// shrink to fit on one line. Edit and trash icons on each curriculum
+// card should be on the title row to the right. Shrink cards by height,
+// about half to be able to view more at once on mobile."
+test('Annual Planner: the student header and curriculum table carry the shrink-to-fit/title-row CSS hooks', async () => {
+  const familyId = await createFamily('Curriculum Shrink Family');
+  const parent = await createPortalMember({ name: 'Curriculum Shrink Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Curriculum Shrink Student', familyId, memberType: 'student', roleKey: 'student' });
+
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/annual-planner');
+  await request(app)
+    .post('/parent/family-school/annual-planner')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: student.memberId, name: 'Shrink Test Curriculum', price: '10', _csrf: csrf });
+
+  const page = await request(app).get('/parent/family-school/annual-planner').set('Cookie', parent.cookie);
+  assert.equal(page.status, 200);
+  // The name and total each have their own shrink/truncate slot inside
+  // one flex header, instead of being plain text + a bare .hint span.
+  assert.match(page.text, /<h2 class="fs-annual-planner-student-header">\s*<span class="fs-annual-planner-student-name">Curriculum Shrink Student<\/span>\s*<span class="hint fs-annual-planner-student-total" data-curriculum-total>Total: \$10\.00<\/span>\s*<\/h2>/);
+  // The curriculum table itself carries the scoped class its own mobile
+  // CSS reorders the Subject/Edit/Delete cells onto one row with -
+  // DOM order (desktop's real column order) is otherwise untouched.
+  assert.match(page.text, /<table class="roster-table members-table condensed-table table-stack-mobile fs-annual-planner-curriculum-table">/);
+  const row = /<tr data-curriculum-id="\d+">([\s\S]*?)<\/tr>/.exec(page.text)[1];
+  assert.match(row, /table-stack-heading[\s\S]*Curriculum[\s\S]*Brand[\s\S]*Level[\s\S]*Price[\s\S]*accounting-row-icons/, 'desktop column order (Subject, Curriculum, Brand, Level, Price, icons) is unchanged');
+});
+
 test('Annual Planner: a curriculum name is required, and another family cannot delete this item', async () => {
   const familyId = await createFamily('Curriculum Validation Family');
   const parent = await createPortalMember({ name: 'Curriculum Validation Parent', familyId, memberType: 'parent', roleKey: 'parent' });
@@ -399,6 +428,78 @@ test('Weekly Planner: each assignment has an Edit icon pre-fillable from its own
 
   const stillUpdated = await db.prepare('SELECT title FROM family_school_week_assignments WHERE id = ?').get(assignment.id);
   assert.equal(stillUpdated.title, 'Fractions worksheet - revised');
+});
+
+// A real request: "a label that says the week title with an edit icon
+// on it. When you click the edit icon it allows you to edit the week
+// such as the dates, title, description or delete the week
+// completely. Remove the trash button on weekly planner view."
+test('Weekly Planner: the week title shows with an Edit icon (no bare trash button), and Edit updates title/description/dates in place', async () => {
+  const familyId = await createFamily('Weekly Planner Edit Week Family');
+  const parent = await createPortalMember({ name: 'Weekly Planner Edit Week Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Weekly Planner Edit Week Student', familyId, memberType: 'student', roleKey: 'student' });
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/weekly-planner');
+
+  await request(app)
+    .post('/parent/family-school/weekly-planner')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ ownerType: 'student', studentId: student.memberId, title: 'Week 1', date: ['2026-11-02', '2026-11-04'], _csrf: csrf });
+  const week = await db.prepare("SELECT * FROM family_school_weeks WHERE title = 'Week 1' AND student_id = ?").get(student.memberId);
+  const dateRows = await db.prepare('SELECT * FROM family_school_week_dates WHERE week_id = ? ORDER BY position').all(week.id);
+  const keptDateId = dateRows[0].id;
+  const removedDateId = dateRows[1].id;
+
+  // An assignment on each of the two dates - editing the week down to
+  // just the first date should keep the first assignment (same date
+  // row id, just a corrected date value) and drop the second (its own
+  // date row no longer exists at all).
+  await request(app).post(`/parent/family-school/weekly-planner/dates/${keptDateId}/assignments`).set('Cookie', parent.cookie).type('form').send({ title: 'Kept Assignment', _csrf: csrf });
+  await request(app).post(`/parent/family-school/weekly-planner/dates/${removedDateId}/assignments`).set('Cookie', parent.cookie).type('form').send({ title: 'Removed Assignment', _csrf: csrf });
+
+  const page = await request(app).get(`/parent/family-school/weekly-planner?owner=${student.memberId}&weekId=${week.id}`).set('Cookie', parent.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /fs-weekly-plan-week-title">Week 1</, 'the week title shows as a label');
+  assert.doesNotMatch(page.text, /aria-label="Delete week"/, 'the old bare trash button should be gone');
+  assert.match(page.text, /aria-label="Edit week"/);
+  assert.match(page.text, /id="edit-week-dialog"/);
+  // Pre-filled straight from the week's own current data.
+  assert.match(page.text, /name="title" value="Week 1"/);
+  assert.match(page.text, /name="date" value="2026-11-02"/);
+  assert.match(page.text, /name="date" value="2026-11-04"/);
+
+  const editRes = await request(app)
+    .post(`/parent/family-school/weekly-planner/${week.id}/edit`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ title: 'Week 1 - Revised', description: 'Focus on fractions this week', date: ['2026-11-03'], _csrf: csrf });
+  assert.equal(editRes.status, 302);
+  assert.match(editRes.headers.location, /notice=/);
+
+  const updatedWeek = await db.prepare('SELECT * FROM family_school_weeks WHERE id = ?').get(week.id);
+  assert.equal(updatedWeek.title, 'Week 1 - Revised');
+  assert.equal(updatedWeek.description, 'Focus on fractions this week');
+
+  const updatedDates = await db.prepare('SELECT * FROM family_school_week_dates WHERE week_id = ? ORDER BY position').all(week.id);
+  assert.equal(updatedDates.length, 1, 'the dropped second date is gone entirely');
+  assert.equal(updatedDates[0].id, keptDateId, 'the first date row keeps its own id - just a corrected date value');
+  assert.equal(updatedDates[0].date, '2026-11-03');
+
+  // The kept date's own assignment survived (same date row id); the
+  // removed date's assignment is gone with it.
+  assert.ok(await db.prepare('SELECT 1 FROM family_school_week_assignments WHERE week_date_id = ?').get(keptDateId));
+  assert.equal(await db.prepare('SELECT 1 FROM family_school_week_dates WHERE id = ?').get(removedDateId), undefined);
+
+  // A different family can't edit or delete via these routes either.
+  const otherFamilyId = await createFamily('Weekly Planner Edit Week Other Family');
+  const otherParent = await createPortalMember({ name: 'Weekly Planner Edit Week Other Parent', familyId: otherFamilyId, memberType: 'parent', roleKey: 'parent' });
+  const otherCsrf = await csrfFrom(otherParent.cookie, '/parent/family-school/weekly-planner');
+  const hijackRes = await request(app)
+    .post(`/parent/family-school/weekly-planner/${week.id}/edit`)
+    .set('Cookie', otherParent.cookie)
+    .type('form')
+    .send({ title: 'Hijacked', date: ['2026-11-03'], _csrf: otherCsrf });
+  assert.equal(hijackRes.status, 404);
 });
 
 test('Weekly Planner: an assignment can be picked from an existing class assignment instead of typed by hand', async () => {

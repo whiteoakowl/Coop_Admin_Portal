@@ -29,17 +29,30 @@
         <table class="roster-table condensed-table fs-weekly-plan-grid">
           <thead>
             <tr>
-              <%# "Check box on each day for teacher to confirm the day
-                  is complete" - read-only here, same as everything else
-                  on this student-facing mirror. %>
-              <% grid.forEach(function(d) { %><th><% if (d.completed) { %>&#9745; <% } %><%= d.dateLabel %></th><% }); %>
+              <%# A real request: "Only parents can see this check box,
+                  not student portal. When parent checks this box, the
+                  student portal will say, complete with a check mark."
+                  Read-only here, same as everything else on this
+                  student-facing mirror - a badge, never the checkbox
+                  itself. %>
+              <% grid.forEach(function(d) { %>
+                <th>
+                  <div class="fs-weekly-plan-day-title-row">
+                    <span><%= d.dateLabel %></span>
+                    <% if (d.completed) { %><span class="badge-pill badge-pill-green"><svg class="icon"><use href="#icon-check"/></svg> Complete</span><% } %>
+                  </div>
+                </th>
+              <% }); %>
             </tr>
           </thead>
           <tbody>
             <tr>
               <% grid.forEach(function(d) { %>
                 <td>
-                  <span class="fs-weekly-plan-day-label-mobile"><% if (d.completed) { %>&#9745; <% } %><%= d.dateLabel %></span>
+                  <div class="fs-weekly-plan-day-label-mobile fs-weekly-plan-day-title-row">
+                    <span><%= d.dateLabel %></span>
+                    <% if (d.completed) { %><span class="badge-pill badge-pill-green"><svg class="icon"><use href="#icon-check"/></svg> Complete</span><% } %>
+                  </div>
                   <% if (d.assignments.length === 0) { %>
                     <p class="roster-empty">Nothing yet.</p>
                   <% } else { %>

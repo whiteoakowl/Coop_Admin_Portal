@@ -35,7 +35,14 @@ function toE164(phone) {
   return null;
 }
 
-async function send(phone, message) {
+// mediaUrl (optional) - a real request: "add an optional image" to the
+// Floater Assignments text-notification popup. Telnyx upgrades a message
+// to MMS automatically once media_urls is present; it must be a URL
+// Telnyx's own servers can fetch themselves (never a cookie-gated proxy
+// path), which is why the Floater notify route only ever uploads this to
+// a PUBLIC bucket (routes/admin-volunteers.js) rather than the private
+// pattern Family School attachments use.
+async function send(phone, message, mediaUrl = null) {
   if (!phone) return { status: 'skipped', detail: 'No phone number on file.' };
   if (!isConfigured()) return { status: 'skipped', detail: 'No SMS provider configured.' };
   const to = toE164(phone);
@@ -58,6 +65,7 @@ async function send(phone, message) {
           : { from: process.env.TELNYX_FROM_NUMBER }),
         to,
         text: message,
+        ...(mediaUrl ? { media_urls: [mediaUrl] } : {}),
       }),
     });
     const data = await res.json().catch(() => null);

@@ -75,17 +75,38 @@
         <p class="roster-empty">Pick a week above to see its grid.</p>
       <% } %>
     <% } else { %>
+      <%# A real request: "a label that says the week title with an
+          edit icon on it. When you click the edit icon it allows you
+          to edit the week such as the dates, title, description or
+          delete the week completely. Remove the trash button on
+          weekly planner view." Replaces the old bare trash-icon row -
+          editing (including deleting) now all happens through the one
+          Edit Week dialog below. %>
       <div class="roster-btn-row roster-btn-row-fit-text no-print fs-weekly-plan-row-spaced">
-        <form method="POST" action="/parent/family-school/weekly-planner/<%= selectedWeek.id %>/delete" data-confirm="Delete &quot;<%= selectedWeek.title %>&quot;? This removes every assignment in it too." class="inline-block-form">
-          <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete week" title="Delete week"><svg class="icon"><use href="#icon-trash"/></svg></button>
-        </form>
+        <span class="fs-weekly-plan-week-title"><%= selectedWeek.title %></span>
+        <button type="button" class="icon-btn" aria-label="Edit week" title="Edit week" onclick="document.getElementById('edit-week-dialog').showModal()"><svg class="icon"><use href="#icon-edit"/></svg></button>
       </div>
 
       <div class="roster-scroll">
         <table class="roster-table condensed-table fs-weekly-plan-grid">
           <thead>
             <tr>
-              <% grid.forEach(function(d) { %><th><%= d.dateLabel %></th><% }); %>
+              <%# A real request: "Day completed check box should be on
+                  the title bar next to each date." Replaces the old
+                  separate "Day complete" checkbox+label row inside the
+                  cell body below with one inline checkbox right next to
+                  the date itself, in the header that's already each
+                  day's own title bar. %>
+              <% grid.forEach(function(d) { %>
+                <th>
+                  <div class="fs-weekly-plan-day-title-row">
+                    <span><%= d.dateLabel %></span>
+                    <form method="POST" action="/parent/family-school/weekly-planner/dates/<%= d.id %>/toggle-complete" class="inline-block-form fs-weekly-plan-day-complete-inline-form">
+                      <input type="checkbox" class="fs-weekly-plan-day-complete-checkbox" <%= d.completed ? 'checked' : '' %> onchange="this.form.requestSubmit()" aria-label="Mark <%= d.dateLabel %> complete" title="Day complete" />
+                    </form>
+                  </div>
+                </th>
+              <% }); %>
             </tr>
           </thead>
           <tbody>
@@ -99,21 +120,18 @@
               <% grid.forEach(function(d) { %>
                 <td>
                   <%# Hidden on desktop (the real <th> above already
-                      shows this day's label) - shown only in the mobile
-                      stacked layout below, where each day becomes its
-                      own full-width block with no column headers left
-                      to read. %>
-                  <span class="fs-weekly-plan-day-label-mobile"><%= d.dateLabel %></span>
-                  <%# "Check box on each day for teacher to confirm the
-                      day is complete." Auto-submits on change, same
-                      "plain form, no fetch" convention as every other
-                      checkbox toggle in this app. %>
-                  <form method="POST" action="/parent/family-school/weekly-planner/dates/<%= d.id %>/toggle-complete" class="inline-block-form fs-weekly-plan-day-complete-form">
-                    <label class="checkbox-option fs-weekly-plan-day-complete">
-                      <input type="checkbox" <%= d.completed ? 'checked' : '' %> onchange="this.form.requestSubmit()" />
-                      Day complete
-                    </label>
-                  </form>
+                      shows this day's label, checkbox included) - shown
+                      only in the mobile stacked layout below, where
+                      each day becomes its own full-width block with no
+                      column headers left to read. Same inline checkbox,
+                      same "plain form, no fetch" convention as every
+                      other checkbox toggle in this app. %>
+                  <div class="fs-weekly-plan-day-label-mobile fs-weekly-plan-day-title-row">
+                    <span><%= d.dateLabel %></span>
+                    <form method="POST" action="/parent/family-school/weekly-planner/dates/<%= d.id %>/toggle-complete" class="inline-block-form fs-weekly-plan-day-complete-inline-form">
+                      <input type="checkbox" class="fs-weekly-plan-day-complete-checkbox" <%= d.completed ? 'checked' : '' %> onchange="this.form.requestSubmit()" aria-label="Mark <%= d.dateLabel %> complete" title="Day complete" />
+                    </form>
+                  </div>
                   <div class="fs-weekly-plan-dropzone" data-week-date-id="<%= d.id %>">
                     <% if (d.assignments.length === 0) { %>
                       <p class="roster-empty fs-weekly-plan-empty-hint">Nothing yet.</p>
@@ -244,6 +262,43 @@
           </form>
         </dialog>
       <% }); %>
+
+      <%# A real request: "a label that says the week title with an
+          edit icon on it. When you click the edit icon it allows you
+          to edit the week such as the dates, title, description or
+          delete the week completely." Pre-filled server-side straight
+          from selectedWeek/grid (there's only ever one week open on
+          this page at a time, unlike the per-assignment Edit dialog
+          above, which needs JS to repopulate itself per row) - same
+          up-to-7-dates shape as Add Week, with Delete Week folded in
+          as this dialog's own danger action instead of a bare icon
+          sitting in the main toolbar. %>
+      <dialog id="edit-week-dialog" class="class-form-dialog">
+        <form method="POST" action="/parent/family-school/weekly-planner/<%= selectedWeek.id %>/edit" class="stack-form">
+          <div class="class-form-dialog-header">
+            <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
+            <h3>Edit Week</h3>
+          </div>
+          <label>Title
+            <input type="text" name="title" value="<%= selectedWeek.title %>" required />
+          </label>
+          <label>Description
+            <textarea name="description" rows="2" placeholder="Details about this week"><%= selectedWeek.description || '' %></textarea>
+          </label>
+          <% for (var i = 0; i < 7; i++) { %>
+            <label>Date <%= i + 1 %><% if (i > 0) { %> <span class="hint">(optional)</span><% } %>
+              <input type="date" name="date" value="<%= grid[i] ? grid[i].date : '' %>" <%= i === 0 ? 'required' : '' %> />
+            </label>
+          <% } %>
+          <div class="notes-dialog-actions">
+            <form method="POST" action="/parent/family-school/weekly-planner/<%= selectedWeek.id %>/delete" data-confirm="Delete &quot;<%= selectedWeek.title %>&quot;? This removes every assignment in it too." class="inline-block-form">
+              <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete Week</button>
+            </form>
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Save Changes</button>
+          </div>
+        </form>
+      </dialog>
     <% } %>
 
     <%# "Add week button. Popup allows you to choose up to 7 dates. And

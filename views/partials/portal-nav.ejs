@@ -23,7 +23,23 @@ const showSwitcher = typeof portalRoles !== 'undefined' && (portalRoles.length >
 // area (partials/main-admin-settings-tabs.ejs's own tab bar, /main-admin/
 // settings redirects there) instead of the generic per-account Settings
 // page (My Privacy, etc.) every other portal's gear still opens.
-const settingsHref = portalTitle === 'Main Admin' ? '/main-admin/settings' : '/portal/settings';
+// A later real request: "Family school management, settings tab, should
+// move to settings gear. Family school management, parent portal have
+// the same linked settings gear." - FSM's own Settings tab (it used to
+// live in FAMILY_SCHOOL_NAV_LINKS below) moved behind the gear instead,
+// same pattern as Main Admin above, and Parent Portal's gear (a parent
+// account's other portal for the same role) now opens that same hub too
+// rather than the bare generic page, so there's one gear destination for
+// both no matter which of the two portals a parent is looking at.
+// A further real request: "All portals settings gear. [They] are all now
+// the card setup" - Student Portal and Co-op Teacher Portal gained their
+// own card-view hub too (routes/portal-auth.js's own /portal/settings-
+// hub, views/portal-settings-hub.ejs) rather than opening the bare
+// generic page directly.
+const settingsHref = portalTitle === 'Main Admin' ? '/main-admin/settings'
+  : (portalTitle === 'Family School Management' || portalTitle === 'Parent Portal') ? '/parent/family-school/settings-hub'
+  : (portalTitle === 'Student Portal' || portalTitle === 'Co-op Teacher Portal') ? '/portal/settings-hub'
+  : '/portal/settings';
 // A real bug report: "Student portal, when you click on chat it should
 // stay on Student portal" - the same "always guess Parent first" mistake
 // sharedPortalTitle now fixes for Chat/Photos (see middleware/portalAuth.js's
@@ -34,7 +50,15 @@ const settingsHref = portalTitle === 'Main Admin' ? '/main-admin/settings' : '/p
 // already knows which portal it's rendering as (portalTitle, the param
 // every caller passes in) - tagging these two corner links with that
 // same ?portal=parent|student is enough, no guessing needed at all.
-const cornerPortalQuery = portalTitle === 'Parent Portal' ? '?portal=parent' : portalTitle === 'Student Portal' ? '?portal=student' : '';
+// Co-op Teacher Portal added to this list alongside Parent/Student once
+// settingsHref above started giving it its own distinct hub content
+// (/portal/settings-hub, resolved via sharedPortalTitle) - without this,
+// a dual parent+teacher account's own corner gear link on Co-op Teacher
+// Portal carried no query at all, so sharedPortalTitle's own hasParent-
+// first precedence would silently resolve it back to the Parent hub
+// instead, the exact "always guess Parent first" bug class this whole
+// query-tagging mechanism exists to prevent.
+const cornerPortalQuery = portalTitle === 'Parent Portal' ? '?portal=parent' : portalTitle === 'Student Portal' ? '?portal=student' : portalTitle === 'Co-op Teacher Portal' ? '?portal=teacher' : '';
 
 // A real request: "On parent, student and teacher portal on mobile add an
 // email icon at the top for contacting group leaders. On desktop it says
@@ -295,7 +319,8 @@ const FAMILY_SCHOOL_NAV_LINKS = [
   { href: '/parent/academics', icon: 'graduation-cap', label: 'Transcripts' },
   { href: '/parent/academics/diplomas', icon: 'graduation-cap', label: 'Diplomas' },
   { href: '/parent/family-school/portfolio', icon: 'file-text', label: 'Portfolio' },
-  { href: '/parent/family-school/settings', icon: 'gear', label: 'Settings' },
+  // Settings used to be a tab here too - moved behind the gear icon (see
+  // settingsHref above) per a later real request.
 ];
 // Co-op Teacher Portal's own primary nav - same anti-drift reasoning as
 // MAIN_ADMIN_NAV_LINKS above, centralizing what used to be an identical

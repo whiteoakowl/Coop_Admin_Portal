@@ -13,12 +13,13 @@ const logoSrc = (settings && settings.logoUrl) || '/img/logo.png';
 const schoolName = (settings && settings.school_name) || 'Sanford Homeschoolers';
 const primaryColor = settings && settings.color_primary;
 const secondaryColor = settings && settings.color_secondary;
+const textColor = settings && settings.color_text;
 %>
 <div class="print-header family-school-print-header"<% if (secondaryColor) { %> style="border-color: <%= secondaryColor %>;"<% } %>>
   <img src="<%= logoSrc %>" alt="" />
   <div>
     <p class="print-header-title"<% if (primaryColor) { %> style="color: <%= primaryColor %>;"<% } %>><%= schoolName %></p>
-    <p class="print-header-sub"><%= subtitle %></p>
-    <% if (settings && settings.nc_homeschool_id) { %><p class="print-header-sub">NC Homeschool ID: <%= settings.nc_homeschool_id %></p><% } %>
+    <p class="print-header-sub"<% if (textColor) { %> style="color: <%= textColor %>;"<% } %>><%= subtitle %></p>
+    <% if (settings && settings.nc_homeschool_id) { %><p class="print-header-sub"<% if (textColor) { %> style="color: <%= textColor %>;"<% } %>>NC Homeschool ID: <%= settings.nc_homeschool_id %></p><% } %>
   </div>
 </div>

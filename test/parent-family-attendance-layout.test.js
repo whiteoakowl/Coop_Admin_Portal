@@ -66,7 +66,7 @@ async function createPortalMember({ name, familyId, memberType, roleKey }) {
   return { memberId, accountId, cookie: loginRes.headers['set-cookie'] };
 }
 
-test('the description, legend row, month navigation, and orange buttons render in the requested order, each left-aligned', async () => {
+test('the description, month navigation, and the merged student/icons/legend row render in the requested order, each left-aligned', async () => {
   const familyId = await createFamily('Attendance Layout Family');
   const parent = await createPortalMember({ name: 'Layout Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const student = await createPortalMember({ name: 'Layout Student', familyId, memberType: 'student', roleKey: 'student' });
@@ -74,23 +74,42 @@ test('the description, legend row, month navigation, and orange buttons render i
   const res = await request(app).get(`/parent/family-school/attendance?studentId=${student.memberId}&year=2026&month=3`).set('Cookie', parent.cookie);
   assert.equal(res.status, 200);
 
-  const legendIdx = res.text.indexOf('fs-attendance-legend-present');
+  // A later real request: "filter button should be dropdown to choose a
+  // student... Shrink this to fit neatly next to the icons on the same
+  // row. Present and absent keys should move to the same row, far
+  // right." The old separate Filter popover and Present/Absent legend
+  // row are gone - the student select, the Export/Print/PDF icons, and
+  // the legend now all share ONE row (fs-attendance-toolbar-row), which
+  // stays right where the old icon row already was: after the month
+  // navigation row, right before the calendar.
   const descriptionIdx = res.text.indexOf('Click a date to mark present');
-  const exportIdx = res.text.indexOf('aria-label="Export CSV"');
   const navRowIdx = res.text.indexOf('fs-attendance-nav-row');
+  const toolbarRowIdx = res.text.indexOf('fs-attendance-toolbar-row');
+  const legendIdx = res.text.indexOf('fs-attendance-legend-present');
+  const exportIdx = res.text.indexOf('aria-label="Export CSV"');
   const calendarIdx = res.text.indexOf('fs-attendance-calendar');
 
-  assert.ok(legendIdx > -1 && descriptionIdx > -1 && exportIdx > -1 && navRowIdx > -1 && calendarIdx > -1, 'every section should be present');
-  assert.ok(descriptionIdx < legendIdx, 'the description should come before the Present/Absent legend');
-  assert.ok(legendIdx < navRowIdx, 'the legend should come before the month navigation row');
-  assert.ok(navRowIdx < exportIdx, 'the month navigation row should come before the orange Export/Print/Download/Filter row');
-  assert.ok(exportIdx < calendarIdx, 'the orange buttons should come right before the calendar itself');
+  assert.ok(descriptionIdx > -1 && navRowIdx > -1 && toolbarRowIdx > -1 && legendIdx > -1 && exportIdx > -1 && calendarIdx > -1, 'every section should be present');
+  assert.ok(descriptionIdx < navRowIdx, 'the description should come before the month navigation row');
+  assert.ok(navRowIdx < toolbarRowIdx, 'the month navigation row should come before the merged student/icons/legend row');
+  assert.ok(toolbarRowIdx < exportIdx && toolbarRowIdx < legendIdx, 'the student select, icons, and legend all live inside the same merged row');
+  assert.ok(exportIdx < calendarIdx && legendIdx < calendarIdx, 'the merged row comes right before the calendar itself');
 
-  // Both the legend row and the nav row opt out of the mobile-centering
+  // Both the merged row and the nav row opt out of the mobile-centering
   // .roster-btn-row-fit-text normally applies (public/css/styles.css's
   // own .roster-btn-row-fit-text.fs-attendance-row-left override).
-  assert.match(res.text, /class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left">\s*<span class="badge-pill fs-attendance-legend-present"/);
+  assert.match(res.text, /class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left fs-attendance-toolbar-row no-print"/);
   assert.match(res.text, /class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left fs-attendance-nav-row"/);
+
+  // A real request: "It should say choose student in the menu bar."
+  // The old Filter <details> popover is gone - the select sits directly
+  // in the toolbar row, with a disabled leading "Choose Student" option
+  // instead of a separate visible label.
+  assert.match(res.text, /<select id="attendance-student-select" name="studentId" aria-label="Choose Student" onchange="this\.form\.submit\(\)">\s*<option value="" disabled>Choose Student<\/option>/);
+
+  // The Present/Absent legend now lives at the far right of this same
+  // row (margin-left: auto on its own wrapper).
+  assert.match(res.text, /<span class="fs-attendance-legend-row">\s*<span class="badge-pill fs-attendance-legend-present">Present<\/span>\s*<span class="badge-pill fs-attendance-legend-absent">Absent<\/span>\s*<\/span>/);
 
   // A later real request: "Erase the words prev and next, it should
   // just be an arrow in a box, fit to text." - plain .icon-btn squares,
@@ -111,13 +130,10 @@ test('the description, legend row, month navigation, and orange buttons render i
   assert.match(res.text, /aria-label="Export CSV"[^>]*><svg class="icon"><use href="#icon-download"\/>/);
   assert.match(res.text, /aria-label="Download PDF"[^>]*><svg class="icon"><use href="#icon-pdf"\/>/);
 
-  // A real bug report ("when you select filter no matter what you do
-  // the filter stays open") elsewhere in Family School Management -
-  // the same fix applies here: data-filter-details is the markup
-  // contract public/js/filter-details-dismiss.js looks for to close
-  // the popover on an outside click.
-  assert.match(res.text, /<details class="filter-details" data-filter-details>/);
-  assert.match(res.text, /<script src="\/js\/filter-details-dismiss\.js"><\/script>/);
+  // The old Filter <details>/filter-details-dismiss.js are both gone -
+  // there's no more popover on this page to dismiss.
+  assert.doesNotMatch(res.text, /<details class="filter-details" data-filter-details>/);
+  assert.doesNotMatch(res.text, /filter-details-dismiss\.js/);
 });
 
 test('the year dropdown always includes the currently selected year, even an old one outside the default window', async () => {

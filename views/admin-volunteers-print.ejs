@@ -4,7 +4,7 @@
   <%- include('partials/head', { title }) %>
   <style>@page { size: letter; margin: 0.4in; }</style>
 </head>
-<body class="admin-page floater-assignments-print-page">
+<body class="admin-page floater-assignments-print-page team-print-preview-page">
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="print-preview-header no-print">
@@ -26,37 +26,53 @@
       <div class="floater-cards-grid floater-chart-cards-grid">
         <% hourSections.forEach(function(hour, idx) { %>
           <% var accent = FLOATER_ACCENTS[idx % FLOATER_ACCENTS.length]; %>
-          <div class="floater-print-page">
-            <div class="print-header">
-              <img src="/img/logo.png" alt="" />
-              <div>
-                <p class="print-header-title">Sanford Homeschoolers</p>
-                <p class="print-header-sub"><%= dayLabel %> Floater Assignments<% if (selectedDateLabel) { %> &mdash; <%= selectedDateLabel %><% } %></p>
+          <%# A real request: "floater assignments, pdf and print, each
+              hour should shrink to fit on one page." The old
+              .floater-print-page wrapper only forced a page-break before
+              each hour (page-break-before: always) - it never actually
+              shrank anything, so an hour with many assigned positions
+              could still overflow past its own one page. Same wrap/inner
+              shape + print-shrink-to-fit.js mechanism as Setup/Cleanup
+              Teams' own one-team-per-page fix (admin-setup-teams-print.
+              ejs) - header and card wrapped together in one inner div
+              since fitOne() only ever shrinks ONE element, its own
+              firstElementChild. No data-shrink-to-fit-group here -
+              unlike Setup/Cleanup, nobody asked for every hour to share
+              one leveled-down font size, so each hour shrinks only as
+              much as it personally needs. %>
+          <div class="floater-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="9.2in">
+            <div class="floater-print-page-inner">
+              <div class="print-header">
+                <img src="/img/logo.png" alt="" />
+                <div>
+                  <p class="print-header-title">Sanford Homeschoolers</p>
+                  <p class="print-header-sub"><%= dayLabel %> Floater Assignments<% if (selectedDateLabel) { %> &mdash; <%= selectedDateLabel %><% } %></p>
+                </div>
               </div>
-            </div>
-            <div class="floater-card floater-card-<%= accent %>">
-              <div class="floater-card-header">
-                <span class="floater-card-icon"><svg class="icon"><use href="#icon-clock"/></svg></span>
-                <h3><%= hour.label %></h3>
-              </div>
-              <table class="floater-card-table floater-chart-table">
-                <thead><tr><th>Position</th><th>Room</th><th>Floater</th></tr></thead>
-                <tbody>
-                  <% hour.slots.forEach(function(slot) { %>
-                    <tr>
-                      <td class="floater-card-position">
-                        <%= slot.label %>
-                        <% if ((slot.slotType === 'class' || slot.slotType === 'vacancy') && slot.reason) { %><span class="floater-slot-reason"><%= slot.reason %></span><% } %>
-                      </td>
-                      <td><%= slot.room || '—' %></td>
-                      <td><%= slot.assigned ? slot.assigned.name : (slot.noneAvailable ? 'No available floaters' : 'Unassigned') %></td>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
-              <div class="floater-card-footer">
-                <svg class="icon"><use href="#icon-users"/></svg>
-                <%= hour.slots.length %> Position<%= hour.slots.length === 1 ? '' : 's' %>
+              <div class="floater-card floater-card-<%= accent %>">
+                <div class="floater-card-header">
+                  <span class="floater-card-icon"><svg class="icon"><use href="#icon-clock"/></svg></span>
+                  <h3><%= hour.label %></h3>
+                </div>
+                <table class="floater-card-table floater-chart-table">
+                  <thead><tr><th>Position</th><th>Room</th><th>Floater</th></tr></thead>
+                  <tbody>
+                    <% hour.slots.forEach(function(slot) { %>
+                      <tr>
+                        <td class="floater-card-position">
+                          <%= slot.label %>
+                          <% if ((slot.slotType === 'class' || slot.slotType === 'vacancy') && slot.reason) { %><span class="floater-slot-reason"><%= slot.reason %></span><% } %>
+                        </td>
+                        <td><%= slot.room || '—' %></td>
+                        <td><%= slot.assigned ? slot.assigned.name : (slot.noneAvailable ? 'No available floaters' : 'Unassigned') %></td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+                <div class="floater-card-footer">
+                  <svg class="icon"><use href="#icon-users"/></svg>
+                  <%= hour.slots.length %> Position<%= hour.slots.length === 1 ? '' : 's' %>
+                </div>
               </div>
             </div>
           </div>
@@ -65,5 +81,6 @@
     <% } %>
   </main>
   <script src="/js/print-auto.js"></script>
+  <script src="/js/print-shrink-to-fit.js"></script>
 </body>
 </html>

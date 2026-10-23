@@ -5438,3 +5438,18 @@ alter table family_school_content_items add column if not exists attachment_mime
 alter table family_school_assignment_submissions add column if not exists file_mime text;
 alter table family_school_week_assignments add column if not exists file_mime text;
 alter table family_school_settings add column if not exists logo_mime text;
+
+-- Family School Management > Settings: a third color choice (Font
+-- Color) - see the family_school_settings_font_color migration's own
+-- header comment.
+alter table family_school_settings add column if not exists color_text text;
+
+-- Weekly Planner: a week can now carry a description too - see the
+-- family_school_week_description migration's own header comment.
+alter table family_school_weeks add column if not exists description text;
+
+-- Notification Preferences: widen the channel CHECK to also accept
+-- 'push' - see the notification_push_channel migration's own header
+-- comment.
+alter table notification_preferences drop constraint if exists notification_preferences_channel_check;
+alter table notification_preferences add constraint notification_preferences_channel_check check (channel in ('email', 'sms', 'push'));

@@ -1964,7 +1964,6 @@ body.public-page .roster-empty {
 
   .admin-mobile-tabs {
     display: flex;
-    gap: 0.2rem;
     position: fixed;
     left: 0;
     right: 0;
@@ -2033,7 +2032,6 @@ body.public-page .roster-empty {
     border: none;
     background: none;
     font-family: inherit;
-    border-radius: 8px;
     color: var(--ink);
     font-size: 0.65rem;
     font-weight: 600;
@@ -2046,21 +2044,37 @@ body.public-page .roster-empty {
   .admin-mobile-tabs > a .icon,
   .admin-mobile-tabs > button .icon { width: 1.2em; height: 1.2em; opacity: 0.75; }
   .admin-mobile-tabs > a:hover,
-  .admin-mobile-tabs > button:hover { background: rgba(255,255,255,0.4); }
+  .admin-mobile-tabs > button:hover { background: rgba(255,255,255,0.4); border-radius: 8px; }
   .admin-mobile-tabs > a.active,
   .admin-mobile-tabs > button.active {
     background: var(--surface);
     color: var(--brand-darker);
     box-shadow: var(--shadow-sm);
+    border-radius: 8px;
   }
   .admin-mobile-tabs > a.active .icon,
   .admin-mobile-tabs > button.active .icon { opacity: 1; }
   /* A real request: "Add vertical lines between each tab for better
-     visuals." A translucent white line (not a hard-coded dark color)
-     reads against this bar's own var(--accent) background in both light
-     and dark mode, the same reasoning this app's other overlay dividers
-     on a colored surface already use. Scoped to :not(:last-child) so the
-     bar's own right edge never gets a trailing line with nothing after it. */
+     visuals," corrected by a later one: "we added lines between the
+     menu tab options they should be straight lines and look exactly
+     like the lines on the kiosk page orange menu bar" - kiosk-home.ejs's
+     own bottom bar (.landing-action-bar-btn above) gets a straight,
+     full-height divider because its buttons sit flush (no gap) with no
+     border-radius on the un-hovered/un-active state. This bar's own
+     buttons used to have both: the old `gap` between items (removed
+     above) left dead space the line didn't actually span, and the old
+     unconditional border-radius: 8px on every tab clipped/curved the
+     border-right's own top and bottom couple of pixels - border-radius
+     now only applies on hover/active (above), where there's a real
+     background to round in the first place; a plain, un-highlighted tab
+     has no visible rounding either way, so moving it here changes
+     nothing about the active "pill" look while leaving the default-
+     state divider a genuinely straight line, same as the kiosk bar's.
+     A translucent white line (not a hard-coded dark color) reads against
+     this bar's own var(--accent) background in both light and dark mode,
+     the same reasoning this app's other overlay dividers on a colored
+     surface already use. Scoped to :not(:last-child) so the bar's own
+     right edge never gets a trailing line with nothing after it. */
   .admin-mobile-tabs > a:not(:last-child),
   .admin-mobile-tabs > button:not(:last-child) {
     border-right: 1px solid rgba(255, 255, 255, 0.35);
@@ -3475,13 +3489,25 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
    "done") rather than disappearing - these are a parent's own planning
    notes, not a checklist that should vanish on check. */
 .fs-weekly-plan-assignment-done .fs-weekly-plan-assignment-text { text-decoration: line-through; color: var(--muted); }
-.fs-weekly-plan-day-complete-form { margin-bottom: 0.4rem; }
-.fs-weekly-plan-day-complete { font-size: 0.78rem; font-weight: 600; }
 .fs-weekly-plan-add-btn-row { margin-top: 0.5rem; }
 .fs-weekly-plan-day-label-mobile { display: none; }
 
+/* A real request: "Day completed check box should be on the title bar
+   next to each date." Each day's title bar (the real <th> on desktop,
+   .fs-weekly-plan-day-label-mobile's own card-header role on mobile) is
+   a flex row with the date on the left and the checkbox on the right,
+   replacing the old separate "Day complete" checkbox+label block that
+   used to sit below it in the cell body. */
+.fs-weekly-plan-day-title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.fs-weekly-plan-day-complete-inline-form { margin: 0; line-height: 0; }
+.fs-weekly-plan-day-complete-checkbox { width: 1.05rem; height: 1.05rem; cursor: pointer; flex-shrink: 0; }
+
 /* "Adequate space between buttons and features on page and popups." */
 .fs-weekly-plan-row-spaced { margin-bottom: 1rem; }
+/* A real request: "a label that says the week title with an edit icon
+   on it." - the week's own title, next to its new Edit icon button
+   (styles.css's own .icon-btn already sizes that part). */
+.fs-weekly-plan-week-title { font-weight: 700; font-size: 1.05rem; }
 
 /* "Each day should be stacked vertically for easier view on mobile.
    Everything is currently overlapping such as text, buttons etc." The
@@ -3511,7 +3537,7 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
   }
   .fs-weekly-plan-grid td:last-child { margin-bottom: 0; }
   .fs-weekly-plan-day-label-mobile {
-    display: block;
+    display: flex;
     font-weight: 700;
     margin-bottom: 0.5rem;
     padding-bottom: 0.4rem;
@@ -3644,6 +3670,35 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
      a deliberately narrow inline width (set on the input itself) and a
      flex item's default flex-grow: 0 already leaves that alone. */
   .table-stack-mobile td input[type="text"] { flex: 1 1 auto; min-width: 0; }
+}
+
+/* A real request: "Annual planner... student name and cost total should
+   shrink to fit on one line." Same shrink-to-fit idea as the Family
+   School header's own .fs-school-header-meta - the name gets a flexible,
+   ellipsis-truncating slot and the total stays pinned to the right so
+   both always share one line instead of the total wrapping onto its
+   own. */
+@media (max-width: 640px) {
+  .fs-annual-planner-student-header { display: flex; align-items: baseline; flex-wrap: nowrap; gap: 0.4rem; overflow: hidden; }
+  .fs-annual-planner-student-name { font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .fs-annual-planner-student-total { font-size: 0.7rem; white-space: nowrap; flex-shrink: 0; margin-left: auto; }
+}
+
+/* A real request: "Edit and trash icons on each curriculum card should
+   be on the title row to the right. Shrink cards by height, about half
+   to be able to view more at once on mobile." Scoped to just this one
+   table (not every .table-stack-mobile site-wide) - its Subject heading
+   cell and its Edit/Delete icon cell join the SAME flex row (via order,
+   no DOM reorder needed - desktop's own real <table> column order stays
+   exactly as it was), and the remaining Curriculum/Brand/Level/Price
+   cells wrap inline instead of each claiming its own full-width stacked
+   row, which is most of the height this cuts. */
+@media (max-width: 640px) {
+  .fs-annual-planner-curriculum-table.table-stack-mobile tr { display: flex; flex-wrap: wrap; align-items: center; padding: 0.4rem 0.6rem; }
+  .fs-annual-planner-curriculum-table.table-stack-mobile td { padding: 0.15rem 0; }
+  .fs-annual-planner-curriculum-table.table-stack-mobile td.table-stack-heading { order: 1; flex: 1 1 auto; border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .fs-annual-planner-curriculum-table.table-stack-mobile td.accounting-row-icons { order: 2; flex: 0 0 auto; width: auto; }
+  .fs-annual-planner-curriculum-table.table-stack-mobile td:not(.table-stack-heading):not(.accounting-row-icons) { order: 3; flex: 0 1 auto; width: auto; justify-content: flex-start; gap: 0.3rem; margin-right: 0.7rem; }
 }
 
 /* The "Add/Edit Semester" list's own rename row (partials/semester-
@@ -6492,6 +6547,12 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
    chart-table specificity rather than touching those shared rules. */
 .floater-notify-col { display: none; }
 .floater-notify-select-mode .floater-notify-col { display: table-cell; }
+/* A real request: "click the checkboxes on each assignment or the
+   whole card." Same select-mode gating as .floater-notify-col above,
+   just living in .floater-card-header (a flex row - margin-left: auto
+   pushes it to the header's own far right) instead of a table column. */
+.floater-card-select-all { display: none; align-items: center; gap: 0.3rem; margin-left: auto; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+.floater-notify-select-mode .floater-card-select-all { display: inline-flex; }
 .floater-card-table.floater-chart-table th:nth-child(1), .floater-card-table.floater-chart-table td:nth-child(1) { width: 2.2rem; }
 .floater-card-table.floater-chart-table th:nth-child(2), .floater-card-table.floater-chart-table td:nth-child(2) { width: 38%; }
 .floater-card-table.floater-chart-table th:nth-child(3), .floater-card-table.floater-chart-table td:nth-child(3) { width: 23%; }
@@ -6896,6 +6957,46 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 /* ---------- Team cards: Floater Teams + Setup/Cleanup share this look ---------- */
 
 .team-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
+
+/* A real request: "All portals settings gear. [They] are all now the
+   card setup. On mobile shrink the cards to fit two to a row." Scoped
+   to settings-hub-card-grid (a second class the 4 real settings-gear
+   hub pages carry alongside .team-card-grid) rather than that shared
+   class itself - .team-card-grid is reused by 24+ unrelated "pick one of
+   these named things" pages (Training, Classifieds, Shop, etc.) nobody
+   asked to force into a fixed 2-column grid. .team-card-grid's own
+   minmax(230px, 1fr) floor already collapses to 1 column on any phone
+   under ~460px wide - this overrides that with an explicit 2-column
+   grid instead, shrinking each card's own padding/icon/title to still
+   read comfortably at half that width. white-space: normal replaces
+   the base .team-info-title's own single-line ellipsis - a card at
+   roughly half its usual width needs to wrap a longer title (e.g.
+   "Family School Settings") onto 2 lines rather than clipping it. */
+@media (max-width: 640px) {
+  .settings-hub-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  .settings-hub-card-grid .team-info-card {
+    padding: 0.65rem 0.4rem 0.55rem;
+    gap: 0.2rem;
+  }
+  .settings-hub-card-grid .team-info-icon {
+    width: 2.1rem;
+    height: 2.1rem;
+  }
+  .settings-hub-card-grid .team-info-icon .icon {
+    width: 1.05rem;
+    height: 1.05rem;
+  }
+  .settings-hub-card-grid .team-info-title {
+    font-size: 0.74rem;
+    white-space: normal;
+  }
+  .settings-hub-card-grid .hint {
+    font-size: 0.62rem;
+  }
+}
 
 /* Setup/Cleanup: exactly 5 cards per row on a full-width desktop screen,
    stepping down smoothly as the viewport narrows instead of just wrapping
@@ -8483,6 +8584,77 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
   }
 }
 
+/* A real request: "Annual planner, shrink add curriculum button and
+   year choice dropdown. So that all buttons, dropdowns and icons fit on
+   one row." At the .roster-btn-row-fit-text mobile breakpoint above,
+   "+ Add Curriculum"'s own text plus the year <select> were still wide
+   enough (even sized to their own content, not an equal-width grid) to
+   wrap onto a second line alongside the 3 icon buttons next to them -
+   shrinking just these two (every other page's own .roster-action-btn/
+   select is untouched) is what actually gets the whole row to fit. */
+@media (max-width: 640px) {
+  /* A real request: "Floater assignments, orange buttons, shrink font
+     in orange buttons so it fits more cleanly on mobile." Add/Edit
+     Dates, +Add/Edit Permanent Positions, +Add/Edit Temporary Position,
+     and Text Notification are the longest-labeled .roster-action-btn
+     row in the app - scoped to just this one page's row (not every
+     other page's own orange buttons) via the same page-specific class
+     pattern as .fs-annual-planner-add-btn below. */
+  .roster-btn-row-fit-text.floater-assignments-btn-row .roster-action-btn {
+    font-size: 0.72rem;
+    padding: 0.35rem 0.5rem;
+  }
+  /* A real request: "choose a date and semester/day drop down should be
+     on the same row, shrink to fit." Visually hides each dropdown's own
+     <label> (same technique as .sr-only, just inlined here rather than
+     toggling that class with JS) - that text is what the two selects
+     don't have room for side by side on a phone, and each select's own
+     options already say what it's choosing (a date; "Fall 2026 -
+     Monday") without needing a label alongside it. Still reachable by
+     screen readers since the markup/for-id pairing is untouched, just
+     the visual hiding. width: auto lets each select size to its own
+     selected option's text instead of a wide default spanning the row. */
+  .floater-assignments-filter-row {
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+  }
+  .floater-assignments-filter-row .category-filter {
+    gap: 0;
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .floater-assignments-filter-row label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .floater-assignments-filter-row select {
+    width: auto;
+    max-width: 100%;
+    font-size: 0.72rem;
+    padding: 0.3rem 1.5rem 0.3rem 0.4rem;
+    background-size: 0.65rem;
+    background-position: right 0.5rem center;
+  }
+  .roster-btn-row-fit-text .fs-annual-planner-add-btn {
+    min-width: 0;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.72rem;
+  }
+  .roster-btn-row-fit-text #annual-planner-school-year {
+    padding: 0.3rem 1.5rem 0.3rem 0.4rem;
+    font-size: 0.72rem;
+    background-size: 0.65rem;
+    background-position: right 0.5rem center;
+  }
+}
+
 /* A real request: "member page button order on mobile" with an exact
    3/2/4 grouping (views/main-admin-members.ejs) - .roster-btn-row-fit-
    text's own flex-wrap above wraps purely based on each button's text
@@ -10025,6 +10197,37 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
   .print-header-title { font-size: 1.25rem; font-weight: 800; margin: 0; color: #000; }
   .print-header-sub { font-size: 0.95rem; margin: 0.1rem 0 0; color: #333; }
 
+  /* A real bug report: "the header should also be on all pdf and print
+     pages, not just the first page." Every other .print-header in this
+     app renders once at the top of a one-page (or already explicitly
+     paginated per-item) printout, so this never came up before - Family
+     School Management's own multi-page reports (Grades across several
+     students, the Daily Learning Log, Volunteer Hours, several weeks of
+     the Weekly Planner, ...) are the first case where a printout's
+     content can genuinely run past one page on its own. Chrome's print
+     engine repeats a position:fixed element at the same spot on EVERY
+     physical page (unlike normal flow, which only ever renders an
+     element once) - the one Paged-Media-correct way to do a repeating
+     header/footer that headless Chromium (what utils/pdfRender.js
+     drives) actually supports; the dedicated CSS Paged Media running-
+     element syntax for this (@page { @top-center { content: element(...) } })
+     has no Chromium support at all. Scoped to this one class (not the
+     shared .print-header every OTHER print page in the app also uses)
+     so this doesn't turn every unrelated one-off print header in the
+     app into a repeating one. admin-main:has(...) reserves the matching
+     space at the top of the content on every page so nothing starts out
+     hidden underneath it - :has() is well past Chromium's support
+     baseline at this point. */
+  .family-school-print-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+  }
+  .admin-main:has(.family-school-print-header) {
+    padding-top: 1in;
+  }
+
   /* Data-bearing text inputs read as plain values, not editable boxes.
      team-info-title/-desc-input already render border-less by default
      (their resting :disabled state, see the .team-info-edit-form rules
@@ -10177,6 +10380,26 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
     display: block !important;
   }
   .floater-print-page:not(:first-child) {
+    page-break-before: always;
+    break-before: page;
+  }
+
+  /* A real follow-up request: "each hour should shrink to fit on one
+     page" - the rule above only ever forced a page BREAK between hours,
+     it never shrank anything, so an hour with many assigned positions
+     could still spill past its own page. views/admin-volunteers-print.
+     ejs's dedicated print/PDF page now wraps each hour in THIS class
+     instead (data-shrink-to-fit-on-print + print-shrink-to-fit.js) -
+     same max-height-only-during-measurement shape as .team-print-page-
+     fit above, for the identical "a real, permanent CSS height here
+     produces a genuine blank page in Chromium's paginated print output"
+     reason documented on that class. */
+  .floater-print-page-fit {
+    width: 100%;
+    max-height: 9.2in;
+    overflow: hidden;
+  }
+  .floater-print-page-fit:not(:first-child) {
     page-break-before: always;
     break-before: page;
   }
@@ -13981,17 +14204,37 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    partials/family-school-print-header.ejs's own print-only header (that
    one's own .print-header is display:none outside @media print, so it
    can't be reused here as-is). */
+/* A real follow-up request: "Secondary color should color the card
+   that shows this information on the homepage" - a background fill
+   reads as an actual card (padding on every side, radius, a subtle
+   shadow, same visual language as .fs-overview-card below) rather than
+   the plain bottom-border strip this used to be, which only had enough
+   padding for that one edge. background: #fff is the fallback for a
+   family that hasn't set a Background Color yet - the inline style
+   this element gets when they have overrides it. */
 .fs-school-header {
   display: flex;
   align-items: center;
   gap: 1rem;
   margin: 1.25rem 0;
-  padding-bottom: 0.85rem;
-  border-bottom: 2px solid var(--border);
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
 }
 .fs-school-header img { height: 56px; width: 56px; border-radius: 50%; object-fit: cover; }
 .fs-school-header-name { font-size: 1.3rem; font-weight: 800; margin: 0; color: var(--ink); }
 .fs-school-header-meta { margin: 0.15rem 0 0; }
+/* A real bug report: "under the school name title it says homeschooling
+   since and the date. Shrink to fit... so that it fits on one line for
+   mobile." At the page's own default font size, "Homeschooling since
+   <long date>" next to the 56px logo wraps onto a second line on a
+   phone-width screen - shrinking just this line (not the whole header)
+   is enough to keep it on one line without truncating any of it. */
+@media (max-width: 480px) {
+  .fs-school-header-meta { font-size: 0.72rem; white-space: nowrap; }
+}
 
 .fs-overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
 .fs-overview-card {
@@ -14099,15 +14342,31 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 
 /* A real request: "Pdf and print should show all 12 months, August-
    July 2026-2027" (parent-family-school-attendance-print.ejs) - one
-   calendar grid per month, each starting its own printed page. Same
-   :not(:last-child) page-break-after shape as .fs-print-family-section
-   just above (see that rule's own comment on why), nested independently
-   of it - in "every family student" mode this is 12 month breaks inside
-   each already-paginated student section, not one combined sequence. */
+   calendar grid per month. A LATER real request: "the entire school
+   year for one student, August-July, should be on one page" - this
+   used to give each month its own printed page (12 pages for one
+   student's own year); now all 12 are tiled into one compact 4-column
+   grid instead, small enough that the whole year fits on the one page
+   .fs-print-family-section above already gives each student (so
+   "every family student" mode is still one page per student, just one
+   page of 12 small months apiece instead of 12 full-size ones). On
+   SCREEN (the live print-preview page, before actually printing) this
+   stays the original plain vertical stack - only @media print switches
+   to the compact grid, same split every other print-specific layout in
+   this app already uses. */
 .fs-attendance-print-month:not(:first-child) { margin-top: 2rem; }
 .fs-attendance-print-month h3 { margin: 0 0 0.5rem; }
 @media print {
-  .fs-attendance-print-month:not(:last-child) { page-break-after: always; break-after: page; }
+  .fs-attendance-print-months-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.3rem;
+  }
+  .fs-attendance-print-month { margin-top: 0 !important; }
+  .fs-attendance-print-month h3 { font-size: 0.7rem; text-align: center; margin: 0 0 0.1rem; }
+  .fs-attendance-print-month .fs-attendance-calendar { max-width: none; margin-top: 0; }
+  .fs-attendance-print-month .fs-attendance-calendar th { font-size: 0.45rem; padding: 0.05rem; }
+  .fs-attendance-print-month .fs-attendance-day { padding: 0.12rem 0.05rem; font-size: 0.5rem; font-weight: 500; }
 }
 
 /* A real request: "Present and absent keys should be to the left, not
@@ -14122,6 +14381,31 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .roster-btn-row-fit-text.fs-attendance-row-left { justify-content: flex-start; }
 .fs-attendance-nav-row { align-items: center; }
 .fs-attendance-nav-row select { width: auto; }
+
+/* A later real request: "filter button should be dropdown to choose a
+   student... Shrink this to fit neatly next to the icons on the same
+   row. Present and absent keys should move to the same row, far right,
+   shrink them to fit on the same row." The old Filter <details> popover
+   is gone - #attendance-student-select now sits directly in this row,
+   and the Present/Absent legend (used to be its own separate row above
+   the month-nav row) moved in here too, pushed to the far right via
+   margin-left: auto on its own wrapper (the one thing in this row that
+   isn't a fit-to-text icon/select, so it's the one that should absorb
+   the row's own leftover space instead of spreading evenly). */
+.fs-attendance-legend-row { display: flex; gap: 0.35rem; margin-left: auto; }
+@media (max-width: 640px) {
+  .fs-attendance-toolbar-row #attendance-student-select {
+    font-size: 0.72rem;
+    padding: 0.3rem 1.5rem 0.3rem 0.4rem;
+    background-size: 0.65rem;
+    background-position: right 0.5rem center;
+  }
+  .fs-attendance-toolbar-row .fs-attendance-legend-row .badge-pill {
+    font-size: 0.65rem;
+    padding: 0.12rem 0.4rem;
+    margin: 0;
+  }
+}
 
 /* Family School Management - Planner's own Weekly Plan Grid (views/
    parent-family-school-planner.ejs). A real request: "Be able to add

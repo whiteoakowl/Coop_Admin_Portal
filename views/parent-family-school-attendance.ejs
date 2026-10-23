@@ -36,16 +36,6 @@
           icons right before the calendar. %>
       <p class="hint">Click a date to mark present, click again for absent, a third time to clear it.</p>
 
-      <%# fs-attendance-row-left overrides roster-btn-row-fit-text's own
-          mobile rule (which centers a row's contents, see public/css/
-          styles.css's own comment on that class) back to left-aligned,
-          the same left-start default this row already has at desktop
-          widths. %>
-      <div class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left">
-        <span class="badge-pill fs-attendance-legend-present">Present</span>
-        <span class="badge-pill fs-attendance-legend-absent">Absent</span>
-      </div>
-
       <%# "View a calendar and mark days student is present for school by
           clicking on the date and it highlights gren. If you click again
           it becomes red for didn't do school." Click cycles unmarked ->
@@ -80,49 +70,43 @@
         <a class="icon-btn" href="?studentId=<%= studentIdParam %>&year=<%= nextYear %>&month=<%= nextMonth %>" aria-label="Next month" title="Next month">&rarr;</a>
       </form>
 
-      <%# "Add the following buttons to each page. Export, print,
-          download, filter. Make sure they are the similar size, same
-          height, fit to text." The old bare Student <select> moved into
-          the Filter popover below (the same <details>/<summary> idiom
-          admin-rosters.ejs's own Filter button already uses) so all four
-          buttons sit in one same-height, fit-to-text row instead of a
-          differently-shaped dropdown sitting apart from them. Export is
-          this one selected student's attendance; Download is every
-          family student's - see routes/parent-family-school.js's own
-          /attendance/export.csv and /attendance/download.pdf. A real
-          follow-up request, later corrected to a PDF icon: "all
-          down[load] icons across the app should be a puff [cloud]
-          icon... it looks the same as export" / "Should be a pdf. Pdf
-          icon." - Export keeps icon-download (tray + arrow), Download
-          now uses the distinct icon-pdf. A further real request: "the
-          download should be a pdf of exactly how it would also look
-          when printing" - Download is now a real PDF (see
-          parent-family-school-attendance-print.ejs), not a CSV. "All
-          print button should show a print preview full real page on a
-          page with a print button" - Print now opens that same preview
-          page in a new tab instead of calling window.print() on this
-          live, editable calendar. %>
-      <div class="roster-btn-row roster-btn-row-fit-text no-print">
-        <details class="filter-details" data-filter-details>
-          <summary class="roster-action-btn">Filter</summary>
-          <form method="GET" action="/parent/family-school/attendance" class="filter-panel">
-            <label for="attendance-student-select">Student</label>
-            <%# A real request: "attendance drop down to choose one of
-                your children or family. Can take attendance by
-                individual child or select family and take attendance
-                that will appear on all individual attendance calendars
-                for each child/student." %>
-            <select id="attendance-student-select" name="studentId" onchange="this.form.submit()">
-              <% familyStudents.forEach(function(s) { %>
-                <option value="<%= s.id %>" <%= !isFamilyMode && selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
-              <% }); %>
-              <option value="family" <%= isFamilyMode ? 'selected' : '' %>>Whole Family</option>
-            </select>
-          </form>
-        </details>
+      <%# A real request: "Family attendance, filter button should be
+          dropdown to choose a student. It should say choose student in
+          the menu bar. Shrink this to fit neatly next to the icons on
+          the same row. Present and absent keys should move to the same
+          row, far right, shrink them to fit on the same row." The old
+          Filter <details>/<summary> popover (which only ever held this
+          one Student select) is gone - the select sits directly in the
+          toolbar row now, shrunk via fs-attendance-toolbar-row's own
+          mobile CSS, with a disabled leading "Choose Student" option
+          instead of a separate label. The Present/Absent legend (used
+          to be its own row above the month-nav row) moves to the far
+          right of this same row via margin-left: auto. Export is this
+          one selected student's attendance; Download is every family
+          student's - see routes/parent-family-school.js's own
+          /attendance/export.csv and /attendance/download.pdf. %>
+      <div class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left fs-attendance-toolbar-row no-print">
+        <form method="GET" action="/parent/family-school/attendance" class="inline-block-form">
+          <%# A real request: "attendance drop down to choose one of
+              your children or family. Can take attendance by
+              individual child or select family and take attendance
+              that will appear on all individual attendance calendars
+              for each child/student." %>
+          <select id="attendance-student-select" name="studentId" aria-label="Choose Student" onchange="this.form.submit()">
+            <option value="" disabled>Choose Student</option>
+            <% familyStudents.forEach(function(s) { %>
+              <option value="<%= s.id %>" <%= !isFamilyMode && selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
+            <% }); %>
+            <option value="family" <%= isFamilyMode ? 'selected' : '' %>>Whole Family</option>
+          </select>
+        </form>
         <a class="icon-btn" href="/parent/family-school/attendance/export.csv?studentId=<%= studentIdParam %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
         <a class="icon-btn" href="/parent/family-school/attendance/print?studentId=<%= studentIdParam %>&year=<%= year %>&month=<%= month %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
         <a class="icon-btn" href="/parent/family-school/attendance/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+        <span class="fs-attendance-legend-row">
+          <span class="badge-pill fs-attendance-legend-present">Present</span>
+          <span class="badge-pill fs-attendance-legend-absent">Absent</span>
+        </span>
       </div>
 
       <table class="fs-attendance-calendar" data-fs-attendance-calendar data-student-id="<%= studentIdParam %>" data-toggle-url="<%= isFamilyMode ? '/parent/family-school/attendance/family/toggle' : '/parent/family-school/attendance/' + selectedStudentId + '/toggle' %>">
@@ -148,6 +132,5 @@
     <% } %>
   </main>
   <script src="/js/family-school-attendance.js"></script>
-  <script src="/js/filter-details-dismiss.js"></script>
 </body>
 </html>

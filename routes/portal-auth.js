@@ -475,6 +475,20 @@ router.get('/portal/settings', (req, res) => {
   res.render('portal-settings', { title: 'Settings' });
 });
 
+// A real request: "All portals settings gear. [They] are all now the
+// card setup" - Student Portal and Co-op Teacher Portal's own gear used
+// to open the bare page above directly; it now opens this card-view hub
+// instead (portal-nav.ejs's own settingsHref), matching every other
+// portal's own gear. sharedPortalTitle (middleware/portalAuth.js) is the
+// same dual-role-safe resolution /portal/settings' own title already
+// used - a ?portal=student|teacher query (portal-nav.ejs's own
+// cornerPortalQuery) disambiguates a dual-role account the same way it
+// already does for My Profile/Settings everywhere else.
+router.get('/portal/settings-hub', (req, res) => {
+  if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fsettings-hub');
+  res.render('portal-settings-hub', { title: 'Settings', navPortalTitle: res.locals.sharedPortalTitle('Settings') });
+});
+
 // A real request: "Clicking on the profile icon at the top on every
 // portal should be the member's full profile membership form so that
 // they can edit it. They still can't edit the birthday and grade level

@@ -1,22 +1,33 @@
 // A real request: "Add a button that says text notification. When you
 // click this button a check box appears next to each floater
-// assignment. When you click the check boxes then click text
-// notifications. It send a notification showing the floater position,
-// hour and room number." Click #1 reveals the checkboxes (nothing is
-// sent yet); click #2 (the same button, now reading "Send Text
-// Notification") collects every checked box and POSTs them in one
-// request. Mirrors floater-assign.js's own fetch + CSRF-header pattern
-// rather than a plain form, since a checkbox here sits outside every
-// row's own per-slot assign/unassign <form> (forms can't nest).
+// assignment. click the check boxes on each assignment or the whole
+// card then click send text notification button. A pop up appears
+// showing an example of the text message that you can edit and add an
+// optional image. Buttons send now or cancel." Click #1 reveals the
+// checkboxes (nothing is sent yet); click #2 (the same button, now
+// reading "Send Text Notification") opens an editable popup pre-filled
+// from whichever boxes are checked instead of sending immediately -
+// Send Now in that popup is what actually fires the request. Mirrors
+// floater-assign.js's own fetch + CSRF-header pattern rather than a
+// plain form, since a checkbox here sits outside every row's own
+// per-slot assign/unassign <form> (forms can't nest), and the image
+// upload + async per-recipient status report both need a real response
+// to react to.
 (function () {
   const toggleBtn = document.getElementById('floater-text-notify-btn');
   const container = document.getElementById('floater-cards-container');
   const status = document.getElementById('floater-assign-status');
   const main = document.getElementById('main-content');
   const day = main ? main.dataset.day : '';
-  if (!toggleBtn || !container) return;
+  const dialog = document.getElementById('floater-text-notify-dialog');
+  const form = document.getElementById('floater-text-notify-form');
+  const messageField = document.getElementById('floater-text-notify-message');
+  const recipientsHint = document.getElementById('floater-text-notify-recipients-hint');
+  const sendBtn = document.getElementById('floater-text-notify-send-btn');
+  if (!toggleBtn || !container || !dialog || !form) return;
 
   let selectMode = false;
+  let pendingNotify = [];
 
   function showMessage(message, isSuccess) {
     if (!status) return;
@@ -35,7 +46,20 @@
     selectMode = on;
     container.classList.toggle('floater-notify-select-mode', on);
     toggleBtn.textContent = on ? 'Send Text Notification' : 'Text Notification';
+    if (!on) {
+      container.querySelectorAll('.floater-card-select-all-checkbox').forEach((cb) => { cb.checked = false; });
+    }
   }
+
+  // "Click the check boxes on each assignment or the whole card" - a
+  // card's own Select All checkbox checks/unchecks every assignment
+  // checkbox inside that SAME card only, never another hour's.
+  container.addEventListener('change', (e) => {
+    if (!e.target.classList.contains('floater-card-select-all-checkbox')) return;
+    const card = e.target.closest('.floater-card');
+    if (!card) return;
+    card.querySelectorAll('.floater-notify-checkbox').forEach((cb) => { cb.checked = e.target.checked; });
+  });
 
   toggleBtn.addEventListener('click', () => {
     if (!selectMode) {
@@ -51,29 +75,48 @@
     }
     clearMessage();
 
-    const notify = checked.map((cb) => ({
-      memberId: cb.dataset.memberId,
-      position: cb.dataset.position,
-      room: cb.dataset.room,
-      hour: cb.dataset.hour,
-    }));
+    pendingNotify = checked.map((cb) => ({ memberId: cb.dataset.memberId }));
+    const first = checked[0].dataset;
+    messageField.value = `You're assigned: ${first.position}${first.hour ? ` at ${first.hour}` : ''}${first.room ? ` in Room ${first.room}` : ''}.`;
+    recipientsHint.textContent = `Sending to ${checked.length} floater${checked.length === 1 ? '' : 's'}.`;
+    const fileInput = form.querySelector('input[type="file"]');
+    if (fileInput) fileInput.value = '';
+    dialog.showModal();
+  });
 
-    toggleBtn.disabled = true;
-    toggleBtn.textContent = 'Sending…';
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (pendingNotify.length === 0) return;
+    const message = messageField.value.trim();
+    if (!message) {
+      messageField.focus();
+      return;
+    }
+
+    const fileInput = form.querySelector('input[type="file"]');
+    const formData = new FormData();
+    formData.append('notify', JSON.stringify(pendingNotify));
+    formData.append('message', message);
+    if (fileInput && fileInput.files[0]) formData.append('image', fileInput.files[0]);
+
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'Sending…';
 
     fetch(`/admin/volunteers/${day}/floater-text-notify`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         Accept: 'application/json',
         'X-CSRF-Token': window.CSRF_TOKEN || '',
       },
-      body: JSON.stringify({ notify }),
+      body: formData,
     })
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) throw new Error(data.error || 'Could not send text notifications.');
-        toggleBtn.disabled = false;
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send Now';
+        dialog.close();
+        pendingNotify = [];
         setSelectMode(false);
         const notSent = (data.results || []).filter((r) => r.status !== 'sent');
         if (notSent.length > 0) {
@@ -83,8 +126,8 @@
         }
       })
       .catch((err) => {
-        toggleBtn.disabled = false;
-        toggleBtn.textContent = 'Send Text Notification';
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send Now';
         showMessage(err.message || 'Could not send text notifications.', false);
       });
   });

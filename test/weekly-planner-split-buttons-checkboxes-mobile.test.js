@@ -67,6 +67,26 @@ async function createParent(familyId) {
   return { memberId, cookie: loginRes.headers['set-cookie'] };
 }
 
+async function createStudent(familyId) {
+  counter += 1;
+  const code = `wpv3s${counter}`;
+  const memberId = (
+    await db
+      .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, active) VALUES (?, ?, ?, 'student', ?, 1) RETURNING id")
+      .get(`Student ${counter}`, code, code, familyId)
+  ).id;
+  const email = `${code}@example.com`;
+  const accountId = (
+    await db
+      .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text()) RETURNING id")
+      .get(memberId, email, hashPassword('testpassword123'))
+  ).id;
+  const role = await db.prepare("SELECT id FROM roles WHERE key = 'student'").get();
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(accountId, role.id);
+  const loginRes = await request(app).post('/login').type('form').send({ email, password: 'testpassword123', next: '/student' });
+  return { memberId, cookie: loginRes.headers['set-cookie'] };
+}
+
 async function csrfFrom(cookie, url) {
   const page = await request(app).get(url).set('Cookie', cookie);
   return /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
@@ -241,8 +261,40 @@ test('checking the box on a day marks that day complete, independent of its assi
   assert.equal(row.completed, true);
 
   const page = await request(app).get(`/parent/family-school/weekly-planner?owner=parent&weekId=${weekId}`).set('Cookie', parent.cookie);
-  const dayCheckboxMatch = /<input type="checkbox" checked onchange="this\.form\.requestSubmit\(\)" \/>\s*\n\s*Day complete/.exec(page.text);
+  const dayCheckboxMatch = /<input type="checkbox" class="fs-weekly-plan-day-complete-checkbox" checked onchange="this\.form\.requestSubmit\(\)"/.exec(page.text);
   assert.ok(dayCheckboxMatch, 'expected the day-complete checkbox to render checked');
+});
+
+// A real request: "Weekly planner, day completed check box should be on
+// the title bar next to each date. Only parents can see this check box,
+// not student portal. When parent checks this box, the student portal
+// will say, complete with a check mark."
+test('the day-complete checkbox lives in the day title bar for parents; students never see it, only a Complete badge once checked', async () => {
+  const familyId = await createFamily('Title Bar Family');
+  const parent = await createParent(familyId);
+  const student = await createStudent(familyId);
+  const weekId = await createWeek({ familyId, ownerType: 'family', studentId: null, title: 'Title Bar Week', dates: ['2027-01-04'], createdByAccountId: null });
+  const [dateA] = await db.prepare('SELECT id FROM family_school_week_dates WHERE week_id = ?').all(weekId);
+
+  const parentPageBefore = await request(app).get(`/parent/family-school/weekly-planner?owner=family&weekId=${weekId}`).set('Cookie', parent.cookie);
+  assert.match(parentPageBefore.text, /<div class="fs-weekly-plan-day-title-row">[\s\S]*?<span>[\s\S]*?<\/span>[\s\S]*?fs-weekly-plan-day-complete-checkbox/, 'checkbox should sit in the same title-row block as the date, not a separate "Day complete" row below');
+  assert.doesNotMatch(parentPageBefore.text, /checkbox-option fs-weekly-plan-day-complete"/, 'the old separate "Day complete" checkbox+label row should be gone');
+
+  const studentPageBefore = await request(app).get(`/student/family-school/weekly-planner?weekId=${weekId}`).set('Cookie', student.cookie);
+  assert.equal(studentPageBefore.status, 200);
+  assert.doesNotMatch(studentPageBefore.text, /fs-weekly-plan-day-complete-checkbox/, 'students must never see the day-complete checkbox');
+  assert.doesNotMatch(studentPageBefore.text, />Complete</, 'no Complete badge yet - the day is not marked complete');
+
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/weekly-planner');
+  await request(app)
+    .post(`/parent/family-school/weekly-planner/dates/${dateA.id}/toggle-complete`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ _csrf: csrf });
+
+  const studentPageAfter = await request(app).get(`/student/family-school/weekly-planner?weekId=${weekId}`).set('Cookie', student.cookie);
+  assert.doesNotMatch(studentPageAfter.text, /fs-weekly-plan-day-complete-checkbox/, 'still read-only for students after the parent checks it');
+  assert.match(studentPageAfter.text, /<span class="badge-pill badge-pill-green"><svg class="icon"><use href="#icon-check"\/><\/svg> Complete<\/span>/);
 });
 
 test('a parent from a different family cannot toggle another family\'s assignment or day complete', async () => {
