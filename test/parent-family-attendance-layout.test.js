@@ -150,3 +150,22 @@ test('Whole Family mode shows the 12-month grid built from every family student,
   assert.equal((res.text.match(/class="annual-calendar-month"/g) || []).length, 12, 'exactly 12 month grids even in Whole Family mode');
   assert.match(res.text, /data-fs-attendance-calendar data-student-id="family" data-toggle-url="\/parent\/family-school\/attendance\/family\/toggle"/);
 });
+
+// A real request on the Main Admin Annual Calendar: "Add edit calendar
+// colors buttons... set the color for the month row and set the color
+// for the days of the week row." Family Attendance shares the exact
+// same .annual-calendar-month h3/.fs-attendance-calendar th CSS rules
+// (public/css/styles.css), but this page's own grid wrapper never sets
+// --annual-calendar-month-color/--annual-calendar-weekday-color -
+// confirms it always keeps using the site's own blue/grey defaults
+// regardless of whatever an admin has picked for Annual Calendar.
+test('Family Attendance never carries the Main Admin Annual Calendar\'s own custom row colors', async () => {
+  const familyId = await createFamily('No Custom Colors Family');
+  const parent = await createPortalMember({ name: 'No Custom Colors Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  await createPortalMember({ name: 'No Custom Colors Student', familyId, memberType: 'student', roleKey: 'student' });
+
+  const res = await request(app).get('/parent/family-school/attendance?studentId=family').set('Cookie', parent.cookie);
+  assert.equal(res.status, 200);
+  assert.doesNotMatch(res.text, /--annual-calendar-month-color/);
+  assert.doesNotMatch(res.text, /--annual-calendar-weekday-color/);
+});

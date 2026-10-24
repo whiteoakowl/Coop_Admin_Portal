@@ -92,6 +92,10 @@ test('Family Attendance: Print links to a dedicated preview page, and Download i
   assert.match(previewRes.text, /class="print-preview-header no-print"/);
   assert.match(previewRes.text, /onclick="window\.print\(\)"/);
   assert.match(previewRes.text, /<h2>Print PDF Student<\/h2>/);
+  // A real request: "Print and pdf should have the calendars in
+  // portrait view" - explicit "portrait" keyword, not just implied by
+  // "letter" alone.
+  assert.match(previewRes.text, /@page \{ size: letter portrait; margin: 0\.5in; \}/);
 
   const pdfRes = await getBuffer('/parent/family-school/attendance/download.pdf', parent.cookie);
   assert.equal(pdfRes.status, 200);

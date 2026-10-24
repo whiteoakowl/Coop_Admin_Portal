@@ -51,11 +51,28 @@
               <span class="annual-calendar-key-swatch"></span><%= k.label %>
             </button>
           <% }); %>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('annual-calendar-keys-dialog').showModal()">+ Create Key</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('annual-calendar-keys-dialog').showModal()">Add/Edit Key</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('annual-calendar-colors-dialog').showModal()">Edit Calendar Colors</button>
         </div>
         <p class="hint no-print">Click a key above to select it, then click calendar dates to apply that key's color. Click the same key on a date again to clear it.</p>
 
-        <div class="annual-calendar-months-grid" data-annual-calendar-grid data-calendar-id="<%= calendar.id %>" data-toggle-url="/main-admin/annual-calendar/days/toggle">
+        <%# A real request: "Add edit calendar colors buttons... set the
+            color for the month row and set the color for the days of
+            the week row." --annual-calendar-month-color/--annual-
+            calendar-weekday-color are only set here when an admin has
+            actually picked one - public/css/styles.css's own var()
+            fallbacks (the site's existing blue/grey defaults) cover
+            every calendar that hasn't, including Family Attendance,
+            which never renders this attribute at all. %>
+        <div
+          class="annual-calendar-months-grid"
+          data-annual-calendar-grid
+          data-calendar-id="<%= calendar.id %>"
+          data-toggle-url="/main-admin/annual-calendar/days/toggle"
+          <% if (calendar.month_row_color || calendar.weekday_row_color) { %>
+            style="<%= calendar.month_row_color ? `--annual-calendar-month-color: ${calendar.month_row_color};` : '' %><%= calendar.weekday_row_color ? `--annual-calendar-weekday-color: ${calendar.weekday_row_color};` : '' %>"
+          <% } %>
+        >
           <% months.forEach(function(m) { %>
             <div class="annual-calendar-month">
               <h3><%= MONTH_NAMES[m.month - 1] %> <%= m.year %></h3>
@@ -83,12 +100,19 @@
           <% }); %>
         </div>
 
+        <%# A real request: "Create key button should say add/edit key...
+            Delete description. Be able to add a new key and stay in the
+            popup and it will appear in the list below. Be able to edit
+            existing keys and click save changes." Add Key is its own
+            AJAX form (public/js/annual-calendar-keys.js) that appends
+            the new row without closing the dialog; existing rows are
+            plain inputs with no auto-submit, saved all at once by the
+            Save Changes button below; each row's trash icon deletes
+            that one key via AJAX, same no-page-reload shape public/js/
+            annual-planner-curriculum.js's own delete already uses. %>
         <dialog id="annual-calendar-keys-dialog" class="member-picker-dialog">
-          <h3>Keys</h3>
-          <p class="hint">Add a label and color for each key, then close this and click it on the page to start coloring dates with it.</p>
-          <form method="POST" action="/main-admin/annual-calendar/keys" class="stack-form">
-            <input type="hidden" name="calendarId" value="<%= calendar.id %>" />
-            <input type="hidden" name="fiscalYearId" value="<%= selectedFiscalYearId %>" />
+          <h3>Add/Edit Key</h3>
+          <form id="annual-calendar-add-key-form" class="stack-form" data-calendar-id="<%= calendar.id %>">
             <div class="member-form-grid">
               <label>Label
                 <input type="text" name="label" placeholder="e.g. Holiday" required />
@@ -104,40 +128,48 @@
             </div>
           </form>
 
-          <% if (keys.length > 0) { %>
-            <div class="table-shrink-wrap">
-              <table class="admin-table">
-                <thead><tr><th>Label</th><th>Color</th><th></th></tr></thead>
-                <tbody>
-                  <% keys.forEach(function(k) { %>
-                    <tr>
-                      <td>
-                        <form method="POST" action="/main-admin/annual-calendar/keys/<%= k.id %>/update" class="inline-block-form">
-                          <input type="hidden" name="fiscalYearId" value="<%= selectedFiscalYearId %>" />
-                          <input type="hidden" name="color" value="<%= k.color %>" />
-                          <input type="text" name="label" value="<%= k.label %>" onchange="this.form.submit()" aria-label="Label for <%= k.label %>" />
-                        </form>
-                      </td>
-                      <td>
-                        <form method="POST" action="/main-admin/annual-calendar/keys/<%= k.id %>/update" class="inline-block-form">
-                          <input type="hidden" name="fiscalYearId" value="<%= selectedFiscalYearId %>" />
-                          <input type="hidden" name="label" value="<%= k.label %>" />
-                          <input type="color" name="color" value="<%= k.color %>" onchange="this.form.submit()" aria-label="Color for <%= k.label %>" />
-                        </form>
-                      </td>
-                      <td>
-                        <form method="POST" action="/main-admin/annual-calendar/keys/<%= k.id %>/delete" class="inline-block-form" data-confirm="Delete this key? Dates colored with it will go back to unmarked.">
-                          <input type="hidden" name="fiscalYearId" value="<%= selectedFiscalYearId %>" />
-                          <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
-                        </form>
-                      </td>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
-            </div>
-          <% } %>
+          <div class="table-shrink-wrap" <%= keys.length === 0 ? 'hidden' : '' %> id="annual-calendar-keys-table-wrap">
+            <table class="admin-table">
+              <thead><tr><th>Label</th><th>Color</th><th></th></tr></thead>
+              <tbody id="annual-calendar-keys-tbody">
+                <% keys.forEach(function(k) { %>
+                  <tr data-key-row data-key-id="<%= k.id %>">
+                    <td><input type="text" name="label" value="<%= k.label %>" aria-label="Label for <%= k.label %>" /></td>
+                    <td><input type="color" name="color" value="<%= k.color %>" aria-label="Color for <%= k.label %>" /></td>
+                    <td><button type="button" class="icon-btn icon-btn-danger" data-delete-key aria-label="Delete key" title="Delete key"><svg class="icon"><use href="#icon-trash"/></svg></button></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+          <p class="roster-empty" id="annual-calendar-keys-empty" <%= keys.length > 0 ? 'hidden' : '' %>>No keys yet. Add one above.</p>
+
           <div class="notes-dialog-actions">
+            <button type="button" class="primary-btn" id="annual-calendar-save-keys-btn">Save Changes</button>
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+          </div>
+        </dialog>
+
+        <%# A real request: "Add edit calendar colors buttons. This
+            button will allow you to set the color for the month row and
+            set the color for the days of the week row." AJAX save
+            (public/js/annual-calendar-colors.js) applies the picked
+            colors to the grid above immediately, no page reload - same
+            shape every other dialog on this page already uses. %>
+        <dialog id="annual-calendar-colors-dialog" class="member-picker-dialog">
+          <h3>Edit Calendar Colors</h3>
+          <form id="annual-calendar-colors-form" class="stack-form" data-calendar-id="<%= calendar.id %>">
+            <div class="member-form-grid">
+              <label>Month Row Color
+                <input type="color" name="monthRowColor" value="<%= calendar.month_row_color || annualCalendarDefaults.monthRowColor %>" />
+              </label>
+              <label>Days of the Week Row Color
+                <input type="color" name="weekdayRowColor" value="<%= calendar.weekday_row_color || annualCalendarDefaults.weekdayRowColor %>" />
+              </label>
+            </div>
+          </form>
+          <div class="notes-dialog-actions">
+            <button type="button" class="primary-btn" id="annual-calendar-save-colors-btn">Save Changes</button>
             <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
           </div>
         </dialog>
@@ -145,5 +177,7 @@
     <% } %>
   </main>
   <script src="/js/annual-calendar.js"></script>
+  <script src="/js/annual-calendar-keys.js"></script>
+  <script src="/js/annual-calendar-colors.js"></script>
 </body>
 </html>

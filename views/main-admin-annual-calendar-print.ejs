@@ -8,7 +8,17 @@
       for that internal render. %>
   <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
   <%- include('partials/head', { title }) %>
-  <style>@page { size: letter; margin: 0.5in; }</style>
+  <%# A real request: "Print and pdf should have the calendars in
+      portrait view" - "letter" alone leaves the orientation ambiguous
+      enough that some browsers' own print dialog defaults to whatever
+      orientation was last chosen on this site (e.g. a landscape page
+      like the Weekly Planner print view), instead of resetting to this
+      page's own intended layout; the explicit "portrait" keyword below
+      removes that ambiguity and locks the print dialog's own
+      orientation control to match, the same way every landscape
+      *-print.ejs view on this site already states "landscape"
+      explicitly rather than leaving it implied. %>
+  <style>@page { size: letter portrait; margin: 0.5in; }</style>
 </head>
 <body class="admin-page">
   <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
@@ -21,7 +31,11 @@
     <% if (!selectedFiscalYear || !calendar) { %>
       <p class="roster-empty">No calendar created for this fiscal year yet.</p>
     <% } else { %>
-      <h2><%= selectedFiscalYear.label %></h2>
+      <%# A real request: "Titl of page should be the school year such
+          as 2026-2027." schoolYearLabel is computed server-side
+          (routes/main-admin-annual-calendar.js) since EJS views here
+          have no access to Node's require(). %>
+      <h2><%= schoolYearLabel %></h2>
 
       <%# A real request: "Create key button... Key shows on page." Same
           legend-row convention the live view's key bar uses, just plain
@@ -35,14 +49,24 @@
         </div>
       <% } %>
 
-      <%# Same 3-columns-of-4-months-evenly-balanced-on-one-page grid
-          Family Attendance's own print view uses (.fs-attendance-print-
-          months-grid, public/css/styles.css) - reused verbatim here so
-          a full 12-month fiscal-year calendar also fits one printed
-          page/PDF. %>
-      <div class="fs-attendance-print-months-grid">
+      <%# A real request: "Pdf and print should be 3 calendar rows with 4
+          months in each column" (4 columns x 3 rows) - its own grid
+          classes (public/css/styles.css), separate from Family
+          Attendance's own 3-columns-of-4-months print grid. A later
+          real request: "Add edit calendar colors buttons... set the
+          color for the month row and set the color for the days of
+          the week row" - same --annual-calendar-month-color/--annual-
+          calendar-weekday-color custom properties the live view's own
+          grid wrapper sets, so the print/PDF output matches whatever
+          an admin picked there. %>
+      <div
+        class="annual-calendar-print-months-grid"
+        <% if (calendar.month_row_color || calendar.weekday_row_color) { %>
+          style="<%= calendar.month_row_color ? `--annual-calendar-month-color: ${calendar.month_row_color};` : '' %><%= calendar.weekday_row_color ? `--annual-calendar-weekday-color: ${calendar.weekday_row_color};` : '' %>"
+        <% } %>
+      >
         <% months.forEach(function(m) { %>
-          <div class="fs-attendance-print-month">
+          <div class="annual-calendar-print-month">
             <h3><%= MONTH_NAMES[m.month - 1] %> <%= m.year %></h3>
             <table class="fs-attendance-calendar">
               <thead>

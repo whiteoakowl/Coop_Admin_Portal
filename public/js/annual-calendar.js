@@ -27,6 +27,14 @@
     activeKeyBtn = btn;
   });
 
+  // The Add/Edit Key dialog (public/js/annual-calendar-keys.js) removes
+  // a deleted key's own key-bar button itself; this just drops our
+  // reference to it too, so a later date click doesn't still try to
+  // apply a key_id that no longer exists.
+  window.addEventListener('annual-calendar-key-removed', (e) => {
+    if (activeKeyBtn && activeKeyBtn.dataset.keyId === String(e.detail.id)) activeKeyBtn = null;
+  });
+
   grid.addEventListener('click', async (e) => {
     const cell = e.target.closest('[data-annual-calendar-day]');
     if (!cell || !grid.contains(cell)) return;

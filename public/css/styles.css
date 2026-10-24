@@ -14349,9 +14349,41 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    attendance.js; these rules are just the 3 color states + the legend
    swatches that share them. */
 .fs-attendance-calendar { border-collapse: collapse; width: 100%; max-width: 32rem; margin-top: 1rem; }
-.fs-attendance-calendar th { font-size: 0.8rem; color: var(--muted); padding: 0.3rem; text-align: center; }
+/* A real request: "Add a nice set of grid lines for each calendar box
+   to help show better division" - var(--brand) instead of the very
+   pale var(--border) so each day cell's own box is actually visible,
+   not just implied by spacing. Shared by every calendar that reuses
+   .fs-attendance-calendar/.fs-attendance-day - Family Attendance (live
+   + print) and the Main Admin Annual Calendar (live + print) all get
+   this from the one rule. */
+/* A real request: "The days of the week row should be a Grey shade" -
+   the Su/Mo/Tu/We/Th/Fr/Sa weekday-label row under each month's own
+   blue title bar. A follow-up request ("Darker grey. You can't see
+   it") bumped this from #f8fafc (too close to white to read as its
+   own shaded row) to #e2e8f0, the same clearly-visible neutral grey
+   this site already uses for other badges/fills (e.g. .status-badge-
+   none, .ach-badge-locked). print-color-adjust so it isn't silently
+   dropped on print/PDF output, same reasoning as the month title bar's
+   own blue fill. */
+/* A later real request: "Add edit calendar colors buttons... set the
+   color for the days of the week row" - the Main Admin Annual Calendar
+   page (only) can now override --annual-calendar-weekday-color on its
+   own grid wrapper (views/main-admin-annual-calendar.ejs/-print.ejs);
+   the var()'s own fallback is this same #e2e8f0 default, so Family
+   Attendance - which never sets that custom property - keeps its
+   current look untouched either way. */
+.fs-attendance-calendar th {
+  font-size: 0.8rem;
+  color: var(--ink);
+  padding: 0.3rem;
+  text-align: center;
+  border: 1px solid var(--brand);
+  background: var(--annual-calendar-weekday-color, #e2e8f0);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
 .fs-attendance-day {
-  border: 1px solid var(--border);
+  border: 1px solid var(--brand);
   text-align: center;
   padding: 0.6rem 0.3rem;
   cursor: pointer;
@@ -14410,11 +14442,76 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
     grid-template-columns: repeat(3, 1fr);
     gap: 0.3rem;
   }
-  .fs-attendance-print-month { margin-top: 0 !important; }
-  .fs-attendance-print-month h3 { font-size: 0.7rem; text-align: center; margin: 0 0 0.1rem; }
+  /* A real request: "it was supposed to be a square border around each
+     month calendar" - a box around each whole month (heading + table
+     together), not just the day-cell grid lines inside it. overflow:
+     hidden clips the h3's own flush top corners below to this box's
+     rounded ones. */
+  .fs-attendance-print-month { margin-top: 0 !important; border: 1px solid var(--brand); padding: 0.2rem; overflow: hidden; }
+  /* A later real request, with a reference calendar image: "each month
+     title bar should be blue" - same solid --btn-blue bar treatment as
+     the live view's own .annual-calendar-month h3. print-color-adjust
+     is needed here - browsers drop background colors on print/PDF
+     output by default unless told otherwise (the day-cell key colors
+     elsewhere on this same page already rely on the same thing). */
+  .fs-attendance-print-month h3 {
+    font-size: 0.7rem;
+    text-align: center;
+    margin: -0.2rem -0.2rem 0.1rem;
+    padding: 0.15rem;
+    background: var(--btn-blue);
+    color: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   .fs-attendance-print-month .fs-attendance-calendar { max-width: none; margin-top: 0; }
   .fs-attendance-print-month .fs-attendance-calendar th { font-size: 0.45rem; padding: 0.05rem; }
   .fs-attendance-print-month .fs-attendance-day { padding: 0.12rem 0.05rem; font-size: 0.5rem; font-weight: 500; }
+}
+
+/* Main Admin Annual Calendar's own print/PDF grid - a real request:
+   "Pdf and print should be 3 calendar rows with 4 months in each
+   column" (4 columns x 3 rows) - its own classes rather than reusing
+   Family Attendance's .fs-attendance-print-months-grid above, since
+   that one is deliberately 3 columns x 4 rows instead. */
+.annual-calendar-print-month:not(:first-child) { margin-top: 2rem; }
+.annual-calendar-print-month h3 { margin: 0 0 0.5rem; }
+@media print {
+  .annual-calendar-print-months-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.3rem;
+  }
+  /* A real request: "it was supposed to be a square border around each
+     month calendar" - a box around each whole month (heading + table
+     together), not just the day-cell grid lines inside it. overflow:
+     hidden clips the h3's own flush top corners below to this box's
+     rounded ones. */
+  .annual-calendar-print-month { margin-top: 0 !important; border: 1px solid var(--brand); padding: 0.2rem; overflow: hidden; }
+  /* A later real request, with a reference calendar image: "each month
+     title bar should be blue" - same solid --btn-blue bar treatment as
+     the live view's own .annual-calendar-month h3. print-color-adjust
+     is needed here - browsers drop background colors on print/PDF
+     output by default unless told otherwise (the day-cell key colors
+     elsewhere on this same page already rely on the same thing). A
+     further real request: "Add edit calendar colors buttons... set the
+     color for the month row" - --annual-calendar-month-color, set
+     inline on this page's own grid wrapper when an admin has picked
+     one (routes/main-admin-annual-calendar.js's own /colors endpoint),
+     falls back to this same --btn-blue default otherwise. */
+  .annual-calendar-print-month h3 {
+    font-size: 0.7rem;
+    text-align: center;
+    margin: -0.2rem -0.2rem 0.1rem;
+    padding: 0.15rem;
+    background: var(--annual-calendar-month-color, var(--btn-blue));
+    color: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .annual-calendar-print-month .fs-attendance-calendar { max-width: none; margin-top: 0; }
+  .annual-calendar-print-month .fs-attendance-calendar th { font-size: 0.45rem; padding: 0.05rem; }
+  .annual-calendar-print-month .fs-attendance-day { padding: 0.12rem 0.05rem; font-size: 0.5rem; font-weight: 500; }
 }
 
 /* Main Admin Annual Calendar - a real request: "Mobile and desktop view
@@ -14429,7 +14526,37 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
   gap: 0.75rem;
   margin-top: 0.5rem;
 }
-.annual-calendar-month h3 { margin: 0 0 0.3rem; font-size: 0.8rem; text-align: center; }
+/* A real request: "it was supposed to be a square border around each
+   month calendar" - a box around each whole month (heading + table
+   together), not just the day-cell grid lines inside it. Shared by
+   both the Main Admin Annual Calendar and Family Attendance live
+   views, same as everything else .annual-calendar-month touches.
+   overflow: hidden so the h3's own flush top corners below get clipped
+   to this box's rounded corners instead of poking past them. */
+.annual-calendar-month { border: 1px solid var(--brand); border-radius: var(--radius); padding: 0.5rem; overflow: hidden; }
+/* A later real request, with a reference calendar image: "each month
+   title bar should be blue" - a solid color bar spanning the box's
+   full width, same --btn-blue solid-fill-plus-white-text treatment
+   already used for other solid blue buttons/bars on this site (e.g.
+   Weekly Planner's own blue week-title box). The negative margin
+   cancels the box's own 0.5rem padding on the h3's three outer sides
+   so the bar sits flush against the box edges instead of floating
+   inside it with a gap. A further real request: "Add edit calendar
+   colors buttons... set the color for the month row" -
+   --annual-calendar-month-color, set inline on the Main Admin Annual
+   Calendar page's own grid wrapper only (views/main-admin-annual-
+   calendar.ejs) when an admin has picked one; Family Attendance shares
+   this same h3 rule but never sets that property, so it keeps using
+   the --btn-blue fallback regardless of what Annual Calendar is set
+   to. */
+.annual-calendar-month h3 {
+  margin: -0.5rem -0.5rem 0.5rem;
+  padding: 0.4rem;
+  background: var(--annual-calendar-month-color, var(--btn-blue));
+  color: #fff;
+  font-size: 0.8rem;
+  text-align: center;
+}
 .annual-calendar-table { max-width: none; margin-top: 0; }
 .annual-calendar-table th { font-size: 0.55rem; padding: 0.1rem; }
 .annual-calendar-table .fs-attendance-day { padding: 0.2rem 0.1rem; font-size: 0.6rem; font-weight: 500; cursor: pointer; }
@@ -14458,6 +14585,17 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .annual-calendar-key-btn.active { border-color: var(--key-color); box-shadow: 0 0 0 2px var(--key-color); font-weight: 600; }
 .annual-calendar-key-swatch { width: 0.9rem; height: 0.9rem; border-radius: 50%; background: var(--key-color); display: inline-block; }
 .annual-calendar-key-legend-pill { color: #1a1a1a; }
+
+/* A real request: "Add/edit key button should be fit to text" - it
+   sits in the same .roster-btn-row as the compact key-swatch buttons
+   above, so .roster-action-btn's own flex: 1 0 auto (meant for rows of
+   SEVERAL same-sized action buttons) stretched it to fill the whole
+   rest of the row instead of just hugging its own label. Not an
+   :only-child of that row (the key buttons are its siblings), so the
+   existing :only-child override above doesn't reach it - scoped here
+   instead, same pattern as every other single-button-in-a-crowded-row
+   fix on this page. */
+[data-annual-calendar-key-bar] .roster-action-btn { flex: 0 0 auto; }
 
 /* A real request: "Present and absent keys should be to the left, not
    centered and just under the title... Move this row to the left.

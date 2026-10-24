@@ -13,7 +13,11 @@
       job and this <base> tag is simply absent. %>
   <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
   <%- include('partials/head', { title }) %>
-  <style>@page { size: letter; margin: 0.5in; }</style>
+  <%# A real request: "Print and pdf should have the calendars in
+      portrait view" - see main-admin-annual-calendar-print.ejs's own
+      matching comment for why "portrait" needs to be explicit here
+      rather than left implied. %>
+  <style>@page { size: letter portrait; margin: 0.5in; }</style>
 </head>
 <body class="admin-page">
   <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>

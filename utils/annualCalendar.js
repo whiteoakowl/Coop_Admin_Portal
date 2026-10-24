@@ -25,6 +25,19 @@ function fiscalYearLabel(fy) {
   return `${formatDateShort(fy.start_date)} - ${formatDateShort(fy.end_date)}`;
 }
 
+// A real request: "Titl of page should be the school year such as
+// 2026-2027." fiscalYearLabel above (the exact date range) stays as
+// the dropdown's own option text; the print/PDF page title uses this
+// shorter "YYYY-YYYY" form instead, derived straight from the fiscal
+// year's own start/end years (fiscal years aren't necessarily Jan-Dec
+// or Aug-Jul, so this reads directly off whatever years the admin
+// actually entered rather than assuming a fixed school-year boundary).
+function fiscalYearSchoolYearLabel(fy) {
+  const startYear = fy.start_date.slice(0, 4);
+  const endYear = fy.end_date.slice(0, 4);
+  return startYear === endYear ? startYear : `${startYear}-${endYear}`;
+}
+
 async function getFiscalYear(id) {
   return db.prepare('SELECT * FROM fiscal_years WHERE id = ?').get(id);
 }
@@ -41,6 +54,22 @@ async function createCalendar(fiscalYearId) {
 
 async function getCalendar(id) {
   return db.prepare('SELECT * FROM annual_calendars WHERE id = ?').get(id);
+}
+
+// A real request: "Add edit calendar colors buttons. This button will
+// allow you to set the color for the month row and set the color for
+// the days of the week row." These are this site's own existing
+// defaults (public/css/styles.css's own .annual-calendar-month h3/
+// .fs-attendance-calendar th rules) - a calendar with nothing picked
+// yet (month_row_color/weekday_row_color both null) renders identically
+// to before this feature existed.
+const DEFAULT_MONTH_ROW_COLOR = '#2e6da4';
+const DEFAULT_WEEKDAY_ROW_COLOR = '#e2e8f0';
+
+async function updateCalendarColors(calendarId, monthRowColor, weekdayRowColor) {
+  await db
+    .prepare('UPDATE annual_calendars SET month_row_color = ?, weekday_row_color = ? WHERE id = ?')
+    .run(monthRowColor || null, weekdayRowColor || null, calendarId);
 }
 
 // --- Keys (a label+color pair, same shape as event_categories). ---
@@ -127,10 +156,14 @@ function monthsForFiscalYear(fiscalYear, keyByDate) {
 module.exports = {
   listFiscalYears,
   fiscalYearLabel,
+  fiscalYearSchoolYearLabel,
   getFiscalYear,
   calendarForFiscalYear,
   createCalendar,
   getCalendar,
+  updateCalendarColors,
+  DEFAULT_MONTH_ROW_COLOR,
+  DEFAULT_WEEKDAY_ROW_COLOR,
   keysForCalendar,
   createKey,
   getKey,
