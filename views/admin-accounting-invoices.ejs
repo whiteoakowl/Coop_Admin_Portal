@@ -14,11 +14,20 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <div class="roster-btn-row accounting-list-toolbar no-print">
+    <%# A real request: "Add invoice button should be fit to text and on
+        the same row as the status dropdown menu. Also add a filter
+        button to filter between members, sections." The +Invoice button,
+        the Status dropdown and the new Filter button (member/section)
+        now all live on one .roster-btn-row - the form itself IS that row
+        (same shape as the per-charge Record Payment dialog's own single
+        <form data-toggle-form>) so every control, including the ones
+        tucked inside the Filter <details> popup below, shares one submit
+        - .accounting-list-toolbar's own existing fit-to-text fix
+        (.roster-action-btn { flex: 0 0 auto; }, styles.css) already
+        covers +Invoice here exactly like it does on the Accounts page. %>
+    <form method="GET" action="/main-admin/accounting/invoices" class="roster-btn-row accounting-list-toolbar no-print">
       <a class="roster-action-btn" href="/main-admin/accounting/invoices/new">+ Invoice</a>
-    </div>
 
-    <form method="GET" action="/main-admin/accounting/invoices" class="roster-btn-row no-print" style="margin-bottom: 1rem;">
       <select name="status" onchange="this.form.submit()">
         <option value="">All Statuses</option>
         <option value="pending" <%= status === 'pending' ? 'selected' : '' %>>Pending</option>
@@ -27,11 +36,41 @@
         <option value="refunded" <%= status === 'refunded' ? 'selected' : '' %>>Refunded</option>
         <option value="partially_refunded" <%= status === 'partially_refunded' ? 'selected' : '' %>>Partially Refunded</option>
       </select>
-      <% if (memberId) { %>
-        <input type="hidden" name="memberId" value="<%= memberId %>" />
-        <span class="badge-pill badge-pill-gray">Filtered to one member - <a href="/main-admin/accounting/invoices<%= status ? '?status=' + status : '' %>">clear</a></span>
-      <% } %>
+
+      <%# Same <details>/Filter-button popup pattern as views/admin-
+          rosters.ejs's own Class Rosters Filter (Day/Hour/Semester) -
+          each select still navigates server-side on its own onchange
+          (this.form.submit(), same convention as Status above), just
+          tucked behind one Filter button instead of its own always-
+          visible dropdown. %>
+      <details class="filter-details" data-filter-details>
+        <summary class="roster-action-btn">Filter</summary>
+        <div class="filter-panel">
+          <div class="category-filter">
+            <label for="invoices-filter-member">Member</label>
+            <select id="invoices-filter-member" name="memberId" onchange="this.form.submit()">
+              <option value="">All Members</option>
+              <% allMembers.forEach(function(m) { %>
+                <option value="<%= m.id %>" <%= memberId === m.id ? 'selected' : '' %>><%= m.name %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="category-filter">
+            <label for="invoices-filter-section">Section</label>
+            <select id="invoices-filter-section" name="sectionId" onchange="this.form.submit()">
+              <option value="">All Sections</option>
+              <% allSections.forEach(function(s) { %>
+                <option value="<%= s.id %>" <%= sectionId === s.id ? 'selected' : '' %>><%= s.name %></option>
+              <% }); %>
+            </select>
+          </div>
+        </div>
+      </details>
     </form>
+
+    <% if (memberId) { %>
+      <p class="no-print"><span class="badge-pill badge-pill-gray">Filtered to one member - <a href="/main-admin/accounting/invoices<%= status ? '?status=' + status : '' %><%= sectionId ? (status ? '&' : '?') + 'sectionId=' + sectionId : '' %>">clear</a></span></p>
+    <% } %>
 
     <% if (invoices.length === 0) { %>
       <p class="roster-empty">No invoices match.</p>
@@ -74,5 +113,6 @@
       </div>
     <% } %>
   </main>
+  <script src="/js/filter-details-dismiss.js"></script>
 </body>
 </html>

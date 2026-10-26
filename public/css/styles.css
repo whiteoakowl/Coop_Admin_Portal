@@ -13920,6 +13920,27 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
   .accounting-orange-buttons-group { flex-direction: column; align-items: stretch; }
 }
 
+/* A real request: "the two orange button rows should be closer
+   together." .accounting-orange-buttons-group above already spaces the
+   two rows with its own 0.6rem gap whenever they stack (wrapped at a
+   narrow desktop width, or flex-direction: column on mobile per the
+   media query just above) - but each row is ALSO a plain .roster-btn-row,
+   so two more margins stack on TOP of that gap instead of being replaced
+   by it, since flex `gap` and margin never collapse: the app-wide
+   adjacent-sibling rule (.roster-btn-row + .roster-btn-row, this file,
+   margin-top: 0.75rem) plus this page's own .accounting-list-toolbar
+   margin-bottom (.accounting-list-toolbar, .accounting-accounts-
+   toolbar-2 { margin-bottom: 0.75rem; } above - meant for a .roster-btn-
+   row that stacks with nothing else sharing its spacing) together add
+   another 1.5rem, for ~2.1rem total between the two rows - visibly more
+   than the ~0.75rem every other stacked .roster-btn-row pair in this app
+   settles for. Canceling both of those for just this pair (the group's
+   own gap already does the real spacing job) brings them back in line -
+   closer together than before, without touching the shared .roster-btn-
+   row/.accounting-list-toolbar rules every other page still relies on. */
+.accounting-orange-buttons-group > .roster-btn-row + .roster-btn-row { margin-top: 0; }
+.accounting-orange-buttons-group > .accounting-list-toolbar { margin-bottom: 0; }
+
 /* Category/Fiscal Year page (views/admin-accounting-categories.ejs) - a
    real request: "shrink all tables to fit nicely in mobile." Replacing
    each row's always-editable, full-width text inputs with plain text +
