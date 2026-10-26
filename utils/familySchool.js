@@ -25,6 +25,15 @@ const { todayISO, formatDateLabel, formatDateLong } = require('./dates');
 const { byLastName } = require('./members');
 const { createStorageClient, uploadFile, deleteFile, downloadFile, generateKey } = require('./storage');
 const { urlForUpload } = require('./uploadBackend');
+// A real request: "Lesson plans... Be able to make lesson plans
+// available for parents to use to assign to students under family
+// school management, family classes." getLessonPlan/contentItemsForLessonPlan
+// are the same read helpers routes/admin-lesson-plans.js's own admin view
+// uses - a Family Classes lesson that references a plan (source_lesson_
+// plan_id, see createLesson/contentItemsForLesson below) reads its
+// content live from there, never a copy. isLessonPlanLocked is the one
+// shared lock lookup (see its own comment in utils/lessonPlans.js).
+const { getLessonPlan, contentItemsForLessonPlan, isLessonPlanLocked } = require('./lessonPlans');
 
 // Same bucket/local-dir convention routes/admin-members.js/routes/member-
 // directory.js already established for member photos - read-only reuse
@@ -266,13 +275,18 @@ async function getLesson(id) {
   return db.prepare('SELECT * FROM family_school_lessons WHERE id = ?').get(id);
 }
 
-async function createLesson({ classId, title, description, createdByAccountId }) {
+// sourceLessonPlanId - "Choose from Lesson Plans library" (routes/
+// parent-family-school.js's own POST .../lessons), set alongside the
+// ordinary "write my own" path below it. Once set, this lesson's own
+// content items are never read (see contentItemsForLesson below) - the
+// plan's content shows through live instead.
+async function createLesson({ classId, title, description, createdByAccountId, sourceLessonPlanId }) {
   const { next_position: nextPosition } = await db
     .prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM family_school_lessons WHERE class_id = ?')
     .get(classId);
   const info = await db
-    .prepare('INSERT INTO family_school_lessons (class_id, title, description, position, created_by_account_id) VALUES (?, ?, ?, ?, ?)')
-    .run(classId, title, description || null, nextPosition, createdByAccountId);
+    .prepare('INSERT INTO family_school_lessons (class_id, title, description, position, created_by_account_id, source_lesson_plan_id) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(classId, title, description || null, nextPosition, createdByAccountId, sourceLessonPlanId || null);
   return info.lastInsertRowid;
 }
 
@@ -284,6 +298,15 @@ async function updateLesson(id, { title, description }) {
 
 async function deleteLesson(id) {
   await db.prepare('DELETE FROM family_school_lessons WHERE id = ?').run(id);
+}
+
+// "They can still, say, remove the reference or unassign it from their
+// own class" - drops the link back to the library (the lesson itself,
+// and its class/students/position, all stay put) so the parent can then
+// add their own content instead, or pick a different plan. Never touches
+// lesson_plans itself.
+async function unlinkLessonFromPlan(id) {
+  await db.prepare('UPDATE family_school_lessons SET source_lesson_plan_id = NULL, updated_at = now_text() WHERE id = ?').run(id);
 }
 
 async function reorderLessons(classId, orderedIds) {
@@ -298,9 +321,37 @@ async function getContentItem(id) {
   return db.prepare('SELECT * FROM family_school_content_items WHERE id = ?').get(id);
 }
 
+// A referenced lesson (source_lesson_plan_id set) always reads its
+// content live from the library plan instead of its own (empty)
+// family_school_content_items rows - see createLesson's own comment.
+// Every existing caller (the parent's own manage page, and - via
+// lessonsForStudentView below - the student's read-only view) gets this
+// for free with no call-site changes of its own.
 async function contentItemsForLesson(lessonId) {
+  const lesson = await db.prepare('SELECT source_lesson_plan_id FROM family_school_lessons WHERE id = ?').get(lessonId);
+  if (lesson && lesson.source_lesson_plan_id) {
+    return contentItemsForReferencedLessonPlan(lesson.source_lesson_plan_id);
+  }
   const items = await db.prepare('SELECT * FROM family_school_content_items WHERE lesson_id = ? ORDER BY position, id').all(lessonId);
   return items.map((item) => ({ ...item, attachmentUrl: attachmentUrl(item.attachment_url) }));
+}
+
+// lesson_plan_content_items has no due_date/attachment_mime of its own
+// (see the lesson_plans migration's own comment on why - due dates only
+// ever make sense once something is attached to real students, and these
+// never get copied at all) - due_date is nulled out explicitly here so
+// callers that check it (dueDateLabel below, the manage table) just see
+// "no due date" instead of an undefined field. fromLessonPlan marks every
+// item as not-this-lesson's-own, which is what actually keeps it read-
+// only everywhere a Family Classes lesson is shown (no edit/delete
+// controls in the manage partial, never a clickable/completable bar in
+// lessons-view.ejs) - never conditioned on the plan's own locked flag,
+// since there is no path for a parent to write to lesson_plan_content_
+// items at all, locked or not (see utils/lessonPlans.js's own
+// isLessonPlanLocked comment).
+async function contentItemsForReferencedLessonPlan(lessonPlanId) {
+  const items = await contentItemsForLessonPlan(lessonPlanId, { includeAnswerKey: false });
+  return items.map((item) => ({ ...item, due_date: null, fromLessonPlan: true }));
 }
 
 async function createContentItem({ lessonId, type, title, videoUrl, body, fileUrl, description, attachmentUrl: attachmentKey, attachmentName, attachmentMime, pointsPossible, dueDate }) {
@@ -400,6 +451,12 @@ async function lessonsForStudentView(classId, studentId) {
       const withCompletion = await Promise.all(
         contentItems.map(async (item) => {
           const dueDateLabel = item.due_date ? formatDateLabel(item.due_date) : null;
+          // fromLessonPlan items (contentItemsForLesson, above) carry a
+          // lesson_plan_content_items id, never a real family_school_
+          // content_items one - never look that id up in either
+          // completion table below, since a coincidentally-matching id
+          // there would belong to a totally different piece of content.
+          if (item.fromLessonPlan) return { ...item, dueDateLabel, submission: null, completed: false };
           if (item.type === 'assignment_submission') {
             const submission = await getAssignmentSubmission(item.id, studentId);
             return { ...item, dueDateLabel, submission: submission || null, completed: !!submission };
@@ -430,8 +487,15 @@ function nextContentItemAfter(lessons, currentItemId) {
     for (const item of lesson.contentItems) flat.push(item);
   }
   const index = flat.findIndex((item) => item.id === currentItemId);
-  if (index === -1 || index === flat.length - 1) return null;
-  return flat[index + 1];
+  if (index === -1) return null;
+  // fromLessonPlan items are never linkable (routes/student-family-
+  // school.js's own detail route has nothing real to show for one - see
+  // contentItemsForLesson's own comment) - skip past any of those to the
+  // next real item, same as if they weren't in the list at all.
+  for (let i = index + 1; i < flat.length; i++) {
+    if (!flat[i].fromLessonPlan) return flat[i];
+  }
+  return null;
 }
 
 // --- Grades (the Grades subpage - a real request: "Subpage for grades."
@@ -1291,6 +1355,7 @@ module.exports = {
   createLesson,
   updateLesson,
   deleteLesson,
+  unlinkLessonFromPlan,
   reorderLessons,
   getContentItem,
   contentItemsForLesson,

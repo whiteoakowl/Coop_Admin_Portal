@@ -35,6 +35,7 @@ const {
   createLessonPlanQuizQuestion,
   deleteLessonPlanQuizQuestion,
   assignLessonPlanToClass,
+  toggleLessonPlanLocked,
 } = require('../utils/lessonPlans');
 
 router.use(requireFullAdmin);
@@ -86,6 +87,17 @@ router.post('/lesson-plans/:id/edit', async (req, res) => {
   if (!title) return res.redirect(`/admin/lesson-plans/${id}?error=` + encodeURIComponent('A title is required.'));
   await updateLessonPlan(id, { title, description: (req.body.description || '').trim() });
   res.redirect(`/admin/lesson-plans/${id}?notice=` + encodeURIComponent('Lesson plan updated.'));
+});
+
+// A real request: "It can be locked or unlocked by admin." Plain toggle
+// - see utils/lessonPlans.js's own isLessonPlanLocked for exactly where
+// (and where not) the resulting flag is actually enforced.
+router.post('/lesson-plans/:id/lock', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const plan = await getLessonPlan(id);
+  if (!plan) return res.status(404).send('Not found');
+  const locked = await toggleLessonPlanLocked(id);
+  res.redirect(`/admin/lesson-plans/${id}?notice=` + encodeURIComponent(locked ? 'Lesson plan locked.' : 'Lesson plan unlocked.'));
 });
 
 // "Admins can create lessons plans and assign them to a class to be used

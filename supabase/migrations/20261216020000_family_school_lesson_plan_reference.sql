@@ -1,0 +1,18 @@
+-- A real request: "Lesson plans. Be able to make lesson plans available
+-- for parents to use to assign to students under family school
+-- management, family classes." A real REFERENCE to the admin's own
+-- lesson_plans row (nullable - most Family Classes lessons are still a
+-- parent's own, written from scratch, exactly as before), never a copy:
+-- unlike routes/admin-lesson-plans.js's own "Assign to Class" deep copy
+-- for a real co-op class (which deliberately severs the link so a
+-- teacher can tweak their own copy afterward), this is the one place in
+-- the app a non-admin can "use" a lesson plan while its content keeps
+-- coming live from the one real source - see utils/familySchool.js's
+-- own contentItemsForLesson for where that live read-through happens,
+-- and the lesson_plans_locked migration for why that also means a
+-- parent can never edit that content out from under the original.
+-- on delete set null (not cascade) - deleting the admin's lesson plan
+-- should never take a parent's own lesson row down with it; it just
+-- goes back to having no content until the parent adds their own or
+-- picks another plan.
+alter table family_school_lessons add column if not exists source_lesson_plan_id integer references lesson_plans(id) on delete set null;

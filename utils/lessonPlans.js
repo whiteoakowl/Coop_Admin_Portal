@@ -35,6 +35,49 @@ async function updateLessonPlan(id, { title, description }) {
   await db.prepare("UPDATE lesson_plans SET title = ?, description = ?, updated_at = now_text() WHERE id = ?").run(title, description || null, id);
 }
 
+// A real request: "Lesson plan so that if a teacher uses it for co-op
+// classes or a parent uses it for a family school management lesson
+// plan for their students they won't be able to change it. It can be
+// locked or unlocked by admin." The one shared lookup every non-admin
+// enforcement point calls, instead of each route file re-querying
+// lesson_plans.locked on its own.
+//
+// Where this is actually checked today:
+//   - Family School Management (routes/parent-family-school.js, via
+//     utils/familySchool.js's own contentItemsForLesson/getLesson call
+//     sites) - a parent's lesson that references a plan always renders
+//     that plan's content read-only, independent of this flag (there is
+//     no route that would ever let a parent write to lesson_plan_
+//     content_items at all - it's a live read-through reference, never
+//     a copy, see the family_school_lesson_plan_reference migration's
+//     own comment). The lock state still shows there, so a parent can
+//     see whether the admin considers it final.
+//   - Co-op Teacher Portal (routes/teacher-portal.js) - deliberately NOT
+//     checked here. "Assign to Class" (this file's own
+//     assignLessonPlanToClass) is a one-time DEEP COPY into ordinary
+//     class_assignments/lesson_content_items rows with no lesson_plan_id
+//     of their own at all - by the time a teacher could edit anything,
+//     it's already a fully independent row, not "this lesson plan's
+//     content" anymore. There is currently no path where a teacher ever
+//     edits a lesson_plans/lesson_plan_content_items row directly (only
+//     routes/admin-lesson-plans.js touches those, and that whole router
+//     is already admin-gated), so there is nothing for `locked` to block
+//     on the teacher side today.
+async function isLessonPlanLocked(id) {
+  if (!id) return false;
+  const plan = await db.prepare('SELECT locked FROM lesson_plans WHERE id = ?').get(id);
+  return !!(plan && plan.locked);
+}
+
+// Admin-only (routes/admin-lesson-plans.js is already fully admin-gated)
+// - a plain toggle, same "flip the boolean, hand back the new value for
+// the redirect notice" shape familySchool.js's own toggleWeekAssignmentComplete
+// already uses.
+async function toggleLessonPlanLocked(id) {
+  const row = await db.prepare('UPDATE lesson_plans SET locked = NOT locked, updated_at = now_text() WHERE id = ? RETURNING locked').get(id);
+  return row ? row.locked : null;
+}
+
 // lesson_plan_content_items/lesson_plan_quiz_questions/lesson_plan_quiz_choices
 // all cascade off lesson_plans, so one delete here is enough - same
 // pattern utils/academics.js's own deleteAssignment comment explains.
@@ -196,6 +239,8 @@ module.exports = {
   createLessonPlan,
   updateLessonPlan,
   deleteLessonPlan,
+  isLessonPlanLocked,
+  toggleLessonPlanLocked,
   getLessonPlanContentItem,
   contentItemsForLessonPlan,
   createLessonPlanContentItem,
