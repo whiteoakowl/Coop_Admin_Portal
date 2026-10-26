@@ -19,19 +19,28 @@ const { renderViewToPdf } = require('../utils/pdfRender');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_annual_calendar'));
 
-// Every fiscal year, the calendar for the selected one (if created yet),
-// its keys, and the 12-month grid - everything the live view needs in
-// one shared loader, reused by the print/download.pdf routes below too.
+// A real request: "Annual calendar dropdown for fiscal year should
+// actually be school years... create the next 20 years and 6 years
+// before" and "no more manual + Create Calendar step" - the dropdown is
+// now a plain generated list of school-year start years (utils/
+// annualCalendar.js's own schoolYearStartYears()), and picking one
+// transparently finds-or-creates both its backing fiscal_years row
+// (findOrCreateFiscalYearForSchoolYear) and its calendar (createCalendar
+// already finds-or-creates), so a calendar is always ready by the time
+// this page renders - everything the live view needs in one shared
+// loader, reused by the print/download.pdf routes below too.
 async function loadCalendarPageData(req) {
-  const fiscalYears = await annualCalendar.listFiscalYears();
-  const fiscalYearsWithLabel = fiscalYears.map((fy) => ({ ...fy, label: annualCalendar.fiscalYearLabel(fy) }));
-  const selectedFiscalYearId = req.query.fiscalYearId ? parseInt(req.query.fiscalYearId, 10) : fiscalYears[0] ? fiscalYears[0].id : null;
-  const selectedFiscalYear = fiscalYearsWithLabel.find((fy) => fy.id === selectedFiscalYearId) || null;
-  const calendar = selectedFiscalYear ? await annualCalendar.calendarForFiscalYear(selectedFiscalYear.id) : null;
-  const keys = calendar ? await annualCalendar.keysForCalendar(calendar.id) : [];
-  const keyByDate = calendar ? await annualCalendar.keyByDateForCalendar(calendar.id) : {};
-  const months = selectedFiscalYear ? annualCalendar.monthsForFiscalYear(selectedFiscalYear, keyByDate) : [];
-  return { fiscalYears: fiscalYearsWithLabel, selectedFiscalYearId, selectedFiscalYear, calendar, keys, months };
+  const schoolYearStartYears = annualCalendar.schoolYearStartYears();
+  const requestedStartYear = req.query.schoolYear ? parseInt(req.query.schoolYear, 10) : null;
+  const selectedStartYear = schoolYearStartYears.includes(requestedStartYear) ? requestedStartYear : annualCalendar.currentSchoolYearStartYear();
+  const schoolYearLabel = `${selectedStartYear}-${selectedStartYear + 1}`;
+  const fiscalYearId = await annualCalendar.findOrCreateFiscalYearForSchoolYear(selectedStartYear);
+  const fiscalYear = await annualCalendar.getFiscalYear(fiscalYearId);
+  const calendar = await annualCalendar.createCalendar(fiscalYearId);
+  const keys = await annualCalendar.keysForCalendar(calendar.id);
+  const keyByDate = await annualCalendar.keyByDateForCalendar(calendar.id);
+  const months = annualCalendar.monthsForFiscalYear(fiscalYear, keyByDate);
+  return { schoolYearStartYears, selectedStartYear, schoolYearLabel, calendar, keys, months };
 }
 
 router.get('/', async (req, res) => {
@@ -44,13 +53,6 @@ router.get('/', async (req, res) => {
     annualCalendarDefaults: { monthRowColor: annualCalendar.DEFAULT_MONTH_ROW_COLOR, weekdayRowColor: annualCalendar.DEFAULT_WEEKDAY_ROW_COLOR },
     ...data,
   });
-});
-
-router.post('/create', async (req, res) => {
-  const fiscalYearId = parseInt(req.body.fiscalYearId, 10);
-  if (!fiscalYearId) return res.redirect('/main-admin/annual-calendar?error=' + encodeURIComponent('Choose a fiscal year first.'));
-  await annualCalendar.createCalendar(fiscalYearId);
-  res.redirect(`/main-admin/annual-calendar?fiscalYearId=${fiscalYearId}&notice=` + encodeURIComponent('Calendar created.'));
 });
 
 // A real request: "Be able to add a new key and stay in the popup and
@@ -121,7 +123,6 @@ router.get('/print', async (req, res) => {
   res.render('main-admin-annual-calendar-print', {
     title: 'Annual Calendar',
     MONTH_NAMES: annualCalendar.MONTH_NAMES,
-    schoolYearLabel: data.selectedFiscalYear ? annualCalendar.fiscalYearSchoolYearLabel(data.selectedFiscalYear) : null,
     ...data,
   });
 });
@@ -134,7 +135,6 @@ router.get('/download.pdf', async (req, res) => {
   const pdf = await renderViewToPdf(req, 'main-admin-annual-calendar-print', {
     title: 'Annual Calendar',
     MONTH_NAMES: annualCalendar.MONTH_NAMES,
-    schoolYearLabel: data.selectedFiscalYear ? annualCalendar.fiscalYearSchoolYearLabel(data.selectedFiscalYear) : null,
     ...data,
   });
   res.set('Content-Type', 'application/pdf');

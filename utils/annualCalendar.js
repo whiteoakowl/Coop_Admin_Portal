@@ -15,7 +15,7 @@
 // generalized from 2 fixed colors to however many keys the admin makes).
 const db = require('../db');
 const { formatDateShort } = require('./dates');
-const { monthGridDays } = require('./familySchool');
+const { monthGridDays, currentSchoolYear } = require('./familySchool');
 
 async function listFiscalYears() {
   return db.prepare('SELECT * FROM fiscal_years ORDER BY start_date DESC').all();
@@ -40,6 +40,53 @@ function fiscalYearSchoolYearLabel(fy) {
 
 async function getFiscalYear(id) {
   return db.prepare('SELECT * FROM fiscal_years WHERE id = ?').get(id);
+}
+
+// A real request: "Annual calendar dropdown for fiscal year should
+// actually be school years, 2026-2027, 2027-2028, 2028-2029 etc
+// (consecutive years). Create the next 20 years and 6 years before."
+// The dropdown no longer lists whatever custom-dated rows Accounting's
+// own "+ Add Fiscal Year" happens to have - it's a plain generated list
+// of consecutive school-year start years, same Aug-start convention
+// utils/familySchool.js's own currentSchoolYear() already establishes
+// for Annual Planner's year dropdown, mirrored here (not literally
+// reused) since this page's own range has no "selected value must
+// never drop out of range" requirement the way schoolYearOptions() does.
+function schoolYearStartYears() {
+  const currentStartYear = currentSchoolYearStartYear();
+  const years = [];
+  for (let y = currentStartYear - 6; y <= currentStartYear + 20; y++) years.push(y);
+  return years;
+}
+
+function currentSchoolYearStartYear() {
+  return parseInt(currentSchoolYear().split('-')[0], 10);
+}
+
+// Finds (or, the first time a given school year is ever picked here,
+// quietly creates) the fiscal_years row backing that school year, so
+// picking a school year from the dropdown above no longer requires an
+// admin to first go create a matching row under Accounting's own
+// "+ Add Fiscal Year" - same Aug 1 - Jul 31 date range every other
+// school-year calculation in this app already uses. Looked up by its
+// exact date range (not inserted blindly) so picking the same school
+// year twice, or a school year an admin already happens to have a
+// same-dated Accounting fiscal year for, reuses that one row instead of
+// creating a duplicate; two DIFFERENT school years can never collide on
+// the same range since start_date is always August 1 of that school
+// year's own distinct start year. This is purely additive - it only
+// ever adds rows to (or reads from) the same fiscal_years table
+// Accounting's own fiscal-year management already owns, never touches
+// or renames an existing row, so that page's own admin-created fiscal
+// years keep working exactly as before (a generated row just quietly
+// shows up in Accounting's own list too, since it's the same table).
+async function findOrCreateFiscalYearForSchoolYear(startYear) {
+  const startDate = `${startYear}-08-01`;
+  const endDate = `${startYear + 1}-07-31`;
+  const existing = await db.prepare('SELECT * FROM fiscal_years WHERE start_date = ? AND end_date = ?').get(startDate, endDate);
+  if (existing) return existing.id;
+  const created = await db.prepare('INSERT INTO fiscal_years (start_date, end_date) VALUES (?, ?) RETURNING *').get(startDate, endDate);
+  return created.id;
 }
 
 async function calendarForFiscalYear(fiscalYearId) {
@@ -158,6 +205,9 @@ module.exports = {
   fiscalYearLabel,
   fiscalYearSchoolYearLabel,
   getFiscalYear,
+  schoolYearStartYears,
+  currentSchoolYearStartYear,
+  findOrCreateFiscalYearForSchoolYear,
   calendarForFiscalYear,
   createCalendar,
   getCalendar,

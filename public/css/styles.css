@@ -14479,6 +14479,13 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    layouts have already diverged once and may again. */
 .annual-calendar-print-month:not(:first-child) { margin-top: 2rem; }
 .annual-calendar-print-month h3 { margin: 0 0 0.5rem; }
+/* A real request: "Title should be 2026-2027 Annual Calendar and
+   centered. Key should also be centered and there should be space
+   between the key and the calendars." Both the on-screen print preview
+   and the actual print/PDF output share this same markup, so these
+   rules apply unconditionally rather than only under @media print. */
+.annual-calendar-print-title { text-align: center; }
+.annual-calendar-print-key-row { justify-content: center; margin-bottom: 1.5rem; }
 @media print {
   /* A later real request: "Fill the full page and have even borders" -
      grid-template-rows: repeat(4, 1fr) on an explicit-height grid forces
@@ -14497,7 +14504,10 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: repeat(4, 1fr);
     height: 9.1in;
-    gap: 0.3rem;
+    /* A real request: "there should also be more spacing between each
+       of the calendars" - bumped up from the original 0.3rem rather
+       than adding a second, conflicting gap rule. */
+    gap: 0.5rem;
   }
   /* A real request: "it was supposed to be a square border around each
      month calendar" - a box around each whole month (heading + table
@@ -14621,6 +14631,14 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    instead, same pattern as every other single-button-in-a-crowded-row
    fix on this page. */
 [data-annual-calendar-key-bar] .roster-action-btn { flex: 0 0 auto; }
+
+/* A real request: "Edit calendar colors button and add/edit key button
+   should be on the same row side by side." Their own row, separate
+   from the key-swatch bar above - same fit-to-text reasoning as that
+   rule just above (otherwise .roster-action-btn's own flex: 1 0 auto
+   stretches these two to fill the row instead of hugging their own
+   labels). */
+.annual-calendar-key-actions-row .roster-action-btn { flex: 0 0 auto; }
 
 /* A real request: "Present and absent keys should be to the left, not
    centered and just under the title... Move this row to the left.
