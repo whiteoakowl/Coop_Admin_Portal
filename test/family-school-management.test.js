@@ -122,11 +122,21 @@ test('Family School Management is its own portal reached from the parent role, a
   assert.match(mainAdminHome.text, />Family School(?:<br\/?>| )Management</);
 });
 
-test('Main Admin Family School Management tab is just a blank Settings page', async () => {
-  const mainAdmin = await createPortalMember({ name: 'Blank Settings Admin', familyId: null, memberType: 'admin', roleKey: 'main_admin' });
-  const page = await request(app).get('/main-admin/family-school').set('Cookie', mainAdmin.cookie);
-  assert.equal(page.status, 200);
-  assert.match(page.text, /No settings here yet\./);
+test('Main Admin Family School Management tab has Transcripts and Diplomas subpages, not a blank Settings page', async () => {
+  // A real request: "Main admin portal. Family school management tab
+  // should simply have two subpages. One for transcript creation and
+  // one for diploma creation. Same pages and features as the family
+  // school management portal for transcripts and diplomas." The old
+  // blank placeholder was replaced entirely.
+  const mainAdmin = await createPortalMember({ name: 'FSM Tab Admin', familyId: null, memberType: 'admin', roleKey: 'main_admin' });
+  const transcripts = await request(app).get('/main-admin/family-school').set('Cookie', mainAdmin.cookie);
+  assert.equal(transcripts.status, 200);
+  assert.match(transcripts.text, /<h1>Transcripts<\/h1>/);
+  assert.doesNotMatch(transcripts.text, /No settings here yet\./);
+
+  const diplomas = await request(app).get('/main-admin/family-school/diplomas').set('Cookie', mainAdmin.cookie);
+  assert.equal(diplomas.status, 200);
+  assert.match(diplomas.text, /<h1>Diplomas<\/h1>/);
 });
 
 test('a parent can create a class, assign it to their own student, add a lesson with content, and the student sees it to work on and complete', async () => {
