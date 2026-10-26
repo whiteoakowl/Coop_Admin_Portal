@@ -1,10 +1,29 @@
 <%# Family School lesson content items (video/text/file/assignment
-    upload/assignment submission - no quiz type, see utils/familySchool.js's
-    own header comment on why). Modeled on views/partials/lesson-plan-
-    content-manage.ejs, plus a per-item Due Date field (lessons here are
-    attached to real students doing real work, unlike a reusable lesson
-    plan template). lesson/contentItems/basePath come from the including
-    page. %>
+    upload/assignment submission - no quiz type of its own, see utils/
+    familySchool.js's own header comment on why) - plus a per-item Due
+    Date field (lessons here are attached to real students doing real
+    work, unlike a reusable lesson plan template). Modeled on views/
+    partials/lesson-plan-content-manage.ejs. lesson/contentItems/basePath
+    come from the including page.
+
+    sourcePlan/sourcePlanLocked (optional - only parent-family-school-
+    lesson-manage.ejs ever passes them) mean this lesson was created via
+    "Choose from Lesson Plans library" (routes/parent-family-school.js's
+    own POST .../lessons) instead of written from scratch - contentItems
+    is then that plan's own content, read live off lesson_plans (see
+    utils/familySchool.js's own contentItemsForLesson), so every item
+    here carries fromLessonPlan: true and this whole section renders it
+    read-only: no drag handles, no Add/Edit/Delete - "they won't be able
+    to change it," regardless of sourcePlanLocked (there's no path for a
+    parent to write to the admin's own lesson_plan_content_items at all,
+    locked or not - see utils/lessonPlans.js's own isLessonPlanLocked
+    comment). A quiz item can only ever appear here by way of a
+    referenced plan (Family Classes lessons never create one of their
+    own), so it's display-only too - no questions-management link, same
+    as this lesson's own content has none of its own editing UI while
+    referenced. %>
+<% var sourcePlanLocal = typeof sourcePlan !== 'undefined' ? sourcePlan : null; %>
+<% var sourcePlanLockedLocal = typeof sourcePlanLocked !== 'undefined' ? sourcePlanLocked : false; %>
 <div class="manage-section">
   <div class="grid-box-header">
     <h2>Lesson Details</h2>
@@ -22,17 +41,34 @@
   </form>
 </div>
 
+<% if (sourcePlanLocal) { %>
+  <div class="manage-section">
+    <div class="grid-box-header">
+      <h2>Lesson Plan <% if (sourcePlanLockedLocal) { %><span class="status-badge status-badge-none">Locked</span><% } %></h2>
+    </div>
+    <p class="hint">
+      This lesson's content comes from the <strong><%= sourcePlanLocal.title %></strong> Lesson Plan in the library and can't be edited here.
+      <% if (sourcePlanLockedLocal) { %>An admin has locked this plan.<% } %>
+    </p>
+    <form method="POST" action="<%= basePath %>/lessons/<%= lesson.id %>/unlink-plan" onsubmit="return confirm('Remove the link to this Lesson Plan? The lesson keeps its title, but has no content until you add your own.');">
+      <button type="submit" class="roster-action-btn">Remove Lesson Plan Reference</button>
+    </form>
+  </div>
+<% } %>
+
 <div class="manage-section">
   <div class="grid-box-header">
     <h2>Content/Assignments (<%= contentItems.length %>)</h2>
-    <button type="button" class="roster-action-btn" onclick="document.getElementById('add-content-dialog').showModal()">+ Add New Content/Assignment</button>
+    <% if (!sourcePlanLocal) { %>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-content-dialog').showModal()">+ Add New Content/Assignment</button>
+    <% } %>
   </div>
   <% if (contentItems.length === 0) { %>
     <p class="roster-empty">No content added yet.</p>
   <% } else { %>
     <%
       var CONTENT_TYPE_LABELS = {
-        video: 'Video', text: 'Text', file: 'File',
+        video: 'Video', text: 'Text', file: 'File', quiz: 'Quiz',
         assignment_upload: 'Assignment', assignment_submission: 'Assignment (student uploads work)',
       };
     %>
@@ -41,6 +77,37 @@
         <thead>
           <tr><th></th><th>Content</th><th></th></tr>
         </thead>
+        <% if (sourcePlanLocal) { %>
+        <tbody>
+          <% contentItems.forEach(function(item) { %>
+            <tr>
+              <td class="roster-drag-col"></td>
+              <td class="roster-name-col table-stack-heading">
+                <span><%= item.title || '(untitled)' %></span>
+                <% if (item.type === 'video' && item.video_url) { %><div class="hint"><a href="<%= item.video_url %>" target="_blank" rel="noopener">Video link</a></div><% } %>
+                <% if (item.type === 'video' && item.description) { %><div class="hint"><%= item.description %></div><% } %>
+                <% if (item.type === 'file' && item.file_url) { %><div class="hint"><a href="<%= item.file_url %>" target="_blank" rel="noopener">File link</a></div><% } %>
+                <% if (item.type === 'file' && item.description) { %><div class="hint"><%= item.description %></div><% } %>
+                <% if (item.type === 'text' && item.body) { %><div class="hint plain-text-display"><%= item.body %></div><% } %>
+                <% if (item.type === 'quiz') { %><div class="hint"><%= item.questions.length %> question<%= item.questions.length === 1 ? '' : 's' %></div><% } %>
+                <% if (item.type === 'assignment_upload') { %>
+                  <% if (item.body) { %><div class="hint forum-editable-display"><%- item.body %></div><% } %>
+                  <% if (item.attachmentUrl) { %><div class="hint"><a href="<%= item.attachmentUrl %>" target="_blank" rel="noopener"><%= item.attachment_name || 'Attachment' %></a></div><% } %>
+                <% } %>
+                <% if (item.type === 'assignment_submission') { %>
+                  <% if (item.body) { %><div class="hint forum-editable-display"><%- item.body %></div><% } %>
+                  <div class="hint"><% if (item.points_possible != null) { %><%= item.points_possible %> points<% } %></div>
+                <% } %>
+              </td>
+              <td data-label="" class="table-stack-full">
+                <div class="roster-btn-row content-item-row-icons">
+                  <span class="content-item-type-label">Type: <%= CONTENT_TYPE_LABELS[item.type] || item.type %></span>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+        <% } else { %>
         <tbody data-content-reorder-tbody data-assignment-id="<%= lesson.id %>" data-reorder-url="<%= basePath %>/lessons/<%= lesson.id %>/content/reorder">
           <% contentItems.forEach(function(item) { %>
             <tr data-content-reorder-row="<%= item.id %>">
@@ -74,8 +141,10 @@
             </tr>
           <% }); %>
         </tbody>
+        <% } %>
       </table>
     </div>
+    <% if (!sourcePlanLocal) { %>
     <% contentItems.forEach(function(item) { %>
       <dialog id="edit-content-dialog-<%= item.id %>" class="member-picker-dialog dialog-label-stack">
         <form method="POST" action="<%= basePath %>/content/<%= item.id %>/edit" enctype="multipart/form-data">
@@ -133,8 +202,10 @@
         </form>
       </dialog>
     <% }); %>
+    <% } %>
   <% } %>
 
+  <% if (!sourcePlanLocal) { %>
   <dialog id="add-content-dialog" class="member-picker-dialog dialog-label-stack">
     <form method="POST" action="<%= basePath %>/lessons/<%= lesson.id %>/content" enctype="multipart/form-data" class="member-form-grid" data-toggle-form>
       <h3>Add New Content/Assignment</h3>
@@ -193,6 +264,7 @@
       </div>
     </form>
   </dialog>
+  <% } %>
 </div>
 <script src="/js/lesson-drag-reorder.js"></script>
 <script src="/js/lesson-content-form.js"></script>

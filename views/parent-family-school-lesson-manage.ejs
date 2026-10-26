@@ -13,7 +13,7 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <%- include('partials/family-school-content-manage', { lesson, contentItems, basePath }) %>
+    <%- include('partials/family-school-content-manage', { lesson, contentItems, basePath, sourcePlan, sourcePlanLocked }) %>
   </main>
 </body>
 </html>

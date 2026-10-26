@@ -1,0 +1,11 @@
+-- A real request: "Lesson plan so that if a teacher uses it for co-op
+-- classes or a parent uses it for a family school management lesson
+-- plan for their students they won't be able to change it. It can be
+-- locked or unlocked by admin." Admins keep full edit access either way
+-- (routes/admin-lesson-plans.js is already fully admin-gated) - locked
+-- only ever matters to a non-admin who's using this plan, checked via
+-- utils/lessonPlans.js's own isLessonPlanLocked helper rather than this
+-- column being read ad hoc from several files. See that helper's own
+-- comment for exactly where (and, just as importantly, where NOT) that
+-- check actually applies today.
+alter table lesson_plans add column if not exists locked boolean not null default false;

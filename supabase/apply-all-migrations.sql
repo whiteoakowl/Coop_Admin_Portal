@@ -5453,3 +5453,13 @@ alter table family_school_weeks add column if not exists description text;
 -- comment.
 alter table notification_preferences drop constraint if exists notification_preferences_channel_check;
 alter table notification_preferences add constraint notification_preferences_channel_check check (channel in ('email', 'sms', 'push'));
+
+-- Lesson Plans: admin lock/unlock - see the lesson_plans_locked
+-- migration's own header comment.
+alter table lesson_plans add column if not exists locked boolean not null default false;
+
+-- Family School Management > Family Classes: a lesson can now reference
+-- an admin-authored Lesson Plan instead of carrying its own content -
+-- see the family_school_lesson_plan_reference migration's own header
+-- comment.
+alter table family_school_lessons add column if not exists source_lesson_plan_id integer references lesson_plans(id) on delete set null;
