@@ -30,6 +30,7 @@ const { requirePortalAuth, requirePortal, requirePortalPermission } = require('.
 const payments = require('../utils/payments');
 const auditLog = require('../utils/auditLog');
 const { byLastName, primaryParentForBilling } = require('../utils/members');
+const { sectionIdsForMembers } = require('../utils/portalPermissions');
 const events = require('../utils/events');
 const emailComposer = require('../utils/emailComposer');
 const { appSetting, setAppSetting } = require('../utils/appSettings');
@@ -357,16 +358,30 @@ function splitLineItems(body) {
   return items;
 }
 
+// A real request: "add a filter button to filter between members,
+// sections" - memberId already narrowed the list (above); sectionId is
+// new, reusing utils/portalPermissions.js's own sectionIdsForMembers
+// batch lookup (the exact same server-side-filter-on-select convention
+// routes/admin-members.js's own Grade Level Report ?sectionId= filter
+// already uses) rather than inventing a new members-by-section query.
 router.get('/invoices', async (req, res) => {
   const status = INVOICE_STATUSES.includes(req.query.status) ? req.query.status : '';
   let invoices = await payments.allCharges(status || undefined);
   const memberId = req.query.memberId ? Number(req.query.memberId) : null;
   if (memberId) invoices = invoices.filter((c) => c.member_id === memberId);
+  const sectionId = req.query.sectionId ? Number(req.query.sectionId) : null;
+  if (sectionId) {
+    const sectionIdsByMember = await sectionIdsForMembers(invoices.map((c) => c.member_id));
+    invoices = invoices.filter((c) => (sectionIdsByMember[c.member_id] || new Set()).has(sectionId));
+  }
   res.render('admin-accounting-invoices', {
     title: 'Invoices',
     invoices,
     status,
     memberId,
+    sectionId,
+    allMembers: await billableMembers(),
+    allSections: await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all(),
     notice: req.query.notice || null,
     error: req.query.error || null,
     formatCents: payments.formatCents,
@@ -456,10 +471,61 @@ router.get('/payments', async (req, res) => {
   res.render('admin-accounting-payments', {
     title: 'Payments',
     rows: await payments.allPayments('payment'),
+    allMembers: await billableMembers(),
     notice: req.query.notice || null,
     error: req.query.error || null,
     formatCents: payments.formatCents,
   });
+});
+
+// A real request: "Payments - add a button for add payment. Popup allows
+// you to choose from the drop down a cash, check or credit card payment"
+// - unlike the Record Payment dialogs above (both always apply to one
+// specific already-open charge/invoice), this one has no particular
+// invoice in mind: the admin just walked up with money for a member. A
+// payment can never float free of a charge (payment_payments.charge_id
+// is NOT NULL - supabase/migrations/20260825080000_payments_foundation.sql;
+// "there is no free-standing payment with nothing to apply it to," this
+// file's own header comment), so this creates its own manual charge for
+// the exact amount typed and immediately records a matching payment
+// against it - same createCharge()/recordPayment() pair, same
+// payment_charges/payment_payments tables, every other route in this
+// file already uses, not a parallel log of its own. There is no real
+// card processor anywhere in this app (this file's own header comment;
+// payment_payments.method's only real value is 'manual' - 'stripe_
+// placeholder' exists for a future integration that doesn't exist yet) -
+// Credit Card here is exactly as "manual" as Cash/Check, just a plain
+// record that a card payment was taken outside the app. Card number/
+// expiration/CVV are read off the form only to confirm something was
+// typed; they are never written to the database, the audit log, or
+// anywhere else - no raw card data is ever stored, same rule that
+// migration's own header comment states for the whole feature.
+const QUICK_PAYMENT_METHODS = { cash: 'Cash', check: 'Check', credit_card: 'Credit Card' };
+router.post('/payments/quick', async (req, res) => {
+  const memberId = Number(req.body.memberId) || null;
+  if (!memberId) return res.redirect('/main-admin/accounting/payments?error=' + encodeURIComponent('Pick a member.'));
+  const amountCents = toCents(req.body.amount);
+  if (amountCents <= 0) return res.redirect('/main-admin/accounting/payments?error=' + encodeURIComponent('Enter a positive amount.'));
+  const method = QUICK_PAYMENT_METHODS[req.body.paymentMethod] ? req.body.paymentMethod : 'cash';
+  const label = QUICK_PAYMENT_METHODS[method];
+  // Same "method label folds into the free-text note" convention as the
+  // per-charge Record Payment dialog's own POST /charges/:id/payments -
+  // payment_payments.method itself always stays 'manual' (the PATHWAY,
+  // never "Cash" vs. "Check" - see that route's own comment).
+  let note = label;
+  if (method === 'check') {
+    const checkNumber = (req.body.checkNumber || '').trim();
+    if (checkNumber) note += ` #${checkNumber}`;
+  } else if (method === 'cash') {
+    const paymentDate = (req.body.paymentDate || '').trim();
+    if (paymentDate) note += ` - ${paymentDate}`;
+  }
+  // method === 'credit_card': card-processing fields end here, confirmed
+  // present but never persisted - see this route's own header comment.
+  const chargeId = await payments.createCharge(memberId, req.portalAccount.id, 'manual', null, `Walk-up Payment (${label})`, amountCents);
+  await payments.recordPayment(chargeId, amountCents, 'manual', req.portalAccount.id, note, null);
+  await auditLog.record(req.portalAccount.id, 'payment_recorded', 'payment_charge', chargeId, `${payments.formatCents(amountCents)} - ${note}`);
+  res.redirect('/main-admin/accounting/payments?notice=' + encodeURIComponent('Payment recorded.'));
 });
 
 // A real request: "Invoice, payment and adjustment button should be a
