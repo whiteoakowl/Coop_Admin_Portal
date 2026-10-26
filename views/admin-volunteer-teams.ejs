@@ -25,7 +25,9 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <%- include('partials/floater-tabs', { day, activeFloaterTab: 'teams', semesterId }) %>
+    <%# Floater Assignments/Floater Teams/Class Cancellation Risk now live
+        as subpages under the orange bar's own Floater Assignments item
+        (views/partials/admin-nav.ejs) instead of a trigger+dialog here. %>
 
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">

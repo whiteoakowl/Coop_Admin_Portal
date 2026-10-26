@@ -218,7 +218,10 @@
             <input type="date" name="date" value="<%= dateFilter %>" aria-label="Filter by date" onchange="this.form.requestSubmit()" />
           </form>
           <% if (dateFilter) { %><a class="roster-action-btn" href="/admin/schedule?tab=classregistrationlog">Clear</a><% } %>
-          <div class="roster-btn-row">
+          <%# A real request: "export, import, print and pdf icons
+              should be in a row side by side. Not in a single column" -
+              see views/admin-design.ejs's own matching comment. %>
+          <div class="roster-btn-row" data-fixed-columns="3">
             <a class="icon-btn" href="/admin/schedule/classregistrationlog/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
             <a class="icon-btn" href="/admin/schedule/classregistrationlog/print<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
             <a class="icon-btn" href="/admin/schedule/classregistrationlog/download.pdf<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
@@ -310,7 +313,7 @@
             </button>
           </div>
 
-          <div class="roster-btn-row">
+          <div class="roster-btn-row" data-fixed-columns="4">
             <button type="button" class="icon-btn" onclick="document.getElementById('schedule-import-dialog').showModal()" aria-label="Import" title="Import"><svg class="icon"><use href="#icon-upload"/></svg></button>
             <a class="icon-btn" href="/admin/schedule/export.csv<%= buildQuery({}) %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
             <a class="icon-btn" href="/admin/schedule/print<%= buildQuery({}) %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>

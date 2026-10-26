@@ -142,28 +142,28 @@ async function resolveRecipients({ recipientIds, memberIds } = {}) {
   return [];
 }
 
-async function createAndSend({ subject, bodyHtml, replyTo, recipientAccountIds, sentByAccountId, sentByPortal }) {
+async function createAndSend({ subject, bodyHtml, replyTo, emailAlsoTo, recipientAccountIds, sentByAccountId, sentByPortal }) {
   const recipients = [...new Set(recipientAccountIds)];
   for (const accountId of recipients) {
     await notify(accountId, 'email_campaign', { title: subject, body: bodyHtml });
   }
   const info = await db
     .prepare(
-      `INSERT INTO email_campaigns (subject, body_html, reply_to, recipient_account_ids, recipient_count, status, sent_at, sent_by_portal, created_by_account_id)
-       VALUES (?, ?, ?, ?, ?, 'sent', now_text(), ?, ?) RETURNING id`
+      `INSERT INTO email_campaigns (subject, body_html, reply_to, email_also_to, recipient_account_ids, recipient_count, status, sent_at, sent_by_portal, created_by_account_id)
+       VALUES (?, ?, ?, ?, ?, ?, 'sent', now_text(), ?, ?) RETURNING id`
     )
-    .get(subject, bodyHtml, replyTo || null, JSON.stringify(recipients), recipients.length, sentByPortal, sentByAccountId);
+    .get(subject, bodyHtml, replyTo || null, emailAlsoTo || null, JSON.stringify(recipients), recipients.length, sentByPortal, sentByAccountId);
   return { id: info.id, recipientCount: recipients.length };
 }
 
-async function createScheduled({ subject, bodyHtml, replyTo, recipientAccountIds, scheduledAt, sentByAccountId, sentByPortal }) {
+async function createScheduled({ subject, bodyHtml, replyTo, emailAlsoTo, recipientAccountIds, scheduledAt, sentByAccountId, sentByPortal }) {
   const recipients = [...new Set(recipientAccountIds)];
   const info = await db
     .prepare(
-      `INSERT INTO email_campaigns (subject, body_html, reply_to, recipient_account_ids, recipient_count, status, scheduled_at, sent_by_portal, created_by_account_id)
-       VALUES (?, ?, ?, ?, ?, 'scheduled', ?, ?, ?) RETURNING id`
+      `INSERT INTO email_campaigns (subject, body_html, reply_to, email_also_to, recipient_account_ids, recipient_count, status, scheduled_at, sent_by_portal, created_by_account_id)
+       VALUES (?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, ?) RETURNING id`
     )
-    .get(subject, bodyHtml, replyTo || null, JSON.stringify(recipients), recipients.length, scheduledAt, sentByPortal, sentByAccountId);
+    .get(subject, bodyHtml, replyTo || null, emailAlsoTo || null, JSON.stringify(recipients), recipients.length, scheduledAt, sentByPortal, sentByAccountId);
   return { id: info.id, recipientCount: recipients.length };
 }
 

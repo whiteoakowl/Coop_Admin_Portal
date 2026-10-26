@@ -37,7 +37,10 @@
             <input type="date" name="date" value="<%= dateFilter %>" aria-label="Filter by date" onchange="this.form.requestSubmit()" />
           </form>
           <% if (dateFilter) { %><a class="roster-action-btn" href="/admin/logs?tab=classregistration">Clear</a><% } %>
-          <div class="roster-btn-row">
+          <%# A real request: "export, import, print and pdf icons
+              should be in a row side by side. Not in a single column" -
+              see views/admin-design.ejs's own matching comment. %>
+          <div class="roster-btn-row" data-fixed-columns="3">
             <a class="icon-btn" href="/admin/logs/classregistration/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
             <a class="icon-btn" href="/admin/logs/classregistration/print<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
             <a class="icon-btn" href="/admin/logs/classregistration/download.pdf<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
@@ -127,7 +130,7 @@
             <input type="date" name="date" value="<%= dateFilter %>" aria-label="Filter by date" onchange="this.form.requestSubmit()" />
           </form>
           <% if (dateFilter) { %><a class="roster-action-btn" href="/admin/logs?tab=missedduty">Clear</a><% } %>
-          <div class="roster-btn-row">
+          <div class="roster-btn-row" data-fixed-columns="3">
             <a class="icon-btn" href="/admin/logs/missedduty/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
             <a class="icon-btn" href="/admin/logs/missedduty/print<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
             <a class="icon-btn" href="/admin/logs/missedduty/download.pdf<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
@@ -199,7 +202,7 @@
             <input type="date" name="date" value="<%= dateFilter %>" aria-label="Filter by date" onchange="this.form.requestSubmit()" />
           </form>
           <% if (dateFilter) { %><a class="roster-action-btn" href="/admin/logs?tab=absence">Clear</a><% } %>
-          <div class="roster-btn-row">
+          <div class="roster-btn-row" data-fixed-columns="3">
             <a class="icon-btn" href="/admin/logs/absence/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
             <a class="icon-btn" href="/admin/logs/absence/print<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
             <a class="icon-btn" href="/admin/logs/absence/download.pdf<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
@@ -285,7 +288,7 @@
               <% }); %>
             </select>
           </div>
-          <div class="roster-btn-row">
+          <div class="roster-btn-row" data-fixed-columns="3">
             <a class="icon-btn" href="/admin/logs/<%= tab %>/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
             <a class="icon-btn" href="/admin/logs/<%= tab %>/print<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
             <a class="icon-btn" href="/admin/logs/<%= tab %>/download.pdf<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
@@ -354,7 +357,7 @@
               href="/admin/logs?tab=nametag<%= showArchived ? '' : '&archived=1' %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>"
             >Archived</a>
           </div>
-          <div class="roster-btn-row">
+          <div class="roster-btn-row" data-fixed-columns="3">
             <a class="icon-btn" href="/admin/logs/nametag/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
             <a class="icon-btn" href="/admin/logs/nametag/print?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
             <a class="icon-btn" href="/admin/logs/nametag/download.pdf?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
@@ -457,7 +460,7 @@
               </div>
             <% } %>
           </div>
-          <div class="roster-btn-row">
+          <div class="roster-btn-row" data-fixed-columns="3">
             <a class="icon-btn" href="/admin/logs/classrisk/export.csv?filterBy=<%= filterBy %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %><%= classIdFilter != null ? '&classId=' + classIdFilter : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
             <a class="icon-btn" href="/admin/logs/classrisk/print?filterBy=<%= filterBy %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %><%= classIdFilter != null ? '&classId=' + classIdFilter : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
             <a class="icon-btn" href="/admin/logs/classrisk/download.pdf?filterBy=<%= filterBy %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %><%= classIdFilter != null ? '&classId=' + classIdFilter : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
@@ -537,7 +540,7 @@
               />
             </div>
           </div>
-          <div class="roster-btn-row">
+          <div class="roster-btn-row" data-fixed-columns="2">
             <a class="icon-btn" href="/admin/logs/substitutes/print?day=<%= day %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
             <a class="icon-btn" href="/admin/logs/substitutes/download.pdf?day=<%= day %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
           </div>
@@ -581,7 +584,7 @@
       <% } else if (tab === 'allergies') { %>
         <div class="roster-toolbar no-print">
           <div></div>
-          <div class="roster-btn-row">
+          <div class="roster-btn-row" data-fixed-columns="3">
             <a class="icon-btn" href="/admin/logs/allergies/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
             <a class="icon-btn" href="/admin/logs/allergies/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
             <a class="icon-btn" href="/admin/logs/allergies/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>

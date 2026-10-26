@@ -19,7 +19,9 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <%- include('partials/setup-tabs', { day, activeSetupTab: 'assignments', semesterId }) %>
+    <%# Setup/Cleanup Assignments/Setup/Cleanup Teams/Task List now live as
+        subpages under the orange bar's own Setup/Cleanup item (views/
+        partials/admin-nav.ejs) instead of a trigger+dialog here. %>
 
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">
@@ -29,7 +31,10 @@
         <div class="roster-btn-row roster-btn-row-fit-text">
           <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
         </div>
-        <div class="roster-btn-row">
+        <%# A real request: "export, import, print and pdf icons should
+            be in a row side by side. Not in a single column" - see
+            views/admin-design.ejs's own matching comment. %>
+        <div class="roster-btn-row" data-fixed-columns="3">
           <a class="icon-btn" href="/admin/setup/<%= day %>/assignments/export.csv?semesterId=<%= semesterId %><%= selectedDate ? '&date=' + selectedDate : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
           <a class="icon-btn" href="/admin/setup/<%= day %>/assignments/print?semesterId=<%= semesterId %><%= selectedDate ? '&date=' + selectedDate : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
           <a class="icon-btn" href="/admin/setup/<%= day %>/assignments/download.pdf?semesterId=<%= semesterId %><%= selectedDate ? '&date=' + selectedDate : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
