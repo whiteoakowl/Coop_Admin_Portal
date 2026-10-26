@@ -2847,6 +2847,17 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   min-width: 0;
   box-sizing: border-box;
 }
+/* Create Event wizard (views/admin-events-new.ejs) - a real request: "on
+   mobile the activity information, meetup parking, what to bring etc.
+   the description boxes should be the full width of the mobile screen."
+   Event Description and the Activity Information/Meetup and Parking
+   Information/What to Bring/Extra Notes textareas each sit in their own
+   .member-form-full OUTSIDE a .member-form-grid (every other field on
+   this page lives inside one) so they never picked up that grid's own
+   "width: 100%" rule just above - a bare <textarea> otherwise falls back
+   to the browser's own ~20-column default width, which is the one that
+   showed up as "not full width" at phone widths. */
+#event-wizard-form .member-form-full textarea { width: 100%; box-sizing: border-box; }
 .member-photo-preview {
   width: 96px;
   height: 96px;

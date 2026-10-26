@@ -66,20 +66,6 @@
           </div>
         </div>
 
-        <%# A real request: "Description box title should be the same size
-            as other section titles" - promoted from a plain <label> (a
-            contenteditable rich-text box isn't a real form control a
-            <label> can associate with anyway) to the same
-            .event-wizard-subheading every other section here already
-            uses, as its own section rather than buried inside the Event
-            Details grid above it. %>
-        <h3 class="event-wizard-subheading">Event Description <span class="required-star">*</span></h3>
-        <div class="member-form-full" data-forum-editor>
-          <%- include('partials/forum-editor-toolbar') %>
-          <div class="forum-editable" data-forum-editable contenteditable="true"></div>
-          <input type="hidden" name="description" data-forum-body-input required />
-        </div>
-
         <h3 class="event-wizard-subheading">Date &amp; Time</h3>
         <%# A real request: "dates and times options should be separated.
             Date should be a calendar picker, time should be a clock
@@ -99,6 +85,15 @@
             startFieldName: 'startsAt', endFieldName: 'endsAt',
             startRequired: true,
           }) %>
+        </div>
+
+        <%# A real request: "Registrations opens and closes should be a
+            section title on create event" - split out of the Date & Time
+            grid above into its own .event-wizard-subheading section,
+            same convention every other section on this page already
+            uses. %>
+        <h3 class="event-wizard-subheading">Registration</h3>
+        <div class="member-form-grid">
           <%- include('partials/date-range-picker', {
             startGroup: 'regOpens', endGroup: 'regCloses',
             startDateLabel: 'Registration Opens Date', endDateLabel: 'Registration Closes Date',
@@ -110,7 +105,7 @@
 
         <h3 class="event-wizard-subheading">Location &amp; Capacity</h3>
         <div class="member-form-grid">
-          <label class="member-form-full">Location (legacy text - prefer the dropdown below)
+          <label class="member-form-full">Location
             <input type="text" name="location" placeholder="e.g., Community Center, 123 Main St" />
           </label>
           <label class="member-form-full">Location
@@ -139,6 +134,17 @@
           <label>Organized By
             <input type="text" name="organizedBy" placeholder="e.g., Sanford Homeschoolers" />
           </label>
+        </div>
+
+        <%# A real request: "the description box and section should be
+            moved to the bottom, above activity information and below
+            the location and capacity section" - moved down from right
+            after Event Details (above Date & Time) to right here. %>
+        <h3 class="event-wizard-subheading">Event Description <span class="required-star">*</span></h3>
+        <div class="member-form-full" data-forum-editor>
+          <%- include('partials/forum-editor-toolbar') %>
+          <div class="forum-editable" data-forum-editable contenteditable="true"></div>
+          <input type="hidden" name="description" data-forum-body-input required />
         </div>
 
         <%# A real request: "remove volunteer signups from page 1. That
