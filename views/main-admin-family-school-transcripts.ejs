@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Transcripts</h1>
+    <p class="hint">Create and print a transcript for any student in the co-op - same builder as Family School Management's own Transcripts page.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <div class="manage-section no-print">
+      <label>Student
+        <select onchange="window.location.href = '/main-admin/family-school?studentId=' + this.value">
+          <option value="">&mdash; choose a student &mdash;</option>
+          <% students.forEach(function(s) { %>
+            <option value="<%= s.id %>" <%= selectedStudent && selectedStudent.id === s.id ? 'selected' : '' %>><%= s.name %></option>
+          <% }); %>
+        </select>
+      </label>
+    </div>
+
+    <% if (students.length === 0) { %>
+      <p class="roster-empty">No active students yet.</p>
+    <% } else if (!rec) { %>
+      <p class="roster-empty">Choose a student above to view or build their transcript.</p>
+    <% } else { %>
+      <%- include('partials/transcript-student-builder', { rec, semesters, yearOptions, currentSchoolYearValue, gradeLetters, basePath: '/main-admin/family-school' }) %>
+    <% } %>
+  </main>
+  <script src="/js/transcript-add-class.js"></script>
+</body>
+</html>

@@ -455,9 +455,27 @@ function expandPortalRoles(roles) {
   return expanded;
 }
 
+// A real request: "Portal Choosing page. Change order. Parent portal,
+// Co-op Teacher, Family School Management Portal, Main Admin Portal,
+// Co-op Admin Portal, Student Portal." rolesForAccount's own `ORDER BY
+// r.label` (utils/portalAuth.js) is alphabetical by design, and other
+// callers of that same function rely on it just being "every role this
+// account holds" with no particular order promised - so this is a
+// display-only re-sort of the switcher's own card list, not a change to
+// that query. Any role key not listed here (there isn't one today) just
+// keeps falling in after every key that is, in whatever order it was in.
+const PORTAL_SWITCHER_CARD_ORDER = ['parent', 'teacher', 'family_school', 'main_admin', 'coop_admin', 'student'];
+function sortForPortalSwitcher(roles) {
+  return [...roles].sort((a, b) => {
+    const ai = PORTAL_SWITCHER_CARD_ORDER.indexOf(a.key);
+    const bi = PORTAL_SWITCHER_CARD_ORDER.indexOf(b.key);
+    return (ai === -1 ? PORTAL_SWITCHER_CARD_ORDER.length : ai) - (bi === -1 ? PORTAL_SWITCHER_CARD_ORDER.length : bi);
+  });
+}
+
 router.get('/portal', async (req, res) => {
   if (!req.portalAccount) return res.redirect('/login?next=%2Fportal');
-  const roles = expandPortalRoles(req.portalRoles);
+  const roles = sortForPortalSwitcher(expandPortalRoles(req.portalRoles));
   if (roles.length === 1) return res.redirect(PORTAL_HOME_ROUTES[roles[0].key] || '/portal');
   res.render('portal-switcher', { title: 'My Portals', roles, portalHomeRoutes: PORTAL_HOME_ROUTES });
 });

@@ -15,10 +15,10 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
-  <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
+  <%- include('partials/portal-nav', { portalTitle: typeof portalTitle !== 'undefined' && portalTitle ? portalTitle : 'Family School Management' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="no-print"><a href="/parent/academics">&larr; Transcripts</a></p>
+    <p class="no-print"><a href="<%= typeof backHref !== 'undefined' && backHref ? backHref : '/parent/academics' %>">&larr; Transcripts</a></p>
     <button type="button" class="roster-action-btn print-action-btn no-print" onclick="window.print()">Print</button>
 
     <%- include('partials/family-school-print-header', { familySettings, subtitle: 'Official Transcript' }) %>

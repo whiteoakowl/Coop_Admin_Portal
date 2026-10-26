@@ -6986,6 +6986,21 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 
 .team-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
 
+/* A real bug report: "Main admin portal and co-op admin portal.
+   Settings gear icon. On the card some of them have a blue line across
+   the last few inches of the bottom of the card." .team-info-card's own
+   border-bottom (below) is a real hairline DIVIDER - drawn on purpose
+   for Floater/Setup Teams' two-part cards, where a Members list section
+   sits right below this same element inside one shared .team-col (see
+   that border-bottom's own comment). Every settings-gear hub page's own
+   card is .team-info-card used ALONE as the whole clickable card, with
+   nothing below it inside its .team-col to divide from - so that same
+   border just shows up as a stray line along the bottom edge instead.
+   Scoped to settings-hub-card-grid (the 4 real settings-gear hub pages'
+   own second class, not .team-info-card itself) so Floater/Setup Teams'
+   real divider is untouched. */
+.settings-hub-card-grid .team-info-card { border-bottom: none; }
+
 /* A real request: "All portals settings gear. [They] are all now the
    card setup. On mobile shrink the cards to fit two to a row." Scoped
    to settings-hub-card-grid (a second class the 4 real settings-gear

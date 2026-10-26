@@ -67,11 +67,11 @@ const {
   markLessonItemComplete,
   TRANSCRIPT_GRADE_LETTERS,
   transcriptBuilderForStudent,
+  transcriptBuilderDataForStudent,
   createTranscriptEntry,
   getTranscriptEntry,
   updateTranscriptEntry,
   deleteTranscriptEntry,
-  coopClassesForStudentAndSemester,
   DIPLOMA_TEMPLATES,
 } = require('../utils/academics');
 const { renderViewToPdf } = require('../utils/pdfRender');
@@ -1232,13 +1232,16 @@ router.get('/academics', async (req, res) => {
   const yearOptions = schoolYearOptions(currentSchoolYear());
   const transcripts = [];
   for (const child of children) {
-    const coopClassesBySemester = {};
-    for (const semester of semesters) {
-      coopClassesBySemester[semester.id] = await coopClassesForStudentAndSemester(child.id, semester.id);
-    }
+    // builder/coopClassesBySemester come from the same
+    // transcriptBuilderDataForStudent (utils/academics.js) Main Admin's
+    // own Family School Management > Transcripts page calls for
+    // whichever student it has picked - this is the only piece of that
+    // Parent-vs-Main-Admin split that's purely "which student(s)", not a
+    // different builder.
+    const { builder, coopClassesBySemester } = await transcriptBuilderDataForStudent(child.id, semesters);
     transcripts.push({
       child,
-      builder: await transcriptBuilderForStudent(child.id),
+      builder,
       // "Add classes from co-op classes or family management classes
       // or manually add" - precomputed per child here (each list is
       // small - a family's own classes) rather than a second fetch()

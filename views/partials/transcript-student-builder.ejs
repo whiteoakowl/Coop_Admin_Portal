@@ -1,0 +1,125 @@
+<%# One student's own Transcripts "manage-section" + Add Class dialog -
+    factored out of views/parent-academics.ejs so Main Admin's own
+    Transcripts page (routes/main-admin-family-school.js, scoped to
+    whichever student its own picker selects, not "my own children") can
+    render the exact same builder a parent gets for their child, instead
+    of a second hand-copied designer. `basePath` is the only thing that
+    differs between callers - Parent Portal passes '/parent/academics',
+    Main Admin passes '/main-admin/family-school' - every action/print/
+    download URL below is built from it so this partial never hardcodes
+    which portal it's running in.
+    Locals: rec ({ child, builder, coopClassesBySemester, familyClasses }),
+    semesters, yearOptions, currentSchoolYearValue, gradeLetters, basePath. %>
+<div class="manage-section">
+  <div class="grid-box-header">
+    <h2><%= rec.child.name %></h2>
+    <div class="roster-btn-row no-print">
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-entry-dialog-<%= rec.child.id %>').showModal()">+ Add Class</button>
+      <a class="icon-btn" href="<%= basePath %>/transcripts/<%= rec.child.id %>/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+      <a class="icon-btn" href="<%= basePath %>/transcripts/<%= rec.child.id %>/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+    </div>
+  </div>
+
+  <% if (rec.builder.schoolYears.length === 0) { %>
+    <p class="roster-empty">No classes on this transcript yet.</p>
+  <% } else { %>
+    <% rec.builder.schoolYears.forEach(function(yr) { %>
+      <h3><%= yr.schoolYear %></h3>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table table-stack-mobile">
+          <thead><tr><th>Class</th><th>Credits</th><th>Grade</th><th></th></tr></thead>
+          <tbody>
+            <% yr.entries.forEach(function(e) { %>
+              <tr>
+                <td data-label="Class" class="table-stack-heading"><input type="text" name="className" form="transcript-entry-<%= e.id %>" value="<%= e.class_name %>" required /></td>
+                <td data-label="Credits"><input type="number" name="creditHours" form="transcript-entry-<%= e.id %>" value="<%= e.credit_hours %>" min="0" step="0.25" /></td>
+                <td data-label="Grade">
+                  <select name="gradeLetter" form="transcript-entry-<%= e.id %>">
+                    <option value="">No grade yet</option>
+                    <% gradeLetters.forEach(function(g) { %><option value="<%= g %>" <%= e.grade_letter === g ? 'selected' : '' %>><%= g %></option><% }); %>
+                  </select>
+                </td>
+                <td class="roster-btn-row accounting-row-icons">
+                  <input type="hidden" name="schoolYear" form="transcript-entry-<%= e.id %>" value="<%= yr.schoolYear %>" />
+                  <button type="submit" form="transcript-entry-<%= e.id %>" class="icon-btn" aria-label="Save" title="Save"><svg class="icon"><use href="#icon-save"/></svg></button>
+                  <form method="POST" action="<%= basePath %>/transcripts/<%= e.id %>/delete" data-confirm="Remove this class from the transcript?">
+                    <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint"><%= yr.schoolYear %> GPA: <%= yr.gpa != null ? yr.gpa.toFixed(2) : 'No grades yet' %><% if (yr.gpa != null) { %> (<%= yr.totalCredits %> credits)<% } %></p>
+      <% yr.entries.forEach(function(e) { %>
+        <form id="transcript-entry-<%= e.id %>" method="POST" action="<%= basePath %>/transcripts/<%= e.id %>/edit"></form>
+      <% }); %>
+    <% }); %>
+    <p><strong>Cumulative GPA (<%= rec.builder.schoolYears.length %> school year<%= rec.builder.schoolYears.length === 1 ? '' : 's' %>): <%= rec.builder.cumulativeGpa != null ? rec.builder.cumulativeGpa.toFixed(2) : 'No grades yet' %></strong><% if (rec.builder.cumulativeGpa != null) { %> (<%= rec.builder.cumulativeCredits %> credits)<% } %></p>
+  <% } %>
+</div>
+
+<dialog id="add-entry-dialog-<%= rec.child.id %>" class="class-form-dialog">
+  <form method="POST" action="<%= basePath %>/transcripts" class="stack-form" data-transcript-add-form>
+    <input type="hidden" name="studentId" value="<%= rec.child.id %>" />
+    <div class="class-form-dialog-header">
+      <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
+      <h3>Add Class to <%= rec.child.name %>&apos;s Transcript</h3>
+    </div>
+    <label>School Year
+      <select name="schoolYear" required>
+        <% yearOptions.forEach(function(y) { %><option value="<%= y %>" <%= y === currentSchoolYearValue ? 'selected' : '' %>><%= y %></option><% }); %>
+      </select>
+    </label>
+    <% if (semesters.length > 0) { %>
+      <label>Semester
+        <select data-transcript-semester-select>
+          <option value="">&mdash; choose a semester &mdash;</option>
+          <% semesters.forEach(function(s) { %><option value="<%= s.id %>"><%= s.title %></option><% }); %>
+        </select>
+      </label>
+    <% } %>
+
+    <div class="roster-btn-row" data-transcript-mode-buttons>
+      <button type="button" class="roster-action-btn" data-transcript-mode="coop">Add Co-op Class</button>
+      <% if (rec.familyClasses.length > 0) { %>
+        <button type="button" class="roster-action-btn" data-transcript-mode="family">Add Family Class</button>
+      <% } %>
+      <button type="button" class="roster-action-btn" data-transcript-mode="manual">Add Manual Class</button>
+    </div>
+
+    <label data-transcript-panel="coop" hidden>Co-op Class
+      <select data-transcript-coop-select>
+        <option value="">&mdash; choose a semester first &mdash;</option>
+      </select>
+    </label>
+    <% if (rec.familyClasses.length > 0) { %>
+      <label data-transcript-panel="family" hidden>Family Class
+        <select data-transcript-family-select>
+          <option value="">&mdash; choose a family class &mdash;</option>
+          <% rec.familyClasses.forEach(function(name) { %><option value="<%= name %>"><%= name %></option><% }); %>
+        </select>
+      </label>
+    <% } %>
+    <label data-transcript-panel="manual" hidden>Class Name
+      <input type="text" data-transcript-manual-input />
+    </label>
+    <input type="hidden" name="className" data-transcript-class-name />
+
+    <label>Credit Hours
+      <input type="number" name="creditHours" value="1" min="0" step="0.25" />
+    </label>
+    <label>Grade <span class="hint">(optional)</span>
+      <select name="gradeLetter">
+        <option value="">No grade yet</option>
+        <% gradeLetters.forEach(function(g) { %><option value="<%= g %>"><%= g %></option><% }); %>
+      </select>
+    </label>
+    <div class="notes-dialog-actions">
+      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+      <button type="submit" class="primary-btn">Add Class</button>
+    </div>
+    <script type="application/json" data-transcript-coop-data><%- JSON.stringify(rec.coopClassesBySemester).replace(/</g, '\\u003c') %></script>
+  </form>
+</dialog>

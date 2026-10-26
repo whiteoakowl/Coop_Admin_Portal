@@ -17,6 +17,7 @@ const notifications = require('../utils/notifications');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const { sendCsv } = require('../utils/spreadsheet');
 const { renderViewToPdf } = require('../utils/pdfRender');
+const { googleCalendarUrl, icsForEvent } = require('../utils/calendarExport');
 
 // A real request: "the download should be a pdf of exactly how it
 // would also look when printing" - sends a headless-Chromium-rendered
@@ -341,6 +342,14 @@ router.get('/:id', async (req, res) => {
     organizers,
     isOrganizer,
     event: withImageUrl(event),
+    // A real request: "Add icons at the bottom for adding event to
+    // google or apple calendars or other calendar services." Google
+    // Calendar's own add-event URL needs no server round trip at all
+    // (utils/calendarExport.js's own googleCalendarUrl); the Apple/
+    // Outlook/"other" side is the GET /:id/calendar.ics route below,
+    // which re-derives this same event rather than trusting anything
+    // this page already computed.
+    googleCalendarUrl: googleCalendarUrl(event),
     startsLabel: formatFriendlyTimestamp(event.starts_at),
     endsLabel: event.ends_at ? formatFriendlyTimestamp(event.ends_at) : null,
     startsDateLabel: startsDateAndTime.dateLabel,
@@ -367,6 +376,31 @@ router.get('/:id', async (req, res) => {
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+// The Apple/Outlook/"other calendar services" side of "Add icons at the
+// bottom for adding event to google or apple calendars or other
+// calendar services" - a plain .ics file (utils/calendarExport.js's own
+// icsForEvent) any calendar app other than Google Calendar itself can
+// import, unlike the Google Calendar add-event link above which only
+// Google Calendar understands. Same visibility rule as GET /:id above
+// (never trusts that this id is even a real, published event until
+// re-checked here) rather than assuming a visitor only ever reaches
+// this URL by already having loaded that page.
+router.get('/:id/calendar.ics', async (req, res) => {
+  const event = await events.getEventWithDetails(req.params.id);
+  if (!event || event.status === 'draft') return res.status(404).render('404', { title: 'Not Found' });
+  if (event.visibility === 'members' && !req.portalAccount) {
+    return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
+  }
+  const family = req.portalAccount ? await familyForAccount(req.portalAccount.id) : [];
+  if (family.length && !(await events.eventVisibleToFamily(event.id, family))) {
+    return res.status(404).render('404', { title: 'Not Found' });
+  }
+  const ics = icsForEvent(event, { host: req.get('host') });
+  res.set('Content-Type', 'text/calendar; charset=utf-8');
+  res.set('Content-Disposition', `attachment; filename="event-${event.id}.ics"`);
+  res.send(ics);
 });
 
 // A real request: "when they click on an event it shows a popup of the
