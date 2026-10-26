@@ -49,16 +49,17 @@
         </div>
       <% } %>
 
-      <%# A real request: "Pdf and print should be 3 calendar rows with 4
-          months in each column" (4 columns x 3 rows) - its own grid
-          classes (public/css/styles.css), separate from Family
-          Attendance's own 3-columns-of-4-months print grid. A later
-          real request: "Add edit calendar colors buttons... set the
-          color for the month row and set the color for the days of
-          the week row" - same --annual-calendar-month-color/--annual-
-          calendar-weekday-color custom properties the live view's own
-          grid wrapper sets, so the print/PDF output matches whatever
-          an admin picked there. %>
+      <%# A real request, later flipped by a follow-up ("Calendars, pdf
+          and print should be 3 columns of 4 months") to 3 columns x 4
+          rows - its own grid classes (public/css/styles.css), kept
+          separate from Family Attendance's own matching-shape print
+          grid rather than literally shared, since the two have already
+          diverged once. A further real request: "Add edit calendar
+          colors buttons... set the color for the month row and set the
+          color for the days of the week row" - same --annual-calendar-
+          month-color/--annual-calendar-weekday-color custom properties
+          the live view's own grid wrapper sets, so the print/PDF output
+          matches whatever an admin picked there. %>
       <div
         class="annual-calendar-print-months-grid"
         <% if (calendar.month_row_color || calendar.weekday_row_color) { %>

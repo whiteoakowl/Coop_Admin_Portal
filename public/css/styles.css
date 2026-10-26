@@ -14469,25 +14469,45 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
   .fs-attendance-print-month .fs-attendance-day { padding: 0.12rem 0.05rem; font-size: 0.5rem; font-weight: 500; }
 }
 
-/* Main Admin Annual Calendar's own print/PDF grid - a real request:
-   "Pdf and print should be 3 calendar rows with 4 months in each
-   column" (4 columns x 3 rows) - its own classes rather than reusing
-   Family Attendance's .fs-attendance-print-months-grid above, since
-   that one is deliberately 3 columns x 4 rows instead. */
+/* Main Admin Annual Calendar's own print/PDF grid. First a real
+   request: "Pdf and print should be 3 calendar rows with 4 months in
+   each column" (4 columns x 3 rows). A later real request: "Calendars,
+   pdf and print should be 3 columns of 4 months" flipped it to 3
+   columns x 4 rows instead - now the same shape as Family Attendance's
+   own .fs-attendance-print-months-grid above, but kept as its own
+   classes/rule (not literally reusing that one) since the two features'
+   layouts have already diverged once and may again. */
 .annual-calendar-print-month:not(:first-child) { margin-top: 2rem; }
 .annual-calendar-print-month h3 { margin: 0 0 0.5rem; }
 @media print {
+  /* A later real request: "Fill the full page and have even borders" -
+     grid-template-rows: repeat(4, 1fr) on an explicit-height grid forces
+     every one of the 12 month boxes to the exact same physical size
+     regardless of whether that month has 4, 5 or 6 calendar weeks (grid
+     items stretch to their row's height by default), so every box's
+     border lines up with its row/column neighbors instead of shrink-
+     wrapping to its own content; the explicit height also fills the
+     page instead of leaving the bottom mostly blank, which auto-sized
+     rows did whenever most months only needed 5 short weeks. 9.3in
+     leaves room, within the @page's own 10in printable height (11in
+     letter minus the 0.5in top+bottom margins), for the title and key
+     legend above it. */
   .annual-calendar-print-months-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    height: 9.1in;
     gap: 0.3rem;
   }
   /* A real request: "it was supposed to be a square border around each
      month calendar" - a box around each whole month (heading + table
      together), not just the day-cell grid lines inside it. overflow:
      hidden clips the h3's own flush top corners below to this box's
-     rounded ones. */
-  .annual-calendar-print-month { margin-top: 0 !important; border: 1px solid var(--brand); padding: 0.2rem; overflow: hidden; }
+     rounded ones. display:flex/height:100% (later real request: "fill
+     the full page") lets the table below stretch to fill this box's
+     own full (now grid-stretched) height instead of sitting at its own
+     natural content height with dead space below it. */
+  .annual-calendar-print-month { margin-top: 0 !important; border: 1px solid var(--brand); padding: 0.2rem; overflow: hidden; height: 100%; display: flex; flex-direction: column; }
   /* A later real request, with a reference calendar image: "each month
      title bar should be blue" - same solid --btn-blue bar treatment as
      the live view's own .annual-calendar-month h3. print-color-adjust
@@ -14509,9 +14529,14 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .annual-calendar-print-month .fs-attendance-calendar { max-width: none; margin-top: 0; }
-  .annual-calendar-print-month .fs-attendance-calendar th { font-size: 0.45rem; padding: 0.05rem; }
-  .annual-calendar-print-month .fs-attendance-day { padding: 0.12rem 0.05rem; font-size: 0.5rem; font-weight: 500; }
+  /* height:100% (plus the box's own display:flex above) lets the
+     table's own rows absorb whatever extra vertical space a shorter
+     month (4-5 calendar weeks instead of 6) leaves inside its now-
+     fixed-height box, instead of that space sitting empty below the
+     table - part of the same "fill the full page" request. */
+  .annual-calendar-print-month .fs-attendance-calendar { max-width: none; margin-top: 0; height: 100%; }
+  .annual-calendar-print-month .fs-attendance-calendar th { font-size: 0.55rem; padding: 0.1rem; }
+  .annual-calendar-print-month .fs-attendance-day { padding: 0.2rem 0.05rem; font-size: 0.6rem; font-weight: 500; }
 }
 
 /* Main Admin Annual Calendar - a real request: "Mobile and desktop view

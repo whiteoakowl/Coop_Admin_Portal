@@ -284,7 +284,7 @@ test('Print preview and Download PDF show the 12-month grid and the key legend',
   assert.equal(previewRes.status, 200);
   assert.match(previewRes.text, /class="print-preview-header no-print"/);
   assert.match(previewRes.text, /onclick="window\.print\(\)"/);
-  assert.equal((previewRes.text.match(/class="annual-calendar-print-month"/g) || []).length, 12, 'exactly 12 month grids - one page, 4 columns x 3 rows');
+  assert.equal((previewRes.text.match(/class="annual-calendar-print-month"/g) || []).length, 12, 'exactly 12 month grids - one page, 3 columns x 4 rows');
   assert.match(previewRes.text, /<h2>2026<\/h2>/, 'title shows the school year - same start/end year here so just "2026"');
   assert.match(previewRes.text, /Break/);
   // A real request: "Print and pdf should have the calendars in
