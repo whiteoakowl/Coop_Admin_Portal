@@ -1507,7 +1507,20 @@ body.public-page .roster-empty {
 .cleanup-team-day-group:first-child { margin-top: 0.5rem; }
 .cleanup-team-day-heading { margin: 0 0 0.15rem; font-size: 0.9rem; font-weight: 700; color: var(--brand-dark); }
 .checkbox-option { display: flex; align-items: center; gap: 0.4rem; font-weight: 500; font-size: 0.95rem; cursor: pointer; }
-.checkbox-option input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); flex-shrink: 0; }
+/* A real bug report (Main Admin > Communication > Compose Email): "radio
+   buttons should be lined up on the left and the words should begin
+   right next to the radio button." .checkbox-option's own flex row
+   above already does that - but only the type="checkbox" case had its
+   own fixed width/height here. A plain `<input type="radio">` fell
+   through to `.stack-form input:not([type="date"])`'s own width: 100%
+   (further up this file - every other plain text input in a .stack-form
+   is meant to stretch, which a radio never should), stretching the Send
+   Email form's "Send right away"/"Schedule for later" radios the full
+   width of the form and shoving their label text down onto its own
+   line instead of sitting right beside the dot. Same fixed size the
+   checkbox case already gets. */
+.checkbox-option input[type="checkbox"],
+.checkbox-option input[type="radio"] { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); flex-shrink: 0; }
 .absence-required-msg { color: var(--red); font-weight: 600; margin-top: 0.35rem; }
 
 /* A real bug report: Co-op Class Settings (General tab) forced the whole
@@ -4734,6 +4747,32 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 @media (max-width: 640px) {
   .member-form-footer-edit .primary-btn,
   .member-form-footer-edit .roster-action-btn { font-size: 0.7rem; padding: 0.4rem 0.5rem; }
+}
+
+/* A real request: "send announcement now and schedule later buttons
+   should be on the same row. Mobile." The reset two rules up already
+   shrinks these two buttons to fit one row down to 640px wide - but
+   .member-form-page-panel's own fixed 1.75rem/2rem side padding never
+   gets reduced below 640px (see that class's own comment), so on a
+   genuinely narrow phone (iPhone SE and similar, ~375px and under)
+   their full text still doesn't both fit at that shrunk size, wrapping
+   "Schedule for Later" down onto its own row below "Send Announcements
+   Now" again. Scoped to #announcement-form specifically (this page's
+   own form id) rather than every other page sharing .member-form-
+   footer-edit's reset above, several of which pair it with a plain
+   .btn-secondary Cancel rather than a second .roster-action-btn and
+   have no need to split evenly. flex: 1 1 0 + min-width: 0 (same
+   "share the row evenly" pattern .class-details-save-row's own
+   .roster-action-btn already uses) splits the row's width between the
+   two buttons instead of sizing each to its own text, so a long label
+   wraps to a second line INSIDE its own button instead of pushing its
+   sibling button down to a second row. */
+@media (max-width: 480px) {
+  #announcement-form .member-form-footer-edit .primary-btn,
+  #announcement-form .member-form-footer-edit .roster-action-btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 }
 
 /* The whole Membership Form (header, fields, Family/Team boxes, footer)

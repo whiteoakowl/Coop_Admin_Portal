@@ -13,6 +13,7 @@
 // comment on why a scheduled send doesn't dispatch on its own).
 const db = require('../db');
 const { notify } = require('./notifications');
+const emailProvider = require('./emailProvider');
 
 const AGE_GROUPS = [
   { key: 'under5', label: 'Under 5', min: 0, max: 4 },
@@ -142,28 +143,42 @@ async function resolveRecipients({ recipientIds, memberIds } = {}) {
   return [];
 }
 
-async function createAndSend({ subject, bodyHtml, replyTo, recipientAccountIds, sentByAccountId, sentByPortal }) {
+// sendTo (optional): a real request - "under reply to, there should be
+// another title and text box that says send to so another email can be
+// added to send the message to." This is a typed-in address, not a
+// member_accounts row, so it can't go through notify() (which always
+// writes an in-app notification for an account id) - it's dispatched
+// straight through emailProvider.send() instead, same email/body as
+// every account recipient gets, in addition to (not instead of) the
+// resolved recipient list. Stored on the campaign row (email_campaigns.
+// send_to) so a scheduled send still reaches it once sendScheduled()
+// actually fires, same reasoning recipient_account_ids is captured at
+// compose time for.
+async function createAndSend({ subject, bodyHtml, replyTo, sendTo, recipientAccountIds, sentByAccountId, sentByPortal }) {
   const recipients = [...new Set(recipientAccountIds)];
   for (const accountId of recipients) {
     await notify(accountId, 'email_campaign', { title: subject, body: bodyHtml });
   }
+  if (sendTo) {
+    await emailProvider.send(sendTo, subject, bodyHtml);
+  }
   const info = await db
     .prepare(
-      `INSERT INTO email_campaigns (subject, body_html, reply_to, recipient_account_ids, recipient_count, status, sent_at, sent_by_portal, created_by_account_id)
-       VALUES (?, ?, ?, ?, ?, 'sent', now_text(), ?, ?) RETURNING id`
+      `INSERT INTO email_campaigns (subject, body_html, reply_to, send_to, recipient_account_ids, recipient_count, status, sent_at, sent_by_portal, created_by_account_id)
+       VALUES (?, ?, ?, ?, ?, ?, 'sent', now_text(), ?, ?) RETURNING id`
     )
-    .get(subject, bodyHtml, replyTo || null, JSON.stringify(recipients), recipients.length, sentByPortal, sentByAccountId);
+    .get(subject, bodyHtml, replyTo || null, sendTo || null, JSON.stringify(recipients), recipients.length, sentByPortal, sentByAccountId);
   return { id: info.id, recipientCount: recipients.length };
 }
 
-async function createScheduled({ subject, bodyHtml, replyTo, recipientAccountIds, scheduledAt, sentByAccountId, sentByPortal }) {
+async function createScheduled({ subject, bodyHtml, replyTo, sendTo, recipientAccountIds, scheduledAt, sentByAccountId, sentByPortal }) {
   const recipients = [...new Set(recipientAccountIds)];
   const info = await db
     .prepare(
-      `INSERT INTO email_campaigns (subject, body_html, reply_to, recipient_account_ids, recipient_count, status, scheduled_at, sent_by_portal, created_by_account_id)
-       VALUES (?, ?, ?, ?, ?, 'scheduled', ?, ?, ?) RETURNING id`
+      `INSERT INTO email_campaigns (subject, body_html, reply_to, send_to, recipient_account_ids, recipient_count, status, scheduled_at, sent_by_portal, created_by_account_id)
+       VALUES (?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, ?) RETURNING id`
     )
-    .get(subject, bodyHtml, replyTo || null, JSON.stringify(recipients), recipients.length, scheduledAt, sentByPortal, sentByAccountId);
+    .get(subject, bodyHtml, replyTo || null, sendTo || null, JSON.stringify(recipients), recipients.length, scheduledAt, sentByPortal, sentByAccountId);
   return { id: info.id, recipientCount: recipients.length };
 }
 
@@ -177,6 +192,9 @@ async function sendScheduled(id) {
   const recipients = JSON.parse(campaign.recipient_account_ids || '[]');
   for (const accountId of recipients) {
     await notify(accountId, 'email_campaign', { title: campaign.subject, body: campaign.body_html });
+  }
+  if (campaign.send_to) {
+    await emailProvider.send(campaign.send_to, campaign.subject, campaign.body_html);
   }
   await db.prepare("UPDATE email_campaigns SET status = 'sent', sent_at = now_text() WHERE id = ?").run(id);
   return campaign;
