@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Event Attendance</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-page">
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub">Event Attendance</p>
+        </div>
+      </div>
+
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr><th>Title</th><th>Starts</th><th>Registered</th><th>Canceled</th><th>Waitlist</th></tr>
+        </thead>
+        <tbody>
+          <% if (attendance.length === 0) { %>
+            <tr><td colspan="5" class="roster-empty">No published events yet.</td></tr>
+          <% } %>
+          <% attendance.forEach(function(e) { %>
+            <tr>
+              <td><%= e.title %></td>
+              <td><%= e.startsLabel %></td>
+              <td><%= e.registrationCount || 0 %></td>
+              <td><%= e.cancelledCount || 0 %></td>
+              <td><%= e.waitlistCount || 0 %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

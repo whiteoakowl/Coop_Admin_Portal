@@ -21,6 +21,15 @@
           <a class="icon-btn" href="/main-admin/events/print?view=<%= calendarView %>&month=<%= monthParam %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
           <a class="icon-btn" href="/main-admin/events/download.pdf?view=<%= calendarView %>&month=<%= monthParam %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         <% } %>
+        <%# A real request: "add export, pdf and print icons to this page"
+            (Event Attendance tab) - this tab never had Print/PDF of its
+            own before (only Calendar did); all three now sit together on
+            this same single .roster-btn-row, same "side by side" grouping
+            every other Events subpage already uses. %>
+        <% if (activeTab === 'attendance') { %>
+          <a class="icon-btn" href="/main-admin/events/attendance/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+          <a class="icon-btn" href="/main-admin/events/attendance/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+        <% } %>
         <%# A real request: "remove export and import buttons from the
             event settings page" - still shown on Calendar/Drafts/
             Requests/Attendance, just not here. The Event Registration Log
@@ -28,9 +37,12 @@
             (same shape Co-op Admin's own Logs page tabs use) - it needs
             its own export endpoint (registration actions, not the events
             list this generic Export button hits) and has no Import of
-            its own at all. %>
+            its own at all. Attendance's own Export CSV below hits its OWN
+            dedicated endpoint (Title/Starts/Registered/Canceled/Waitlist,
+            the same counts its table shows) instead of this generic "every
+            event" export every other tab here uses. %>
         <% if (activeTab !== 'settings' && activeTab !== 'registrationlog') { %>
-          <a class="icon-btn" href="/main-admin/events/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+          <a class="icon-btn" href="<%= activeTab === 'attendance' ? '/main-admin/events/attendance/export.csv' : '/main-admin/events/export.csv' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
           <button type="button" class="icon-btn" onclick="document.getElementById('import-events-dialog').showModal()" aria-label="Import" title="Import"><svg class="icon"><use href="#icon-upload"/></svg></button>
         <% } %>
       </div>
@@ -147,7 +159,7 @@
                   <td class="roster-name-col table-stack-heading">
                     <button
                       type="button"
-                      class="link-btn event-quick-edit-trigger"
+                      class="link-btn event-quick-edit-trigger event-attendance-title"
                       data-id="<%= e.id %>"
                       data-title="<%= e.title %>"
                       data-description="<%= (e.description || '').replace(/"/g, '&quot;') %>"
@@ -159,9 +171,30 @@
                       data-capacity="<%= e.capacity ?? '' %>"
                     ><%= e.title %></button>
                   </td>
-                  <td data-label="Starts"><%= e.startsLabel %></td>
-                  <td data-label="Registered"><%= e.registrationCount || 0 %></td>
-                  <td><a class="roster-action-btn" href="/main-admin/events/<%= e.id %>/registrations">Attendance</a></td>
+                  <td data-label="Starts" class="event-attendance-starts"><%= e.startsLabel %></td>
+                  <td data-label="Registered">
+                    <%# A real request: "registered # should also include
+                        canceled number and waitlist number all on the
+                        same row." %>
+                    <span class="event-attendance-counts">
+                      <span class="event-attendance-count">Registered <%= e.registrationCount || 0 %></span>
+                      <span class="event-attendance-count event-attendance-count-canceled">Canceled <%= e.cancelledCount || 0 %></span>
+                      <span class="event-attendance-count event-attendance-count-waitlist">Waitlist <%= e.waitlistCount || 0 %></span>
+                    </span>
+                  </td>
+                  <%# A real request: "attendance button should fit to
+                      text and will be bottom left of the attendance
+                      card" - table-stack-full (this table's own stacked-
+                      card mobile layout) drops this cell's default
+                      "squeeze into a label: value row, right-aligned"
+                      shape for a plain left-aligned block instead, same
+                      convention every other icon/action-only cell in this
+                      app already uses - roster-action-btn-fit then keeps
+                      the button itself sized to its own "Attendance" text
+                      instead of stretching to fill that block. %>
+                  <td class="table-stack-full">
+                    <a class="roster-action-btn roster-action-btn-fit" href="/main-admin/events/<%= e.id %>/registrations">Attendance</a>
+                  </td>
                 </tr>
               <% }); %>
             </tbody>
@@ -181,16 +214,24 @@
           accordion.js) those logs already established, just with a
           nested family list inside each date's own panel instead of a
           flat member list. %>
+      <%# A real request: "export, print and pdf icons should be on the
+          same row side by side... it should also be on the same row as
+          the dropdown menu of dates. Dates dropdown should be first in
+          the row, then the print, export and pdf icons." One shared
+          .roster-btn-row (not three separate top-level .roster-toolbar
+          children, which could each wrap onto their own line) with the
+          date dropdown first and Export/Print/PDF right after it, in
+          their existing order. %>
       <div class="roster-toolbar no-print">
-        <form method="GET" action="/main-admin/events" class="dashboard-date-picker">
-          <input type="hidden" name="tab" value="registrationlog" />
-          <svg class="icon"><use href="#icon-calendar-check"/></svg>
-          <span class="dashboard-date-picker-label"><%= dateFilterLabel %></span>
-          <svg class="icon"><use href="#icon-chevron-down"/></svg>
-          <input type="date" name="date" value="<%= dateFilter %>" aria-label="Filter by date" onchange="this.form.requestSubmit()" />
-        </form>
-        <% if (dateFilter) { %><a class="roster-action-btn" href="/main-admin/events?tab=registrationlog">Clear</a><% } %>
-        <div class="roster-btn-row">
+        <div class="roster-btn-row event-reglog-toolbar-row">
+          <form method="GET" action="/main-admin/events" class="dashboard-date-picker">
+            <input type="hidden" name="tab" value="registrationlog" />
+            <svg class="icon"><use href="#icon-calendar-check"/></svg>
+            <span class="dashboard-date-picker-label"><%= dateFilterLabel %></span>
+            <svg class="icon"><use href="#icon-chevron-down"/></svg>
+            <input type="date" name="date" value="<%= dateFilter %>" aria-label="Filter by date" onchange="this.form.requestSubmit()" />
+          </form>
+          <% if (dateFilter) { %><a class="roster-action-btn roster-action-btn-fit" href="/main-admin/events?tab=registrationlog">Clear</a><% } %>
           <a class="icon-btn" href="/main-admin/events/registrationlog/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
           <a class="icon-btn" href="/main-admin/events/registrationlog/print<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
           <a class="icon-btn" href="/main-admin/events/registrationlog/download.pdf<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
@@ -303,7 +344,13 @@
         <div class="member-form-grid">
           <div class="member-form-full">
             <span class="class-form-field-label">Default Calendar User View</span>
-            <div class="checkbox-group">
+            <%# A real request: "calendar view should be one row and list
+                view should be stacked in a row underneath." .checkbox-
+                group-stack is this same view's own established "one
+                option per row" convention (already used by the big Yes/
+                No checkbox column right below) - plain .checkbox-group
+                lets these two share one flex-wrap row instead. %>
+            <div class="checkbox-group checkbox-group-stack">
               <label class="checkbox-option"><input type="radio" name="defaultCalendarView" value="calendar" <%= eventSettings.default_calendar_view === 'calendar' ? 'checked' : '' %> /> Calendar View</label>
               <label class="checkbox-option"><input type="radio" name="defaultCalendarView" value="list" <%= eventSettings.default_calendar_view === 'list' ? 'checked' : '' %> /> List View</label>
             </div>
@@ -351,7 +398,14 @@
     <dialog id="manage-categories-dialog" class="member-picker-dialog">
       <h3>Categories</h3>
       <p class="hint">A fixed list an event picks one of, so the calendar can filter/color-code events consistently.</p>
-      <form method="POST" action="/main-admin/events/categories" class="stack-form">
+      <%# A real request: "the add category button should be slightly
+          above the category list table, adequate spacing." manage-
+          categories-add-form gives this form (already directly above
+          the table in document order) a visible gap - and a divider,
+          same breathing-room idea as .manage-families-add-form's own
+          margin-bottom/border-bottom - instead of the button running
+          straight into the table right below it. %>
+      <form method="POST" action="/main-admin/events/categories" class="stack-form manage-categories-add-form">
         <div class="member-form-grid">
           <label>Category Name
             <input type="text" name="name" placeholder="e.g. Field Trip" required />
@@ -371,27 +425,33 @@
       <% if (categories.length === 0) { %>
         <p class="roster-empty">No categories yet - add one above.</p>
       <% } else { %>
+        <%# A real request: "the entire row should shrink to fit in
+            mobile view without side to side scrolling" - table-stack-
+            mobile (this app's own "no side to side scroll" convention,
+            see that class's own comment) stacks each category into its
+            own card below 640px instead of a cramped, horizontally-
+            scrolling row of 4 columns. %>
         <div class="roster-scroll">
-          <table class="roster-table condensed-table">
+          <table class="roster-table condensed-table manage-categories-table table-stack-mobile">
             <thead><tr><th>Category</th><th>Color</th><th>Allow Sync</th><th></th></tr></thead>
             <tbody>
               <% categories.forEach(function(c) { %>
                 <tr>
-                  <td>
+                  <td class="table-stack-heading">
                     <form method="POST" action="/main-admin/events/categories/<%= c.id %>/update" class="inline-block-form">
                       <input type="text" name="name" value="<%= c.name %>" onchange="this.form.submit()" aria-label="Name for <%= c.name %>" />
                       <input type="hidden" name="color" value="<%= c.color %>" />
                       <input type="hidden" name="allowSync" value="<%= c.allow_sync ? '1' : '' %>" />
                     </form>
                   </td>
-                  <td>
+                  <td data-label="Color">
                     <form method="POST" action="/main-admin/events/categories/<%= c.id %>/update" class="inline-block-form">
                       <input type="hidden" name="name" value="<%= c.name %>" />
                       <input type="color" name="color" value="<%= c.color %>" onchange="this.form.submit()" aria-label="Color for <%= c.name %>" />
                       <input type="hidden" name="allowSync" value="<%= c.allow_sync ? '1' : '' %>" />
                     </form>
                   </td>
-                  <td>
+                  <td data-label="Allow Sync">
                     <form method="POST" action="/main-admin/events/categories/<%= c.id %>/update" class="inline-block-form">
                       <input type="hidden" name="name" value="<%= c.name %>" />
                       <input type="hidden" name="color" value="<%= c.color %>" />
@@ -399,8 +459,13 @@
                     </form>
                   </td>
                   <td>
+                    <%# A real request: "delete button should be a trash
+                        icon" - same icon-btn/icon-btn-danger + #icon-trash
+                        convention every other delete action in this app
+                        already uses (see the Registrations page's own
+                        js-registration-delete button). %>
                     <form method="POST" action="/main-admin/events/categories/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete this category? Events using it will just show no category.">
-                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete category <%= c.name %>" title="Delete Category"><svg class="icon"><use href="#icon-trash"/></svg></button>
                     </form>
                   </td>
                 </tr>
