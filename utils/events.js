@@ -196,6 +196,20 @@ async function registrationCountForEvent(id) {
   return Number((await db.prepare("SELECT COUNT(*) AS c FROM event_registrations WHERE event_id = ? AND status = 'confirmed'").get(id)).c);
 }
 
+// A real request: "registered # should also include canceled number and
+// waitlist number all on the same row" (Events > Event Attendance tab's
+// own per-event list) - one grouped query instead of 3 separate COUNT(*)
+// round-trips, same status values registrationCountForEvent/
+// getEventWithDetails's own waitlistCount already key off.
+async function registrationStatusCountsForEvent(id) {
+  const rows = await db.prepare("SELECT status, COUNT(*) AS c FROM event_registrations WHERE event_id = ? GROUP BY status").all(id);
+  const counts = { confirmed: 0, cancelled: 0, waitlisted: 0 };
+  for (const row of rows) {
+    if (row.status in counts) counts[row.status] = Number(row.c);
+  }
+  return counts;
+}
+
 // Full detail for one event page (admin management or a member's own
 // view of it): the event row, its category, its section restriction, its
 // volunteer roles each with their own signups + filled/needed counts, its
@@ -1065,6 +1079,22 @@ function buildEventRegistrationLogExportCsvLines(actions) {
   return [
     toCsvRow(EVENT_REGISTRATION_LOG_EXPORT_HEADER),
     ...actions.map((a) => toCsvRow([a.dateLabel, a.familyName || '', a.memberName, a.eventTitle, a.eventStartsLabel, a.actionLabel])),
+  ];
+}
+
+// A real request: "add export, pdf and print icons to this page" (Events
+// > Event Attendance tab) - this tab had no export/print/PDF of its own
+// at all before (its header's shared Export CSV button just exported
+// EVERY event, routes/admin-events.js's own generic buildEventsExportCsvLines,
+// not this tab's own published-events-with-counts list). `list` is the
+// same shape routes/admin-events.js's buildAttendanceList() builds for
+// the on-screen table/print preview.
+const EVENT_ATTENDANCE_EXPORT_HEADER = ['Title', 'Starts', 'Registered', 'Canceled', 'Waitlist'];
+
+function buildEventAttendanceExportCsvLines(list) {
+  return [
+    toCsvRow(EVENT_ATTENDANCE_EXPORT_HEADER),
+    ...list.map((e) => toCsvRow([e.title, e.startsLabel, e.registrationCount || 0, e.cancelledCount || 0, e.waitlistCount || 0])),
   ];
 }
 
@@ -2101,6 +2131,7 @@ module.exports = {
   listEvents,
   getEvent,
   registrationCountForEvent,
+  registrationStatusCountsForEvent,
   getEventWithDetails,
   createEvent,
   duplicateEvent,
@@ -2152,6 +2183,7 @@ module.exports = {
   eventRegistrationsForMembers,
   allEventRegistrationActions,
   buildEventRegistrationLogExportCsvLines,
+  buildEventAttendanceExportCsvLines,
   eventTicketDetailsForMember,
   familyGroupedRegistrationsForEvent,
   buildRegistrationsExportCsvLines,
