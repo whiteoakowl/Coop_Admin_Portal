@@ -202,17 +202,29 @@ const MAIN_ADMIN_NAV_LINKS = [
   { href: '/main-admin/annual-calendar', icon: 'calendar-check', label: 'Annual Calendar' },
   // A real request: "Main admin portal, remove academics tab and
   // features. Only parent portal has those pages and admin doesn't need
-  // to control them with any settings." Diplomas/transcripts are entirely
-  // a Parent Portal self-service feature now (views/parent-academics-
-  // diplomas.ejs's own designer, routes/parent-portal.js's own
+  // to control them with any settings." Diplomas/transcripts used to be
+  // entirely a Parent Portal self-service feature (views/parent-
+  // academics-diplomas.ejs's own designer, routes/parent-portal.js's own
   // transcript builder) - Main Admin's old issue-a-diploma/add-a-
-  // transcript-entry control panel (routes/main-admin.js) is gone.
+  // transcript-entry control panel (routes/main-admin.js) was removed.
   // A real request: "Parent portal, student portal and main admin
   // portal add a tab called family school management... On main admin
   // the family school management tab simply has settings. Leave
   // settings for that blank for now." routes/main-admin-family-
-  // school.js - no subpages (there's only the one page).
-  { href: '/main-admin/family-school', icon: 'home-heart', label: 'Family School Management', mobileLabel: 'Family School<br>Management' },
+  // school.js - no subpages (there was only the one blank page).
+  // A later real request walked that back: "Main admin portal. Family
+  // school management tab should simply have two subpages. One for
+  // transcript creation and one for diploma creation. Same pages and
+  // features as the family school management portal for transcripts
+  // and diplomas." Unlike Parent Portal's own self-service pages (always
+  // scoped to "my own children"), these two are scoped to any student in
+  // the co-op via a student picker - see routes/main-admin-family-
+  // school.js's own header comment for how the actual builder/designer
+  // markup is shared with Parent Portal's pages rather than re-copied.
+  { href: '/main-admin/family-school', icon: 'home-heart', label: 'Family School Management', mobileLabel: 'Family School<br>Management', subpages: [
+    { href: '/main-admin/family-school', label: 'Transcripts' },
+    { href: '/main-admin/family-school/diplomas', label: 'Diplomas' },
+  ] },
   // Same Training & Learning module as Co-op Admin's own Training tab
   // (routes/main-admin-training.js, shared utils/training.js data) - a
   // real request: "the training tab should also be on main admin

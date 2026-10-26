@@ -728,6 +728,25 @@
             </div>
           <% }); %>
         <% } %>
+
+        <%# A real request: "Add icons at the bottom for adding event to
+            google or apple calendars or other calendar services." Google
+            Calendar needs no file at all - a plain link (googleCalendarUrl,
+            routes/events.js's own GET /:id) it parses itself; Apple
+            Calendar/Outlook/every other calendar app gets a real .ics
+            file instead (GET /:id/calendar.ics), which Google Calendar
+            could also import but doesn't need to. %>
+        <div class="manage-section event-add-to-calendar-card">
+          <h3>Add to Calendar</h3>
+          <div class="roster-btn-row">
+            <a class="roster-action-btn" href="<%= googleCalendarUrl %>" target="_blank" rel="noopener">
+              <svg class="icon"><use href="#icon-calendar-check"/></svg> Google Calendar
+            </a>
+            <a class="roster-action-btn" href="/events/<%= event.id %>/calendar.ics">
+              <svg class="icon"><use href="#icon-download"/></svg> Apple / Outlook (.ics)
+            </a>
+          </div>
+        </div>
       </div>
     </section>
   </main>
