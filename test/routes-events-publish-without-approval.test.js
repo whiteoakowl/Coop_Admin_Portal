@@ -62,7 +62,6 @@ test('publishing a still-pending submitted event (no prior Approve click) also a
   const parentRole = await db.prepare("SELECT id FROM roles WHERE key = 'parent'").get();
   await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(parentAcctId, parentRole.id);
 
-  const eventDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
   const startsAt = (await db.prepare("SELECT to_char(now() + interval '5 days', 'YYYY-MM-DD HH24:MI:SS') AS t").get()).t;
   const eventId = await events.submitEvent({ title: 'Publish Bug Fall Fest', startsAt, visibility: 'members' }, parentAcctId);
 
