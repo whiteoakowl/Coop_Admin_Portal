@@ -504,6 +504,19 @@ test('Weekly Planner: the week title shows with an Edit icon (no bare trash butt
   assert.doesNotMatch(page.text, /aria-label="Delete week"/, 'the old bare trash button should be gone');
   assert.match(page.text, /aria-label="Edit week"/);
   assert.match(page.text, /id="edit-week-dialog"/);
+  // Regression: a <form> can't contain another <form> - a nested
+  // Delete Week <form> inside the edit <form> got silently dropped by
+  // the browser's HTML parser, so Delete Week fell through to the
+  // surrounding edit form instead, and Save Changes ended up outside
+  // any form at all (the stray closing tag closed the edit form
+  // early). The edit form must fully close (by id) before the Delete
+  // Week form opens, and Save Changes must reference that id instead
+  // of relying on DOM nesting.
+  const editFormOpen = page.text.indexOf('id="edit-week-form"');
+  const editFormClose = page.text.indexOf('</form>', editFormOpen);
+  const deleteFormOpen = page.text.indexOf(`/weekly-planner/${week.id}/delete`);
+  assert.ok(editFormOpen > -1 && editFormClose > editFormOpen && deleteFormOpen > editFormClose, 'the edit form must close before the Delete Week form opens - never nested');
+  assert.match(page.text, /<button type="submit" form="edit-week-form" class="primary-btn">Save Changes<\/button>/);
   // A real request: "Weekly planner, week title and edit icon should
   // be in a blue button looking box to the left."
   assert.match(page.text, /<div class="roster-btn-row roster-btn-row-fit-text no-print fs-weekly-plan-row-spaced fs-weekly-plan-week-title-row">\s*<span class="fs-weekly-plan-week-title">Week 1<\/span>/);
