@@ -21,7 +21,7 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
-const { createClass, setEnrollment } = require('../utils/classSchedule');
+const { createClass, setEnrollment, saveHourLabels } = require('../utils/classSchedule');
 const { CLASS_DAY_WEEKDAY_FULL } = require('../utils/classDays');
 const { todayISO } = require('../utils/dates');
 
@@ -85,6 +85,13 @@ test('Floater Assignments Class Cancellation Risk print preview: shows the same 
   // test has to actually use today's own day name to see anything flagged.
   const today = todayISO();
   const day = Object.keys(CLASS_DAY_WEEKDAY_FULL).find((d) => CLASS_DAY_WEEKDAY_FULL[d] === new Date(today).getUTCDay());
+  // The default seed data only ever configures class_schedule_hours rows
+  // for Monday/Wednesday - gridForDay (which classesAtRiskForDay reads
+  // from) returns zero hours, and therefore never surfaces this class,
+  // for any other day of the week the suite happens to run on. Seed an
+  // hour for today's own day explicitly so this test doesn't depend on
+  // which weekday it's actually run on.
+  await saveHourLabels(day, ['Hour 1']);
   const classId = await createClass({ day, hourPosition: 1, className: 'Risk Preview Class', room: 'Room 5' });
   const students = [];
   for (let i = 1; i <= 4; i++) {
@@ -119,6 +126,9 @@ test('Floater Assignments Class Cancellation Risk tab: Download PDF is a real PD
   const cookie = await loginAsAdmin();
   const today = todayISO();
   const day = Object.keys(CLASS_DAY_WEEKDAY_FULL).find((d) => CLASS_DAY_WEEKDAY_FULL[d] === new Date(today).getUTCDay());
+  // Same reasoning as the print-preview test above - seed an hour for
+  // today's own day so this doesn't depend on which weekday it runs on.
+  await saveHourLabels(day, ['Hour 1']);
   const classId = await createClass({ day, hourPosition: 1, className: 'Download PDF Risk Class', room: 'Room 6' });
   const students = [];
   for (let i = 1; i <= 4; i++) {
