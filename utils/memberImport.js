@@ -261,7 +261,12 @@ async function applyImportMerges(memberIds, payloads, allMemberIds) {
 // subset shown in the on-screen table. `members` is membersWithDetails()'s
 // own output (utils/members.js).
 function buildMembersExportCsvLines(members) {
-  const typeLabel = (t) => (t === 'parent' ? 'Parent' : 'Student');
+  // A real bug: admin-type members (member_type 'admin', see
+  // utils/adminPositions.js's syncMemberAdminStatus) exported with
+  // everyone else's Type column reading "Student" - this only ever
+  // distinguished parent from everything else, back when 'admin' wasn't
+  // a real member_type yet.
+  const typeLabel = (t) => (t === 'parent' ? 'Parent' : t === 'admin' ? 'Admin' : 'Student');
   return [
     toCsvRow([
       'Name',
