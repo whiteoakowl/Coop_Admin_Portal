@@ -9,19 +9,25 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_communications'));
 
 router.get('/', async (req, res) => {
   const showArchived = req.query.archived === '1';
-  const messages = await db
+  const allMessages = await db
     .prepare(
       `SELECT * FROM contact_admin_messages WHERE archived = ? ORDER BY created_at DESC`
     )
     .all(showArchived ? 1 : 0);
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(allMessages, parsePage(req.query.page), pageSize);
   res.render('admin-contact-admin-messages', {
     title: 'Contact Admin Messages',
-    messages,
+    messages: pagination.items,
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: `/main-admin/contact-admin-messages?${showArchived ? 'archived=1&' : ''}`,
     showArchived,
     notice: req.query.notice || null,
   });

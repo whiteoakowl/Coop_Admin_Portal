@@ -10,6 +10,7 @@ const router = express.Router();
 const db = require('../db');
 const { requirePortalAuth } = require('../middleware/portalAuth');
 const newsletter = require('../utils/newsletter');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 router.use(requirePortalAuth);
 
@@ -20,8 +21,16 @@ router.use(requirePortalAuth);
 // newsletter before a member checks this archive themselves.
 router.get('/', async (req, res) => {
   await newsletter.advanceIfDue();
-  const issues = await db.prepare("SELECT * FROM newsletter_issues WHERE status = 'sent' ORDER BY sent_at DESC").all();
-  res.render('newsletter-list', { title: 'Newsletter', issues });
+  const allIssues = await db.prepare("SELECT * FROM newsletter_issues WHERE status = 'sent' ORDER BY sent_at DESC").all();
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(allIssues, parsePage(req.query.page), pageSize);
+  res.render('newsletter-list', {
+    title: 'Newsletter',
+    issues: pagination.items,
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: '/newsletter?',
+  });
 });
 
 router.get('/:id', async (req, res) => {
