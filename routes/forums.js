@@ -26,6 +26,7 @@ const { requirePortalAuth } = require('../middleware/portalAuth');
 const { memberForAccount, familyForAccount } = require('../utils/portalAuth');
 const forums = require('../utils/forums');
 const notifications = require('../utils/notifications');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 router.use(requirePortalAuth);
 
@@ -137,17 +138,30 @@ router.post('/:categoryId/threads', loadCategory, async (req, res) => {
 });
 
 router.get('/threads/:threadId', loadThread, async (req, res) => {
-  const posts = await forums.listPosts(req.thread.id);
+  const allPosts = await forums.listPosts(req.thread.id);
   const self = await memberForAccount(req.portalAccount.id);
+  const portal = portalParam(req);
+  // Same "default to the newest page, not page 1" behavior as the admin
+  // thread view (routes/admin-forums.js) - a long-lived thread/chat room
+  // feed should land on its newest messages by default. pageSize=Infinity
+  // ('View All') has no "last page" to default to - paginate() itself
+  // already collapses totalPages to 1 for it.
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const totalPages = pageSize === Infinity ? 1 : Math.max(1, Math.ceil(allPosts.length / pageSize));
+  const requestedPage = req.query.page ? parsePage(req.query.page) : totalPages;
+  const pagination = paginate(allPosts, requestedPage, pageSize);
   res.render('forums-thread', {
     title: req.thread.title,
     category: req.category,
     thread: req.thread,
-    posts,
+    posts: pagination.items,
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: `/forums/threads/${req.thread.id}?${portal ? `portal=${portal}&` : ''}`,
     canModerate: await canModerate(req),
     selfMemberId: self ? self.id : null,
     error: req.query.error || null,
-    portalParam: portalParam(req),
+    portalParam: portal,
   });
 });
 

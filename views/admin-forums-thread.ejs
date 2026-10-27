@@ -33,11 +33,21 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <% posts.forEach(function(p, i) { %>
+      <%
+      // "Post" (the thread's very first message) vs "Comment" (any reply
+      // after it) is a property of the post's true position in the whole
+      // thread, not of where it lands within the current paginated page -
+      // pagination.startIndex (1-based) is how far into the full list
+      // this page's own index 0 actually sits, so it has to offset `i`
+      // here rather than using `i` directly, or every page past the first
+      // would mislabel its own first row "Post".
+      var absoluteIndex = pagination.startIndex - 1 + i;
+      %>
       <div class="forum-post <%= p.status === 'removed' ? 'forum-post-removed' : '' %> <%= category.is_chat_room ? 'forum-chat-room-post' : '' %>">
         <div class="forum-post-header">
           <span class="forum-post-author"><%= p.authorName || 'Unknown' %></span>
           <% if (p.authorAdminTitle) { %><span class="badge-pill" title="Admin Position"><%= p.authorAdminTitle %></span><% } %>
-          <span class="hint"><%= category.is_chat_room ? 'Message' : (i === 0 ? 'Post' : 'Comment') %> &middot; <%= category.is_chat_room ? p.createdAtLabel : p.created_at %></span>
+          <span class="hint"><%= category.is_chat_room ? 'Message' : (absoluteIndex === 0 ? 'Post' : 'Comment') %> &middot; <%= category.is_chat_room ? p.createdAtLabel : p.created_at %></span>
           <% if (p.edited_at) { %><span class="hint">(edited)</span><% } %>
           <% if (p.status === 'removed') { %><span class="badge-pill badge-pill-gray">Removed</span><% } %>
         </div>
@@ -68,7 +78,7 @@
       <% if (p.status === 'active') { %>
         <dialog id="edit-post-<%= p.id %>" class="member-picker-dialog">
           <form method="POST" action="/main-admin/forums/threads/<%= thread.id %>/posts/<%= p.id %>/edit" data-forum-editor>
-            <h3>Edit <%= category.is_chat_room ? 'Message' : (i === 0 ? 'Post' : 'Comment') %></h3>
+            <h3>Edit <%= category.is_chat_room ? 'Message' : (absoluteIndex === 0 ? 'Post' : 'Comment') %></h3>
             <%- include(category.is_chat_room ? 'partials/forum-editor-toolbar-chat' : 'partials/forum-editor-toolbar') %>
             <div class="forum-editable" data-forum-editable contenteditable="true"><%- p.body_html %></div>
             <input type="hidden" name="body" data-forum-body-input />
@@ -80,6 +90,8 @@
         </dialog>
       <% } %>
     <% }); %>
+
+    <%- include('partials/pagination-controls', { pagination, baseHref, viewingAll }) %>
 
     <%# A real request: "a thread or comment could be added by an
         admin" - same reply form routes/forums.js's own member-facing

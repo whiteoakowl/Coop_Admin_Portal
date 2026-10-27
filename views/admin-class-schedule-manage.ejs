@@ -427,7 +427,7 @@
         <div class="grid-box-header">
           <h2>Chat</h2>
         </div>
-        <%- include('partials/class-chat', { chatMessages, postUrl: `/admin/class-schedule/classes/${cls.id}/chat` }) %>
+        <%- include('partials/class-chat', { chatMessages, postUrl: `/admin/class-schedule/classes/${cls.id}/chat`, pagination: chatPagination, viewingAll: chatViewingAll, baseHref: chatBaseHref }) %>
       </div>
     <% } %>
 

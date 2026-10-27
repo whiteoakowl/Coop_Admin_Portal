@@ -42,6 +42,7 @@ const { requirePortalAuth, requirePortal, requirePortalPermission } = require('.
 const forums = require('../utils/forums');
 const { activeMemberOptions, membersWithDetails, avatarColorFor, allFamilies } = require('../utils/members');
 const { forumCategorySectionIds } = require('../utils/sections');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_forum'));
 
@@ -63,15 +64,23 @@ router.get('/', async (req, res) => {
   let categories = [];
   let classes = [];
   let archived = [];
+  let pagination = null;
+  let viewingAll = false;
+  let baseHref = null;
   if (activeTab === 'new' || activeTab === 'rooms') {
     const allCategories = await forums.listCategories();
     categories = activeTab === 'rooms' ? allCategories.filter((c) => c.is_chat_room) : allCategories.filter((c) => !c.is_chat_room);
     classes = await db.prepare('SELECT id, class_name FROM classes ORDER BY LOWER(class_name)').all();
   } else {
-    archived = await forums.archivedThreads();
+    const allArchived = await forums.archivedThreads();
+    const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+    pagination = paginate(allArchived, parsePage(req.query.page), pageSize);
+    archived = pagination.items;
+    viewingAll = pageSize === Infinity;
+    baseHref = '/main-admin/forums?tab=archive&';
   }
 
-  res.render('admin-forums-list', { title: 'Chat', activeTab, categories, classes, archived, notice, error });
+  res.render('admin-forums-list', { title: 'Chat', activeTab, categories, classes, archived, pagination, viewingAll, baseHref, notice, error });
 });
 
 router.post('/', async (req, res) => {
@@ -208,11 +217,16 @@ router.get('/:id', async (req, res) => {
   // A chat room has exactly one underlying thread (its own live feed) -
   // skip straight to it instead of showing a thread list with one row.
   if (category.is_chat_room) return res.redirect(`/main-admin/forums/threads/${category.room_thread_id}`);
-  const threads = await forums.listThreads(category.id);
+  const allThreads = await forums.listThreads(category.id);
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(allThreads, parsePage(req.query.page), pageSize);
   res.render('admin-forums-category', {
     title: category.name,
     category,
-    threads,
+    threads: pagination.items,
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: `/main-admin/forums/${category.id}?`,
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
@@ -264,8 +278,27 @@ router.get('/threads/:threadId', async (req, res) => {
   const thread = await forums.getThread(req.params.threadId);
   if (!thread) return res.status(404).render('404', { title: 'Not Found' });
   const category = await forums.getCategory(thread.category_id);
-  const posts = await forums.listPosts(thread.id);
-  res.render('admin-forums-thread', { title: thread.title, category, thread, posts, error: req.query.error || null });
+  const allPosts = await forums.listPosts(thread.id);
+  // A long-lived thread/chat room feed should land on its newest messages
+  // by default, not page 1 of history - same paginate() + pagination-
+  // controls pattern as every other paginated list, just defaulting the
+  // requested page to the LAST one when ?page= isn't explicitly given.
+  // pageSize=Infinity ('View All') has no "last page" to default to -
+  // paginate() itself already collapses totalPages to 1 for it.
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const totalPages = pageSize === Infinity ? 1 : Math.max(1, Math.ceil(allPosts.length / pageSize));
+  const requestedPage = req.query.page ? parsePage(req.query.page) : totalPages;
+  const pagination = paginate(allPosts, requestedPage, pageSize);
+  res.render('admin-forums-thread', {
+    title: thread.title,
+    category,
+    thread,
+    posts: pagination.items,
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: `/main-admin/forums/threads/${thread.id}?`,
+    error: req.query.error || null,
+  });
 });
 
 router.post('/threads/:threadId/archive', async (req, res) => {
