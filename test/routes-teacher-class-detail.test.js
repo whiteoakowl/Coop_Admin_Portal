@@ -27,7 +27,7 @@ const app = require('../server');
 const db = require('../db');
 const { generateMemberCode } = require('../utils/members');
 const { hashPassword } = require('../utils/portalAuth');
-const { createClass, addStaff } = require('../utils/classSchedule');
+const { createClass } = require('../utils/classSchedule');
 const { createAssignment, createContentItem } = require('../utils/academics');
 
 test.before(() => app.ready);

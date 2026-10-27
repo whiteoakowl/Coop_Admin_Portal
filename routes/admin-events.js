@@ -413,18 +413,21 @@ function groupEventRegistrationActionsByDate(actions) {
 // data-building step.
 async function buildAttendanceList() {
   const published = await events.listEvents({ status: 'published' });
-  return Promise.all(
-    published.map(async (e) => {
-      const counts = await events.registrationStatusCountsForEvent(e.id);
-      return {
-        ...e,
-        startsLabel: formatFriendlyTimestamp(e.starts_at),
-        registrationCount: counts.confirmed,
-        cancelledCount: counts.cancelled,
-        waitlistCount: counts.waitlisted,
-      };
-    })
-  );
+  // One batched query for every published event's counts (events.
+  // registrationStatusCountsForEvents), not one registrationStatusCounts-
+  // ForEvent round-trip per event - this list only grows (every event the
+  // co-op has ever published), so an N+1 here gets slower every year.
+  const countsByEvent = await events.registrationStatusCountsForEvents(published.map((e) => e.id));
+  return published.map((e) => {
+    const counts = countsByEvent[e.id];
+    return {
+      ...e,
+      startsLabel: formatFriendlyTimestamp(e.starts_at),
+      registrationCount: counts.confirmed,
+      cancelledCount: counts.cancelled,
+      waitlistCount: counts.waitlisted,
+    };
+  });
 }
 
 router.get('/', async (req, res) => {

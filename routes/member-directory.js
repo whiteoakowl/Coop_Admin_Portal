@@ -12,6 +12,7 @@ const { urlForUpload } = require('../utils/uploadBackend');
 const { requirePortalAuth } = require('../middleware/portalAuth');
 const { familyForAccount } = require('../utils/portalAuth');
 const memberDirectory = require('../utils/memberDirectory');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 // Same bucket/local-dir convention routes/admin-members.js already
 // established for member photos - read-only reuse here (resolving a URL
@@ -43,7 +44,19 @@ router.use(requirePortalAuth);
 router.get('/', async (req, res) => {
   const fieldSettings = await memberDirectory.getFieldSettings();
   const members = await memberDirectory.listDirectoryMembers();
-  res.render('member-directory-list', { title: 'Member Directory', members: members.map((m) => visibleFields(m, fieldSettings)) });
+  // Same pagination (utils/pagination.js) the Members/Logs/Library admin
+  // lists already use - a growing co-op's full active-member directory
+  // is the same "renders as one enormous DOM grid" problem those lists
+  // were paginated to fix, just member-facing instead of admin-facing.
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(members, parsePage(req.query.page), pageSize);
+  res.render('member-directory-list', {
+    title: 'Member Directory',
+    members: pagination.items.map((m) => visibleFields(m, fieldSettings)),
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: '/member-directory?',
+  });
 });
 
 router.get('/mine', async (req, res) => {

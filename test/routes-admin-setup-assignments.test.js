@@ -358,7 +358,7 @@ test('Setup/Cleanup Assignments: Assign/Unassign + mutual exclusion (mirrors Flo
   // whatever this SAME member already holds in their own other two slots.
   await t.test('slot 3\'s own dropdown excludes a different member\'s assignments AND this member\'s own slot 1/slot 2 picks', async () => {
     const item3 = await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 2)').run(section.lastInsertRowid, 'Dust shelves');
-    const item4 = await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 3)').run(section.lastInsertRowid, 'Sweep porch');
+    await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 3)').run(section.lastInsertRowid, 'Sweep porch');
 
     await request(app)
       .post(`/admin/setup/monday/assignments/${bob.lastInsertRowid}/task`)

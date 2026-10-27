@@ -46,7 +46,7 @@ async function loginAsAdmin() {
 }
 
 test('the Edit Member form has a single family dropdown, no duplicate checklist', async (t) => {
-  const { cookie, csrfToken } = await loginAsAdmin();
+  const { cookie } = await loginAsAdmin();
 
   await t.test('/admin/members/:id/edit renders the select and Add New Family button, not the old checklist', async () => {
     // Add Member ("there shouldn't be any lone admins/leaders, or single

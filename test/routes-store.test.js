@@ -202,8 +202,8 @@ test('an account cannot buy for a member outside its own family, and cannot view
 
 test('a real request: "storefront view of product should look exactly like this" - photo on top, name, a price + dot-style in-stock row, and a View button', async () => {
   const admin = await loginAsMainAdmin();
-  const inStockId = await createActiveProduct(admin, { name: 'Card In Stock Widget', inventoryCount: '3' });
-  const outOfStockId = await createActiveProduct(admin, { name: 'Card Out Of Stock Widget', inventoryCount: '0' });
+  await createActiveProduct(admin, { name: 'Card In Stock Widget', inventoryCount: '3' });
+  await createActiveProduct(admin, { name: 'Card Out Of Stock Widget', inventoryCount: '0' });
   const parent = await createParentAccount();
 
   const page = await request(app).get('/store').set('Cookie', parent.cookie);

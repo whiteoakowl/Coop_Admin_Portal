@@ -41,7 +41,7 @@ const { adminRemoveStudentFromClass } = require('../utils/classRegistration');
 const { renderViewToPdf } = require('../utils/pdfRender');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter, imageFileFilter, lessonAttachmentFileFilter } = require('../utils/uploads');
-const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = require('../utils/storage');
+const { createStorageClient, uploadFile, deleteFile, generateKey } = require('../utils/storage');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const {
   CLASS_DAY_LABELS_FULL,
@@ -59,7 +59,6 @@ const {
   roomGridForDay,
   renameRoom,
   saveRoomOrder,
-  declaredRoomsForGrid,
   saveRoomsForGrid,
   listClassSchedules,
   createClassSchedule,

@@ -16,7 +16,7 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
       <h1>Notifications</h1>
-      <% if (items.some(function(i) { return !i.read_at; })) { %>
+      <% if (hasUnread) { %>
         <form method="POST" action="/notifications/read-all">
           <button type="submit" class="roster-action-btn">Mark All Read</button>
         </form>
@@ -55,6 +55,7 @@
           </div>
         <% }); %>
       </div>
+      <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref, viewingAll: viewingAll }) %>
     <% } %>
   </main>
 </body>

@@ -221,7 +221,7 @@ test('Grade Level Report: filter by section, schedule grid signup, and family', 
 
   const sectionedId = await createStudentWithFamily({ name: 'Sectioned Student', gradeLevel: '5th', familyId: familyAId });
   await db.prepare('INSERT INTO member_sections (member_id, section_id) VALUES (?, ?)').run(sectionedId, sectionId);
-  const unsectionedId = await createStudentWithFamily({ name: 'Unsectioned Student', gradeLevel: '5th', familyId: familyBId });
+  await createStudentWithFamily({ name: 'Unsectioned Student', gradeLevel: '5th', familyId: familyBId });
 
   const enrolledId = await createStudentWithFamily({ name: 'Enrolled Student', gradeLevel: '6th', familyId: familyAId });
   const classId = (
@@ -230,7 +230,7 @@ test('Grade Level Report: filter by section, schedule grid signup, and family', 
       .run()
   ).lastInsertRowid;
   await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId, enrolledId);
-  const notEnrolledId = await createStudentWithFamily({ name: 'Not Enrolled Student', gradeLevel: '6th', familyId: familyBId });
+  await createStudentWithFamily({ name: 'Not Enrolled Student', gradeLevel: '6th', familyId: familyBId });
 
   await t.test('sectionId filters to only members holding that section', async () => {
     const res = await request(app).get(`/main-admin/members/grade-level-report?sectionId=${sectionId}`).set('Cookie', cookie);

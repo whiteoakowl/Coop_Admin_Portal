@@ -533,7 +533,7 @@ test('Overview: the bare /parent/family-school page shows a card per student wit
   const familyId = await createFamily('Overview Family');
   const parent = await createPortalMember({ name: 'Overview Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const gradedStudent = await createPortalMember({ name: 'Overview Graded Student', familyId, memberType: 'student', roleKey: 'student' });
-  const ungradedStudent = await createPortalMember({ name: 'Overview Ungraded Student', familyId, memberType: 'student', roleKey: 'student' });
+  await createPortalMember({ name: 'Overview Ungraded Student', familyId, memberType: 'student', roleKey: 'student' });
   await db.prepare('UPDATE members SET grade_level = ? WHERE id = ?').run('5th Grade', gradedStudent.memberId);
 
   const { createClass, assignClassToStudents, createLesson, createContentItem, submitAssignment, toggleAttendance } = require('../utils/familySchool');
@@ -593,7 +593,7 @@ test('Overview: Export/Download CSV buttons cover the whole family, the old quic
   const familyId = await createFamily('CSV Family');
   const parent = await createPortalMember({ name: 'CSV Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const studentA = await createPortalMember({ name: 'CSV Student A', familyId, memberType: 'student', roleKey: 'student' });
-  const studentB = await createPortalMember({ name: 'CSV Student B', familyId, memberType: 'student', roleKey: 'student' });
+  await createPortalMember({ name: 'CSV Student B', familyId, memberType: 'student', roleKey: 'student' });
 
   const { createClass, assignClassToStudents, saveFamilySchoolSettings } = require('../utils/familySchool');
   const classId = await createClass({ familyId, className: 'CSV Class', description: null, createdByAccountId: null });
@@ -651,7 +651,7 @@ test('Overview: the Filter popover offers Student and School Year dropdowns that
   const familyId = await createFamily('Overview Filter Family');
   const parent = await createPortalMember({ name: 'Overview Filter Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const studentA = await createPortalMember({ name: 'Overview Filter Student A', familyId, memberType: 'student', roleKey: 'student' });
-  const studentB = await createPortalMember({ name: 'Overview Filter Student B', familyId, memberType: 'student', roleKey: 'student' });
+  await createPortalMember({ name: 'Overview Filter Student B', familyId, memberType: 'student', roleKey: 'student' });
 
   const { toggleAttendance } = require('../utils/familySchool');
   await toggleAttendance(studentA.memberId, '2024-10-05');

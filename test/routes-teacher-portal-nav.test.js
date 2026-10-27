@@ -129,8 +129,8 @@ test('Co-op Teacher Portal Class Schedule tab: Grid view shows the entire co-op 
   const fall = (await db.prepare("INSERT INTO semesters (title) VALUES ('Fall Grid Test') RETURNING id").get()).id;
   const spring = (await db.prepare("INSERT INTO semesters (title) VALUES ('Spring Grid Test') RETURNING id").get()).id;
   const myClass = await makeClass('My Own Grid Class', { day: 'monday', hourPosition: 1, semesterId: fall });
-  const otherTeacherClass = await makeClass('Someone Elses Grid Class', { day: 'monday', hourPosition: 2, semesterId: fall });
-  const springOnlyClass = await makeClass('Spring Only Grid Class', { day: 'monday', hourPosition: 3, semesterId: spring });
+  await makeClass('Someone Elses Grid Class', { day: 'monday', hourPosition: 2, semesterId: fall });
+  await makeClass('Spring Only Grid Class', { day: 'monday', hourPosition: 3, semesterId: spring });
   const cookie = await loginTeacher([myClass]);
 
   const allSemesters = await request(app).get('/teacher/classes?view=grid&day=monday').set('Cookie', cookie);

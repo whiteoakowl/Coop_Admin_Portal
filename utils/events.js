@@ -188,19 +188,11 @@ async function getEvent(id) {
   return db.prepare('SELECT * FROM events WHERE id = ?').get(id);
 }
 
-// A lighter-weight version of getEventWithDetails's own registrationCount
-// - just the one count, for the Events > Event Attendance tab's own
-// per-event list (routes/admin-events.js), which doesn't need the rest of
-// that function's volunteer-role/donation-item detail.
-async function registrationCountForEvent(id) {
-  return Number((await db.prepare("SELECT COUNT(*) AS c FROM event_registrations WHERE event_id = ? AND status = 'confirmed'").get(id)).c);
-}
-
 // A real request: "registered # should also include canceled number and
 // waitlist number all on the same row" (Events > Event Attendance tab's
 // own per-event list) - one grouped query instead of 3 separate COUNT(*)
-// round-trips, same status values registrationCountForEvent/
-// getEventWithDetails's own waitlistCount already key off.
+// round-trips, same status values getEventWithDetails's own waitlistCount
+// already keys off.
 async function registrationStatusCountsForEvent(id) {
   const rows = await db.prepare("SELECT status, COUNT(*) AS c FROM event_registrations WHERE event_id = ? GROUP BY status").all(id);
   const counts = { confirmed: 0, cancelled: 0, waitlisted: 0 };
@@ -208,6 +200,25 @@ async function registrationStatusCountsForEvent(id) {
     if (row.status in counts) counts[row.status] = Number(row.c);
   }
   return counts;
+}
+
+// Batched sibling of registrationStatusCountsForEvent, for the Events >
+// Event Attendance tab's own per-event list (routes/admin-events.js)
+// building every published event's row at once - one grouped query for
+// every event's counts instead of one registrationStatusCountsForEvent
+// round-trip per event, the same WHERE id IN (...) batching every other
+// per-list-item lookup in this app already uses (e.g. portalPermissions'
+// own sectionIdsForMembers).
+async function registrationStatusCountsForEvents(ids) {
+  const result = {};
+  for (const id of ids) result[id] = { confirmed: 0, cancelled: 0, waitlisted: 0 };
+  if (ids.length === 0) return result;
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = await db.prepare(`SELECT event_id, status, COUNT(*) AS c FROM event_registrations WHERE event_id IN (${placeholders}) GROUP BY event_id, status`).all(...ids);
+  for (const row of rows) {
+    if (row.status in result[row.event_id]) result[row.event_id][row.status] = Number(row.c);
+  }
+  return result;
 }
 
 // Full detail for one event page (admin management or a member's own
@@ -2130,8 +2141,8 @@ module.exports = {
   isRegistrationWindowOpen,
   listEvents,
   getEvent,
-  registrationCountForEvent,
   registrationStatusCountsForEvent,
+  registrationStatusCountsForEvents,
   getEventWithDetails,
   createEvent,
   duplicateEvent,

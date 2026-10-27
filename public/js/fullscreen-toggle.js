@@ -1,3 +1,4 @@
+/* global initPinKeypad */
 (function () {
   // Several buttons can exist on the same page (desktop corner button +
   // mobile topbar icon, see partials/admin-nav.ejs - and kiosk-home.ejs's

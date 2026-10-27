@@ -37,10 +37,6 @@ test.after(() => {
   fs.rmSync(testUploadsDir, { recursive: true, force: true });
 });
 
-function extractCsrf(html) {
-  return /name="csrf-token" content="([^"]*)"/.exec(html)[1];
-}
-
 async function loginAsAdmin() {
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   return loginRes.headers['set-cookie'];
