@@ -49,15 +49,28 @@ test.after(() => {
 
 // Same extraction the audit itself used: every href inside a `subpages:
 // [...]` array in either nav partial - the single source of truth for
-// which pages are supposed to carry this dropdown.
+// which pages are supposed to carry this dropdown. Floater Assignments/
+// Setup-Cleanup's own 6 subpage hrefs are template literals built from a
+// `navDay` local (see admin-nav.ejs's own comment on why - they take the
+// day as a :day URL segment, unlike every other section's own static
+// query-param hrefs) rather than plain quoted strings; substituting
+// 'monday' for ${navDay} here mirrors hitting one of those pages with
+// ?day=monday context, so the resolved href below (e.g. "/admin/
+// volunteers/monday/manage") is both a real reachable page AND the exact
+// self-referencing link that same page's own re-rendered nav will produce
+// (its own `day` local resolves to 'monday' too), closing the loop the
+// same way every other entry here already does.
 function extractSubpageHrefs(src) {
   const subRe = /subpages:\s*\[([\s\S]*?)\]\s*\}/g;
   const all = [];
   let m;
   while ((m = subRe.exec(src))) {
-    const hrefRe = /href:\s*'([^']+)'/g;
+    const hrefRe = /href:\s*(?:'([^']+)'|`([^`]+)`)/g;
     let hm;
-    while ((hm = hrefRe.exec(m[1]))) all.push(hm[1]);
+    while ((hm = hrefRe.exec(m[1]))) {
+      const raw = hm[1] !== undefined ? hm[1] : hm[2];
+      all.push(raw.replace(/\$\{navDay\}/g, 'monday'));
+    }
   }
   return all;
 }

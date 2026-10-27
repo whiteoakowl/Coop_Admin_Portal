@@ -58,27 +58,30 @@ test('no description text on Members, Archive, Approvals, or Settings tabs', asy
 // gone from this toolbar - Sections management moved to a card on the
 // Settings tab, and section/portal assignment moved into the Bulk Edit
 // dialog (see test/routes-main-admin-members-edit-mode-actions.test.js).
-test('the Members toolbar carries a single .roster-btn-row, with Edit Permissions/Add-Edit Sections gone', async () => {
+test('the Members toolbar has Edit Permissions/Add-Edit Sections gone', async () => {
   const cookie = await loginAsMainAdmin();
   const res = await request(app).get('/main-admin/members?tab=members').set('Cookie', cookie);
-  const rowMatch = /<div class="roster-btn-row roster-btn-row-fit-text no-print">([\s\S]*?)<\/div>\s*<dialog/.exec(res.text);
-  assert.ok(rowMatch, 'expected the members toolbar row');
-  const rowHtml = rowMatch[1];
-  assert.doesNotMatch(rowHtml, /data-permissions-toggle/);
-  assert.doesNotMatch(rowHtml, /data-permissions-save/);
-  assert.doesNotMatch(rowHtml, />Edit Permissions</);
-  assert.doesNotMatch(rowHtml, />Add\/Edit Sections</);
-  assert.match(rowHtml, /\+ Add Member/);
+  // A real request: "Filter button should be on the same row as icons"
+  // split the old single toolbar row into two (.roster-btn-row.roster-
+  // btn-row-fit-text.main-admin-members-btn-row each) - checking the
+  // whole page rather than slicing out one row's own substring (see
+  // test/routes-main-admin-members-mobile-button-order.test.js's own
+  // comment on why a regex can no longer safely carve one out).
+  assert.doesNotMatch(res.text, /data-permissions-toggle/);
+  assert.doesNotMatch(res.text, /data-permissions-save/);
+  assert.doesNotMatch(res.text, />Edit Permissions</);
+  assert.doesNotMatch(res.text, />Add\/Edit Sections</);
+  assert.match(res.text, /\+ Add Member/);
   // A later real request: "change export and print buttons to icons" /
   // "all pages/subpages with print, export, import, or download buttons
   // should be changed to icons" - Import/Export are now icon-only
   // buttons (aria-label, no visible text).
-  assert.match(rowHtml, /aria-label="Import"/);
-  assert.match(rowHtml, /aria-label="Export CSV"/);
+  assert.match(res.text, /aria-label="Import"/);
+  assert.match(res.text, /aria-label="Export CSV"/);
   // A later real request: "delete create account button. every member
   // already automatically has an account. instead there can be an add
   // member button" - + Add Member (already present above) replaces it.
-  assert.doesNotMatch(rowHtml, />Create Accounts</);
+  assert.doesNotMatch(res.text, />Create Accounts</);
 });
 
 test('Settings tab is a card grid, with a Sections card linking to /main-admin/sections', async () => {

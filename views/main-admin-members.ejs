@@ -70,19 +70,24 @@
             (member-intake-form.ejs) to manually add a family and its
             members, which is what "instead" asked for. %>
         <%# A real request: "member page button order on mobile. Add
-            member, edit member list, add/edit family. 2nd row
-            underneath, edit permissions, add/edit sections. 3rd row
-            underneath filter, import, export, print." Reordered to
-            match, with two mobile-only .roster-btn-row-break spacers
-            (styles.css) forcing exactly those 3/2/4 groupings on a
-            narrow phone regardless of how each button's own text width
-            would otherwise wrap - desktop is untouched (those spacers
-            render as nothing there, same flex-wrap-as-space-allows
-            layout as before). The Filter dropdown moves into this row
-            as "row 3"'s lead item (partials/members-type-filter.ejs,
-            shared with the Archive tab's own copy further down, which
-            has no button toolbar of its own to join). %>
-        <div class="roster-btn-row roster-btn-row-fit-text no-print">
+            member, edit member list, add/edit family." Reordered to
+            match - desktop is untouched, same flex-wrap-as-space-allows
+            layout as before. %>
+        <%# A real request: "Grade level report button should be next to
+            add/edit family button" - the mobile-only .roster-btn-row-
+            break spacer that used to force it onto its own line is
+            removed; it now just wraps naturally with its two neighbors,
+            same flex-wrap behavior every other roster-btn-row-fit-text
+            row already uses. %>
+        <%# A real request: "Filter button should be on the same row as
+            icons. Orange buttons shrink to fit more on each row side by
+            side" - Filter (partials/members-type-filter.ejs) moved out
+            of this row into its own row below, which now sizes every
+            button to its own content (roster-btn-row-fit-text) instead
+            of an equal-width grid, same as .main-admin-members-btn-row's
+            own shrink-font rule (styles.css) scoped to every row on this
+            page. %>
+        <div class="roster-btn-row roster-btn-row-fit-text main-admin-members-btn-row no-print">
           <a class="roster-action-btn" href="/main-admin/members/new">+ Add Member</a>
           <%# A real request: "remove manage family blue bar and make it
               an orange button with the rest of the orange buttons that
@@ -91,31 +96,10 @@
               page; same #manage-families-dialog, just opened from here
               now. %>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-families-dialog').showModal()">Add/Edit Family</button>
-          <span class="roster-btn-row-break" aria-hidden="true"></span>
           <%# A real request: "Add a button that's says grade level
               report." %>
           <a class="roster-action-btn" href="/main-admin/members/grade-level-report">Grade Level Report</a>
-          <span class="roster-btn-row-break" aria-hidden="true"></span>
-          <%- include('partials/members-type-filter', { activeTab, typeFilter, familyFilter, families }) %>
         </div>
-        <div class="roster-btn-row no-print">
-          <button type="button" class="icon-btn" onclick="document.getElementById('main-admin-import-dialog').showModal()" aria-label="Import" title="Import"><svg class="icon"><use href="#icon-upload"/></svg></button>
-          <%# A real request: "change export and print buttons to icons" -
-              same icon-btn + icon-download/icon-printer pattern already
-              used elsewhere (e.g. views/admin-accounting-list.ejs's own
-              toolbar). %>
-          <a class="icon-btn" href="/main-admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-          <%# A real request: "all print button should show a print
-              preview full real page on a page with a print button" -
-              opens the dedicated main-admin-members-print.ejs view in a
-              new tab instead of printing this interactive card list in
-              place (see routes/main-admin-members.js's own GET /print).
-              Carries the same Type/Family/search filters as Export CSV
-              above, plus the search box's own q. %>
-          <a class="icon-btn" href="/main-admin/members/print<%= (typeFilter || familyFilter || q) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %><%= ((typeFilter || familyFilter) && q) ? '&' : '' %><%= q ? 'q=' + encodeURIComponent(q) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
-          <a class="icon-btn" href="/main-admin/members/download.pdf<%= (typeFilter || familyFilter || q) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %><%= ((typeFilter || familyFilter) && q) ? '&' : '' %><%= q ? 'q=' + encodeURIComponent(q) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
-        </div>
-
         <dialog id="main-admin-import-dialog" class="member-picker-dialog">
           <form method="POST" action="/main-admin/members/import" enctype="multipart/form-data">
             <h3>Import</h3>
@@ -129,15 +113,22 @@
         </dialog>
       <% } %>
 
-      <%# A real request (Archive tab): "filter button should be first on
-          the row. Search bar next to it." Reversed from the Members tab's
-          own search-then-filter order (that one keeps its own Filter in
-          the button toolbar above, not here) - the Archive tab has no
-          such toolbar, so its own copy of the filter leads this row
-          instead. %>
+      <%# A real request: "filter button should be first on the row.
+          Search bar next to it." Filter used to render in its own
+          separate row above the Members tab's own button toolbar; a
+          later real request ("Filter button and search bar should be on
+          the same row") merged it into this row instead, same as the
+          Archive tab's own copy already did. %>
+      <%# A real request: "Put bulk edit button next to filter button and
+          shrink the search bar" - Bulk Edit (Archive has no Bulk Edit of
+          its own, so this is Members-tab-only, same as the dialog/select-
+          all controls below) moved up here, and the search bar shrinks
+          (styles.css's own :has(#bulk-edit-btn) rule) to leave it and
+          Filter the room they need. %>
       <div class="members-search-filter-row no-print">
-        <% if (activeTab !== 'members') { %>
-          <%- include('partials/members-type-filter', { activeTab, typeFilter, familyFilter, families }) %>
+        <%- include('partials/members-type-filter', { activeTab, typeFilter, familyFilter, families }) %>
+        <% if (activeTab === 'members') { %>
+          <button type="button" class="roster-action-btn" id="bulk-edit-btn">Bulk Edit</button>
         <% } %>
 
         <form method="GET" action="/main-admin/members" class="members-search-bar">
@@ -166,12 +157,33 @@
           Members tab only. %>
       <% if (activeTab === 'members') { %>
         <div class="roster-toolbar no-print">
-          <div class="class-schedule-archive-controls">
+          <%# A real request: "Bulk edit button shrink to fit to text.
+              Import, export, pdf and print icons next to bulk edit
+              button on the same row." (an earlier batch) put Bulk Edit
+              here next to Select All/the icons; "Put bulk edit button
+              next to filter button and shrink the search bar" (this
+              batch) moved it up into .members-search-filter-row instead,
+              leaving Select All and the icons here. %>
+          <div class="class-schedule-archive-controls main-admin-members-btn-row">
             <label class="checkbox-option class-schedule-select-all">
               <input type="checkbox" data-select-all-for="members-select-form" />
               Select All
             </label>
-            <button type="button" class="roster-action-btn" id="bulk-edit-btn">Bulk Edit</button>
+            <button type="button" class="icon-btn" onclick="document.getElementById('main-admin-import-dialog').showModal()" aria-label="Import" title="Import"><svg class="icon"><use href="#icon-upload"/></svg></button>
+            <%# A real request: "change export and print buttons to icons" -
+                same icon-btn + icon-download/icon-printer pattern already
+                used elsewhere (e.g. views/admin-accounting-list.ejs's own
+                toolbar). %>
+            <a class="icon-btn" href="/main-admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+            <%# A real request: "all print button should show a print
+                preview full real page on a page with a print button" -
+                opens the dedicated main-admin-members-print.ejs view in a
+                new tab instead of printing this interactive card list in
+                place (see routes/main-admin-members.js's own GET /print).
+                Carries the same Type/Family/search filters as Export CSV
+                above, plus the search box's own q. %>
+            <a class="icon-btn" href="/main-admin/members/print<%= (typeFilter || familyFilter || q) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %><%= ((typeFilter || familyFilter) && q) ? '&' : '' %><%= q ? 'q=' + encodeURIComponent(q) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+            <a class="icon-btn" href="/main-admin/members/download.pdf<%= (typeFilter || familyFilter || q) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %><%= ((typeFilter || familyFilter) && q) ? '&' : '' %><%= q ? 'q=' + encodeURIComponent(q) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
           </div>
         </div>
 

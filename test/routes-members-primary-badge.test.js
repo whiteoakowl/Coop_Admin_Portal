@@ -55,17 +55,24 @@ test('Main Admin Members list: no inline Primary badge, search bar sits next to 
   assert.equal(res.status, 200);
   assert.match(res.text, /MainAdminBadge Primary Parent/);
   assert.doesNotMatch(res.text, /primary-parent-badge/);
-  // A later real request moved the Filter dropdown out of the search row
-  // and into the button toolbar's own mobile "row 3" (with Import/
-  // Export/Print) for the Members tab specifically - the search row now
-  // holds only the search bar there.
-  const rowMatch = /<div class="members-search-filter-row no-print">([\s\S]*?)<\/div>/.exec(res.text);
-  assert.ok(rowMatch, 'expected a members-search-filter-row wrapping the search bar');
-  assert.match(rowMatch[1], /class="members-search-bar"/);
-  assert.doesNotMatch(rowMatch[1], /class="category-filter"/);
-  const toolbarMatch = /<div class="roster-btn-row roster-btn-row-fit-text no-print">([\s\S]*?)<\/div>\s*<dialog/.exec(res.text);
-  assert.ok(toolbarMatch, 'expected the button toolbar');
-  assert.match(toolbarMatch[1], /class="category-filter"/);
+  // A real request: "Filter button and search bar should be on the same
+  // row" - Filter (partials/members-type-filter.ejs, including its own
+  // nested <div>s) now renders inline inside .members-search-filter-row
+  // for the Members tab too, same as it already did for Archive - which
+  // breaks a regex trying to capture "up to the next </div>" (it would
+  // stop at one of the filter dialog's own inner divs instead of the
+  // row's own closing tag). A plain whole-page match is robust against
+  // that nesting and still proves both are present.
+  assert.match(res.text, /class="members-search-filter-row no-print">[\s\S]*?onclick="document\.getElementById\('members-filter-dialog'\)\.showModal\(\)"/, 'expected Filter to lead the search-filter row');
+  assert.match(res.text, /class="members-search-bar"/);
+  // A real request: "Filter button should be on the same row as icons"
+  // moved Filter (and its own dialog, including this Family <select>)
+  // into the icon row - still on the page either way, so a plain
+  // whole-page match proves the same thing without needing to carve out
+  // one row's own substring (nested <div>s inside the dialog make that
+  // fragile now - see test/routes-main-admin-members-mobile-button-
+  // order.test.js's own comment on why).
+  assert.match(res.text, /class="category-filter"/);
 });
 
 test('Co-op Admin Members list: no inline Primary badge, Filter moved into the button toolbar same as Main Admin', async () => {

@@ -17,6 +17,26 @@
     // portal (see portal-nav.ejs's own primaryNavLinks/subpages and
     // public/js/admin-nav-accordion.js, page-tabs.js below), just never
     // wired in here for Co-op Admin's own separate nav shell.
+    // Floater Assignments'/Setup-Cleanup's own pages all take the day as a
+    // :day URL SEGMENT (routes/admin-volunteers.js's/admin-setup.js's own
+    // /volunteers/:day/manage, /:day/teams, /:day/risk, /setup/:day/
+    // assignments, /:day/manage, /:day/tasks) rather than a query param
+    // like every other dropdown's own subpages here - so unlike Classes'/
+    // Attendance's own bare first-subpage link (which never redirects,
+    // landing at that exact bare URL, so its pathname always matches
+    // reality), a bare /admin/volunteers or /admin/setup link redirects to
+    // a SPECIFIC day and would only ever pathname-match the real URL for
+    // whichever day it happened to hardcode - the title's own Menu
+    // dropdown (public/js/page-tabs.js's own findCurrentSectionDialog) and
+    // this sidebar's own active-subpage highlight (admin-nav-accordion.js)
+    // both need an exact match to ever recognize their own section.
+    // Building each link from the CURRENT page's own `day` local (passed
+    // by all 6 routes above, same as partials/floater-tabs.ejs/setup-
+    // tabs.ejs used to) keeps every link's pathname in sync with whichever
+    // day you're actually on; falling back to 'monday' on every other page
+    // (where `day` isn't in scope at all) is harmless - a correct match is
+    // only ever needed on the Floater/Setup pages themselves.
+    const navDay = typeof day !== 'undefined' ? day : 'monday';
     const adminNavLinks = [
       { href: '/admin', icon: 'home', label: 'Home' },
       // Each day's own Student/Parent roster toggle lives inside the page
@@ -45,8 +65,21 @@
         { href: '/admin/rosters?tab=classes', label: 'Class Rosters' },
         { href: '/admin/rosters?tab=playground', label: 'Playground Check in/out' },
       ] },
-      { href: '/admin/volunteers', icon: 'users', label: 'Floater Assignments', mobileLabel: 'Floater<br>Assignments' },
-      { href: '/admin/setup', icon: 'broom', label: 'Setup/Cleanup' },
+      // A real request: "it should be like other pages where the
+      // subpages are an attached menu to the orange menu bar" - these two
+      // used to render their own in-page <div class="view-tabs"> (see
+      // partials/floater-tabs.ejs/setup-tabs.ejs, now deleted) instead of
+      // living here like every other section's own subpages.
+      { href: '/admin/volunteers', icon: 'users', label: 'Floater Assignments', mobileLabel: 'Floater<br>Assignments', subpages: [
+        { href: `/admin/volunteers/${navDay}/manage`, label: 'Floater Assignments' },
+        { href: `/admin/volunteers/${navDay}/teams`, label: 'Floater Teams' },
+        { href: `/admin/volunteers/${navDay}/risk`, label: 'Class Cancellation Risk' },
+      ] },
+      { href: '/admin/setup', icon: 'broom', label: 'Setup/Cleanup', subpages: [
+        { href: `/admin/setup/${navDay}/assignments`, label: 'Setup/Cleanup Assignments' },
+        { href: `/admin/setup/${navDay}/manage`, label: 'Setup/Cleanup Teams' },
+        { href: `/admin/setup/${navDay}/tasks`, label: 'Task List' },
+      ] },
       { href: '/admin/schedule', icon: 'clock', match: '/admin/class-schedule', label: 'Classes', subpages: [
         // A real bug report: "co-op main menu, classes page should have
         // blue bubble dropdown menu next to title for subpages" - public/

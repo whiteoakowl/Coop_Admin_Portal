@@ -33,7 +33,16 @@
               href="/admin/design?tab=requests<%= showArchived ? '' : '&archived=1' %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>"
             >Archived</a>
           </div>
-          <div class="roster-btn-row">
+          <%# A real request: "export, import, print and pdf icons should
+              be in a row side by side. Not in a single column" -
+              data-fixed-columns here means roster-btn-row-grid.js's own
+              column-count calc (which only counts .roster-action-btn/
+              .btn-secondary children) doesn't need to - this row's
+              children are .icon-btn, so without it the row's mobile
+              `display: grid` (public/css/styles.css) falls back to one
+              implicit column, stacking these 3 icons instead of keeping
+              them side by side. %>
+          <div class="roster-btn-row" data-fixed-columns="3">
             <a class="icon-btn" href="/admin/design/requests/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
             <a class="icon-btn" href="/admin/design/requests/print?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
             <a class="icon-btn" href="/admin/design/requests/download.pdf?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>

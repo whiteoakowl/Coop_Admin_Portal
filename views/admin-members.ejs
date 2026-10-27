@@ -126,7 +126,10 @@
         </button>
         <a class="roster-action-btn" href="/admin/members/grade-level-report">Grade Level Report</a>
       </div>
-      <div class="roster-btn-row">
+      <%# A real request: "export, import, print and pdf icons should be
+          in a row side by side. Not in a single column" - see
+          views/admin-design.ejs's own matching comment. %>
+      <div class="roster-btn-row" data-fixed-columns="3">
         <%# A real request: "change export and print buttons to icons" -
             same icon-btn + icon-download/icon-printer pattern already
             used elsewhere (e.g. views/admin-accounting-list.ejs's own

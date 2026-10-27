@@ -60,12 +60,21 @@ test('Members tab: Select All and a Bulk Edit button/dialog are permanently visi
   const res = await request(app).get('/main-admin/members').set('Cookie', cookie);
   assert.equal(res.status, 200);
 
-  const controlsMatch = /<div class="class-schedule-archive-controls">([\s\S]*?)<\/div>\s*<\/div>/.exec(res.text);
+  // A real request: "Import, export, pdf and print icons next to bulk
+  // edit button on the same row" added a second class
+  // (.main-admin-members-btn-row) to this div for its own shrink-font
+  // styling - tolerant of that extra class instead of requiring the
+  // bare original.
+  const controlsMatch = /<div class="class-schedule-archive-controls[^"]*">([\s\S]*?)<\/div>\s*<\/div>/.exec(res.text);
   assert.ok(controlsMatch, 'expected the always-visible Select All/Bulk Edit controls block');
   const controls = controlsMatch[1];
 
   assert.match(controls, /data-select-all-for="members-select-form"/);
-  assert.match(controls, /id="bulk-edit-btn"/);
+  // A real request: "Put bulk edit button next to filter button and
+  // shrink the search bar" moved #bulk-edit-btn out of this div and into
+  // .members-search-filter-row instead - still present on the page, just
+  // not inside this particular controls block any more.
+  assert.match(res.text, /class="members-search-filter-row[^"]*">[\s\S]*?id="bulk-edit-btn"/, 'expected Bulk Edit in the search-filter row');
   assert.doesNotMatch(controls, /data-select-none-for/, 'Select None was removed - unchecking Select All already clears everyone');
   assert.doesNotMatch(res.text, /Select None/);
   assert.doesNotMatch(res.text, /Edit Member List/, 'the old Edit Member List toggle was replaced by permanently-visible controls');
