@@ -241,6 +241,8 @@
         </div>
       <% } %>
 
+      <%- include('partials/pagination-controls', { pagination, baseHref }) %>
+
       <dialog id="in-person-dialog" class="class-form-dialog">
         <form method="POST" action="/main-admin/store/orders/in-person">
           <div class="class-form-dialog-header">

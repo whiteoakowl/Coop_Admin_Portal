@@ -540,3 +540,41 @@ test('Filter label says "Filter" (not "Filter by category"), and a View Member S
   assert.match(page.text, /<label>Filter\s*<select name="category"/);
   assert.match(page.text, /<a class="roster-action-btn" href="\/store" target="_blank" rel="noopener">View Member Store<\/a>/);
 });
+
+// Pagination: years of order history used to render as one unbounded
+// table (utils/pagination.js's own in-memory paginate(), not a second
+// SQL round-trip - see its header comment). Page 1 of Orders shows only
+// the default page size, and every pagination link keeps ?tab=orders so
+// Next/Prev/the page select never silently falls back to the Products
+// tab (STORE_TABS' own default).
+test('Orders tab paginates past the default page size, and its pagination links preserve ?tab=orders', async () => {
+  const admin = await loginAsMainAdmin();
+  const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Pagination Buyer', 'pagination-buyer', 'parent')").run()).lastInsertRowid;
+  // Earlier tests in this file already recorded a handful of their own
+  // orders against this same shared test db - only the count ADDED here
+  // (past DEFAULT_PAGE_SIZE) matters, not the absolute total.
+  const existingTotal = Number((await db.prepare('SELECT COUNT(*) AS n FROM store_orders').get()).n);
+  const ADDED_ORDERS = 55; // > utils/pagination.js's DEFAULT_PAGE_SIZE (50)
+  for (let i = 0; i < ADDED_ORDERS; i++) {
+    await db
+      .prepare("INSERT INTO store_orders (member_id, sale_type, status, total_cents) VALUES (?, 'in_person', 'paid', 100)")
+      .run(memberId);
+  }
+  const expectedTotal = existingTotal + ADDED_ORDERS;
+
+  const page1 = await request(app).get('/main-admin/store?tab=orders').set('Cookie', admin.cookie);
+  assert.equal(page1.status, 200);
+  const rowCount = (page1.text.match(/<td class="store-orders-actions-col">/g) || []).length;
+  assert.equal(rowCount, 50, 'page 1 should show only the first 50 orders, not all of them');
+  assert.match(page1.text, /class="pagination-bar no-print"/);
+  assert.match(page1.text, new RegExp(`Showing 1&ndash;50 of ${expectedTotal}`));
+  // Every pagination link must keep tab=orders - a bare "?page=2" would
+  // otherwise fall back to the Products tab.
+  assert.match(page1.text, /href="\/main-admin\/store\?tab=orders&amp;page=2">Next/);
+  assert.match(page1.text, /href="\/main-admin\/store\?tab=orders&amp;pageSize=all">View All</);
+
+  const page2 = await request(app).get('/main-admin/store?tab=orders&page=2').set('Cookie', admin.cookie);
+  const page2RowCount = (page2.text.match(/<td class="store-orders-actions-col">/g) || []).length;
+  assert.equal(page2RowCount, expectedTotal - 50, 'page 2 should show the remaining orders');
+  assert.match(page2.text, /href="\/main-admin\/store\?tab=orders&amp;page=1">.*Prev/);
+});

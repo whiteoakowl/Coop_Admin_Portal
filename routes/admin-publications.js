@@ -9,12 +9,25 @@ const router = express.Router();
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const publications = require('../utils/publications');
 const auditLog = require('../utils/auditLog');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_publications'));
 
 router.get('/', async (req, res) => {
-  const items = await publications.listPublications();
-  res.render('admin-publications-list', { title: 'Publications', items, notice: req.query.notice || null });
+  // Full, unbounded publications list - never large enough to be a query
+  // bottleneck (see utils/pagination.js's own header comment), but
+  // unpaginated this rendered years of articles as one giant table.
+  const allItems = await publications.listPublications();
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(allItems, parsePage(req.query.page), pageSize);
+  res.render('admin-publications-list', {
+    title: 'Publications',
+    items: pagination.items,
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: '/main-admin/publications?',
+    notice: req.query.notice || null,
+  });
 });
 
 router.post('/', async (req, res) => {
