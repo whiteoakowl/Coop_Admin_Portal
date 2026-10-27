@@ -325,3 +325,30 @@ test('unpublishing removes a publication from the public listing again', async (
   const view = await request(app).get(`/publications/${id}`);
   assert.equal(view.status, 404);
 });
+
+// Pagination: years of articles used to render as one unbounded table
+// (utils/pagination.js's own in-memory paginate(), not a second SQL
+// round-trip - see its header comment).
+test('Main Admin Publications list paginates past the default page size', async () => {
+  const admin = await loginAsMainAdmin();
+  // A few publications already exist from earlier tests in this file -
+  // only the count ADDED here (past DEFAULT_PAGE_SIZE) matters.
+  const existingTotal = Number((await db.prepare('SELECT COUNT(*) AS n FROM publications').get()).n);
+  const ADDED_PUBLICATIONS = 55; // > utils/pagination.js's DEFAULT_PAGE_SIZE (50)
+  for (let i = 0; i < ADDED_PUBLICATIONS; i++) {
+    await db.prepare(`INSERT INTO publications (title, body_html) VALUES (?, '')`).run(`Bulk Article ${i}`);
+  }
+  const expectedTotal = existingTotal + ADDED_PUBLICATIONS;
+
+  const page1 = await request(app).get('/main-admin/publications').set('Cookie', admin.cookie);
+  assert.equal(page1.status, 200);
+  const rowCount = (page1.text.match(/<tr>\s*<td><a href="\/main-admin\/publications\//g) || []).length;
+  assert.equal(rowCount, 50, 'page 1 should show only the first 50 publications');
+  assert.match(page1.text, /class="pagination-bar no-print"/);
+  assert.match(page1.text, new RegExp(`Showing 1&ndash;50 of ${expectedTotal}`));
+  assert.match(page1.text, /href="\/main-admin\/publications\?page=2">Next/);
+
+  const page2 = await request(app).get('/main-admin/publications?page=2').set('Cookie', admin.cookie);
+  const page2RowCount = (page2.text.match(/<tr>\s*<td><a href="\/main-admin\/publications\//g) || []).length;
+  assert.equal(page2RowCount, expectedTotal - 50, 'page 2 should show the remaining publications');
+});

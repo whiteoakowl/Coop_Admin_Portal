@@ -18,6 +18,7 @@ const { requirePortalAuth, requirePortal, requirePortalPermission } = require('.
 const { documentFileFilter, imageFileFilter, DOCUMENT_MIME_BY_EXT } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, downloadFile, generateKey, createSignedUploadUrl } = require('../utils/storage');
 const { roleKeysByDocument, setDocumentRoleKeys } = require('../utils/documents');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_documents'));
 
@@ -59,18 +60,30 @@ function generatePublicToken() {
 }
 
 router.get('/', async (req, res) => {
-  const documents = await db.prepare('SELECT * FROM documents ORDER BY LOWER(title)').all();
+  // Full, unbounded document list - never large enough to be a query
+  // bottleneck (see utils/pagination.js's own header comment), but
+  // unpaginated this rendered years of uploads as one giant card grid.
+  const allDocuments = await db.prepare('SELECT * FROM documents ORDER BY LOWER(title)').all();
   // A real request: "when clicking edit icon you can control which
   // portals can view the documents" - every document's own role keys,
   // pre-filling each one's edit popup's checkboxes.
   const rolesByDoc = await roleKeysByDocument();
-  documents.forEach((d) => {
+  allDocuments.forEach((d) => {
     d.roleKeys = rolesByDoc.get(d.id) || [];
   });
   const roles = await db.prepare('SELECT key, label FROM roles ORDER BY label').all();
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(allDocuments, parsePage(req.query.page), pageSize);
   res.render('main-admin-documents', {
     title: 'Documents',
-    documents,
+    documents: pagination.items,
+    // The "Uploaded Documents" manage popup lists (and lets an admin
+    // delete) every document regardless of which card-grid page is open
+    // on screen - it's a management list, not the paginated card grid.
+    allDocuments,
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: '/main-admin/documents?',
     roles,
     storageConfigured: !!createStorageClient(),
     publicOrigin: `${req.protocol}://${req.get('host')}`,
