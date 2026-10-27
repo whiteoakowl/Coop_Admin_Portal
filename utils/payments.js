@@ -80,6 +80,38 @@ async function amountPaidForCharge(chargeId) {
   return Number((await db.prepare('SELECT COALESCE(SUM(amount_cents), 0) AS s FROM payment_payments WHERE charge_id = ?').get(chargeId)).s);
 }
 
+// A real bug: a discount/credit/exemption adjustment (ADJUSTMENT_TYPES
+// below, all stored as a negative payment_payments row same as a real
+// refund) was treated by recalculateStatus/balanceForMember as if real
+// money had been collected and handed back - a $30 discount on a
+// never-paid $100 charge flipped it straight to 'refunded' and made the
+// $70 still owed vanish from balanceForMember entirely, instead of
+// reducing what's owed to $70. A discount/credit/exemption never
+// involved real cash moving either direction, so it has to lower the
+// EFFECTIVE amount owed on the charge instead of counting as money
+// paid-then-refunded. Only a genuine 'refund' row represents real money
+// actually given back.
+async function effectiveChargeAmount(charge) {
+  const reduced = Number(
+    (
+      await db
+        .prepare("SELECT COALESCE(SUM(amount_cents), 0) AS s FROM payment_payments WHERE charge_id = ? AND adjustment_type IN ('discount', 'credit', 'exemption')")
+        .get(charge.id)
+    ).s
+  );
+  return charge.amount_cents + reduced; // reduced is already <= 0
+}
+
+async function netCashForCharge(chargeId) {
+  return Number(
+    (
+      await db
+        .prepare("SELECT COALESCE(SUM(amount_cents), 0) AS s FROM payment_payments WHERE charge_id = ? AND (adjustment_type IS NULL OR adjustment_type = 'refund')")
+        .get(chargeId)
+    ).s
+  );
+}
+
 // Recomputes and saves a charge's own status from its real payment rows
 // - never set directly by a route. A charge already 'cancelled' stays
 // cancelled regardless of what's been paid against it (a cancelled
@@ -89,14 +121,18 @@ async function amountPaidForCharge(chargeId) {
 async function recalculateStatus(chargeId) {
   const charge = await getCharge(chargeId);
   if (!charge || charge.status === 'cancelled') return;
-  const paid = await amountPaidForCharge(chargeId);
-  // A refund row (any negative payment_payments amount) is what tells
-  // "not yet paid" apart from "was paid, then refunded" - both can net
-  // to the same running total otherwise.
-  const hasRefund = await db.prepare('SELECT 1 FROM payment_payments WHERE charge_id = ? AND amount_cents < 0').get(chargeId);
+  const effectiveAmount = await effectiveChargeAmount(charge);
+  const netCash = await netCashForCharge(chargeId);
+  // A genuine refund row (never a discount/credit/exemption - see
+  // effectiveChargeAmount above) is what tells "not yet paid" apart from
+  // "was paid, then refunded" - both can net to the same running total
+  // otherwise.
+  const hasRefund = await db
+    .prepare("SELECT 1 FROM payment_payments WHERE charge_id = ? AND amount_cents < 0 AND (adjustment_type IS NULL OR adjustment_type = 'refund')")
+    .get(chargeId);
   let status;
-  if (paid >= charge.amount_cents) status = 'paid';
-  else if (paid <= 0) status = hasRefund ? 'refunded' : 'pending';
+  if (netCash >= effectiveAmount) status = 'paid'; // includes a fully-discounted-to-zero charge - nothing left owed either way
+  else if (netCash <= 0) status = hasRefund ? 'refunded' : 'pending';
   else status = hasRefund ? 'partially_refunded' : 'pending';
   await db.prepare('UPDATE payment_charges SET status = ?, updated_at = now_text() WHERE id = ?').run(status, chargeId);
   await recalculateParkedStatus(charge.member_id);
@@ -179,8 +215,9 @@ async function balanceForMember(memberId) {
   const charges = await db.prepare("SELECT id, amount_cents FROM payment_charges WHERE member_id = ? AND status = 'pending'").all(memberId);
   let owed = 0;
   for (const c of charges) {
-    const paid = await amountPaidForCharge(c.id);
-    owed += Math.max(0, c.amount_cents - paid);
+    const effectiveAmount = await effectiveChargeAmount(c);
+    const netCash = await netCashForCharge(c.id);
+    owed += Math.max(0, effectiveAmount - netCash);
   }
   return owed;
 }
