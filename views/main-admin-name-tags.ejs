@@ -40,7 +40,14 @@
               href="/main-admin/name-tags?tab=requests<%= showArchived ? '' : '&archived=1' %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>"
             >Archived</a>
           </div>
-          <div class="roster-btn-row">
+          <%# A real request: "icons and buttons should not be in
+              columns, they should be in rows" - this row's children are
+              .icon-btn, not .roster-action-btn/.btn-secondary, so
+              public/js/roster-btn-row-grid.js's own column-count calc
+              (which only counts those) sees zero items and never sets an
+              explicit column count, leaving the row's mobile `display:
+              grid` (styles.css) at one implicit column. %>
+          <div class="roster-btn-row" data-fixed-columns="3">
             <a class="icon-btn" href="/main-admin/name-tags/requests/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
             <a class="icon-btn" href="/main-admin/name-tags/requests/print?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
             <a class="icon-btn" href="/main-admin/name-tags/requests/download.pdf?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>

@@ -16,7 +16,16 @@
           <a class="roster-action-btn" href="/main-admin/events/new">+ New Event</a>
         <% } %>
       </div>
-      <div class="roster-btn-row no-print">
+      <%# A real request: "icons and buttons should not be in columns,
+          they should be in rows" - this row's children are .icon-btn, not
+          .roster-action-btn/.btn-secondary, so public/js/roster-btn-row-
+          grid.js's own column-count calc (which only counts those) sees
+          zero items and never sets an explicit column count, leaving the
+          row's mobile `display: grid` (styles.css) at one implicit
+          column. The actual icon count here varies by tab (0/2/4), so
+          data-fixed-columns is computed the same way the icons below it
+          are conditionally rendered, instead of a single static number. %>
+      <div class="roster-btn-row no-print" data-fixed-columns="<%= activeTab === 'calendar' ? 4 : (activeTab !== 'settings' && activeTab !== 'registrationlog' ? 2 : 0) %>">
         <% if (activeTab === 'calendar') { %>
           <a class="icon-btn" href="/main-admin/events/print?view=<%= calendarView %>&month=<%= monthParam %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
           <a class="icon-btn" href="/main-admin/events/download.pdf?view=<%= calendarView %>&month=<%= monthParam %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
@@ -190,7 +199,10 @@
           <input type="date" name="date" value="<%= dateFilter %>" aria-label="Filter by date" onchange="this.form.requestSubmit()" />
         </form>
         <% if (dateFilter) { %><a class="roster-action-btn" href="/main-admin/events?tab=registrationlog">Clear</a><% } %>
-        <div class="roster-btn-row">
+        <%# A real request: "icons and buttons should not be in columns,
+            they should be in rows" - see this view's own earlier matching
+            comment. %>
+        <div class="roster-btn-row" data-fixed-columns="3">
           <a class="icon-btn" href="/main-admin/events/registrationlog/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
           <a class="icon-btn" href="/main-admin/events/registrationlog/print<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
           <a class="icon-btn" href="/main-admin/events/registrationlog/download.pdf<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>

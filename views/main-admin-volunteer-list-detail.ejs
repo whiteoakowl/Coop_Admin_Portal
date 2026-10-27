@@ -24,7 +24,14 @@
           <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
         </form>
       </div>
-      <div class="roster-btn-row">
+      <%# A real request: "icons and buttons should not be in columns,
+          they should be in rows" - this row's children are .icon-btn, not
+          .roster-action-btn/.btn-secondary, so public/js/roster-btn-row-
+          grid.js's own column-count calc (which only counts those) sees
+          zero items and never sets an explicit column count, leaving the
+          row's mobile `display: grid` (styles.css) at one implicit
+          column. %>
+      <div class="roster-btn-row" data-fixed-columns="3">
         <%# A real request: "All print button should show a print preview
             full real page on a page with a print button." %>
         <a class="icon-btn" href="/main-admin/volunteers/volunteer-lists/<%= list.id %>/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>

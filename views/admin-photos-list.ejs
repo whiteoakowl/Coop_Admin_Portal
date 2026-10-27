@@ -95,7 +95,14 @@
               </form>
             </div>
           <% } %>
-          <div class="roster-btn-row photo-album-card-icons">
+          <%# A real request: "icons and buttons should not be in
+              columns, they should be in rows" - this row's children are
+              .icon-btn/form>.icon-btn, not .roster-action-btn/
+              .btn-secondary, so public/js/roster-btn-row-grid.js's own
+              column-count calc (which only counts those) sees zero items
+              and never sets an explicit column count, leaving the row's
+              mobile `display: grid` (styles.css) at one implicit column. %>
+          <div class="roster-btn-row photo-album-card-icons" data-fixed-columns="3">
             <a class="icon-btn" href="/main-admin/photos/<%= a.id %>/edit" aria-label="Edit <%= a.title %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></a>
             <a class="icon-btn" href="/photos/<%= a.id %>/download" aria-label="Export <%= a.title %>" title="Export"><svg class="icon"><use href="#icon-download"/></svg></a>
             <form method="POST" action="/main-admin/photos/<%= a.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= a.title %>&quot; and all its photos? This cannot be undone.">

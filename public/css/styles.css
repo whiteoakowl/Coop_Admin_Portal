@@ -5231,6 +5231,19 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
     flex: 1 1 auto;
     min-width: 0;
   }
+  /* A real request: "Let the search bar fill the rest of the row on
+     mobile" reversed an earlier fixed 7rem shrink that was here (see git
+     history) - Filter and Bulk Edit are both flex: 0 0 auto (fixed to
+     their own content width, not shrinkable, from .members-search-
+     filter-row .roster-action-btn above), so the search bar's flex: 1 1
+     auto from the shared rule above already fills whatever space is left
+     without squeezing either button. This :has(#bulk-edit-btn) rule now
+     just restates that explicitly for this row rather than overriding
+     it. */
+  .members-search-filter-row:has(#bulk-edit-btn) .members-search-bar {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
   .members-search-go-btn {
     margin-left: 0.35rem;
     padding: 0.5rem 0.7rem;
@@ -8590,10 +8603,18 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
    grid.js's own inline grid-template-columns is harmlessly ignored once
    display is flex instead of grid. */
 @media (max-width: 640px) {
+  /* A real request: "The buttons and icons rows should be under the
+     title neatly. Left side aligned." - centered wrapped button groups
+     floated with uneven side margins instead of reading as one tight
+     toolbar; left-aligned matches this class's own existing desktop
+     behavior (never centered there - see this file's own comment lower
+     down) and the .fs-attendance-row-left override a past identical
+     complaint already needed on one page (now redundant, left in place
+     harmlessly - same value either way). */
   .roster-btn-row-fit-text {
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
+    justify-content: flex-start;
   }
   /* .btn-secondary/.primary-btn added for a later bug report (the
      Instructor Profile edit dialog's own Cancel/Save row): same stacked-
@@ -8631,6 +8652,37 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
   .roster-btn-row-fit-text.floater-assignments-btn-row .roster-action-btn {
     font-size: 0.72rem;
     padding: 0.35rem 0.5rem;
+  }
+  /* A real request: "Orange buttons shrink to fit more on each row side
+     by side" (Main Admin Members: + Add Member/Add-Edit Family/Grade
+     Level Report/Filter/Bulk Edit) - same shrink as Floater Assignments'
+     own row just above, scoped to every row on this page instead. Not
+     prefixed with .roster-btn-row-fit-text - the Select All/Bulk Edit/
+     icon row below is .class-schedule-archive-controls instead (a real
+     request: "import, export, pdf and print icons next to bulk edit
+     button on the same row"), but .main-admin-members-btn-row alone
+     already scopes this to just this page's own rows either way. */
+  .main-admin-members-btn-row .roster-action-btn {
+    font-size: 0.72rem;
+    padding: 0.35rem 0.5rem;
+  }
+  /* .class-schedule-archive-controls carries no flex-wrap of its own
+     (every other page using it - Class Schedule's own archive controls -
+     only ever holds the Select All checkbox + one button, which never
+     needed to wrap) and its .roster-action-btn (Bulk Edit) inherits the
+     site-wide mobile `.roster-action-btn { width: 100%; ... }` rule just
+     above (unscoped - applies everywhere, not just inside .roster-btn-
+     row) that stretches it to fill the row. A real request: "Bulk edit
+     button shrink to fit to text" - overridden back to its own content
+     width here, same as every .roster-btn-row-fit-text row's own
+     .roster-action-btn override elsewhere in this file. */
+  .class-schedule-archive-controls.main-admin-members-btn-row {
+    flex-wrap: wrap;
+  }
+  .class-schedule-archive-controls.main-admin-members-btn-row .roster-action-btn {
+    width: auto;
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
   /* A real request: "choose a date and semester/day drop down should be
      on the same row, shrink to fit." Visually hides each dropdown's own
