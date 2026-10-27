@@ -1286,48 +1286,68 @@ async function chargeForConfirmedRegistration(tx, event, member, accountId, tick
 // target - only "already registered" is re-checked here since it's cheap
 // and both callers need it.
 async function createOrReactivateRegistration(event, member, accountId, answers = {}, { allowWaitlist = true, ticketTypeId = null } = {}) {
-  const existing = await db.prepare("SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ? AND status != 'cancelled'").get(event.id, member.id);
-  if (existing) return { ok: false, error: `${member.name} is already registered for that event.` };
-
-  const confirmedCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM event_registrations WHERE event_id = ? AND status = 'confirmed'").get(event.id)).c);
-  const familyCount = Number(
-    (
-      await db
-        .prepare(
-          `SELECT COUNT(DISTINCT COALESCE(m.family_id, -m.id)) AS c FROM event_registrations er
-           JOIN members m ON m.id = er.member_id
-           WHERE er.event_id = ? AND er.status = 'confirmed' AND COALESCE(m.family_id, -m.id) != ?`
-        )
-        .get(event.id, member.family_id ?? -member.id)
-    ).c
-  );
-  const overCapacity = event.capacity != null && confirmedCount >= event.capacity;
-  // A family cap only blocks a *new* family from registering, once
-  // event.family_capacity families already have someone confirmed - a
-  // second (or third) member of a family that's already in doesn't count
-  // as a new family, so they're never blocked by this cap on their own.
-  const alreadyInFamily = await db
-    .prepare(
-      `SELECT 1 FROM event_registrations er JOIN members m ON m.id = er.member_id
-       WHERE er.event_id = ? AND er.status = 'confirmed' AND COALESCE(m.family_id, -m.id) = ?`
-    )
-    .get(event.id, member.family_id ?? -member.id);
-  const overFamilyCapacity = event.family_capacity != null && !alreadyInFamily && familyCount >= event.family_capacity;
-
-  const isFull = overCapacity || overFamilyCapacity;
-  // A real request: "allow waiting list signups (only applicable when
-  // Max Allowed is reached)" - allowWaitlist is registerForEvent's own
-  // member-facing setting; adminAddRegistrations never passes it, so an
-  // admin's own manual add still always bypasses this, same as every
-  // other member-facing registration rule.
-  if (isFull && !allowWaitlist) return { ok: false, error: `"${event.title}" is full and not accepting waitlist signups.` };
-  const status = isFull ? 'waitlisted' : 'confirmed';
-  let waitlistPosition = null;
-  let chargeId = null;
-
-  const previouslyCancelled = await db.prepare("SELECT id FROM event_registrations WHERE event_id = ? AND member_id = ? AND status = 'cancelled'").get(event.id, member.id);
-
+  let result;
   await db.withTransaction(async (tx) => {
+    // A real bug: the capacity/family-capacity counts just below used to
+    // run on the plain outer `db` connection, then the actual INSERT ran
+    // afterward in its own transaction - a read-then-write gap wide
+    // enough for two members racing for the very last open slot to both
+    // read "still room," both decide 'confirmed', and both get inserted,
+    // overselling a capacity-limited event. Locking this event's own row
+    // first (and running every count/check below on `tx`, not `db`)
+    // makes a second registration for the SAME event wait for the first
+    // one's transaction to finish before it can even read the counts, so
+    // only one of two simultaneous requests for the last slot can ever
+    // win it - a different event's own registrations are untouched.
+    await tx.prepare('SELECT 1 FROM events WHERE id = ? FOR UPDATE').get(event.id);
+
+    const existing = await tx.prepare("SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ? AND status != 'cancelled'").get(event.id, member.id);
+    if (existing) {
+      result = { ok: false, error: `${member.name} is already registered for that event.` };
+      return;
+    }
+
+    const confirmedCount = Number((await tx.prepare("SELECT COUNT(*) AS c FROM event_registrations WHERE event_id = ? AND status = 'confirmed'").get(event.id)).c);
+    const familyCount = Number(
+      (
+        await tx
+          .prepare(
+            `SELECT COUNT(DISTINCT COALESCE(m.family_id, -m.id)) AS c FROM event_registrations er
+             JOIN members m ON m.id = er.member_id
+             WHERE er.event_id = ? AND er.status = 'confirmed' AND COALESCE(m.family_id, -m.id) != ?`
+          )
+          .get(event.id, member.family_id ?? -member.id)
+      ).c
+    );
+    const overCapacity = event.capacity != null && confirmedCount >= event.capacity;
+    // A family cap only blocks a *new* family from registering, once
+    // event.family_capacity families already have someone confirmed - a
+    // second (or third) member of a family that's already in doesn't count
+    // as a new family, so they're never blocked by this cap on their own.
+    const alreadyInFamily = await tx
+      .prepare(
+        `SELECT 1 FROM event_registrations er JOIN members m ON m.id = er.member_id
+         WHERE er.event_id = ? AND er.status = 'confirmed' AND COALESCE(m.family_id, -m.id) = ?`
+      )
+      .get(event.id, member.family_id ?? -member.id);
+    const overFamilyCapacity = event.family_capacity != null && !alreadyInFamily && familyCount >= event.family_capacity;
+
+    const isFull = overCapacity || overFamilyCapacity;
+    // A real request: "allow waiting list signups (only applicable when
+    // Max Allowed is reached)" - allowWaitlist is registerForEvent's own
+    // member-facing setting; adminAddRegistrations never passes it, so an
+    // admin's own manual add still always bypasses this, same as every
+    // other member-facing registration rule.
+    if (isFull && !allowWaitlist) {
+      result = { ok: false, error: `"${event.title}" is full and not accepting waitlist signups.` };
+      return;
+    }
+    const status = isFull ? 'waitlisted' : 'confirmed';
+    let waitlistPosition = null;
+    let chargeId = null;
+
+    const previouslyCancelled = await tx.prepare("SELECT id FROM event_registrations WHERE event_id = ? AND member_id = ? AND status = 'cancelled'").get(event.id, member.id);
+
     if (status === 'confirmed') {
       chargeId = await chargeForConfirmedRegistration(tx, event, member, accountId, ticketTypeId);
     } else {
@@ -1358,13 +1378,14 @@ async function createOrReactivateRegistration(event, member, accountId, answers 
         .prepare('INSERT INTO event_registration_answers (registration_id, extra_field_id, value) VALUES (?, ?, ?)')
         .run(registrationId, extraFieldId, value);
     }
-  });
 
-  const notice =
-    status === 'confirmed'
-      ? `${member.name} is registered for "${event.title}".`
-      : `${event.title} is full - ${member.name} has been added to the waitlist (#${waitlistPosition}).`;
-  return { ok: true, notice, status, waitlistPosition };
+    const notice =
+      status === 'confirmed'
+        ? `${member.name} is registered for "${event.title}".`
+        : `${event.title} is full - ${member.name} has been added to the waitlist (#${waitlistPosition}).`;
+    result = { ok: true, notice, status, waitlistPosition };
+  });
+  return result;
 }
 
 // { ok: false, error } or { ok: true, notice, status, waitlistPosition }
