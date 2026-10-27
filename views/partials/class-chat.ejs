@@ -3,7 +3,12 @@
     Chat tab (only rendered at all when the class's allow_parent_chat
     setting is on - see routes/parent-portal.js's own comment). `body`
     is plain text (no rich-text editor here, unlike a forum post), so it's
-    rendered escaped, not raw. locals: chatMessages, postUrl. %>
+    rendered escaped, not raw. locals: chatMessages, postUrl, plus the
+    optional pagination/viewingAll/baseHref trio (Co-op Admin's own route
+    paginates, defaulting to the newest page - see routes/admin-class-
+    schedule.js's own comment; Parent Portal doesn't pass these yet, so
+    its own feed keeps showing in full exactly as before). %>
+<% var hasPagination = typeof pagination !== 'undefined' && pagination; %>
 <div class="roster-log-list">
   <% if (chatMessages.length === 0) { %>
     <p class="roster-log-empty">No messages yet.</p>
@@ -16,6 +21,9 @@
     </div>
   <% }); %>
 </div>
+<% if (hasPagination) { %>
+  <%- include('pagination-controls', { pagination, baseHref, viewingAll }) %>
+<% } %>
 <form method="POST" action="<%= postUrl %>" class="stack-form">
   <label class="member-form-full">Message
     <textarea name="body" rows="2" required></textarea>

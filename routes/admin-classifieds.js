@@ -26,6 +26,7 @@ const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = require('../utils/storage');
 const classifieds = require('../utils/classifieds');
 const auditLog = require('../utils/auditLog');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_classifieds'));
 
@@ -56,9 +57,18 @@ router.get('/', async (req, res) => {
   let groups = [];
   let archived = [];
   let requests = [];
+  let pagination = null;
+  let viewingAll = false;
+  let baseHref = null;
   if (activeTab === 'categories') groups = await classifieds.activeListingsByCategory();
-  else if (activeTab === 'archive') archived = await classifieds.archivedListings();
-  else requests = await classifieds.listListings({ status: 'pending' });
+  else if (activeTab === 'archive') {
+    const allArchived = await classifieds.archivedListings();
+    const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+    pagination = paginate(allArchived, parsePage(req.query.page), pageSize);
+    archived = pagination.items;
+    viewingAll = pageSize === Infinity;
+    baseHref = '/main-admin/classifieds?tab=archive&';
+  } else requests = await classifieds.listListings({ status: 'pending' });
 
   res.render('admin-classifieds-list', {
     title: 'Classifieds',
@@ -67,6 +77,9 @@ router.get('/', async (req, res) => {
     groups,
     archived,
     requests,
+    pagination,
+    viewingAll,
+    baseHref,
     notice: req.query.notice || null,
     error: req.query.error || null,
   });

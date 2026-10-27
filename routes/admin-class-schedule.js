@@ -33,6 +33,7 @@ const {
   gradeAssignmentSubmission,
 } = require('../utils/academics');
 const { primaryParentsFor } = require('../utils/scheduleCardData');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 // A real request: "after charge per add a dropdown choice for account
 // category" - reuses Events' own admin-managed accounting category list
 // (utils/events.js) rather than standing up a second, parallel list.
@@ -479,11 +480,27 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, r
   }
 
   let chatMessages = [];
+  let chatPagination = null;
+  let chatViewingAll = false;
+  let chatBaseHref = null;
   if (activeTab === 'chat') {
-    chatMessages = (await db.prepare('SELECT * FROM class_chat_messages WHERE class_id = ? ORDER BY id ASC').all(id)).map((m) => ({
+    const allChatMessages = (await db.prepare('SELECT * FROM class_chat_messages WHERE class_id = ? ORDER BY id ASC').all(id)).map((m) => ({
       ...m,
       createdAtLabel: formatFriendlyTimestamp(m.created_at),
     }));
+    // A long-lived class chat feed should land on its newest messages by
+    // default, not page 1 of history - same paginate() + pagination-
+    // controls pattern as every other paginated list, just defaulting the
+    // requested page to the LAST one when ?page= isn't explicitly given.
+    // pageSize=Infinity ('View All') has no "last page" to default to -
+    // paginate() itself already collapses totalPages to 1 for it.
+    const chatPageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+    const chatTotalPages = chatPageSize === Infinity ? 1 : Math.max(1, Math.ceil(allChatMessages.length / chatPageSize));
+    const requestedChatPage = req.query.page ? parsePage(req.query.page) : chatTotalPages;
+    chatPagination = paginate(allChatMessages, requestedChatPage, chatPageSize);
+    chatMessages = chatPagination.items;
+    chatViewingAll = chatPageSize === Infinity;
+    chatBaseHref = `/admin/class-schedule/classes/${id}/manage?tab=chat&`;
   }
 
   res.render('admin-class-schedule-manage', {
@@ -505,6 +522,9 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, r
     classImageUrl: classImageUrl(cls.image_key),
     assignments,
     chatMessages,
+    chatPagination,
+    chatViewingAll,
+    chatBaseHref,
     // Duplicate Class dialog's own "which semester/day" dropdown (a real
     // request) - every class_schedules combo this class could be copied
     // onto, including the one it's already on (duplicating onto the

@@ -147,6 +147,8 @@
         <% }); %>
       </div>
 
+      <%- include('partials/pagination-controls', { pagination, baseHref, viewingAll }) %>
+
       <% if (!category.is_chat_room && canModerate) { %>
         <div class="manage-section">
           <div class="grid-box-header"><h2>Move Thread</h2></div>
