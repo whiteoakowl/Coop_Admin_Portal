@@ -14,7 +14,7 @@ const path = require('path');
 const fs = require('fs');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const { requirePortalPermission } = require('../middleware/portalAuth');
-const { imageFileFilter } = require('../utils/uploads');
+const { imageFileFilter, spreadsheetFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, generateKey } = require('../utils/storage');
 const { formatFriendlyTimestamp, formatFriendlyDateAndTime, formatDateLabel } = require('../utils/dates');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
@@ -799,7 +799,11 @@ router.get('/import-template.xlsx', (req, res) => {
   res.send(buffer);
 });
 
-const importUpload = multer({ storage: multer.memoryStorage() });
+// Same spreadsheetFileFilter/1MB cap every other "Import" button in this
+// app uses for a readRowsFromFile upload (utils/uploads.js's own
+// comment) - missing here before let an arbitrary file type through and
+// had no size limit at all, unlike every sibling import route.
+const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 router.post('/import', importUpload.single('file'), async (req, res) => {
   if (!req.file) return res.redirect('/main-admin/events?error=' + encodeURIComponent('Please choose a file to import.'));
   let rows;
@@ -1554,7 +1558,9 @@ router.get('/:id/registrations/import-template.xlsx', (req, res) => {
   res.send(buffer);
 });
 
-const registrationsImportUpload = multer({ storage: multer.memoryStorage() });
+// Same fix as the events importUpload above - a spreadsheetFileFilter/
+// 1MB cap, matching every other readRowsFromFile import route.
+const registrationsImportUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 router.post('/:id/registrations/import', registrationsImportUpload.single('file'), async (req, res) => {
   const eventId = req.params.id;
   if (!req.file) return res.redirect(`/main-admin/events/${eventId}/registrations?error=` + encodeURIComponent('Please choose a file to import.'));
