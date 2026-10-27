@@ -173,11 +173,39 @@ async function hasInfantChild(memberId) {
 // re-querying its own - callers without one handy (Absence/Late) can just
 // omit it. member_type is included on every entry so a view can label
 // family members by their real type too, not just the top-level pick.
+// A real performance issue: this used to call familyOf(m.id) (2 queries
+// of its own) once per member in a plain for-loop - on the public,
+// no-login /absence and /name-tag forms, `members` defaults to every
+// active member in the co-op, so loading either page fired up to 2x that
+// many sequential round trips before the page could even render. Batched
+// into 2 queries total regardless of list size: everyone's own family_id
+// in one IN(...), then every active member of any of those families in
+// one more, grouped back out per member in memory.
 async function familyGroupsByMember(members) {
   const list = members || (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).sort(byLastName);
   const byMember = {};
+  if (list.length === 0) return byMember;
+
+  const ids = list.map((m) => m.id);
+  const idPlaceholders = ids.map(() => '?').join(',');
+  const selves = await db.prepare(`SELECT id, family_id FROM members WHERE id IN (${idPlaceholders})`).all(...ids);
+  const familyIdByMemberId = new Map(selves.map((s) => [s.id, s.family_id]));
+
+  const familyIds = [...new Set(selves.map((s) => s.family_id).filter((id) => id != null))];
+  let familyMembersById = new Map();
+  if (familyIds.length > 0) {
+    const familyPlaceholders = familyIds.map(() => '?').join(',');
+    const familyMembers = (await db.prepare(`SELECT * FROM members WHERE family_id IN (${familyPlaceholders}) AND active = 1`).all(...familyIds)).sort(byLastName);
+    for (const fm of familyMembers) {
+      if (!familyMembersById.has(fm.family_id)) familyMembersById.set(fm.family_id, []);
+      familyMembersById.get(fm.family_id).push(fm);
+    }
+  }
+
   for (const m of list) {
-    byMember[m.id] = (await familyOf(m.id)).map((fm) => ({ id: fm.id, name: fm.name, member_type: fm.member_type }));
+    const familyId = familyIdByMemberId.get(m.id);
+    const familyMembers = familyId != null ? familyMembersById.get(familyId) || [] : [];
+    byMember[m.id] = familyMembers.filter((fm) => fm.id !== m.id).map((fm) => ({ id: fm.id, name: fm.name, member_type: fm.member_type }));
   }
   return byMember;
 }

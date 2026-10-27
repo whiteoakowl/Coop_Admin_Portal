@@ -193,6 +193,52 @@ test('a parent can register themselves and their family, and capacity waitlists 
   );
 });
 
+// Family capacity (capacityType: 'family') had no test coverage at all -
+// a cap on how many DIFFERENT families can have someone confirmed, not
+// on how many people total. A second member of a family already in
+// never counts against it on their own (utils/events.js's own
+// alreadyInFamily check), but a new family does, once the cap is hit.
+test('family capacity caps how many different families can register, not how many people', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin, { title: 'One Family Potluck', visibility: 'public', capacityValue: '1', capacityType: 'family' });
+  await publishEvent(admin, eventId);
+
+  const familyA = await createParentAccount(1);
+  const familyAChild = familyA.familyMemberIds[0];
+  const familyB = await createParentAccount();
+
+  const first = await request(app)
+    .post(`/events/${eventId}/register`)
+    .set('Cookie', familyA.cookie)
+    .type('form')
+    .send({ memberId: String(familyA.memberId), _csrf: familyA.csrfToken });
+  assert.doesNotMatch(decodeURIComponent(first.headers.location), /waitlist/);
+
+  // A second member of the SAME family - should still confirm, since the
+  // family cap only blocks a brand new family from registering.
+  const secondSameFamily = await request(app)
+    .post(`/events/${eventId}/register`)
+    .set('Cookie', familyA.cookie)
+    .type('form')
+    .send({ memberId: String(familyAChild), _csrf: familyA.csrfToken });
+  assert.doesNotMatch(decodeURIComponent(secondSameFamily.headers.location), /waitlist/);
+
+  // A different family entirely - the family cap (1) is already met, so
+  // this one waitlists even though only 2 people total are registered.
+  const differentFamily = await request(app)
+    .post(`/events/${eventId}/register`)
+    .set('Cookie', familyB.cookie)
+    .type('form')
+    .send({ memberId: String(familyB.memberId), _csrf: familyB.csrfToken });
+  assert.match(decodeURIComponent(differentFamily.headers.location), /waitlist/);
+
+  const rows = await db.prepare('SELECT member_id, status FROM event_registrations WHERE event_id = ? ORDER BY id').all(eventId);
+  assert.deepEqual(
+    rows.map((r) => r.status),
+    ['confirmed', 'confirmed', 'waitlisted']
+  );
+});
+
 // A real request: "allow waiting list signups (only applicable when Max
 // Allowed is reached)" - when off, a full event rejects a new
 // registration outright instead of waitlisting it.
