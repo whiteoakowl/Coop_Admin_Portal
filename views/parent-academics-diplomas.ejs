@@ -17,78 +17,12 @@
       <p class="roster-empty">No students are linked to your family yet. Contact an admin if this looks wrong.</p>
     <% } %>
 
+    <%# The per-student designer itself (card + Edit Design dialog) is
+        shared with Main Admin's own Diplomas page (any student, not
+        just one's own children) - see views/partials/diploma-student-
+        builder.ejs. %>
     <% diplomas.forEach(function(rec) { %>
-      <section class="portal-dashboard-card portal-dashboard-card-wide">
-        <h2><%= rec.child.name %></h2>
-        <% if (rec.diploma) { %>
-          <%- include('partials/diploma-certificate', { diploma: rec.diploma, member: rec.child, compact: true }) %>
-          <div class="roster-btn-row">
-            <a class="roster-action-btn print-action-btn" href="/parent/academics/diplomas/<%= rec.child.id %>/print" target="_blank">Print</a>
-            <a class="icon-btn" href="/parent/academics/diplomas/<%= rec.child.id %>/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
-            <button type="button" class="roster-action-btn" onclick="document.getElementById('diploma-dialog-<%= rec.child.id %>').showModal()">Edit Design</button>
-          </div>
-        <% } else { %>
-          <p class="roster-empty">No diploma designed yet.</p>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('diploma-dialog-<%= rec.child.id %>').showModal()">Design a Diploma</button>
-        <% } %>
-      </section>
-
-      <dialog id="diploma-dialog-<%= rec.child.id %>" class="member-picker-dialog diploma-design-dialog">
-        <form method="POST" action="/parent/academics/diplomas">
-          <h3>Diploma for <%= rec.child.name %></h3>
-          <input type="hidden" name="studentId" value="<%= rec.child.id %>" />
-
-          <div class="diploma-design-preview">
-            <%- include('partials/diploma-certificate', { diploma: rec.diploma, member: rec.child }) %>
-          </div>
-
-          <div class="member-form-grid">
-            <label class="member-form-full">Title
-              <input type="text" name="title" value="<%= rec.diploma ? rec.diploma.title : 'Diploma of Completion' %>" required />
-            </label>
-            <label>Name on Diploma <span class="hint">(edit if different from their account name)</span>
-              <input type="text" name="displayName" value="<%= (rec.diploma && rec.diploma.display_name) || rec.child.name %>" />
-            </label>
-            <label>Issue Date
-              <input type="date" name="issuedDate" value="<%= rec.diploma ? rec.diploma.issued_date : todayISO %>" required />
-            </label>
-            <label>Template
-              <select name="template">
-                <% DIPLOMA_TEMPLATES.forEach(function(t) { %>
-                  <option value="<%= t %>" <%= rec.diploma && rec.diploma.template === t ? 'selected' : '' %>><%= t.charAt(0).toUpperCase() + t.slice(1) %></option>
-                <% }); %>
-              </select>
-            </label>
-            <label>Color
-              <input type="color" name="color" value="<%= (rec.diploma && rec.diploma.color) || '#2e6da4' %>" />
-            </label>
-            <label class="member-form-full">Body Text <span class="hint">(optional wording shown on the printed diploma)</span>
-              <textarea name="bodyText" rows="3"><%= rec.diploma ? (rec.diploma.body_text || '') : '' %></textarea>
-            </label>
-            <div class="member-form-full diploma-signature-pair">
-              <label>Signature 1 Name
-                <input type="text" name="signature1Name" value="<%= (rec.diploma && rec.diploma.signature1_name) || '' %>" placeholder="e.g., Jane Smith" />
-              </label>
-              <label>Signature 1 Title
-                <input type="text" name="signature1Title" value="<%= (rec.diploma && rec.diploma.signature1_title) || '' %>" placeholder="e.g., Program Director" />
-              </label>
-            </div>
-            <div class="member-form-full diploma-signature-pair">
-              <label>Signature 2 Name
-                <input type="text" name="signature2Name" value="<%= (rec.diploma && rec.diploma.signature2_name) || '' %>" placeholder="e.g., John Smith" />
-              </label>
-              <label>Signature 2 Title
-                <input type="text" name="signature2Title" value="<%= (rec.diploma && rec.diploma.signature2_title) || '' %>" placeholder="e.g., Parent/Guardian" />
-              </label>
-            </div>
-          </div>
-
-          <div class="notes-dialog-actions">
-            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-            <button type="submit" class="primary-btn">Save</button>
-          </div>
-        </form>
-      </dialog>
+      <%- include('partials/diploma-student-builder', { rec, todayISO, DIPLOMA_TEMPLATES, basePath: '/parent/academics/diplomas' }) %>
     <% }); %>
   </main>
   <script src="/js/diploma-designer.js"></script>

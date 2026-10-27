@@ -104,7 +104,7 @@ router.post('/email/send', async (req, res) => {
   const subject = (req.body.subject || '').trim();
   const body = sanitizePostBody(req.body.body || '');
   const replyTo = (req.body.replyTo || '').trim();
-  const emailAlsoTo = (req.body.emailAlsoTo || '').trim();
+  const sendTo = (req.body.sendTo || '').trim();
   const sendOption = req.body.sendOption === 'schedule' ? 'schedule' : 'now';
   const scheduledAt = (req.body.scheduledAt || '').trim();
 
@@ -125,11 +125,11 @@ router.post('/email/send', async (req, res) => {
   }
 
   if (sendOption === 'schedule') {
-    await emailComposer.createScheduled({ subject, bodyHtml: body, replyTo, emailAlsoTo, recipientAccountIds: recipientIds, scheduledAt, sentByAccountId: req.portalAccount.id, sentByPortal: 'main_admin' });
+    await emailComposer.createScheduled({ subject, bodyHtml: body, replyTo, sendTo, recipientAccountIds: recipientIds, scheduledAt, sentByAccountId: req.portalAccount.id, sentByPortal: 'main_admin' });
     return res.redirect('/main-admin/announcements/email?notice=' + encodeURIComponent(`Scheduled for ${scheduledAt}.`));
   }
 
-  const { recipientCount } = await emailComposer.createAndSend({ subject, bodyHtml: body, replyTo, emailAlsoTo, recipientAccountIds: recipientIds, sentByAccountId: req.portalAccount.id, sentByPortal: 'main_admin' });
+  const { recipientCount } = await emailComposer.createAndSend({ subject, bodyHtml: body, replyTo, sendTo, recipientAccountIds: recipientIds, sentByAccountId: req.portalAccount.id, sentByPortal: 'main_admin' });
   res.redirect('/main-admin/announcements/email?notice=' + encodeURIComponent(`Sent to ${recipientCount} member(s).`));
 });
 

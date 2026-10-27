@@ -85,8 +85,15 @@
                    // A quiz's own detail page 404s unless canTakeQuiz (no
                    // read-only review page exists for it yet, unlike every
                    // other type's new generic detail page) - only make the
-                   // bar a real link when it won't just dead-end.
-                   var isLinkable = item.type !== 'quiz' || canTakeQuiz;
+                   // bar a real link when it won't just dead-end. A
+                   // fromLessonPlan item (Family School Management's own
+                   // lessons, see utils/familySchool.js's own
+                   // contentItemsForLesson) carries a lesson_plan_
+                   // content_items id, never a real one of whatever table
+                   // this bar's own basePath route reads from - never
+                   // linkable, regardless of type, so nothing ever posts
+                   // or navigates using that id.
+                   var isLinkable = !item.fromLessonPlan && (item.type !== 'quiz' || canTakeQuiz);
                    var tag = isLinkable ? 'a' : 'div';
               %>
                 <li>

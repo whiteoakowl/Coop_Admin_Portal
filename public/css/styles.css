@@ -1507,7 +1507,20 @@ body.public-page .roster-empty {
 .cleanup-team-day-group:first-child { margin-top: 0.5rem; }
 .cleanup-team-day-heading { margin: 0 0 0.15rem; font-size: 0.9rem; font-weight: 700; color: var(--brand-dark); }
 .checkbox-option { display: flex; align-items: center; gap: 0.4rem; font-weight: 500; font-size: 0.95rem; cursor: pointer; }
-.checkbox-option input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); flex-shrink: 0; }
+/* A real bug report (Main Admin > Communication > Compose Email): "radio
+   buttons should be lined up on the left and the words should begin
+   right next to the radio button." .checkbox-option's own flex row
+   above already does that - but only the type="checkbox" case had its
+   own fixed width/height here. A plain `<input type="radio">` fell
+   through to `.stack-form input:not([type="date"])`'s own width: 100%
+   (further up this file - every other plain text input in a .stack-form
+   is meant to stretch, which a radio never should), stretching the Send
+   Email form's "Send right away"/"Schedule for later" radios the full
+   width of the form and shoving their label text down onto its own
+   line instead of sitting right beside the dot. Same fixed size the
+   checkbox case already gets. */
+.checkbox-option input[type="checkbox"],
+.checkbox-option input[type="radio"] { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); flex-shrink: 0; }
 .absence-required-msg { color: var(--red); font-weight: 600; margin-top: 0.35rem; }
 
 /* A real bug report: Co-op Class Settings (General tab) forced the whole
@@ -2847,6 +2860,17 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   min-width: 0;
   box-sizing: border-box;
 }
+/* Create Event wizard (views/admin-events-new.ejs) - a real request: "on
+   mobile the activity information, meetup parking, what to bring etc.
+   the description boxes should be the full width of the mobile screen."
+   Event Description and the Activity Information/Meetup and Parking
+   Information/What to Bring/Extra Notes textareas each sit in their own
+   .member-form-full OUTSIDE a .member-form-grid (every other field on
+   this page lives inside one) so they never picked up that grid's own
+   "width: 100%" rule just above - a bare <textarea> otherwise falls back
+   to the browser's own ~20-column default width, which is the one that
+   showed up as "not full width" at phone widths. */
+#event-wizard-form .member-form-full textarea { width: 100%; box-sizing: border-box; }
 .member-photo-preview {
   width: 96px;
   height: 96px;
@@ -4734,6 +4758,32 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 @media (max-width: 640px) {
   .member-form-footer-edit .primary-btn,
   .member-form-footer-edit .roster-action-btn { font-size: 0.7rem; padding: 0.4rem 0.5rem; }
+}
+
+/* A real request: "send announcement now and schedule later buttons
+   should be on the same row. Mobile." The reset two rules up already
+   shrinks these two buttons to fit one row down to 640px wide - but
+   .member-form-page-panel's own fixed 1.75rem/2rem side padding never
+   gets reduced below 640px (see that class's own comment), so on a
+   genuinely narrow phone (iPhone SE and similar, ~375px and under)
+   their full text still doesn't both fit at that shrunk size, wrapping
+   "Schedule for Later" down onto its own row below "Send Announcements
+   Now" again. Scoped to #announcement-form specifically (this page's
+   own form id) rather than every other page sharing .member-form-
+   footer-edit's reset above, several of which pair it with a plain
+   .btn-secondary Cancel rather than a second .roster-action-btn and
+   have no need to split evenly. flex: 1 1 0 + min-width: 0 (same
+   "share the row evenly" pattern .class-details-save-row's own
+   .roster-action-btn already uses) splits the row's width between the
+   two buttons instead of sizing each to its own text, so a long label
+   wraps to a second line INSIDE its own button instead of pushing its
+   sibling button down to a second row. */
+@media (max-width: 480px) {
+  #announcement-form .member-form-footer-edit .primary-btn,
+  #announcement-form .member-form-footer-edit .roster-action-btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 }
 
 /* The whole Membership Form (header, fields, Family/Team boxes, footer)
@@ -6999,6 +7049,21 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 
 .team-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
 
+/* A real bug report: "Main admin portal and co-op admin portal.
+   Settings gear icon. On the card some of them have a blue line across
+   the last few inches of the bottom of the card." .team-info-card's own
+   border-bottom (below) is a real hairline DIVIDER - drawn on purpose
+   for Floater/Setup Teams' two-part cards, where a Members list section
+   sits right below this same element inside one shared .team-col (see
+   that border-bottom's own comment). Every settings-gear hub page's own
+   card is .team-info-card used ALONE as the whole clickable card, with
+   nothing below it inside its .team-col to divide from - so that same
+   border just shows up as a stray line along the bottom edge instead.
+   Scoped to settings-hub-card-grid (the 4 real settings-gear hub pages'
+   own second class, not .team-info-card itself) so Floater/Setup Teams'
+   real divider is untouched. */
+.settings-hub-card-grid .team-info-card { border-bottom: none; }
+
 /* A real request: "All portals settings gear. [They] are all now the
    card setup. On mobile shrink the cards to fit two to a row." Scoped
    to settings-hub-card-grid (a second class the 4 real settings-gear
@@ -7791,6 +7856,15 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 .manage-families-add-form { display: flex; align-items: flex-end; gap: 0.4rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
 .manage-families-add-form label { flex: 1 1 auto; min-width: 0; }
 .manage-families-add-form input[type="text"] { width: 100%; }
+
+/* Events > Settings > Add/Edit Category dialog - a real request: "the
+   add category button should be slightly above the category list
+   table, adequate spacing." The button (.member-form-footer, inside
+   this form) already sits above the table in document order; nothing
+   previously separated the two, so the button ran straight into the
+   table below it. Same breathing-room/divider idea as .manage-families-
+   add-form just above. */
+.manage-categories-add-form { margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
 
 /* Create/Edit Class popup - wider than the default member-picker-dialog
    since it carries a full field set (name/day/hour/room/color/times/
@@ -12426,19 +12500,59 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
    instead of none at all. */
 @media (max-width: 640px) {
   .event-attendance-table th, .event-attendance-table td { padding: 0.5rem 0.5rem; font-size: 0.8rem; }
-  /* A real bug report: "shrink table to view full table in mobile
-     view" - the above font/padding shrink alone still left a long event
-     title and the full "October 15, 2026 2:00pm" date format wide
-     enough to push Registered and the Attendance button off past the
-     viewport edge, needing a sideways scroll to reach them (confirmed
-     live via Playwright, same shape as the Committees table's own real
-     bug report). Capping and wrapping Title/Starts frees up enough room
-     for the whole row to fit; the Attendance button's own padding/font
-     shrink further than the table-wide rule above. */
-  .event-attendance-table .roster-name-col { max-width: 6rem; white-space: normal; }
-  .event-attendance-table td:nth-child(2) { max-width: 4.5rem; white-space: normal; }
-  .event-attendance-table .roster-action-btn { padding: 0.35rem 0.5rem; font-size: 0.72rem; min-width: 0; }
+  .event-attendance-table .roster-action-btn { padding: 0.35rem 0.5rem; font-size: 0.72rem; }
 }
+
+/* A real request: "date and time of the event should fit clean on one
+   row. Title of each event should fit clean on one row." This table now
+   carries .table-stack-mobile (each row becomes its own stacked card
+   below 640px, see that class's own comment) - the max-width: 6rem/
+   4.5rem + white-space: normal pair this block used to carry (sized for
+   the real, horizontally-scrolling <table> this used to be before
+   .table-stack-mobile was added) fought that card layout instead of
+   helping it, squeezing the title and the "Starts" value down into a
+   tiny box and forcing both to wrap across several lines. Title gets a
+   normal ellipsis-truncate instead (same convention as .team-info-title/
+   .lesson-item-bar-title elsewhere), and the date value stays on its one
+   line via white-space: nowrap on its own cell, overflowing before it
+   wraps rather than after - a typical "Oct 15, 2026 2:00pm" easily fits
+   a phone-width card either way. */
+@media (max-width: 640px) {
+  .event-attendance-table td.table-stack-heading .event-attendance-title {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .event-attendance-table td.event-attendance-starts { white-space: nowrap; }
+}
+
+/* "Registered # should also include canceled number and waitlist number
+   all on the same row" - Registered/Canceled/Waitlist now share this
+   cell's one line instead of a lone Registered count; flex-wrap keeps it
+   safe on a narrow phone (wrapping only if it truly has to) rather than
+   ever forcing a horizontal scroll. Canceled/Waitlist get the same
+   orange/muted tint the per-event Registrations page's own reg-summary
+   cards already use for those two statuses. */
+.event-attendance-counts { display: inline-flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-start; }
+.event-attendance-count { white-space: nowrap; font-weight: 600; }
+.event-attendance-count-canceled { color: var(--orange); }
+.event-attendance-count-waitlist { color: var(--muted); }
+@media (max-width: 640px) {
+  .event-attendance-counts { justify-content: flex-end; font-size: 0.72rem; gap: 0.4rem; }
+}
+
+/* A real request: "export, print and pdf icons should be on the same
+   row side by side... it should also be on the same row as the dropdown
+   menu of dates." All four (date dropdown, Clear, Export, Print, PDF)
+   now sit as siblings in one .roster-btn-row (views/admin-events-
+   list.ejs) - .dashboard-date-picker's own margin-left: auto (sized for
+   its original use sitting alone against a card's own title) would
+   otherwise shove itself (and the icons after it) off to the right of
+   this row instead of sitting flush at its start. */
+.event-reglog-toolbar-row { align-items: center; }
+.event-reglog-toolbar-row .dashboard-date-picker { margin-left: 0; }
 
 /* A real request (superseded by the one below, kept for history): "prev/
    next buttons should be side by side with the month name stacked above
@@ -13972,6 +14086,27 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
   .accounting-orange-buttons-group { flex-direction: column; align-items: stretch; }
 }
 
+/* A real request: "the two orange button rows should be closer
+   together." .accounting-orange-buttons-group above already spaces the
+   two rows with its own 0.6rem gap whenever they stack (wrapped at a
+   narrow desktop width, or flex-direction: column on mobile per the
+   media query just above) - but each row is ALSO a plain .roster-btn-row,
+   so two more margins stack on TOP of that gap instead of being replaced
+   by it, since flex `gap` and margin never collapse: the app-wide
+   adjacent-sibling rule (.roster-btn-row + .roster-btn-row, this file,
+   margin-top: 0.75rem) plus this page's own .accounting-list-toolbar
+   margin-bottom (.accounting-list-toolbar, .accounting-accounts-
+   toolbar-2 { margin-bottom: 0.75rem; } above - meant for a .roster-btn-
+   row that stacks with nothing else sharing its spacing) together add
+   another 1.5rem, for ~2.1rem total between the two rows - visibly more
+   than the ~0.75rem every other stacked .roster-btn-row pair in this app
+   settles for. Canceling both of those for just this pair (the group's
+   own gap already does the real spacing job) brings them back in line -
+   closer together than before, without touching the shared .roster-btn-
+   row/.accounting-list-toolbar rules every other page still relies on. */
+.accounting-orange-buttons-group > .roster-btn-row + .roster-btn-row { margin-top: 0; }
+.accounting-orange-buttons-group > .accounting-list-toolbar { margin-bottom: 0; }
+
 /* Category/Fiscal Year page (views/admin-accounting-categories.ejs) - a
    real request: "shrink all tables to fit nicely in mobile." Replacing
    each row's always-editable, full-width text inputs with plain text +
@@ -14531,6 +14666,13 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    layouts have already diverged once and may again. */
 .annual-calendar-print-month:not(:first-child) { margin-top: 2rem; }
 .annual-calendar-print-month h3 { margin: 0 0 0.5rem; }
+/* A real request: "Title should be 2026-2027 Annual Calendar and
+   centered. Key should also be centered and there should be space
+   between the key and the calendars." Both the on-screen print preview
+   and the actual print/PDF output share this same markup, so these
+   rules apply unconditionally rather than only under @media print. */
+.annual-calendar-print-title { text-align: center; }
+.annual-calendar-print-key-row { justify-content: center; margin-bottom: 1.5rem; }
 @media print {
   /* A later real request: "Fill the full page and have even borders" -
      grid-template-rows: repeat(4, 1fr) on an explicit-height grid forces
@@ -14549,7 +14691,10 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: repeat(4, 1fr);
     height: 9.1in;
-    gap: 0.3rem;
+    /* A real request: "there should also be more spacing between each
+       of the calendars" - bumped up from the original 0.3rem rather
+       than adding a second, conflicting gap rule. */
+    gap: 0.5rem;
   }
   /* A real request: "it was supposed to be a square border around each
      month calendar" - a box around each whole month (heading + table
@@ -14673,6 +14818,14 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    instead, same pattern as every other single-button-in-a-crowded-row
    fix on this page. */
 [data-annual-calendar-key-bar] .roster-action-btn { flex: 0 0 auto; }
+
+/* A real request: "Edit calendar colors button and add/edit key button
+   should be on the same row side by side." Their own row, separate
+   from the key-swatch bar above - same fit-to-text reasoning as that
+   rule just above (otherwise .roster-action-btn's own flex: 1 0 auto
+   stretches these two to fill the row instead of hugging their own
+   labels). */
+.annual-calendar-key-actions-row .roster-action-btn { flex: 0 0 auto; }
 
 /* A real request: "Present and absent keys should be to the left, not
    centered and just under the title... Move this row to the left.

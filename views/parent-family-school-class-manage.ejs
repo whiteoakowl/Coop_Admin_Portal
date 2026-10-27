@@ -101,18 +101,48 @@
       .stack-form bug as the New Class dialog (parent-family-school-
       classes.ejs's own comment on this) - this dialog's bare <label>
       elements had no display:block or row spacing of their own. %>
+  <%# A real request: "Lesson plans... Be able to make lesson plans
+      available for parents to use to assign to students under family
+      school management, family classes." Source toggles the dialog
+      between the original "write my own" fields and a picker over the
+      admin's own Lesson Plans library (every plan is eligible - see
+      routes/parent-family-school.js's own comment on why there's no
+      separate visibility flag to filter this by) - same show/hide-by-
+      dropdown-value behavior as the Add Content dialog below's own
+      Type field (public/js/lesson-content-form.js), reused here as-is. %>
   <dialog id="add-lesson-dialog" class="class-form-dialog">
-    <form method="POST" action="/parent/family-school/classes/<%= cls.id %>/lessons" class="stack-form">
+    <form method="POST" action="/parent/family-school/classes/<%= cls.id %>/lessons" class="stack-form" data-toggle-form>
       <div class="class-form-dialog-header">
         <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
         <h3>New Lesson</h3>
       </div>
-      <label>Title
-        <input type="text" name="title" required />
+      <label>Source
+        <select name="source" data-toggle-select>
+          <option value="own">Write my own</option>
+          <option value="plan">Choose from Lesson Plans library</option>
+        </select>
       </label>
-      <label>Description
+      <label data-toggle-field="own">Title
+        <input type="text" name="title" />
+      </label>
+      <label data-toggle-field="own">Description
         <textarea name="description" rows="2"></textarea>
       </label>
+      <label data-toggle-field="plan" style="display: none;">Lesson Plan
+        <select name="lessonPlanId">
+          <option value="">Choose a lesson plan&hellip;</option>
+          <% lessonPlans.forEach(function(p) { %>
+            <option value="<%= p.id %>"><%= p.title %><%= p.locked ? ' (Locked)' : '' %></option>
+          <% }); %>
+        </select>
+      </label>
+      <p class="hint" data-toggle-field="plan" style="display: none;">
+        <% if (lessonPlans.length === 0) { %>
+          No lesson plans are in the library yet.
+        <% } else { %>
+          Its content comes straight from the library and can't be edited here - you can remove the link later without changing the original.
+        <% } %>
+      </p>
       <div class="notes-dialog-actions">
         <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
         <button type="submit" class="primary-btn">Create Lesson</button>
@@ -120,5 +150,6 @@
     </form>
   </dialog>
   <script src="/js/lesson-drag-reorder.js"></script>
+  <script src="/js/lesson-content-form.js"></script>
 </body>
 </html>

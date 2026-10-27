@@ -11,6 +11,19 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Payments</h1>
 
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <%# A real request: "add a button for add payment. Popup allows you
+        to choose from the drop down a cash, check or credit card
+        payment." .accounting-list-toolbar reused here for the exact same
+        fit-to-text/spacing fix the Accounts and Invoices toolbars above
+        already get (styles.css), even though this row is a plain
+        <button> (opens the dialog below) rather than a link. %>
+    <div class="roster-btn-row accounting-list-toolbar no-print">
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-payment-dialog').showModal()">+ Add Payment</button>
+    </div>
+
     <% if (rows.length === 0) { %>
       <p class="roster-empty">No payments recorded yet.</p>
     <% } else { %>
@@ -45,6 +58,75 @@
         </table>
       </div>
     <% } %>
+
+    <%# Same <dialog>/.stack-form shell convention as the per-charge
+        Record Payment dialog (views/admin-accounting-member.ejs's own
+        .member-picker-dialog), and the same data-toggle-form/data-
+        toggle-select/data-toggle-field branch-on-a-dropdown pattern that
+        dialog already uses for Direction (public/js/lesson-content-
+        form.js) - just 3 branches (Cash/Check/Credit Card) instead of 2.
+        There is no real card processor in this app (see routes/admin-
+        accounting.js's own header comment) - Credit Card below is a
+        plain manual-entry record that a card payment was taken, same as
+        Cash/Check; its card number/expiration/CVV are never sent to the
+        database (the route reads them only to accept the form, never
+        stores them - see POST /payments/quick in that same file). %>
+    <dialog id="add-payment-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/accounting/payments/quick" class="stack-form" data-toggle-form>
+        <h3>Add Payment</h3>
+
+        <label>Payment Method
+          <select name="paymentMethod" data-toggle-select>
+            <option value="cash">Cash</option>
+            <option value="check">Check</option>
+            <option value="credit_card">Credit Card</option>
+          </select>
+        </label>
+
+        <label>Member
+          <select name="memberId" required>
+            <option value="">Select a member&hellip;</option>
+            <% allMembers.forEach(function(m) { %>
+              <option value="<%= m.id %>"><%= m.name %></option>
+            <% }); %>
+          </select>
+        </label>
+
+        <label>Amount ($)
+          <input type="number" name="amount" min="0.01" step="0.01" required />
+        </label>
+
+        <label data-toggle-field="check" style="display: none;">Check Number
+          <input type="text" name="checkNumber" placeholder="e.g. 1234" />
+        </label>
+
+        <label data-toggle-field="cash">Date
+          <input type="date" name="paymentDate" value="<%= new Date().toISOString().slice(0, 10) %>" />
+        </label>
+
+        <div data-toggle-field="credit_card" style="display: none;">
+          <p class="hint">Card Processing Information &mdash; recorded for reference only. This app does not actually charge the card; no card number is ever stored.</p>
+          <label>Name on Card
+            <input type="text" name="cardName" autocomplete="cc-name" />
+          </label>
+          <label>Card Number
+            <input type="text" name="cardNumber" inputmode="numeric" autocomplete="cc-number" placeholder="&bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull;" />
+          </label>
+          <label>Expiration (MM/YY)
+            <input type="text" name="cardExpiry" autocomplete="cc-exp" placeholder="MM/YY" />
+          </label>
+          <label>CVV
+            <input type="text" name="cardCvv" inputmode="numeric" autocomplete="cc-csc" />
+          </label>
+        </div>
+
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Collect Payment</button>
+        </div>
+      </form>
+    </dialog>
   </main>
+  <script src="/js/lesson-content-form.js"></script>
 </body>
 </html>

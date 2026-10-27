@@ -15,11 +15,11 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
-  <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
+  <%- include('partials/portal-nav', { portalTitle: typeof portalTitle !== 'undefined' && portalTitle ? portalTitle : 'Family School Management' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Diploma</h1>
-    <p><a class="no-print" href="/parent/academics/diplomas">&larr; Diplomas</a></p>
+    <p><a class="no-print" href="<%= typeof backHref !== 'undefined' && backHref ? backHref : '/parent/academics/diplomas' %>">&larr; Diplomas</a></p>
 
     <button type="button" class="roster-action-btn print-action-btn no-print" onclick="window.print()">Print</button>
     <%- include('partials/diploma-certificate', { diploma, member }) %>

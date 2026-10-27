@@ -7,7 +7,7 @@
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
     <p class="subtitle no-print"><a href="/admin/lesson-plans">&larr; Lesson Plans</a></p>
-    <h1><%= plan.title %></h1>
+    <h1><%= plan.title %> <% if (plan.locked) { %><span class="status-badge status-badge-none">Locked</span><% } %></h1>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
@@ -20,7 +20,17 @@
         duplicating FROM one specific class already on a grid. %>
     <div class="roster-btn-row no-print">
       <button type="button" class="roster-action-btn" onclick="document.getElementById('assign-lesson-plan-dialog').showModal()">Assign to Class</button>
+      <%# "It can be locked or unlocked by admin." Admins can always keep
+          editing this page regardless - locking only ever affects a
+          non-admin's own use of this plan elsewhere (see utils/
+          lessonPlans.js's own isLessonPlanLocked). %>
+      <form method="POST" action="/admin/lesson-plans/<%= plan.id %>/lock" class="inline-block-form">
+        <button type="submit" class="roster-action-btn"><%= plan.locked ? 'Unlock' : 'Lock' %></button>
+      </form>
     </div>
+    <p class="hint no-print">
+      <% if (plan.locked) { %>Locked - a co-op class's own copy of this plan is still a separate, editable copy, but a Family Classes lesson that references this plan directly shows its content read-only.<% } else { %>Unlocked.<% } %>
+    </p>
 
     <dialog id="assign-lesson-plan-dialog" class="member-picker-dialog">
       <form method="POST" action="/admin/lesson-plans/<%= plan.id %>/assign">

@@ -14,49 +14,58 @@
     <% if (notice) { %><p class="notice-banner"><%= notice %></p><% } %>
     <% if (error) { %><p class="notice-banner notice-banner-error"><%= error %></p><% } %>
 
-    <%# A real request: "Dropdown menu for each fiscal year created in
-        the system. Can create a calendar for each fiscal year." %>
-    <% if (fiscalYears.length === 0) { %>
-      <p class="roster-empty">No fiscal years yet. Add one under <a href="/main-admin/accounting/categories">Accounting &rarr; Category/Fiscal Year</a>, then come back here to create its calendar.</p>
-    <% } else { %>
-      <form method="GET" action="/main-admin/annual-calendar" class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left no-print">
-        <select name="fiscalYearId" aria-label="Fiscal Year" onchange="this.form.submit()">
-          <% fiscalYears.forEach(function(fy) { %>
-            <option value="<%= fy.id %>" <%= selectedFiscalYearId === fy.id ? 'selected' : '' %>><%= fy.label %></option>
-          <% }); %>
-        </select>
-        <% if (calendar) { %>
-          <a class="icon-btn" href="/main-admin/annual-calendar/print?fiscalYearId=<%= selectedFiscalYearId %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
-          <a class="icon-btn" href="/main-admin/annual-calendar/download.pdf?fiscalYearId=<%= selectedFiscalYearId %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
-        <% } %>
-      </form>
+    <%# A real request: "Annual calendar dropdown for fiscal year should
+        actually be school years, 2026-2027, 2027-2028, 2028-2029 etc
+        (consecutive years). Create the next 20 years and 6 years
+        before." Picking one transparently finds-or-creates its calendar
+        behind the scenes (routes/main-admin-annual-calendar.js), so
+        there's no separate "+ Create Calendar" step any more. %>
+    <form method="GET" action="/main-admin/annual-calendar" class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left no-print">
+      <select name="schoolYear" aria-label="School Year" onchange="this.form.submit()">
+        <% schoolYearStartYears.forEach(function(y) { %>
+          <option value="<%= y %>" <%= selectedStartYear === y ? 'selected' : '' %>><%= y %>-<%= y + 1 %></option>
+        <% }); %>
+      </select>
+    </form>
 
-      <% if (!calendar) { %>
-        <form method="POST" action="/main-admin/annual-calendar/create" class="inline-block-form no-print">
-          <input type="hidden" name="fiscalYearId" value="<%= selectedFiscalYearId %>" />
-          <button type="submit" class="primary-btn">+ Create Calendar for <%= selectedFiscalYear.label %></button>
-        </form>
-      <% } else { %>
-        <%# A real request: "Create key button. Be able to add a label
-            and color for each key item. Key shows on page. Be able to
-            click each key then click on the calendar dates to color/key
-            each one that particular key. Click on a new key and repeat
-            the process." data-annual-calendar-key-bar tracks which key
-            button is currently "active" (public/js/annual-calendar.js) -
-            the calendar grid click handler below reads that to decide
-            which key a date click should apply. %>
-        <div class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left no-print" data-annual-calendar-key-bar>
-          <% keys.forEach(function(k) { %>
-            <button type="button" class="annual-calendar-key-btn" data-annual-calendar-key-btn data-key-id="<%= k.id %>" data-key-label="<%= k.label %>" style="--key-color: <%= k.color %>;" title="Click, then click calendar dates to apply &ldquo;<%= k.label %>&rdquo;">
-              <span class="annual-calendar-key-swatch"></span><%= k.label %>
-            </button>
-          <% }); %>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('annual-calendar-keys-dialog').showModal()">Add/Edit Key</button>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('annual-calendar-colors-dialog').showModal()">Edit Calendar Colors</button>
-        </div>
-        <p class="hint no-print">Click a key above to select it, then click calendar dates to apply that key's color. Click the same key on a date again to clear it.</p>
+    <%# A real request: "Create key button. Be able to add a label and
+        color for each key item. Key shows on page. Be able to click
+        each key then click on the calendar dates to color/key each one
+        that particular key. Click on a new key and repeat the process."
+        data-annual-calendar-key-bar tracks which key button is
+        currently "active" (public/js/annual-calendar.js) - the
+        calendar grid click handler below reads that to decide which
+        key a date click should apply. %>
+    <div class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left no-print" data-annual-calendar-key-bar>
+      <% keys.forEach(function(k) { %>
+        <button type="button" class="annual-calendar-key-btn" data-annual-calendar-key-btn data-key-id="<%= k.id %>" data-key-label="<%= k.label %>" style="--key-color: <%= k.color %>;" title="Click, then click calendar dates to apply &ldquo;<%= k.label %>&rdquo;">
+          <span class="annual-calendar-key-swatch"></span><%= k.label %>
+        </button>
+      <% }); %>
+    </div>
+    <p class="hint no-print">Click a key above to select it, then click calendar dates to apply that key's color. Click the same key on a date again to clear it.</p>
 
-        <%# A real request: "Add edit calendar colors buttons... set the
+    <%# A real request: "Edit calendar colors button and add/edit key
+        button should be on the same row side by side." Their own
+        dedicated row, kept separate from the per-key swatch buttons
+        above so they always stay next to each other regardless of how
+        many keys exist (same "split into sibling .roster-btn-row divs"
+        convention this site already uses - see styles.css's own
+        .roster-btn-row + .roster-btn-row rule). %>
+    <div class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left annual-calendar-key-actions-row no-print">
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('annual-calendar-keys-dialog').showModal()">Add/Edit Key</button>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('annual-calendar-colors-dialog').showModal()">Edit Calendar Colors</button>
+    </div>
+
+    <%# A real request: "Print, and pdf icons should be on the last row
+        just above the calendar." Their own row, immediately above the
+        12-month grid instead of up with the other toolbar rows. %>
+    <div class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left no-print">
+      <a class="icon-btn" href="/main-admin/annual-calendar/print?schoolYear=<%= selectedStartYear %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+      <a class="icon-btn" href="/main-admin/annual-calendar/download.pdf?schoolYear=<%= selectedStartYear %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+    </div>
+
+    <%# A real request: "Add edit calendar colors buttons... set the
             color for the month row and set the color for the days of
             the week row." --annual-calendar-month-color/--annual-
             calendar-weekday-color are only set here when an admin has
@@ -173,8 +182,6 @@
             <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
           </div>
         </dialog>
-      <% } %>
-    <% } %>
   </main>
   <script src="/js/annual-calendar.js"></script>
   <script src="/js/annual-calendar-keys.js"></script>

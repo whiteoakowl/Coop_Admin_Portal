@@ -24,9 +24,24 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <% if (activeTab === 'committees') { %>
+      <%# A real request: "add committee button shrink to fit to text, on
+          the same row add an export, pdf and print icon" - same roster-
+          btn-row-fit-text/roster-action-btn-fit + icon-btn Export/PDF/
+          Print group already used on the per-committee detail page
+          (views/main-admin-committee-detail.ejs's own grid-box-header),
+          just reused here for the committee list as a whole (routes/
+          main-admin-volunteers.js's own GET /committees/print,
+          /committees/download.pdf, /committees/export.csv). %>
       <div class="grid-box-header">
         <h2>Committees</h2>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-committee-dialog').showModal()">+ Add Committee</button>
+        <div class="roster-btn-row roster-btn-row-fit-text">
+          <button type="button" class="roster-action-btn roster-action-btn-fit" onclick="document.getElementById('add-committee-dialog').showModal()">+ Add Committee</button>
+        </div>
+        <div class="roster-btn-row">
+          <a class="icon-btn roster-action-btn-fit" href="/main-admin/volunteers/committees/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+          <a class="icon-btn roster-action-btn-fit" href="/main-admin/volunteers/committees/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+          <a class="icon-btn roster-action-btn-fit" href="/main-admin/volunteers/committees/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+        </div>
       </div>
 
       <% if (committees.length === 0) { %>
@@ -75,7 +90,16 @@
       <% } %>
 
       <dialog id="add-committee-dialog" class="member-picker-dialog">
-        <form method="POST" action="/main-admin/volunteers/committees">
+        <%# A real request: "the pop up there should be adequate space
+            between titles, text bars and buttons." Same .stack-form fix
+            as views/parent-family-school-classes.ejs's own add-class-
+            dialog (that comment explains it in full): .member-picker-
+            dialog's own label spacing alone (display:block; margin-
+            bottom:0.5rem) read as cramped next to this dialog's sibling
+            Add Sign-Up/Volunteer List dialogs further down, which already
+            layer .stack-form's own margin-top:0.75rem between rows and
+            .notes-dialog-actions' own margin-top on top of that. %>
+        <form method="POST" action="/main-admin/volunteers/committees" class="stack-form">
           <h3>Add Committee</h3>
           <label>Name
             <input type="text" name="name" required />
@@ -117,10 +141,38 @@
       </dialog>
       <script src="/js/committee-leader-picker.js"></script>
     <% } else if (activeTab === 'signup-lists') { %>
+      <%# A real request: "add list button should fit to text, on the
+          same row add import, pdf and print icons." Same roster-btn-row-
+          fit-text/roster-action-btn-fit + icon-btn group as Committees'
+          own toolbar above; Import is a new capability (no existing
+          bulk-create-sign-up-lists route to reuse) - same plain upload-
+          and-append pattern as routes/admin-misc-badges.js's own Import
+          (routes/main-admin-volunteers.js's own POST /signup-lists/
+          import), PDF/Print mirror the per-list detail page's own
+          download.pdf/print routes, just for the list as a whole. %>
       <div class="grid-box-header">
         <h2>Sign-Up Lists</h2>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-signup-list-dialog').showModal()">+ Add List</button>
+        <div class="roster-btn-row roster-btn-row-fit-text">
+          <button type="button" class="roster-action-btn roster-action-btn-fit" onclick="document.getElementById('add-signup-list-dialog').showModal()">+ Add List</button>
+        </div>
+        <div class="roster-btn-row">
+          <button type="button" class="icon-btn roster-action-btn-fit" onclick="document.getElementById('signup-lists-import-dialog').showModal()" aria-label="Import" title="Import"><svg class="icon"><use href="#icon-upload"/></svg></button>
+          <a class="icon-btn roster-action-btn-fit" href="/main-admin/volunteers/signup-lists/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+          <a class="icon-btn roster-action-btn-fit" href="/main-admin/volunteers/signup-lists/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        </div>
       </div>
+
+      <dialog id="signup-lists-import-dialog" class="member-picker-dialog">
+        <form method="POST" action="/main-admin/volunteers/signup-lists/import" enctype="multipart/form-data">
+          <h3>Import Sign-Up Lists</h3>
+          <a class="btn-secondary import-sample-link" href="/main-admin/volunteers/signup-lists/import-template.xlsx">Download Sample File</a>
+          <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Import</button>
+          </div>
+        </form>
+      </dialog>
       <% if (signUpLists.length === 0) { %>
         <p class="roster-empty">No sign-up lists yet &mdash; add one above.</p>
       <% } else { %>

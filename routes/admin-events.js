@@ -405,6 +405,28 @@ function groupEventRegistrationActionsByDate(actions) {
   return Array.from(dateGroups.values());
 }
 
+// Events > Event Attendance tab's own per-event list - shared by the tab
+// itself and its new Print/Download PDF/Export CSV routes below (a real
+// request: "add export, pdf and print icons to this page") so all three
+// render the exact same rows the on-screen table shows, same pattern as
+// admin-events-registrations.ejs's own print/PDF/export trio reusing one
+// data-building step.
+async function buildAttendanceList() {
+  const published = await events.listEvents({ status: 'published' });
+  return Promise.all(
+    published.map(async (e) => {
+      const counts = await events.registrationStatusCountsForEvent(e.id);
+      return {
+        ...e,
+        startsLabel: formatFriendlyTimestamp(e.starts_at),
+        registrationCount: counts.confirmed,
+        cancelledCount: counts.cancelled,
+        waitlistCount: counts.waitlisted,
+      };
+    })
+  );
+}
+
 router.get('/', async (req, res) => {
   const activeTab = EVENTS_TABS.includes(req.query.tab) ? req.query.tab : 'calendar';
   const dateFilter = req.query.date || '';
@@ -447,10 +469,7 @@ router.get('/', async (req, res) => {
   } else if (activeTab === 'requests') {
     requests = pending.map((e) => ({ ...e, startsLabel: formatFriendlyTimestamp(e.starts_at) }));
   } else if (activeTab === 'attendance') {
-    const published = await events.listEvents({ status: 'published' });
-    attendance = await Promise.all(
-      published.map(async (e) => ({ ...e, startsLabel: formatFriendlyTimestamp(e.starts_at), registrationCount: await events.registrationCountForEvent(e.id) }))
-    );
+    attendance = await buildAttendanceList();
   } else if (activeTab === 'registrationlog') {
     const allActions = await events.allEventRegistrationActions();
     // Already newest-first (allEventRegistrationActions' own sort) - a Map
@@ -576,6 +595,32 @@ router.get('/registrationlog/export.csv', async (req, res) => {
   const allActions = await events.allEventRegistrationActions();
   const actions = dateFilter ? allActions.filter((a) => a.date === dateFilter) : allActions;
   sendCsv(res, 'event-registration-log.csv', events.buildEventRegistrationLogExportCsvLines(actions));
+});
+
+// A real request: "add export, pdf and print icons to this page" (Events
+// > Event Attendance tab) - same Print-preview/Download-PDF/Export-CSV
+// trio as every other Events subpage (Calendar/Registration Log/per-
+// event Registrations), this tab just never had one of its own before.
+router.get('/attendance/print', async (req, res) => {
+  const attendance = await buildAttendanceList();
+  res.render('admin-events-attendance-print', {
+    title: 'Event Attendance Print Preview',
+    attendance,
+  });
+});
+
+router.get('/attendance/download.pdf', async (req, res) => {
+  const attendance = await buildAttendanceList();
+  const pdf = await renderViewToPdf(req, 'admin-events-attendance-print', {
+    title: 'Event Attendance Print Preview',
+    attendance,
+  });
+  sendPdf(res, 'event-attendance.pdf', pdf);
+});
+
+router.get('/attendance/export.csv', async (req, res) => {
+  const attendance = await buildAttendanceList();
+  sendCsv(res, 'event-attendance.csv', events.buildEventAttendanceExportCsvLines(attendance));
 });
 
 router.post('/categories', async (req, res) => {

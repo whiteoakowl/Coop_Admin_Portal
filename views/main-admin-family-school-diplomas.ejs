@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Diplomas</h1>
+    <p class="hint">Design and print a diploma for any student in the co-op - pick a template and color, then edit the name, dates, and signatures. Saving again replaces its design - each student has one diploma.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <div class="manage-section no-print">
+      <label>Student
+        <select onchange="window.location.href = '/main-admin/family-school/diplomas?studentId=' + this.value">
+          <option value="">&mdash; choose a student &mdash;</option>
+          <% students.forEach(function(s) { %>
+            <option value="<%= s.id %>" <%= selectedStudent && selectedStudent.id === s.id ? 'selected' : '' %>><%= s.name %></option>
+          <% }); %>
+        </select>
+      </label>
+    </div>
+
+    <% if (students.length === 0) { %>
+      <p class="roster-empty">No active students yet.</p>
+    <% } else if (!selectedStudent) { %>
+      <p class="roster-empty">Choose a student above to design or view their diploma.</p>
+    <% } else { %>
+      <%- include('partials/diploma-student-builder', { rec: { child: selectedStudent, diploma }, todayISO, DIPLOMA_TEMPLATES, basePath: '/main-admin/family-school/diplomas' }) %>
+    <% } %>
+  </main>
+  <script src="/js/diploma-designer.js"></script>
+</body>
+</html>

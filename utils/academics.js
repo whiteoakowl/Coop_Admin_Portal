@@ -349,6 +349,24 @@ async function deleteTranscriptEntry(id) {
 // own class_id goes null the moment its class is archived/deleted (see
 // that table's own migration comment), so a past, ended class's
 // semester can't be recovered here.
+// Everything the Transcripts page's own per-student builder needs for
+// ONE student, computed once and shared by both callers that build that
+// same page: Parent Portal's own GET /academics (looping over "my own
+// children") and Main Admin's Family School Management > Transcripts
+// page (routes/main-admin-family-school.js, scoped to whichever student
+// its own picker selects instead of a family). Family classes are left
+// out here on purpose - that's a separate utils/familySchool.js lookup
+// each caller already does for its own child/student list, and pulling
+// it in here would give this module a new cross-module dependency for
+// no real benefit.
+async function transcriptBuilderDataForStudent(studentId, semesters) {
+  const coopClassesBySemester = {};
+  for (const semester of semesters) {
+    coopClassesBySemester[semester.id] = await coopClassesForStudentAndSemester(studentId, semester.id);
+  }
+  return { builder: await transcriptBuilderForStudent(studentId), coopClassesBySemester };
+}
+
 async function coopClassesForStudentAndSemester(studentId, semesterId) {
   if (!semesterId) return [];
   const rows = await db
@@ -907,6 +925,7 @@ module.exports = {
   updateTranscriptEntry,
   deleteTranscriptEntry,
   coopClassesForStudentAndSemester,
+  transcriptBuilderDataForStudent,
   getContentItem,
   contentItemsForAssignment,
   createContentItem,

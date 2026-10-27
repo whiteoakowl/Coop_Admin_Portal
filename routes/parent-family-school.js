@@ -21,6 +21,16 @@ const { memberForAccount } = require('../utils/portalAuth');
 const { avatarColorFor } = require('../utils/members');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const { lessonAttachmentFileFilter, imageFileFilter } = require('../utils/uploads');
+// A real request: "Lesson plans... Be able to make lesson plans
+// available for parents to use to assign to students under family
+// school management, family classes." listLessonPlans/getLessonPlan are
+// the same read helpers routes/admin-lesson-plans.js's own admin view
+// uses - every admin-authored plan is eligible to pick from here, same
+// as every co-op class is already eligible for that router's own
+// "Assign to Class" with no visibility flag of its own to gate it.
+// isLessonPlanLocked is the one shared lock lookup (see its own comment
+// in utils/lessonPlans.js).
+const { listLessonPlans, getLessonPlan, isLessonPlanLocked } = require('../utils/lessonPlans');
 const {
   CONTENT_ITEM_TYPES,
   classesForFamily,
@@ -38,6 +48,7 @@ const {
   createLesson,
   updateLesson,
   deleteLesson,
+  unlinkLessonFromPlan,
   reorderLessons,
   getContentItem,
   contentItemsForLesson,
@@ -323,6 +334,7 @@ router.get('/family-school/classes/:id', async (req, res) => {
     lessons: await lessonsForClass(cls.id),
     familyStudents: await studentsForFamily(cls.family_id),
     assignedStudents: await studentsForClass(cls.id),
+    lessonPlans: await listLessonPlans(),
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
@@ -349,11 +361,33 @@ router.post('/family-school/classes/:id/students', async (req, res) => {
   res.redirect(`/parent/family-school/classes/${cls.id}?notice=` + encodeURIComponent('Students updated.'));
 });
 
+// "Be able to make lesson plans available for parents to use to assign
+// to students under family school management, family classes." The New
+// Lesson dialog's own Source toggle (views/parent-family-school-class-
+// manage.ejs) picks between this and the plain "write my own" path -
+// title/description come from the chosen plan itself, not the form's
+// own (hidden, in that mode) Title/Description fields.
 router.post('/family-school/classes/:id/lessons', async (req, res) => {
   const cls = await requireOwnClass(req);
   if (!cls) return res.status(404).send('Not found');
+  const back = `/parent/family-school/classes/${cls.id}`;
+
+  if (req.body.source === 'plan') {
+    const lessonPlanId = parseInt(req.body.lessonPlanId, 10);
+    const plan = lessonPlanId ? await getLessonPlan(lessonPlanId) : null;
+    if (!plan) return res.redirect(back + '?error=' + encodeURIComponent('Choose a lesson plan from the library.'));
+    const id = await createLesson({
+      classId: cls.id,
+      title: plan.title,
+      description: plan.description,
+      createdByAccountId: req.portalAccount.id,
+      sourceLessonPlanId: plan.id,
+    });
+    return res.redirect(`/parent/family-school/lessons/${id}?notice=` + encodeURIComponent(`Added "${plan.title}" from the Lesson Plans library.`));
+  }
+
   const title = (req.body.title || '').trim();
-  if (!title) return res.redirect(`/parent/family-school/classes/${cls.id}?error=` + encodeURIComponent('A lesson title is required.'));
+  if (!title) return res.redirect(back + '?error=' + encodeURIComponent('A lesson title is required.'));
   const id = await createLesson({ classId: cls.id, title, description: (req.body.description || '').trim(), createdByAccountId: req.portalAccount.id });
   res.redirect(`/parent/family-school/lessons/${id}?notice=` + encodeURIComponent('Lesson created.'));
 });
@@ -380,15 +414,29 @@ router.post('/family-school/lessons/:id/delete', async (req, res) => {
 router.get('/family-school/lessons/:id', async (req, res) => {
   const found = await requireOwnLesson(req, parseInt(req.params.id, 10));
   if (!found) return res.status(404).send('Not found');
+  const sourcePlan = found.lesson.source_lesson_plan_id ? await getLessonPlan(found.lesson.source_lesson_plan_id) : null;
   res.render('parent-family-school-lesson-manage', {
     title: found.lesson.title,
     lesson: found.lesson,
     cls: found.cls,
     contentItems: await contentItemsForLesson(found.lesson.id),
+    sourcePlan,
+    sourcePlanLocked: sourcePlan ? await isLessonPlanLocked(sourcePlan.id) : false,
     basePath: '/parent/family-school',
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
+});
+
+// "They can still, say, remove the reference or unassign it from their
+// own class" - utils/familySchool.js's own unlinkLessonFromPlan.
+router.post('/family-school/lessons/:id/unlink-plan', async (req, res) => {
+  const found = await requireOwnLesson(req, parseInt(req.params.id, 10));
+  if (!found) return res.status(404).send('Not found');
+  await unlinkLessonFromPlan(found.lesson.id);
+  res.redirect(
+    `/parent/family-school/lessons/${found.lesson.id}?notice=` + encodeURIComponent('Removed the Lesson Plan reference - add your own content below.')
+  );
 });
 
 router.post('/family-school/lessons/:id/edit', async (req, res) => {
@@ -437,6 +485,13 @@ router.post('/family-school/lessons/:id/content', uploadAttachment, async (req, 
   const found = await requireOwnLesson(req, parseInt(req.params.id, 10));
   if (!found) return res.status(404).send('Not found');
   const back = `/parent/family-school/lessons/${found.lesson.id}`;
+  // A referenced lesson (views/partials/family-school-content-manage.ejs
+  // never shows this form for one) always reads its content from the
+  // library plan instead - see utils/familySchool.js's own
+  // contentItemsForLesson. Reject server-side too, same as every other
+  // "the UI already hides this, but don't trust that alone" check in
+  // this router.
+  if (found.lesson.source_lesson_plan_id) return res.redirect(back + '?error=' + encodeURIComponent("This lesson is based on a Lesson Plan and can't have its own content added - remove the reference first."));
   const type = req.body.type;
   if (!CONTENT_ITEM_TYPES.includes(type)) return res.redirect(back + '?error=' + encodeURIComponent('Choose a content type.'));
 

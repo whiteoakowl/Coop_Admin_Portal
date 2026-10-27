@@ -5453,3 +5453,46 @@ alter table family_school_weeks add column if not exists description text;
 -- comment.
 alter table notification_preferences drop constraint if exists notification_preferences_channel_check;
 alter table notification_preferences add constraint notification_preferences_channel_check check (channel in ('email', 'sms', 'push'));
+
+-- Lesson Plans: admin lock/unlock - see the lesson_plans_locked
+-- migration's own header comment.
+alter table lesson_plans add column if not exists locked boolean not null default false;
+
+-- Family School Management > Family Classes: a lesson can now reference
+-- an admin-authored Lesson Plan instead of carrying its own content -
+-- see the family_school_lesson_plan_reference migration's own header
+-- comment.
+alter table family_school_lessons add column if not exists source_lesson_plan_id integer references lesson_plans(id) on delete set null;
+
+-- Main Admin Annual Calendar: one calendar per fiscal year, with its own
+-- keys (label+color) and colored dates - see the annual_calendar
+-- migration's own header comment.
+create table if not exists annual_calendars (
+  id integer generated always as identity primary key,
+  fiscal_year_id integer not null references fiscal_years(id) on delete cascade,
+  created_at text not null default now_text(),
+  unique (fiscal_year_id)
+);
+
+create table if not exists annual_calendar_keys (
+  id integer generated always as identity primary key,
+  calendar_id integer not null references annual_calendars(id) on delete cascade,
+  label text not null,
+  color text not null default '#EE9A4D',
+  position integer not null default 0,
+  created_at text not null default now_text()
+);
+
+create table if not exists annual_calendar_days (
+  id integer generated always as identity primary key,
+  calendar_id integer not null references annual_calendars(id) on delete cascade,
+  day_date text not null,
+  key_id integer references annual_calendar_keys(id) on delete set null,
+  updated_at text not null default now_text(),
+  unique (calendar_id, day_date)
+);
+
+-- Annual Calendar: custom month-row/weekday-row colors - see the
+-- annual_calendar_colors migration's own header comment.
+alter table annual_calendars add column if not exists month_row_color text;
+alter table annual_calendars add column if not exists weekday_row_color text;

@@ -85,12 +85,14 @@ test('Logs tabs: every Print button links to its own dedicated preview route ins
     });
   }
 
-  // Substitutes has no date filter selected by default, so its own Print
-  // link's href always carries at least ?day=.
+  // Substitutes' own Print link's href always carries at least ?day= -
+  // plus an extra &date=... (escaped to &amp; by EJS) whenever today is
+  // itself a session day for that day (routes/admin-logs.js's own
+  // todayIfSessionDay default).
   await t.test("substitutes tab's Print button is a link to its own preview route", async () => {
     const page = await request(app).get('/admin/logs?tab=substitutes').set('Cookie', cookie);
     assert.equal(page.status, 200);
-    assert.match(page.text, /href="\/admin\/logs\/substitutes\/print\?day=\w+" target="_blank" aria-label="Print"/);
+    assert.match(page.text, /href="\/admin\/logs\/substitutes\/print\?day=\w+(?:&amp;date=\d{4}-\d{2}-\d{2})?" target="_blank" aria-label="Print"/);
   });
 
   // The already-converted Allergies tab's own Print button/route is left
@@ -213,7 +215,12 @@ test('Logs tabs: every Print button has a sibling Download PDF button right next
   await t.test("substitutes tab's Download PDF button links to its own route", async () => {
     const page = await request(app).get('/admin/logs?tab=substitutes').set('Cookie', cookie);
     assert.equal(page.status, 200);
-    assert.match(page.text, /href="\/admin\/logs\/substitutes\/download\.pdf\?day=\w+" aria-label="Download PDF"/);
+    // The default day defaults to today's own date filter when today is
+    // a session day for it (routes/admin-logs.js's own todayIfSessionDay),
+    // so the href can legitimately carry an extra &date=... (EJS's <%=
+    // escapes it to &amp; in the rendered HTML) - not just a bare
+    // ?day=<day>.
+    assert.match(page.text, /href="\/admin\/logs\/substitutes\/download\.pdf\?day=\w+(?:&amp;date=\d{4}-\d{2}-\d{2})?" aria-label="Download PDF"/);
   });
 });
 

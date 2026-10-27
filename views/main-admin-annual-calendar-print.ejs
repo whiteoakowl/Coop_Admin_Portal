@@ -28,21 +28,23 @@
       <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
     </div>
 
-    <% if (!selectedFiscalYear || !calendar) { %>
+    <% if (!calendar) { %>
       <p class="roster-empty">No calendar created for this fiscal year yet.</p>
     <% } else { %>
       <%# A real request: "Titl of page should be the school year such
-          as 2026-2027." schoolYearLabel is computed server-side
+          as 2026-2027" and later "Title should be 2026-2027 Annual
+          Calendar and centered." schoolYearLabel is computed server-side
           (routes/main-admin-annual-calendar.js) since EJS views here
           have no access to Node's require(). %>
-      <h2><%= schoolYearLabel %></h2>
+      <h2 class="annual-calendar-print-title"><%= schoolYearLabel %> Annual Calendar</h2>
 
-      <%# A real request: "Create key button... Key shows on page." Same
-          legend-row convention the live view's key bar uses, just plain
-          swatches here since there's nothing to click on a printed
-          page. %>
+      <%# A real request: "Create key button... Key shows on page" and
+          later "Key should also be centered and there should be space
+          between the key and the calendars." Same legend-row convention
+          the live view's key bar uses, just plain swatches here since
+          there's nothing to click on a printed page. %>
       <% if (keys.length > 0) { %>
-        <div class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left">
+        <div class="roster-btn-row roster-btn-row-fit-text annual-calendar-print-key-row">
           <% keys.forEach(function(k) { %>
             <span class="badge-pill annual-calendar-key-legend-pill" style="background-color: <%= k.color %>;"><%= k.label %></span>
           <% }); %>

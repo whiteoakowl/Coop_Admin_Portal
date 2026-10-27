@@ -57,9 +57,12 @@ test('Events Settings tab: Add/Edit Category & Location buttons at the top, Expo
   assert.ok(categoryBtnIndex > -1 && categoryBtnIndex < headingIndex, 'Add/Edit Category should sit above General Settings');
   assert.ok(locationBtnIndex > -1 && locationBtnIndex < headingIndex, 'Add/Edit Location should sit above General Settings');
 
-  // Calendar/List View radios share one .checkbox-group row.
-  const calendarViewGroup = /Default Calendar User View<\/span>\s*<div class="checkbox-group">([\s\S]*?)<\/div>/.exec(res.text);
-  assert.ok(calendarViewGroup, 'expected a checkbox-group wrapping the Calendar/List View radios');
+  // A real request: "Calendar view should be one row and list view
+  // should be stacked in a row underneath." Calendar/List View radios
+  // now share the stacked-row .checkbox-group-stack layout (each its
+  // own row) instead of one plain .checkbox-group row.
+  const calendarViewGroup = /Default Calendar User View<\/span>\s*<div class="checkbox-group checkbox-group-stack">([\s\S]*?)<\/div>/.exec(res.text);
+  assert.ok(calendarViewGroup, 'expected a checkbox-group-stack wrapping the Calendar/List View radios, one row each');
   assert.match(calendarViewGroup[1], /Calendar View/);
   assert.match(calendarViewGroup[1], /List View/);
 

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Sign-Up Lists</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Sign-Up Lists</p>
+      </div>
+    </div>
+
+    <% if (signUpLists.length === 0) { %>
+      <p class="roster-empty">No sign-up lists yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table committees-table">
+          <thead><tr><th>Title</th><th>Event</th><th>Open</th></tr></thead>
+          <tbody>
+            <% signUpLists.forEach(function(l) { %>
+              <tr>
+                <td class="roster-name-col"><%= l.title %></td>
+                <td><%= l.eventTitle || '—' %></td>
+                <td><%= l.is_open ? 'Yes' : 'No' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

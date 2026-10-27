@@ -7,15 +7,22 @@
 // volunteer signups," a good fit for this new section too.
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const volunteers = require('../utils/committeesAndSignupLists');
 const events = require('../utils/events');
 const { listAdminPositions, membersByAdminPosition } = require('../utils/adminPositions');
 const { activeParentAndAdminOptions, activeMemberOptions } = require('../utils/members');
-const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
+const { spreadsheetFileFilter } = require('../utils/uploads');
 const { renderViewToPdf } = require('../utils/pdfRender');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_volunteers'));
+
+// Sign-Up Lists' own bulk Import (below) - same memory-storage/1MB-limit/
+// spreadsheet-only shape as every other spreadsheet import in the app
+// (e.g. routes/main-admin-members.js's own importUpload).
+const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
 const TABS = ['committees', 'signup-lists', 'volunteer-lists'];
 
@@ -80,6 +87,37 @@ router.post('/committees/:id/enabled', async (req, res) => {
 router.post('/committees/:id/delete', async (req, res) => {
   await volunteers.deleteCommittee(req.params.id);
   res.redirect('/main-admin/volunteers?notice=' + encodeURIComponent('Committee deleted.'));
+});
+
+// A real request: "add committee button shrink to fit to text, on the
+// same row add an export, pdf and print icon" - list-level counterparts
+// to the per-committee Export/Print/Download PDF icons further below
+// (main-admin-committee-detail.ejs), covering the whole Committees list
+// instead of one committee. Registered before GET /committees/:id below
+// so "print"/"download.pdf"/"export.csv" are matched as literal paths,
+// not swallowed as an :id.
+router.get('/committees/print', async (req, res) => {
+  res.render('main-admin-committees-list-print', {
+    title: 'Committees Print Preview',
+    committees: await volunteers.listCommittees(),
+  });
+});
+
+router.get('/committees/download.pdf', async (req, res) => {
+  const pdf = await renderViewToPdf(req, 'main-admin-committees-list-print', {
+    title: 'Committees Print Preview',
+    committees: await volunteers.listCommittees(),
+  });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', 'attachment; filename="committees.pdf"');
+  res.send(pdf);
+});
+
+router.get('/committees/export.csv', async (req, res) => {
+  const committees = await volunteers.listCommittees();
+  const lines = [toCsvRow(['Name', 'Leader', 'Volunteers'])];
+  for (const c of committees) lines.push(toCsvRow([c.name, c.leaderName || '', c.signupCount]));
+  sendCsv(res, 'committees.csv', lines);
 });
 
 router.get('/committees/:id', async (req, res) => {
@@ -224,6 +262,94 @@ router.get('/signup-lists/:id/export.csv', async (req, res) => {
     lines.push(toCsvRow([item.item_name, item.quantity_needed, item.quantityClaimed, claimedBy]));
   }
   sendCsv(res, `${list.title.replace(/[^a-z0-9]+/gi, '-')}-signup-list.csv`, lines);
+});
+
+// A real request: "add list button should fit to text, on the same row
+// add import, pdf and print icons." Import is a genuinely new capability
+// here - there's no existing bulk-create-sign-up-lists route anywhere
+// else to reuse - so it follows the simplest existing import shape in
+// the app (routes/admin-misc-badges.js's own Import): a template
+// download, an upload that just creates new rows (nothing to merge
+// against, unlike Members' own confirm-screen import), and a plain
+// success notice. Registered before GET /signup-lists/:id below so these
+// literal paths are matched first, not swallowed as an :id.
+router.get('/signup-lists/import-template.xlsx', (req, res) => {
+  const buffer = buildTemplateWorkbook(
+    ['Title', 'Description', 'Event'],
+    [
+      ['Fall Festival Snack Bar', 'Bring a dish to share for the Fall Festival.', 'Fall Festival'],
+      ['Field Trip Carpool', '', ''],
+    ]
+  );
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="signup-lists-import-template.xlsx"');
+  res.send(buffer);
+});
+
+const SIGNUP_LIST_IMPORT_ALIASES = {
+  title: ['title', 'name'],
+  description: ['description', 'notes'],
+  event: ['event', 'attach to event'],
+};
+
+function normalizeSignUpListImportRow(row) {
+  const lowerMap = {};
+  for (const key of Object.keys(row)) lowerMap[key.trim().toLowerCase()] = row[key];
+  const out = {};
+  for (const [field, aliases] of Object.entries(SIGNUP_LIST_IMPORT_ALIASES)) {
+    for (const alias of aliases) {
+      if (lowerMap[alias] !== undefined && String(lowerMap[alias]).trim() !== '') {
+        out[field] = String(lowerMap[alias]).trim();
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+router.post('/signup-lists/import', importUpload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.redirect('/main-admin/volunteers?tab=signup-lists&error=' + encodeURIComponent('Please choose a file to import.'));
+  }
+
+  let rows;
+  try {
+    rows = (await readRowsFromFile(req.file.buffer)).map(normalizeSignUpListImportRow).filter((r) => r.title);
+  } catch (err) {
+    return res.redirect('/main-admin/volunteers?tab=signup-lists&error=' + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
+  }
+
+  // Event is matched by title against the same event list the Add
+  // Sign-Up List dialog's own dropdown offers - a blank/unmatched Event
+  // column just leaves the list unattached rather than failing the row.
+  const allEvents = await events.listEvents({});
+  for (const row of rows) {
+    const matchedEvent = row.event ? allEvents.find((e) => e.title.toLowerCase() === row.event.toLowerCase()) : null;
+    await volunteers.createSignUpList({
+      title: row.title,
+      description: row.description || '',
+      eventId: matchedEvent ? matchedEvent.id : null,
+      memberId: null,
+    });
+  }
+  res.redirect('/main-admin/volunteers?tab=signup-lists&notice=' + encodeURIComponent(`Imported ${rows.length} sign-up list(s).`));
+});
+
+router.get('/signup-lists/print', async (req, res) => {
+  res.render('main-admin-signup-lists-list-print', {
+    title: 'Sign-Up Lists Print Preview',
+    signUpLists: await volunteers.listSignUpLists(),
+  });
+});
+
+router.get('/signup-lists/download.pdf', async (req, res) => {
+  const pdf = await renderViewToPdf(req, 'main-admin-signup-lists-list-print', {
+    title: 'Sign-Up Lists Print Preview',
+    signUpLists: await volunteers.listSignUpLists(),
+  });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', 'attachment; filename="signup-lists.pdf"');
+  res.send(pdf);
 });
 
 router.get('/signup-lists/:id', async (req, res) => {
