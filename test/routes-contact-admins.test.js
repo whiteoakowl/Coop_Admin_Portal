@@ -222,3 +222,21 @@ test('Main Admin: Contact Admin Messages inbox lists a submitted message and can
   const archivedAfter = await request(app).get('/main-admin/contact-admin-messages?archived=1').set('Cookie', mainAdminCookie);
   assert.match(archivedAfter.text, /Inbox Test Subject/);
 });
+
+test('Main Admin: Contact Admin Messages inbox paginates past the default page size', async () => {
+  await db.prepare("DELETE FROM contact_admin_messages WHERE archived = 0").run();
+  for (let i = 0; i < 55; i += 1) {
+    await db
+      .prepare(`INSERT INTO contact_admin_messages (leadership_team, sender_email, title, message) VALUES (?, ?, ?, ?)`)
+      .run('Pagination Test Dept', 'sender@example.com', `Pagination Message ${i}`, 'Body');
+  }
+
+  const mainAdminCookie = await loginAsMainAdmin();
+  const page1 = await request(app).get('/main-admin/contact-admin-messages').set('Cookie', mainAdminCookie);
+  assert.equal(page1.status, 200);
+  assert.equal((page1.text.match(/Pagination Message \d+/g) || []).length, 50, 'page 1 should only show pageSize (50) rows');
+  assert.match(page1.text, /class="pagination-bar/, 'pagination controls should render once past one page');
+
+  const page2 = await request(app).get('/main-admin/contact-admin-messages?page=2').set('Cookie', mainAdminCookie);
+  assert.equal((page2.text.match(/Pagination Message \d+/g) || []).length, 5, 'page 2 should show the remaining 5 rows');
+});

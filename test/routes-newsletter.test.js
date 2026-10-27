@@ -444,6 +444,25 @@ test('Send newsletter immediately sends the most recent unsent issue, and the sc
   assert.doesNotMatch(page.text, /name="sendNow" value="1" checked/);
 });
 
+test('member newsletter archive paginates past the default page size', async () => {
+  const admin = await loginAsMainAdmin();
+  const parent = await createParentAccount();
+  await db.prepare("DELETE FROM newsletter_issues WHERE status = 'sent'").run();
+
+  for (let i = 0; i < 55; i += 1) {
+    const id = await newsletterUtil.createDraft(`Pagination Issue ${i}`, admin.accountId);
+    await newsletterUtil.markSent(id);
+  }
+
+  const page1 = await request(app).get('/newsletter').set('Cookie', parent.cookie);
+  assert.equal(page1.status, 200);
+  assert.equal((page1.text.match(/Pagination Issue \d+/g) || []).length, 50, 'page 1 should only show pageSize (50) issues');
+  assert.match(page1.text, /class="pagination-bar/, 'pagination controls should render once past one page');
+
+  const page2 = await request(app).get('/newsletter?page=2').set('Cookie', parent.cookie);
+  assert.equal((page2.text.match(/Pagination Issue \d+/g) || []).length, 5, 'page 2 should show the remaining 5 issues');
+});
+
 test('Send newsletter immediately with nothing eligible still saves the schedule and says so', async () => {
   const admin = await loginAsMainAdmin();
   // Clear out every draft/scheduled issue (including any left over from
