@@ -57,6 +57,8 @@
           </tbody>
         </table>
       </div>
+
+      <%- include('partials/pagination-controls', { pagination, baseHref, viewingAll }) %>
     <% } %>
 
     <%# Same <dialog>/.stack-form shell convention as the per-charge

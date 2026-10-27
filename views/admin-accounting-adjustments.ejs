@@ -49,6 +49,8 @@
             </tbody>
           </table>
         </div>
+
+        <%- include('partials/pagination-controls', { pagination: refundsPagination, baseHref: refundsBaseHref, viewingAll: refundsViewingAll, pageParam: 'refundsPage', pageSizeParam: 'refundsPageSize' }) %>
       <% } %>
     </div>
 
@@ -86,6 +88,8 @@
             </tbody>
           </table>
         </div>
+
+        <%- include('partials/pagination-controls', { pagination: cancelledPagination, baseHref: cancelledBaseHref, viewingAll: cancelledViewingAll, pageParam: 'cancelledPage', pageSizeParam: 'cancelledPageSize' }) %>
       <% } %>
     </div>
   </main>
