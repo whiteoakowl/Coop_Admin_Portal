@@ -138,8 +138,15 @@ router.post('/library/items/:id/edit', async (req, res) => {
   const barcode = (req.body.barcode || '').trim();
   const rawType = (req.body.type || '').trim();
   const type = (await isKnownLibraryType(rawType)) ? rawType : null;
-  if (title && barcode) await updateItem(id, title, barcode, type);
-  res.redirect('/admin/library?tab=titles');
+  if (!title || !barcode) {
+    return res.redirect('/admin/library?tab=titles&error=' + encodeURIComponent('Title and barcode are required.'));
+  }
+  const existing = await findItemByBarcode(barcode);
+  if (existing && existing.id !== id) {
+    return res.redirect('/admin/library?tab=titles&error=' + encodeURIComponent('That barcode is already in use.'));
+  }
+  await updateItem(id, title, barcode, type);
+  res.redirect('/admin/library?tab=titles&notice=' + encodeURIComponent('Item updated.'));
 });
 
 router.post('/library/items/:id/delete', async (req, res) => {
