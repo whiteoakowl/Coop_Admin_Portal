@@ -19,6 +19,7 @@ const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, generateKey } = require('../utils/storage');
 const photos = require('../utils/photos');
 const auditLog = require('../utils/auditLog');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_publications'));
 
@@ -58,8 +59,22 @@ router.post('/', async (req, res) => {
 async function loadEditor(req, res) {
   const album = await photos.getAlbum(req.params.id);
   if (!album) return res.status(404).render('404', { title: 'Not Found' });
+  // Can grow into the hundreds per album - paginated the same in-memory
+  // way as every other ongoing list/log (utils/pagination.js), not a
+  // second, LIMIT/OFFSET-shaped query.
   const albumPhotos = await photos.listPhotos(album.id);
-  res.render('admin-photos-edit', { title: album.title, album, photos: albumPhotos, error: req.query.error || null, notice: req.query.notice || null });
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(albumPhotos, parsePage(req.query.page), pageSize);
+  res.render('admin-photos-edit', {
+    title: album.title,
+    album,
+    photos: pagination.items,
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: `/main-admin/photos/${album.id}/edit?`,
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
 }
 router.get('/:id/edit', loadEditor);
 

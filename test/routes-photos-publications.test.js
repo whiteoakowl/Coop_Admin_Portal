@@ -262,6 +262,27 @@ test('album edit page: Save/Archive sit in one row, same size, and there is no D
   assert.match(listPage.text, new RegExp(`action="/main-admin/photos/${albumId}/delete"`));
 });
 
+// Pagination (Phase 4 audit item) - an album's photo grid can grow into
+// the hundreds, so it's paginated the same in-memory way as every other
+// ongoing list/log (utils/pagination.js).
+test('album edit page: photo grid is paginated, page 1 shows only the first page of photos', async () => {
+  const admin = await loginAsMainAdmin();
+  const albumId = await createAlbum(admin, 'members');
+  for (let i = 0; i < 55; i += 1) {
+    await db.prepare("INSERT INTO photo_album_photos (album_id, image_key, caption, status) VALUES (?, ?, ?, 'approved')").run(albumId, `key-${i}`, `Caption ${i}`);
+  }
+
+  const page1 = await request(app).get(`/main-admin/photos/${albumId}/edit`).set('Cookie', admin.cookie);
+  assert.equal(page1.status, 200);
+  assert.equal((page1.text.match(/class="team-info-card"/g) || []).length, 50, 'page 1 should show only the default 50-item page');
+  assert.match(page1.text, /class="pagination-bar no-print"/, 'pagination controls should render once there is more than one page');
+  assert.match(page1.text, /Showing 1&ndash;50 of 55/);
+
+  const page2 = await request(app).get(`/main-admin/photos/${albumId}/edit?page=2`).set('Cookie', admin.cookie);
+  assert.equal(page2.status, 200);
+  assert.equal((page2.text.match(/class="team-info-card"/g) || []).length, 5, 'page 2 should show the remaining 5 photos');
+});
+
 test('a draft publication 404s even by direct URL; publishing makes it visible', async () => {
   const admin = await loginAsMainAdmin();
   const createRes = await request(app).post('/main-admin/publications').set('Cookie', admin.cookie).type('form').send({ title: 'Season Update', _csrf: admin.csrfToken });
