@@ -26,7 +26,6 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 
 const request = require('supertest');
 const app = require('../server');
-const db = require('../db');
 const { createClass, createSemester, createClassSchedule } = require('../utils/classSchedule');
 const { setActiveKioskSemesterId } = require('../utils/kioskSettings');
 

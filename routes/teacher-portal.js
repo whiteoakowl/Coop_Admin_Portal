@@ -7,7 +7,6 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
@@ -219,7 +218,6 @@ router.get('/classes', async (req, res) => {
 
 router.get('/classes/print', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
-  const semesters = await listSemesters();
   const selectedSemesterId = req.query.semesterId ? parseInt(req.query.semesterId, 10) : null;
   const gridSemesterId = selectedSemesterId === null ? undefined : selectedSemesterId;
   const classes = await classesForTeacher(member, selectedSemesterId);
@@ -250,7 +248,6 @@ router.get('/classes/print', async (req, res) => {
 // now a PDF built from the exact same -print.ejs view.
 router.get('/classes/download.pdf', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
-  const semesters = await listSemesters();
   const selectedSemesterId = req.query.semesterId ? parseInt(req.query.semesterId, 10) : null;
   const gridSemesterId = selectedSemesterId === null ? undefined : selectedSemesterId;
   const classes = await classesForTeacher(member, selectedSemesterId);

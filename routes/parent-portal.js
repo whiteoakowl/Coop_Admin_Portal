@@ -951,12 +951,11 @@ router.get('/content/:id', async (req, res) => {
 
   let cls;
   let selectedChild = null;
-  let selectedParent = null;
   let viewerQuery;
   let canTakeQuiz;
   if (staffViewerMatch) {
     const parents = await parentsForAccount(req.portalAccount);
-    selectedParent = parents.find((p) => p.id === parseInt(staffViewerMatch[1], 10));
+    const selectedParent = parents.find((p) => p.id === parseInt(staffViewerMatch[1], 10));
     if (!selectedParent) return res.status(404).render('404', { title: 'Not Found' });
     const staffedClasses = await classesStaffedByMember(selectedParent.id);
     cls = staffedClasses.find((c) => c.id === assignment.class_id);

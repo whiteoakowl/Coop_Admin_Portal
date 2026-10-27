@@ -27,7 +27,6 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 
 const request = require('supertest');
 const app = require('../server');
-const db = require('../db');
 
 test.before(() => app.ready);
 test.after(() => {

@@ -86,7 +86,7 @@ test('Annual Planner: organized by student, a parent can add and delete curricul
   const familyId = await createFamily('Curriculum Family');
   const parent = await createPortalMember({ name: 'Curriculum Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const studentA = await createPortalMember({ name: 'Curriculum Student A', familyId, memberType: 'student', roleKey: 'student' });
-  const studentB = await createPortalMember({ name: 'Curriculum Student B', familyId, memberType: 'student', roleKey: 'student' });
+  await createPortalMember({ name: 'Curriculum Student B', familyId, memberType: 'student', roleKey: 'student' });
 
   const csrf = await csrfFrom(parent.cookie, '/parent/family-school/annual-planner');
   const createRes = await request(app)

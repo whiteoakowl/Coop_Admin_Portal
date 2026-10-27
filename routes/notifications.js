@@ -8,12 +8,28 @@ const express = require('express');
 const router = express.Router();
 const { requirePortalAuth } = require('../middleware/portalAuth');
 const notifications = require('../utils/notifications');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 router.use(requirePortalAuth);
 
 router.get('/', async (req, res) => {
-  const items = await notifications.listForAccount(req.portalAccount.id);
-  res.render('notifications-list', { title: 'Notifications', items });
+  const allItems = await notifications.listForAccount(req.portalAccount.id);
+  // Same pagination (utils/pagination.js) the Members/Logs/Library admin
+  // lists already use - a long-lived account's full notification history
+  // is the same "renders as one enormous DOM list" problem those lists
+  // were paginated to fix. hasUnread is checked against the FULL list,
+  // not just this page's slice - Mark All Read has to stay visible
+  // whenever any page has unread items, not only the one currently open.
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(allItems, parsePage(req.query.page), pageSize);
+  res.render('notifications-list', {
+    title: 'Notifications',
+    items: pagination.items,
+    hasUnread: allItems.some((i) => !i.read_at),
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: '/notifications?',
+  });
 });
 
 router.post('/:id/read', async (req, res) => {

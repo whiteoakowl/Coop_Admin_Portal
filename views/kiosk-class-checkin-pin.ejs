@@ -24,7 +24,7 @@
           enough (typeable, still enforces pattern/required/maxlength) for
           a physical keyboard, or plain HTML5 validation, to work as a
           fallback if the keypad script somehow doesn't load. %>
-      <input id="pin" class="visually-kiosk-hidden" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" autofocus required />
+      <input id="pin" class="visually-kiosk-hidden" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" autofocus required aria-label="4-digit staff PIN" />
       <div id="class-checkin-pin-keypad" class="kiosk-scan-col"></div>
 
       <button type="submit" class="primary-btn">Unlock</button>

@@ -176,7 +176,7 @@ test('the print sheet groups classes into one page per (day, room), sorted by ho
 // (see utils/pdfRender.js), with the selected classIds carried as a
 // query string instead of a POST body. PDF generation via real headless
 // Chromium is slow (~1-2s) - expected, not a bug.
-test('downloading the QR sheet as a PDF renders a real, non-trivial PDF', async (t) => {
+test('downloading the QR sheet as a PDF renders a real, non-trivial PDF', async () => {
   const { cookie } = await loginAsAdmin();
   const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'QR Download Class', room: 'Room 1' });
 

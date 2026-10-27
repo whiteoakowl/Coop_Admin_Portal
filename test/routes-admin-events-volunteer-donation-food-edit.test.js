@@ -22,7 +22,6 @@ process.env.MAIN_ADMIN_PASSWORD = 'changeme123';
 const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
-const { hashPassword } = require('../utils/portalAuth');
 const { generateMemberCode } = require('../utils/members');
 
 test.before(() => app.ready);

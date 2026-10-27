@@ -91,7 +91,11 @@ async function sendAnnouncement({ title, body, targets, sentByAccountId, sentByP
 // own email_campaigns already use - saves a row now, an estimated
 // recipient_count for display, and nothing is notified until
 // sendScheduledAnnouncement actually runs.
-async function scheduleAnnouncement({ title, body, targets, scheduledAt, sentByAccountId, sentByPortal }) {
+// sentByAccountId isn't accepted here (unlike sendAnnouncement above) -
+// announcement_log has no scheduled-by column to put it in, so callers
+// passing one (e.g. routes/main-admin-announcements.js's own
+// req.portalAccount.id) has always been a no-op.
+async function scheduleAnnouncement({ title, body, targets, scheduledAt, sentByPortal }) {
   const normalizedTargets = normalizeTargets(targets);
   const estimatedCount = (await accountIdsForTargets(normalizedTargets)).size;
   const info = await db

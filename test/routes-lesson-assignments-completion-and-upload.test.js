@@ -84,8 +84,6 @@ test('Lesson list shows a Completed percentage column - "—" with no quiz conte
     .type('form')
     .send({ title: 'No Quiz Lesson', _csrf: admin.csrfToken });
 
-  const noQuizAssignment = await db.prepare('SELECT id FROM class_assignments WHERE title = ?').get('No Quiz Lesson');
-
   const listBefore = await request(app).get(`/admin/class-schedule/classes/${classId}/manage?tab=assignments`).set('Cookie', admin.cookie);
   // No quiz content at all - not measurable, so "—" not a misleading 0%.
   // The row's trailing action cell is now a pair of icon buttons (Manage/

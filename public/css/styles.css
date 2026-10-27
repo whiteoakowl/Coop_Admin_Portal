@@ -825,10 +825,15 @@ textarea:focus-visible,
   bottom: 1.5rem;
   margin: 0;
   background: none;
-  border: 1px solid var(--btn-bg);
+  /* var(--orange), not var(--btn-bg) - this is text/border on a plain
+     white panel, the same "outline button on white" shape .btn-secondary's
+     own dialog-close variant above uses, and var(--btn-bg) itself falls
+     short of WCAG AA 4.5:1 there (caught by the a11y/accessibility-check.js
+     CI check) the same way --muted would on a tinted background. */
+  border: 1px solid var(--orange);
   border-radius: 10px;
   padding: 0.6rem 2rem;
-  color: var(--btn-bg);
+  color: var(--orange);
   font-size: 1rem;
   font-weight: 600;
 }
@@ -1831,17 +1836,23 @@ body.public-page .roster-empty {
 /* A real request: "On desktop the blue buttons at the top for settings,
    portals and profile. The blue should also match the background blue
    of the app" - var(--bg), not var(--brand) (the lighter logo blue). */
+/* #000, not var(--ink) - var(--ink) only reaches 3.76:1 against var(--bg)
+   (caught by the a11y/accessibility-check.js CI check), short of WCAG AA's
+   4.5:1; plain black does (background must stay var(--bg) itself per the
+   real request above), the same literal black text .admin-corner-link-
+   green already uses for the same reason (filled color button, not a
+   tinted-text pairing with its own named token). */
 .admin-page-corner-actions .admin-corner-link,
 .admin-page-corner-actions .portal-switcher-details summary {
   background: var(--bg);
-  color: var(--ink);
+  color: #000;
 }
 .admin-page-corner-actions .admin-corner-link:hover,
 .admin-page-corner-actions .portal-switcher-details summary:hover,
 .admin-page-corner-actions .portal-switcher-details[open] summary {
   background: var(--bg);
   filter: brightness(0.88);
-  color: var(--ink);
+  color: #000;
 }
 @media (min-width: 861px) {
   .site-header-actions .btn-secondary {
@@ -2388,7 +2399,16 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   flex-shrink: 0;
 }
 .family-student-day-header-icon .icon { width: 14px; height: 14px; color: inherit; }
-.family-student-day-header-orange { background: var(--orange-bg); color: var(--accent-dark); }
+/* var(--orange-bg) with a one-off darker orange, not var(--accent-dark)
+   (3.76:1, caught by the a11y/accessibility-check.js CI check) nor even
+   var(--orange) itself (4.04:1 at this bar's own bold 0.95rem - still
+   short of WCAG AA's 4.5:1, unlike var(--orange)'s other, larger/bolder
+   callers elsewhere that clear it). #a05014 is var(--orange) darkened
+   just enough to clear 4.5:1 against var(--orange-bg) specifically -
+   scoped to this one bar rather than redefined as a new global token,
+   since every other var(--orange-bg)/var(--orange) pairing in this file
+   already clears AA at its own size/weight and doesn't need it. */
+.family-student-day-header-orange { background: var(--orange-bg); color: #a05014; }
 .family-student-day-header-blue { background: var(--brand-soft); color: var(--brand-dark); }
 
 @media (max-width: 720px) {

@@ -31,7 +31,6 @@ const {
   updateLessonPlanContentItem,
   deleteLessonPlanContentItem,
   reorderLessonPlanContentItems,
-  questionsForLessonPlanContentItem,
   createLessonPlanQuizQuestion,
   deleteLessonPlanQuizQuestion,
   assignLessonPlanToClass,

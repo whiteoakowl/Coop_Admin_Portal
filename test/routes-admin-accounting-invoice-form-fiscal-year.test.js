@@ -102,7 +102,6 @@ test('Category/Fiscal Year subpage: title+code popup, mobile-shrink table, and a
 test('New/Edit Invoice form: Family read-only, Category/Due Date/Admin Notes/Auto-Park persist, Split Invoice creates a 2nd charge, Email Family sends a notification', async () => {
   const admin = await loginAsMainAdmin();
   const memberId = await createMemberWithAccount('Kara Kalna');
-  const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(memberId);
 
   const categoriesPage = await request(app).get('/main-admin/accounting/categories').set('Cookie', admin.cookie);
   await request(app)
