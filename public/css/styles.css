@@ -979,7 +979,7 @@ textarea:focus-visible,
    precisely because an old, unpatchable Chromebook in the field runs a
    Chromium version this codebase can't assume modern CSS support from,
    and :has() is newer than plenty of those. */
-@media (min-width: 640px) {
+@media (min-width: 641px) {
   .kiosk-panel { max-width: 800px; padding: 4rem 3.5rem; }
   .kiosk-scan-now-text { font-size: 2.6rem; }
   .kiosk-instructions { font-size: 1.8rem; }
@@ -1854,7 +1854,7 @@ body.public-page .roster-empty {
   filter: brightness(0.88);
   color: #000;
 }
-@media (min-width: 860px) {
+@media (min-width: 861px) {
   .site-header-actions .btn-secondary {
     background: var(--brand);
     color: var(--ink);
@@ -3098,7 +3098,7 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   }
   .page-title-subpages-trigger .icon { width: 0.8rem; height: 0.8rem; }
 }
-@media (min-width: 860px) {
+@media (min-width: 861px) {
   .page-title-subpages-trigger { display: none; }
 }
 
@@ -14209,7 +14209,7 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    though none of that content needs the room; width: auto lets the
    table shrink to its real content width instead, which alone pulls the
    columns back together. */
-@media (min-width: 640px) {
+@media (min-width: 641px) {
   .accounting-accounts-table-fit { width: auto; }
   .accounting-accounts-table-fit th, .accounting-accounts-table-fit td { padding: 0.45rem 0.9rem; }
 }

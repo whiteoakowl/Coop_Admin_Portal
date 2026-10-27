@@ -68,6 +68,7 @@ async function loginAsMainAdmin() {
 }
 
 test('Parent Portal Events calendar renders the same month/year-dropdown calendar grid as Main Admin', async () => {
+  const eventMonth = (await db.prepare("SELECT to_char(now() + interval '5 days', 'YYYY-MM') AS m").get()).m;
   await db
     .prepare("INSERT INTO events (title, starts_at, status) VALUES ('Shared Calendar Event', to_char(now() + interval '5 days', 'YYYY-MM-DD HH24:MI:SS'), 'published')")
     .run();
@@ -75,9 +76,12 @@ test('Parent Portal Events calendar renders the same month/year-dropdown calenda
   const parentCookie = await createParentAndLogin();
   const adminCookie = await loginAsMainAdmin();
 
-  const parentPage = await request(app).get('/events?view=calendar').set('Cookie', parentCookie);
+  // +5 days can land in the next month depending on when this test
+  // runs, so request the calendar for the event's own month instead of
+  // relying on "today's" default month view.
+  const parentPage = await request(app).get(`/events?view=calendar&month=${eventMonth}`).set('Cookie', parentCookie);
   assert.equal(parentPage.status, 200);
-  const adminPage = await request(app).get('/main-admin/events?tab=calendar&view=calendar').set('Cookie', adminCookie);
+  const adminPage = await request(app).get(`/main-admin/events?tab=calendar&view=calendar&month=${eventMonth}`).set('Cookie', adminCookie);
   assert.equal(adminPage.status, 200);
 
   // Both pages render the exact same calendar nav row markup.

@@ -88,7 +88,10 @@ test('publishing a still-pending submitted event (no prior Approve click) also a
 
   const loginRes = await request(app).post('/login').type('form').send({ email: parentEmail, password: 'testpassword123' });
   const parentCookie = loginRes.headers['set-cookie'];
-  const calendarPage = await request(app).get('/events?view=calendar&portal=parent').set('Cookie', parentCookie);
+  // +5 days can land in the next month depending on when this test
+  // runs, so request the calendar for the event's own month instead of
+  // relying on "today's" default month view.
+  const calendarPage = await request(app).get(`/events?view=calendar&portal=parent&month=${startsAt.slice(0, 7)}`).set('Cookie', parentCookie);
   assert.match(calendarPage.text, /Publish Bug Fall Fest/);
 });
 
