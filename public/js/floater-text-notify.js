@@ -83,7 +83,10 @@
 
     const checked = Array.from(container.querySelectorAll('.floater-notify-checkbox:checked'));
     if (checked.length === 0) {
-      showMessage('Check at least one floater to text first.');
+      // A real request: this should be a popup, not the page's own
+      // inline status banner - same window.alert() the Send Now error
+      // path below already uses for a popup-style message.
+      window.alert('No members have been selected.');
       return;
     }
     clearMessage();

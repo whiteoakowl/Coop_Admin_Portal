@@ -1387,10 +1387,21 @@ async function createOrReactivateRegistration(event, member, accountId, answers 
         .run(registrationId, extraFieldId, value);
     }
 
-    const templateKey = status === 'confirmed' ? 'event_registration_confirmed' : 'event_registration_waitlisted';
-    const rendered = await renderTemplate(templateKey, { eventTitle: event.title, memberName: member.name, waitlistPosition });
-    result = { ok: true, notice: rendered.body, subject: rendered.subject, status, waitlistPosition };
+    result = { ok: true, status, waitlistPosition };
   });
+  // renderTemplate reads notification_message_templates on the plain
+  // outer `db` connection, not `tx` - calling it from inside the
+  // transaction above deadlocks PGlite (a real bug this hit: the whole
+  // registration hung forever, never even reaching this return).
+  // Rendering out here, after the transaction has already committed, is
+  // also strictly correct: the registration's own confirmed/waitlisted
+  // outcome is already final by this point.
+  if (result.ok) {
+    const templateKey = result.status === 'confirmed' ? 'event_registration_confirmed' : 'event_registration_waitlisted';
+    const rendered = await renderTemplate(templateKey, { eventTitle: event.title, memberName: member.name, waitlistPosition: result.waitlistPosition });
+    result.notice = rendered.body;
+    result.subject = rendered.subject;
+  }
   return result;
 }
 
