@@ -13,6 +13,7 @@
   var list = root.querySelector('[data-chat-room-messages]');
   var form = root.querySelector('[data-chat-room-form]');
   var seenIds = {};
+  var maxSeenId = 0;
 
   function escapeHtml(s) {
     var div = document.createElement('div');
@@ -21,7 +22,9 @@
   }
 
   Array.prototype.forEach.call(list.querySelectorAll('[data-post-id]'), function (el) {
-    seenIds[el.getAttribute('data-post-id')] = true;
+    var id = parseInt(el.getAttribute('data-post-id'), 10);
+    seenIds[id] = true;
+    if (id > maxSeenId) maxSeenId = id;
   });
 
   function isNearBottom() {
@@ -50,13 +53,19 @@
   }
 
   function poll() {
-    fetch('/forums/threads/' + threadId + '/feed.json', { credentials: 'same-origin' })
+    // afterId: the thread view paginates (defaulting to the newest page),
+    // so the page's own DOM never holds the thread's full history - only
+    // ask the server for posts newer than the highest one already shown,
+    // or every older post on an earlier page would look "unseen" on the
+    // very first poll and get appended right back onto the bottom.
+    fetch('/forums/threads/' + threadId + '/feed.json?afterId=' + maxSeenId, { credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var wasNearBottom = isNearBottom();
         (data.posts || []).forEach(function (p) {
           if (seenIds[p.id]) return;
           seenIds[p.id] = true;
+          if (p.id > maxSeenId) maxSeenId = p.id;
           list.appendChild(renderMessage(p));
         });
         if (wasNearBottom) window.scrollTo(0, document.body.scrollHeight);
@@ -97,6 +106,7 @@
         .then(function (data) {
           if (data && data.post) {
             seenIds[data.post.id] = true;
+            if (data.post.id > maxSeenId) maxSeenId = data.post.id;
             list.appendChild(renderMessage(data.post));
             window.scrollTo(0, document.body.scrollHeight);
             if (editable) editable.innerHTML = '';

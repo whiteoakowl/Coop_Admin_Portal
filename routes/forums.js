@@ -170,9 +170,21 @@ router.get('/threads/:threadId', loadThread, async (req, res) => {
 // pick up messages posted by other people without a page reload. Same
 // access check as the thread page itself (loadThread), just JSON instead
 // of HTML.
+//
+// ?afterId=<postId> - the thread view above now paginates (defaulting to
+// the newest page), so the page only ever renders one page's worth of
+// posts, not the thread's full history. Without this filter, every post
+// from an earlier page would look "unseen" to the client's own seenIds
+// tracking on its very first poll and get appended right back onto the
+// bottom of the feed a few seconds after load. The client sends the
+// highest post id it already has on the page; only genuinely newer posts
+// come back. Omitted (or unparseable), every post is returned, same as
+// before pagination existed - the client's own initial-render seenIds
+// seeding still protects against double-rendering those.
 router.get('/threads/:threadId/feed.json', loadThread, async (req, res) => {
   const posts = await forums.listPosts(req.thread.id);
-  res.json({ posts });
+  const afterId = parseInt(req.query.afterId, 10);
+  res.json({ posts: Number.isInteger(afterId) ? posts.filter((p) => p.id > afterId) : posts });
 });
 
 router.post('/threads/:threadId/posts', loadThread, async (req, res) => {

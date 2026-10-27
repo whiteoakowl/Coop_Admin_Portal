@@ -211,6 +211,33 @@ test('feed.json returns every post in the thread for polling, and still enforces
   assert.equal(denied.status, 403);
 });
 
+test('feed.json with ?afterId= only returns posts newer than it - the live poll\'s own guard against re-appending an earlier page\'s posts once the thread view paginates', async () => {
+  const admin = await loginAsMainAdmin();
+  const category = await createChatRoom(admin, 'After Id Room');
+  const member = await createParentAccount();
+
+  const postIds = [];
+  for (let i = 0; i < 3; i += 1) {
+    const res = await request(app)
+      .post(`/forums/threads/${category.room_thread_id}/posts`)
+      .set('Cookie', member.cookie)
+      .set('Accept', 'application/json')
+      .type('form')
+      .send({ body: `<p>Message ${i}</p>`, _csrf: member.csrfToken });
+    postIds.push(res.body.post.id);
+  }
+
+  const noFilter = await request(app).get(`/forums/threads/${category.room_thread_id}/feed.json`).set('Cookie', member.cookie);
+  assert.equal(noFilter.body.posts.length, 3, 'with no afterId, every post still comes back, same as before pagination existed');
+
+  const afterFirst = await request(app).get(`/forums/threads/${category.room_thread_id}/feed.json?afterId=${postIds[0]}`).set('Cookie', member.cookie);
+  assert.equal(afterFirst.body.posts.length, 2, 'only posts newer than afterId come back');
+  assert.ok(afterFirst.body.posts.every((p) => p.id > postIds[0]));
+
+  const afterLast = await request(app).get(`/forums/threads/${category.room_thread_id}/feed.json?afterId=${postIds[2]}`).set('Cookie', member.cookie);
+  assert.equal(afterLast.body.posts.length, 0, 'nothing newer than the last post - the poll finds nothing new, not every post "unseen" again');
+});
+
 test('admin-facing: opening a chat room category from the Chat Groups list goes straight to its thread view (no thread-list page in between)', async () => {
   const admin = await loginAsMainAdmin();
   const category = await createChatRoom(admin, 'Admin View Room');
