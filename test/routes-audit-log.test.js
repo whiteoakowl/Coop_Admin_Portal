@@ -149,3 +149,35 @@ test('the audit log page filters by target type', async () => {
   assert.equal(filtered.status, 200);
   assert.doesNotMatch(filtered.text, /payment_recorded/);
 });
+
+// Real pagination coverage (utils/pagination.js) replacing the old hard
+// LIMIT 200 that used to silently truncate this log once it grew past
+// that cap with no way to see older entries - auditLog.list() now only
+// applies a LIMIT when one is actually requested (every other caller
+// still gets the default 200), and this route passes limit: null to
+// fetch the full filtered list for paginate() to slice at render time.
+// A unique target_type isolates this test's own count from every real
+// entry the tests above already wrote.
+test('Audit Log pagination: page 1 shows only the page size, page 2 and View All both work', async () => {
+  const admin = await loginAsMainAdmin();
+  for (let i = 1; i <= 55; i++) {
+    await db
+      .prepare('INSERT INTO audit_log (actor_account_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)')
+      .run(null, 'pagination_test_action', 'pagination_test_type', i, null);
+  }
+
+  const page1 = await request(app).get('/main-admin/audit-log?targetType=pagination_test_type').set('Cookie', admin.cookie);
+  assert.equal(page1.status, 200);
+  assert.equal((page1.text.match(/pagination_test_action/g) || []).length, 50, 'page 1 shows only the first 50 of 55 matching entries');
+  assert.match(page1.text, /Showing 1&ndash;50 of 55/);
+  assert.match(page1.text, /class="pagination-bar/, 'pagination controls render once there is more than one page');
+
+  const page2 = await request(app).get('/main-admin/audit-log?targetType=pagination_test_type&page=2').set('Cookie', admin.cookie);
+  assert.equal(page2.status, 200);
+  assert.equal((page2.text.match(/pagination_test_action/g) || []).length, 5, 'page 2 shows the remaining 5');
+  assert.match(page2.text, /Showing 51&ndash;55 of 55/);
+
+  const viewAll = await request(app).get('/main-admin/audit-log?targetType=pagination_test_type&pageSize=all').set('Cookie', admin.cookie);
+  assert.equal(viewAll.status, 200);
+  assert.equal((viewAll.text.match(/pagination_test_action/g) || []).length, 55, 'View All shows every matching entry at once, not just the old 200-row cap');
+});

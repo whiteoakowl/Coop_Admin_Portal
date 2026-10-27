@@ -151,6 +151,50 @@ test('Co-op Admin Communication page: 3 tabs (no Newsletter), checkbox recipient
   assert.match(page.text, /Coop send/);
 });
 
+// Real pagination coverage (utils/pagination.js) replacing the old hard
+// LIMIT 25 that used to silently truncate the unified "Past Announcements"
+// log once it grew past that cap - listAnnouncementLog() now only
+// applies a LIMIT when one is actually requested, and both portals' own
+// Communication > Announcements routes pass limit: null to fetch the
+// full log for paginate() to slice at render time. A unique title
+// prefix lets this test count just its own rows regardless of whatever
+// real sends the tests above already logged.
+test('Communication "Past Announcements" pagination: page 1 shows only the page size, page 2 and View All both work, on both portals', async () => {
+  const main = await loginAsMainAdmin();
+  // Cleared first so this test's own 55-row fixture is the entire log -
+  // every other test above already made its own assertions against the
+  // rows it created, so there is nothing left relying on them once this
+  // test runs. Without this, same-second created_at ties between the
+  // fixture rows and earlier real sends make which 50 land on page 1
+  // non-deterministic.
+  await db.prepare('DELETE FROM announcement_log').run();
+  for (let i = 1; i <= 55; i++) {
+    await db
+      .prepare("INSERT INTO announcement_log (title, body, targets, recipient_count, sent_by_portal, status, sent_at) VALUES (?, ?, ?, ?, 'main_admin', 'sent', now_text())")
+      .run(`Pagination Announcement ${i}`, '<p>body</p>', JSON.stringify(['parent']), 1);
+  }
+
+  const page1 = await request(app).get('/main-admin/announcements').set('Cookie', main.cookie);
+  assert.equal(page1.status, 200);
+  assert.equal((page1.text.match(/Pagination Announcement/g) || []).length, 50, 'page 1 shows only the first 50 (newest) of the 55 fixture rows');
+  assert.match(page1.text, /class="pagination-bar/, 'pagination controls render once there is more than one page');
+
+  const page2 = await request(app).get('/main-admin/announcements?page=2').set('Cookie', main.cookie);
+  assert.equal(page2.status, 200);
+  assert.equal((page2.text.match(/Pagination Announcement/g) || []).length, 5, 'page 2 shows the remaining 5 fixture rows');
+
+  const viewAll = await request(app).get('/main-admin/announcements?pageSize=all').set('Cookie', main.cookie);
+  assert.equal(viewAll.status, 200);
+  assert.equal((viewAll.text.match(/Pagination Announcement/g) || []).length, 55, 'View All shows every fixture row at once, not just the old 25-row cap');
+
+  // Co-op Admin's own Communication > Announcements tab shares the exact
+  // same unified announcement_log and the same utils/pagination.js wiring.
+  const coop = await loginAsAdmin();
+  const coopPage1 = await request(app).get('/admin/announcements').set('Cookie', coop.cookie);
+  assert.equal(coopPage1.status, 200);
+  assert.equal((coopPage1.text.match(/Pagination Announcement/g) || []).length, 50, 'Co-op Admin portal paginates the same shared log the same way');
+});
+
 test('Email/Text tabs render on both portals instead of 404ing', async () => {
   const main = await loginAsMainAdmin();
   const mainEmail = await request(app).get('/main-admin/announcements/email').set('Cookie', main.cookie);
