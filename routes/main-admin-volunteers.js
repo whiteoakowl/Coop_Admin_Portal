@@ -224,8 +224,10 @@ router.post('/signup-lists', async (req, res) => {
 });
 
 router.post('/signup-lists/:id/update', async (req, res) => {
+  const title = (req.body.title || '').trim();
+  if (!title) return res.redirect(`/main-admin/volunteers/signup-lists/${req.params.id}?error=` + encodeURIComponent('List title is required.'));
   await volunteers.updateSignUpList(req.params.id, {
-    title: (req.body.title || '').trim(),
+    title,
     description: (req.body.description || '').trim(),
     eventId: req.body.eventId ? parseInt(req.body.eventId, 10) : null,
     memberId: req.body.memberId ? parseInt(req.body.memberId, 10) : null,
@@ -445,8 +447,10 @@ router.post('/volunteer-lists', async (req, res) => {
 });
 
 router.post('/volunteer-lists/:id/update', async (req, res) => {
+  const title = (req.body.title || '').trim();
+  if (!title) return res.redirect(`/main-admin/volunteers/volunteer-lists/${req.params.id}?error=` + encodeURIComponent('List title is required.'));
   await volunteers.updateVolunteerList(req.params.id, {
-    title: (req.body.title || '').trim(),
+    title,
     description: (req.body.description || '').trim(),
     eventId: req.body.eventId ? parseInt(req.body.eventId, 10) : null,
     memberId: req.body.memberId ? parseInt(req.body.memberId, 10) : null,

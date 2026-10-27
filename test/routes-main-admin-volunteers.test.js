@@ -418,6 +418,49 @@ test('Sign-Up/Volunteer List Add & Edit dialogs: Attach to Member dropdown lists
   assert.equal(vList.member_id, appleId, 'Volunteer Lists should also save Attach to Member');
 });
 
+// A real bug: the Title field is `required` in both Edit dialogs, but a
+// direct POST (bypassing that HTML attribute) hit no server-side check at
+// all on either /update route, unlike their own Add routes (and
+// Committees' own /update) which both already reject a blank name - this
+// let a raw request blank out an existing list's title.
+test('Sign-Up List and Volunteer List update routes reject a blank title, same as their own create routes', async () => {
+  const admin = await loginAsMainAdmin();
+
+  const signupCreate = await request(app)
+    .post('/main-admin/volunteers/signup-lists')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Keep This Title', _csrf: admin.csrfToken });
+  const signupListId = Number(/\/signup-lists\/(\d+)/.exec(signupCreate.headers.location)[1]);
+
+  const signupRes = await request(app)
+    .post(`/main-admin/volunteers/signup-lists/${signupListId}/update`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: '', description: 'Edited', _csrf: admin.csrfToken });
+  assert.equal(signupRes.status, 302);
+  assert.match(signupRes.headers.location, /error=/);
+  const signupList = await db.prepare('SELECT title FROM sign_up_lists WHERE id = ?').get(signupListId);
+  assert.equal(signupList.title, 'Keep This Title', 'a blank title must not overwrite the existing one');
+
+  const volunteerCreate = await request(app)
+    .post('/main-admin/volunteers/volunteer-lists')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Keep This Title Too', _csrf: admin.csrfToken });
+  const volunteerListId = Number(/\/volunteer-lists\/(\d+)/.exec(volunteerCreate.headers.location)[1]);
+
+  const volunteerRes = await request(app)
+    .post(`/main-admin/volunteers/volunteer-lists/${volunteerListId}/update`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: '  ', description: 'Edited', _csrf: admin.csrfToken });
+  assert.equal(volunteerRes.status, 302);
+  assert.match(volunteerRes.headers.location, /error=/);
+  const volunteerList = await db.prepare('SELECT title FROM volunteer_signup_lists WHERE id = ?').get(volunteerListId);
+  assert.equal(volunteerList.title, 'Keep This Title Too', 'a whitespace-only title must not overwrite the existing one');
+});
+
 test('Sign-Up List Add Item dialog: a fetch()-style request (Accept: application/json) gets JSON back instead of a redirect, so several items can be added without the page navigating away', async () => {
   const admin = await loginAsMainAdmin();
   await request(app).post('/main-admin/volunteers/signup-lists').set('Cookie', admin.cookie).type('form').send({ title: 'Fetch Check List', _csrf: admin.csrfToken });
