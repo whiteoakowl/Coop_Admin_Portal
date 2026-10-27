@@ -37,6 +37,7 @@ const { appSetting, setAppSetting } = require('../utils/appSettings');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { formatTimestamp, formatDateShort } = require('../utils/dates');
 const { renderViewToPdf } = require('../utils/pdfRender');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 function sendPdf(res, filename, pdfBuffer) {
   res.set('Content-Type', 'application/pdf');
@@ -107,9 +108,15 @@ async function billableMembers() {
 
 router.get('/', async (req, res) => {
   const q = (req.query.q || '').trim().toLowerCase();
+  const allMembers = await accountRows(q);
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(allMembers, parsePage(req.query.page), pageSize);
   res.render('admin-accounting-list', {
     title: 'Accounts',
-    members: await accountRows(q),
+    members: pagination.items,
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: `/main-admin/accounting?${q ? `q=${encodeURIComponent(q)}&` : ''}`,
     q: req.query.q || '',
     notice: req.query.notice || null,
     error: req.query.error || null,
@@ -374,9 +381,14 @@ router.get('/invoices', async (req, res) => {
     const sectionIdsByMember = await sectionIdsForMembers(invoices.map((c) => c.member_id));
     invoices = invoices.filter((c) => (sectionIdsByMember[c.member_id] || new Set()).has(sectionId));
   }
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(invoices, parsePage(req.query.page), pageSize);
   res.render('admin-accounting-invoices', {
     title: 'Invoices',
-    invoices,
+    invoices: pagination.items,
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: `/main-admin/accounting/invoices?${status ? `status=${status}&` : ''}${memberId ? `memberId=${memberId}&` : ''}${sectionId ? `sectionId=${sectionId}&` : ''}`,
     status,
     memberId,
     sectionId,
@@ -468,9 +480,15 @@ router.post('/invoices/:id/delete', async (req, res) => {
 // actually received). ---
 
 router.get('/payments', async (req, res) => {
+  const allRows = await payments.allPayments('payment');
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(allRows, parsePage(req.query.page), pageSize);
   res.render('admin-accounting-payments', {
     title: 'Payments',
-    rows: await payments.allPayments('payment'),
+    rows: pagination.items,
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: '/main-admin/accounting/payments?',
     allMembers: await billableMembers(),
     notice: req.query.notice || null,
     error: req.query.error || null,
@@ -610,13 +628,43 @@ router.post('/payments/:id/delete', async (req, res) => {
 // and corrections - plus cancelled charges, both ways a charge's
 // original bill gets walked back after the fact). ---
 
+// Two independent, unbounded lists on one page (Refunds and Cancelled
+// Charges) - unlike every other paginated view in this app, which only
+// ever has one list per page. Each gets its own pagination object and
+// its own query param names (refundsPage/cancelledPage) so paging
+// through one never resets or collides with the other's own page.
 router.get('/adjustments', async (req, res) => {
-  const refunds = await payments.allPayments('refund');
-  const cancelled = await payments.allCharges('cancelled');
+  const allRefunds = await payments.allPayments('refund');
+  const allCancelled = await payments.allCharges('cancelled');
+
+  const refundsPageSize = parsePageSize(req.query.refundsPageSize, DEFAULT_PAGE_SIZE);
+  const refundsPagination = paginate(allRefunds, parsePage(req.query.refundsPage), refundsPageSize);
+
+  const cancelledPageSize = parsePageSize(req.query.cancelledPageSize, DEFAULT_PAGE_SIZE);
+  const cancelledPagination = paginate(allCancelled, parsePage(req.query.cancelledPage), cancelledPageSize);
+
+  // Each section's own baseHref preserves the OTHER section's current
+  // page/pageSize, same "don't lose an unrelated filter already in
+  // effect" convention routes/admin-logs.js's own baseHref follows for
+  // tab/date - paging through Refunds shouldn't silently bounce
+  // Cancelled Charges back to its own page 1, and vice versa.
+  const refundsBaseHref = `/main-admin/accounting/adjustments?${
+    cancelledPageSize === Infinity ? 'cancelledPageSize=all&' : cancelledPagination.currentPage > 1 ? `cancelledPage=${cancelledPagination.currentPage}&` : ''
+  }`;
+  const cancelledBaseHref = `/main-admin/accounting/adjustments?${
+    refundsPageSize === Infinity ? 'refundsPageSize=all&' : refundsPagination.currentPage > 1 ? `refundsPage=${refundsPagination.currentPage}&` : ''
+  }`;
+
   res.render('admin-accounting-adjustments', {
     title: 'Adjustments',
-    refunds,
-    cancelled,
+    refunds: refundsPagination.items,
+    refundsPagination,
+    refundsViewingAll: refundsPageSize === Infinity,
+    refundsBaseHref,
+    cancelled: cancelledPagination.items,
+    cancelledPagination,
+    cancelledViewingAll: cancelledPageSize === Infinity,
+    cancelledBaseHref,
     notice: req.query.notice || null,
     error: req.query.error || null,
     formatCents: payments.formatCents,
@@ -634,9 +682,14 @@ router.get('/logs', async (req, res) => {
   // uses (utils/payments.js's own dateLabel), applied here too since this
   // page reads audit_log rows directly rather than through that file.
   for (const e of entries) e.dateLabel = formatTimestamp(e.created_at);
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(entries, parsePage(req.query.page), pageSize);
   res.render('admin-accounting-logs', {
     title: 'Accounting Logs',
-    entries,
+    entries: pagination.items,
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: '/main-admin/accounting/logs?',
   });
 });
 

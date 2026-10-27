@@ -14,7 +14,16 @@
 // unpaginated list, not just whichever page happened to be open on
 // screen (see the print-only table each paginated view renders
 // alongside its on-screen one).
+//
+// pageParam/pageSizeParam (both optional, default 'page'/'pageSize') -
+// only needed when a single page has more than one independently
+// paginated list (e.g. Adjustments' own Refunds and Cancelled Charges
+// tables) - every other caller has just one list per page and leaves
+// these at their defaults, so ?page=N keeps meaning what it always has
+// everywhere else in the app.
 var isViewingAll = typeof viewingAll !== 'undefined' && viewingAll;
+var pageParam = typeof pageParam !== 'undefined' ? pageParam : 'page';
+var pageSizeParam = typeof pageSizeParam !== 'undefined' ? pageSizeParam : 'pageSize';
 %>
 <% if (pagination.totalPages > 1 || isViewingAll) { %>
   <nav class="pagination-bar no-print" aria-label="Pagination">
@@ -25,10 +34,10 @@ var isViewingAll = typeof viewingAll !== 'undefined' && viewingAll;
             rather than a dead end, since ?pageSize=all collapses
             pagination.totalPages to 1 with nothing left to Prev/Next
             through otherwise. %>
-        <a class="pagination-btn" href="<%= baseHref %>page=1">Show Pages</a>
+        <a class="pagination-btn" href="<%= baseHref %><%= pageParam %>=1">Show Pages</a>
       <% } else { %>
         <% if (pagination.hasPrev) { %>
-          <a class="pagination-btn" href="<%= baseHref %>page=<%= pagination.currentPage - 1 %>">&larr; Prev</a>
+          <a class="pagination-btn" href="<%= baseHref %><%= pageParam %>=<%= pagination.currentPage - 1 %>">&larr; Prev</a>
         <% } else { %>
           <span class="pagination-btn pagination-btn-disabled" aria-disabled="true">&larr; Prev</span>
         <% } %>
@@ -37,7 +46,7 @@ var isViewingAll = typeof viewingAll !== 'undefined' && viewingAll;
           <select
             class="pagination-page-select"
             aria-label="Jump to page"
-            onchange="window.fullscreenNavigate('<%= baseHref %>page=' + this.value)"
+            onchange="window.fullscreenNavigate('<%= baseHref %><%= pageParam %>=' + this.value)"
           >
             <% for (var p = 1; p <= pagination.totalPages; p++) { %>
               <option value="<%= p %>"<%= p === pagination.currentPage ? ' selected' : '' %>><%= p %></option>
@@ -46,11 +55,11 @@ var isViewingAll = typeof viewingAll !== 'undefined' && viewingAll;
           of <%= pagination.totalPages %>
         </label>
         <% if (pagination.hasNext) { %>
-          <a class="pagination-btn" href="<%= baseHref %>page=<%= pagination.currentPage + 1 %>">Next &rarr;</a>
+          <a class="pagination-btn" href="<%= baseHref %><%= pageParam %>=<%= pagination.currentPage + 1 %>">Next &rarr;</a>
         <% } else { %>
           <span class="pagination-btn pagination-btn-disabled" aria-disabled="true">Next &rarr;</span>
         <% } %>
-        <a class="pagination-btn" href="<%= baseHref %>pageSize=all">View All</a>
+        <a class="pagination-btn" href="<%= baseHref %><%= pageSizeParam %>=all">View All</a>
       <% } %>
     </div>
   </nav>
