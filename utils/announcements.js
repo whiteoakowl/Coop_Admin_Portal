@@ -132,8 +132,15 @@ function targetLabels(targets, roleLabelByKey) {
   });
 }
 
+// limit=25 by default; both Communication pages' own "Past Announcements"
+// list pass limit: null to fetch every row with no LIMIT clause at all,
+// ahead of their own in-memory pagination (utils/pagination.js - see its
+// own header comment on why that's the right place to paginate, not a
+// second SQL round-trip here).
 async function listAnnouncementLog(limit = 25) {
-  const rows = await db.prepare('SELECT * FROM announcement_log ORDER BY created_at DESC LIMIT ?').all(limit);
+  const hasLimit = limit !== null && limit !== undefined;
+  const sql = `SELECT * FROM announcement_log ORDER BY created_at DESC${hasLimit ? ' LIMIT ?' : ''}`;
+  const rows = hasLimit ? await db.prepare(sql).all(limit) : await db.prepare(sql).all();
   return rows.map((r) => ({ ...r, targets: JSON.parse(r.targets || '[]') }));
 }
 

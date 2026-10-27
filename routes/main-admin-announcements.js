@@ -17,17 +17,26 @@ const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const announcements = require('../utils/announcements');
 const emailComposer = require('../utils/emailComposer');
 const textComposer = require('../utils/textComposer');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('send_announcements'));
 
 router.get('/', async (req, res) => {
   const roles = await db.prepare('SELECT key, label FROM roles ORDER BY label').all();
   const roleLabelByKey = Object.fromEntries(roles.map((r) => [r.key, r.label]));
-  const log = await announcements.listAnnouncementLog();
+  // limit: null - every announcement ever sent/scheduled, not just the
+  // most recent 25 - paginate() below slices it at render time instead
+  // (see utils/pagination.js's own header comment).
+  const allLog = await announcements.listAnnouncementLog(null);
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(allLog, parsePage(req.query.page), pageSize);
   res.render('main-admin-announcements', {
     title: 'Communication',
     roles,
-    log,
+    log: pagination.items,
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: '/main-admin/announcements?',
     targetLabels: (targets) => announcements.targetLabels(targets, roleLabelByKey),
     error: req.query.error || null,
     notice: req.query.notice || null,
