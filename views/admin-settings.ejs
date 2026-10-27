@@ -50,6 +50,13 @@
           </div>
         <% } %>
         <div class="team-col">
+          <a class="team-info-card" href="/admin/settings?tab=notificationtemplates">
+            <span class="team-info-icon"><svg class="icon"><use href="#icon-mail"/></svg></span>
+            <h2 class="team-info-title">Text/Email Notifications</h2>
+            <p class="hint">Default message text for floater assignments, waitlists, registrations, and more.</p>
+          </a>
+        </div>
+        <div class="team-col">
           <a class="team-info-card" href="/admin/settings?tab=quicklinks">
             <span class="team-info-icon"><svg class="icon"><use href="#icon-link"/></svg></span>
             <h2 class="team-info-title">Quick Links</h2>
@@ -161,6 +168,39 @@
             <li>Confirm by clicking <strong>Install</strong>.</li>
           </ol>
         </div>
+      <% } else if (activeTab === 'notificationtemplates') { %>
+        <%# A real request: "Add a text/email notification settings
+            card. There you can change the default message for
+            different things like floater assignments, class wait list,
+            event waitlist, event registration, class registration,
+            etc." Same notification_message_templates rows the Main
+            Admin portal's own /main-admin/notifications page edits -
+            there's only one real message a member ever receives, so
+            either portal editing it is the same save. %>
+        <h2>Default Messages</h2>
+        <p class="hint">The wording automatically sent for each of these - editable here, shared with the Main Admin portal's own copy of this page. <code>{{placeholder}}</code> text is filled in with the real value when the message actually sends.</p>
+        <%
+          const templateGroups = {};
+          templates.forEach(function(t) { (templateGroups[t.group] = templateGroups[t.group] || []).push(t); });
+        %>
+        <% Object.keys(templateGroups).forEach(function(groupName) { %>
+          <div class="manage-section">
+            <h3><%= groupName %></h3>
+            <% templateGroups[groupName].forEach(function(t) { %>
+              <form method="POST" action="/admin/settings/notification-templates/<%= t.templateKey %>" class="stack-form stack-form-narrow notification-template-form">
+                <label><%= t.label %></label>
+                <% if (t.placeholders.length) { %><p class="hint">Placeholders: <% t.placeholders.forEach(function(p, i) { %><code>{{<%= p %>}}</code><%= i < t.placeholders.length - 1 ? ' ' : '' %><% }); %></p><% } %>
+                <% if (t.hasSubject) { %>
+                  <label for="co-subject-<%= t.templateKey %>">Subject / Title</label>
+                  <input id="co-subject-<%= t.templateKey %>" name="subject" type="text" value="<%= t.subject %>" required />
+                <% } %>
+                <label for="co-body-<%= t.templateKey %>">Message</label>
+                <textarea id="co-body-<%= t.templateKey %>" name="body" rows="3" required><%= t.body %></textarea>
+                <button type="submit" class="primary-btn">Save</button>
+              </form>
+            <% }); %>
+          </div>
+        <% }); %>
       <% } else { %>
         <div class="admin-card-grid">
           <a class="admin-card" href="/kiosk" target="_blank">Full Kiosk Screen</a>

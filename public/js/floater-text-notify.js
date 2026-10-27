@@ -26,6 +26,19 @@
   const sendBtn = document.getElementById('floater-text-notify-send-btn');
   if (!toggleBtn || !container || !dialog || !form) return;
 
+  // Admin-editable (Settings > Text/Email Notifications > Floater
+  // Assignments) via utils/notificationTemplates.js's own
+  // notification_message_templates row 'floater_assignment_default' -
+  // dialog.dataset.messageTemplate is that row's raw {{placeholder}}
+  // text, server-rendered into this page. Falls back to the original
+  // hardcoded line only if that row is somehow missing entirely (should
+  // never happen - the migration always seeds it).
+  function fillMessageTemplate(data) {
+    const template = dialog.dataset.messageTemplate;
+    if (!template) return `You're assigned: ${data.position}${data.hour ? ` at ${data.hour}` : ''}${data.room ? ` in Room ${data.room}` : ''}.`;
+    return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key) => (data[key] != null ? data[key] : ''));
+  }
+
   let selectMode = false;
   let pendingNotify = [];
 
@@ -77,7 +90,7 @@
 
     pendingNotify = checked.map((cb) => ({ memberId: cb.dataset.memberId }));
     const first = checked[0].dataset;
-    messageField.value = `You're assigned: ${first.position}${first.hour ? ` at ${first.hour}` : ''}${first.room ? ` in Room ${first.room}` : ''}.`;
+    messageField.value = fillMessageTemplate(first);
     recipientsHint.textContent = `Sending to ${checked.length} floater${checked.length === 1 ? '' : 's'}.`;
     const fileInput = form.querySelector('input[type="file"]');
     if (fileInput) fileInput.value = '';

@@ -34,6 +34,7 @@ const {
   signUpForShift,
 } = require('../utils/committeesAndSignupLists');
 const { notify } = require('../utils/notifications');
+const { renderTemplate } = require('../utils/notificationTemplates');
 const { mapWithConcurrency } = require('../utils/concurrency');
 const auditLog = require('../utils/auditLog');
 const { findMemberByBarcodeOrName } = require('../utils/memberLookup');
@@ -1132,13 +1133,8 @@ router.post('/:id/status', async (req, res) => {
     const event = await events.getEvent(req.params.id);
     const registrations = await events.registrationsForEvent(req.params.id);
     const accountIds = [...new Set(registrations.filter((r) => r.status !== 'cancelled' && r.registered_by_account_id).map((r) => r.registered_by_account_id))];
-    await mapWithConcurrency(accountIds, 20, (accountId) =>
-      notify(accountId, 'event_cancelled', {
-        title: `Event Cancelled: ${event.title}`,
-        body: `"${event.title}" has been cancelled.`,
-        linkUrl: '/events/' + req.params.id,
-      })
-    );
+    const rendered = await renderTemplate('event_cancelled', { eventTitle: event.title });
+    await mapWithConcurrency(accountIds, 20, (accountId) => notify(accountId, 'event_cancelled', { title: rendered.subject, body: rendered.body, linkUrl: '/events/' + req.params.id }));
   }
 
   res.redirect(`/main-admin/events/${req.params.id}/builder?notice=` + encodeURIComponent(`Marked ${status}.`));

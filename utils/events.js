@@ -25,6 +25,7 @@ const { GRADE_OPTIONS } = require('./membership');
 const { lastNameOf, primaryParentForBilling } = require('./members');
 const { formatDateLabel, formatFriendlyTimestamp } = require('./dates');
 const notifications = require('./notifications');
+const { renderTemplate } = require('./notificationTemplates');
 const { toCsvRow } = require('./spreadsheet');
 const { findMemberByBarcodeOrName } = require('./memberLookup');
 const { ageFromBirthday } = require('./emailComposer');
@@ -900,13 +901,9 @@ async function decideSubmission(eventId, approve) {
   if (!event || event.approval_status !== 'pending') return null;
   await db.prepare('UPDATE events SET approval_status = ?, updated_at = now_text() WHERE id = ?').run(approve ? 'approved' : 'rejected', eventId);
   if (event.submitted_by_account_id) {
-    await notifications.notify(event.submitted_by_account_id, 'event_submission_decided', {
-      title: approve ? `Event approved: ${event.title}` : `Event not approved: ${event.title}`,
-      body: approve
-        ? `Your submitted event "${event.title}" was approved. A Main Admin still needs to publish it before it's visible on the calendar.`
-        : `Your submitted event "${event.title}" was not approved.`,
-      linkUrl: '/events',
-    });
+    const templateKey = approve ? 'event_submission_decided_approved' : 'event_submission_decided_rejected';
+    const rendered = await renderTemplate(templateKey, { eventTitle: event.title });
+    await notifications.notify(event.submitted_by_account_id, 'event_submission_decided', { title: rendered.subject, body: rendered.body, linkUrl: '/events' });
   }
   return approve ? 'approved' : 'rejected';
 }
@@ -1390,11 +1387,9 @@ async function createOrReactivateRegistration(event, member, accountId, answers 
         .run(registrationId, extraFieldId, value);
     }
 
-    const notice =
-      status === 'confirmed'
-        ? `${member.name} is registered for "${event.title}".`
-        : `${event.title} is full - ${member.name} has been added to the waitlist (#${waitlistPosition}).`;
-    result = { ok: true, notice, status, waitlistPosition };
+    const templateKey = status === 'confirmed' ? 'event_registration_confirmed' : 'event_registration_waitlisted';
+    const rendered = await renderTemplate(templateKey, { eventTitle: event.title, memberName: member.name, waitlistPosition });
+    result = { ok: true, notice: rendered.body, subject: rendered.subject, status, waitlistPosition };
   });
   return result;
 }
@@ -1630,11 +1625,8 @@ async function releaseEventClaimsAndShiftWaitlist(tx, eventId, memberId, registr
 
 async function notifyWaitlistPromotion(promoted, eventId) {
   if (!promoted) return;
-  await notifications.notify(promoted.accountId, 'event_waitlist_promoted', {
-    title: `Off the waitlist: ${promoted.eventTitle}`,
-    body: `A spot opened up - ${promoted.memberName} is now confirmed for "${promoted.eventTitle}".`,
-    linkUrl: '/events/' + eventId,
-  });
+  const rendered = await renderTemplate('event_waitlist_promoted', { eventTitle: promoted.eventTitle, memberName: promoted.memberName });
+  await notifications.notify(promoted.accountId, 'event_waitlist_promoted', { title: rendered.subject, body: rendered.body, linkUrl: '/events/' + eventId });
 }
 
 async function cancelRegistration(eventId, memberId) {

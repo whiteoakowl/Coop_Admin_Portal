@@ -36,6 +36,43 @@
         </tbody>
       </table>
     </div>
+
+    <%# A real request: "Add a text/email notification settings card.
+        There you can change the default message for different things
+        like floater assignments, class wait list, event waitlist,
+        event registration, class registration, etc." One form per
+        message (a type with two real outcomes - confirmed/waitlisted,
+        approved/rejected - gets two separate forms, grouped under one
+        heading), grouped the same way utils/notificationTemplates.js's
+        own TEMPLATE_DEFINITIONS groups them. Shared with the Co-op
+        Admin portal's own Settings > Text/Email Notifications tab -
+        the same notification_message_templates rows either portal
+        edits are what actually sends, there's only one real message a
+        member ever receives. %>
+    <h2>Default Messages</h2>
+    <p class="hint">The wording automatically sent for each of these - editable here, shared with the Co-op Admin portal's own copy of this page. <code>{{placeholder}}</code> text is filled in with the real value when the message actually sends.</p>
+    <%
+      const templateGroups = {};
+      templates.forEach(function(t) { (templateGroups[t.group] = templateGroups[t.group] || []).push(t); });
+    %>
+    <% Object.keys(templateGroups).forEach(function(groupName) { %>
+      <div class="manage-section">
+        <h3><%= groupName %></h3>
+        <% templateGroups[groupName].forEach(function(t) { %>
+          <form method="POST" action="/main-admin/notifications/templates/<%= t.templateKey %>" class="stack-form stack-form-narrow notification-template-form">
+            <label><%= t.label %></label>
+            <% if (t.placeholders.length) { %><p class="hint">Placeholders: <% t.placeholders.forEach(function(p, i) { %><code>{{<%= p %>}}</code><%= i < t.placeholders.length - 1 ? ' ' : '' %><% }); %></p><% } %>
+            <% if (t.hasSubject) { %>
+              <label for="subject-<%= t.templateKey %>">Subject / Title</label>
+              <input id="subject-<%= t.templateKey %>" name="subject" type="text" value="<%= t.subject %>" required />
+            <% } %>
+            <label for="body-<%= t.templateKey %>">Message</label>
+            <textarea id="body-<%= t.templateKey %>" name="body" rows="3" required><%= t.body %></textarea>
+            <button type="submit" class="primary-btn">Save</button>
+          </form>
+        <% }); %>
+      </div>
+    <% }); %>
   </main>
 </body>
 </html>
