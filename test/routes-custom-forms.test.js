@@ -128,6 +128,32 @@ test('an unassigned published form is open to any signed-in account, and answers
   assert.equal(byField.get(subField.id), '1');
 });
 
+// Pagination (Phase 4 audit item) - a form's submissions list grows
+// every time someone submits it, so it's paginated the same in-memory
+// way as every other ongoing list/log (utils/pagination.js).
+test('admin submissions list is paginated, page 1 shows only the first page of submissions', async () => {
+  const admin = await loginAsMainAdmin();
+  const formId = await createAndPublishForm(admin, 'Pagination Test Form');
+
+  for (let i = 0; i < 55; i += 1) {
+    const code = await generateMemberCode();
+    const memberInfo = await db
+      .prepare("INSERT INTO members (name, barcode, member_code, member_type, active) VALUES (?, ?, ?, 'parent', 1)")
+      .run(`Submitter ${i}`, code, code);
+    await db.prepare('INSERT INTO custom_form_submissions (form_id, member_id) VALUES (?, ?)').run(formId, memberInfo.lastInsertRowid);
+  }
+
+  const page1 = await request(app).get(`/main-admin/forms/${formId}/submissions`).set('Cookie', admin.cookie);
+  assert.equal(page1.status, 200);
+  assert.equal((page1.text.match(/Submitter \d+/g) || []).length, 50, 'page 1 should show only the default 50-item page');
+  assert.match(page1.text, /class="pagination-bar no-print"/, 'pagination controls should render once there is more than one page');
+  assert.match(page1.text, /Showing 1&ndash;50 of 55/);
+
+  const page2 = await request(app).get(`/main-admin/forms/${formId}/submissions?page=2`).set('Cookie', admin.cookie);
+  assert.equal(page2.status, 200);
+  assert.equal((page2.text.match(/Submitter \d+/g) || []).length, 5, 'page 2 should show the remaining 5 submissions');
+});
+
 test('multiple_choice stores every selected option, and required fields block submission when missing', async () => {
   const admin = await loginAsMainAdmin();
   const formId = await createAndPublishForm(admin, 'Volunteer Interests');
