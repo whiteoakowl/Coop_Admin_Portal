@@ -62,6 +62,7 @@ test('publishing a still-pending submitted event (no prior Approve click) also a
   const parentRole = await db.prepare("SELECT id FROM roles WHERE key = 'parent'").get();
   await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(parentAcctId, parentRole.id);
 
+  const eventDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
   const startsAt = (await db.prepare("SELECT to_char(now() + interval '5 days', 'YYYY-MM-DD HH24:MI:SS') AS t").get()).t;
   const eventId = await events.submitEvent({ title: 'Publish Bug Fall Fest', startsAt, visibility: 'members' }, parentAcctId);
 
@@ -88,7 +89,12 @@ test('publishing a still-pending submitted event (no prior Approve click) also a
 
   const loginRes = await request(app).post('/login').type('form').send({ email: parentEmail, password: 'testpassword123' });
   const parentCookie = loginRes.headers['set-cookie'];
-  const calendarPage = await request(app).get('/events?view=calendar&portal=parent').set('Cookie', parentCookie);
+  // "+5 days" can land in the next month depending on when this test
+  // happens to run - an explicit ?month= keeps this pinned to the
+  // event's own month regardless of today's date (see test/routes-
+  // events-shared-calendar.test.js's own matching comment).
+  const monthParam = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth() + 1).padStart(2, '0')}`;
+  const calendarPage = await request(app).get(`/events?view=calendar&portal=parent&month=${monthParam}`).set('Cookie', parentCookie);
   assert.match(calendarPage.text, /Publish Bug Fall Fest/);
 });
 

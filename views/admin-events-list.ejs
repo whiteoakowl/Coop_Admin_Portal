@@ -26,7 +26,18 @@
         <a class="roster-action-btn" href="/main-admin/events/new">+ New Event</a>
       </div>
     <% } %>
-      <div class="roster-btn-row no-print">
+      <%# A real request: "Main admin portal, all pages, all subpages, the
+          icons and buttons should not be in columns, they should be in
+          rows" - this row mixes .roster-action-btn (the Calendar/List
+          view toggle) with plain .icon-btn children (Print/PDF/Export/
+          Import), and the real count varies by tab (2/4/6/0), so a fixed
+          data-fixed-columns computation would have to track every
+          combination - roster-btn-row-fit-text sidesteps that entirely
+          (content-sized flex-wrap, not a counted grid), the same fix
+          already used for other mixed icon/button toolbars this same
+          audit touched (e.g. views/main-admin-members.ejs's own Filter +
+          Bulk Edit row). %>
+      <div class="roster-btn-row roster-btn-row-fit-text no-print">
         <% if (activeTab === 'calendar') { %>
           <a class="roster-action-btn archived-toggle-btn icon-toggle-btn<%= calendarView === 'calendar' ? ' active' : '' %>" href="/main-admin/events?tab=calendar&view=calendar&month=<%= monthParam %>" aria-label="Calendar View" title="Calendar View"><svg class="icon"><use href="#icon-grid"/></svg></a>
           <a class="roster-action-btn archived-toggle-btn icon-toggle-btn<%= calendarView === 'list' ? ' active' : '' %>" href="/main-admin/events?tab=calendar&view=list&month=<%= monthParam %>" aria-label="List View" title="List View"><svg class="icon"><use href="#icon-menu"/></svg></a>
@@ -227,7 +238,13 @@
           date dropdown first and Export/Print/PDF right after it, in
           their existing order. %>
       <div class="roster-toolbar no-print">
-        <div class="roster-btn-row event-reglog-toolbar-row">
+        <%# A real request: "icons and buttons should not be in columns,
+            they should be in rows" - this row's own date-picker <form> and
+            Export/Print/PDF .icon-btn children are both invisible to the
+            mobile grid JS's column-count calc (it only counts .roster-
+            action-btn/.btn-secondary), so roster-btn-row-fit-text (see
+            this view's own earlier matching comment) instead of a grid. %>
+        <div class="roster-btn-row roster-btn-row-fit-text event-reglog-toolbar-row">
           <form method="GET" action="/main-admin/events" class="dashboard-date-picker">
             <input type="hidden" name="tab" value="registrationlog" />
             <svg class="icon"><use href="#icon-calendar-check"/></svg>

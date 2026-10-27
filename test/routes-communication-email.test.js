@@ -133,12 +133,13 @@ test('Main Admin Email: Create Email renders the compose screen with hidden reci
   assert.match(composeRes.text, /Send right away/);
   assert.match(composeRes.text, /Schedule for later/);
   assert.match(composeRes.text, /Reply-To/);
-  // A real request: "reply to email address and a text bar. Email also
-  // to, and a text bar. Subject line, and a text bar" - Reply-To, then
-  // Email Also To, then Subject, in that order.
-  assert.match(composeRes.text, /Email Also To/);
-  assert.ok(composeRes.text.indexOf('Reply-To') < composeRes.text.indexOf('Email Also To'), 'Reply-To must come before Email Also To');
-  assert.ok(composeRes.text.indexOf('Email Also To') < composeRes.text.indexOf('member-form-full">Subject'), 'Email Also To must come before Subject');
+  // A real request: "under reply to, there should be another title and
+  // text box that says send to so another email can be added to send
+  // the message to" - Reply-To, then Send To, then Subject, in that
+  // order.
+  assert.match(composeRes.text, /Send To/);
+  assert.ok(composeRes.text.indexOf('Reply-To') < composeRes.text.indexOf('Send To'), 'Reply-To must come before Send To');
+  assert.ok(composeRes.text.indexOf('Send To') < composeRes.text.indexOf('member-form-full">Subject'), 'Send To must come before Subject');
   // A real request: "After click the send email button for send in the
   // future it will ask you to pick a date and time to send. And save."
   // - a popup dialog, not the old always-visible inline datetime-local.
@@ -151,7 +152,7 @@ test('Main Admin Email: Create Email renders the compose screen with hidden reci
     .post('/main-admin/announcements/email/send')
     .type('form')
     .set('Cookie', cookie)
-    .send({ _csrf: csrfToken, recipientIds: [String(accountId)], subject: 'Class update', body: '<p>hi</p>', replyTo: 'board@example.com', emailAlsoTo: 'extra@example.com', sendOption: 'now' });
+    .send({ _csrf: csrfToken, recipientIds: [String(accountId)], subject: 'Class update', body: '<p>hi</p>', replyTo: 'board@example.com', sendTo: 'extra@example.com', sendOption: 'now' });
   assert.equal(sendRes.status, 302);
   assert.match(sendRes.headers.location, /notice=/);
 
@@ -159,7 +160,7 @@ test('Main Admin Email: Create Email renders the compose screen with hidden reci
   assert.ok(campaign);
   assert.equal(campaign.status, 'sent');
   assert.equal(campaign.reply_to, 'board@example.com');
-  assert.equal(campaign.email_also_to, 'extra@example.com');
+  assert.equal(campaign.send_to, 'extra@example.com');
   assert.equal(campaign.recipient_count, 1);
 
   const notif = await db.prepare("SELECT * FROM notifications WHERE type_key = 'email_campaign' AND member_account_id = ?").get(accountId);
@@ -175,13 +176,13 @@ test('Main Admin Email: scheduling saves a scheduled campaign without notifying 
     .post('/main-admin/announcements/email/send')
     .type('form')
     .set('Cookie', cookie)
-    .send({ _csrf: csrfToken, recipientIds: [String(accountId)], subject: 'Scheduled note', body: '<p>later</p>', emailAlsoTo: 'later-extra@example.com', sendOption: 'schedule', scheduledAt });
+    .send({ _csrf: csrfToken, recipientIds: [String(accountId)], subject: 'Scheduled note', body: '<p>later</p>', sendTo: 'later-extra@example.com', sendOption: 'schedule', scheduledAt });
   assert.equal(sendRes.status, 302);
 
   let campaign = await db.prepare("SELECT * FROM email_campaigns WHERE subject = 'Scheduled note'").get();
   assert.equal(campaign.status, 'scheduled');
   assert.equal(campaign.scheduled_at, scheduledAt);
-  assert.equal(campaign.email_also_to, 'later-extra@example.com');
+  assert.equal(campaign.send_to, 'later-extra@example.com');
 
   let notif = await db.prepare("SELECT * FROM notifications WHERE type_key = 'email_campaign' AND member_account_id = ? AND title = 'Scheduled note'").get(accountId);
   assert.equal(notif, undefined, 'a scheduled email must not notify anyone until it is actually sent');
@@ -219,19 +220,19 @@ test('Co-op Admin Email tab: same filter/select-all/compose wiring, reached at /
     .post('/admin/announcements/email/send')
     .type('form')
     .set('Cookie', cookie)
-    .send({ _csrf: csrfToken, recipientIds: [String(accountId)], subject: 'Coop email', body: '<p>hi</p>', emailAlsoTo: 'coop-extra@example.com', sendOption: 'now' });
+    .send({ _csrf: csrfToken, recipientIds: [String(accountId)], subject: 'Coop email', body: '<p>hi</p>', sendTo: 'coop-extra@example.com', sendOption: 'now' });
   assert.equal(sendRes.status, 302);
 
   const campaign = await db.prepare("SELECT * FROM email_campaigns WHERE subject = 'Coop email'").get();
   assert.ok(campaign);
   assert.equal(campaign.sent_by_portal, 'coop_admin');
-  assert.equal(campaign.email_also_to, 'coop-extra@example.com');
+  assert.equal(campaign.send_to, 'coop-extra@example.com');
 
   const composePage = await request(app)
     .post('/admin/announcements/email/compose')
     .type('form')
     .set('Cookie', cookie)
     .send({ _csrf: csrfToken, recipientIds: [String(accountId)] });
-  assert.match(composePage.text, /Email Also To/);
+  assert.match(composePage.text, /Send To/);
   assert.match(composePage.text, /<dialog id="schedule-email-dialog"/);
 });

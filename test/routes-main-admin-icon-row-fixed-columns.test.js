@@ -67,10 +67,15 @@ test('Main Admin pages: icon/button rows that the mobile grid JS cannot auto-cou
   await request(app).post('/main-admin/photos').type('form').set('Cookie', cookie).send({ _csrf: csrfToken, title: 'Icon Row Test Album' });
 
   const cases = [
-    { url: '/main-admin/events?tab=calendar', columns: 4 },
-    { url: '/main-admin/events?tab=requests', columns: 2 },
-    { url: '/main-admin/events?tab=settings', columns: 0 },
-    { url: '/main-admin/events?tab=registrationlog', columns: 3 },
+    // /main-admin/events is deliberately NOT here any more - a later real
+    // request ("Print, pdf, import and export icons should be on the same
+    // row as the calendar and list view icons") merged the Calendar/List
+    // view toggle into this row, mixing .roster-action-btn with plain
+    // .icon-btn children whose real count varies by tab - roster-btn-
+    // row-fit-text (content-sized flex-wrap) replaced data-fixed-columns
+    // here, same as it did for the registration log's own date-picker +
+    // icon row. See test/routes-events-shared-calendar.test.js for that
+    // page's own coverage.
     { url: '/main-admin/photos', columns: 3 },
     { url: '/main-admin/admins', columns: 3 },
     { url: '/main-admin/members/grade-level-report', columns: 3 },

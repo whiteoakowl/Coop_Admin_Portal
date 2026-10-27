@@ -20,14 +20,14 @@
       <label class="member-form-full">Reply-To (optional)
         <input type="email" name="replyTo" placeholder="e.g. board@ourcoop.org" />
       </label>
-      <%# A real request: "Email also to, and a text bar" - extra raw
-          address(es) to also reach, independent of the recipient list
-          above (which only ever resolves to existing member portal
-          accounts - see utils/emailComposer.js's own resolveRecipients()).
-          Plain text, not type="email", since it can hold more than one
-          address. %>
-      <label class="member-form-full">Email Also To (optional)
-        <input type="text" name="emailAlsoTo" placeholder="e.g. someone-else@example.com" />
+      <%# A real request: "under reply to, there should be another title
+          and text box that says send to so another email can be added to
+          send the message to" - same Send To field Main Admin's own copy
+          of this screen has (views/main-admin-email-compose.ejs), kept in
+          sync here (utils/emailComposer.js's own createAndSend/
+          createScheduled take one shared sendTo param for both portals). %>
+      <label class="member-form-full">Send To (optional)
+        <input type="email" name="sendTo" placeholder="e.g. another@example.com" />
       </label>
 
       <label class="member-form-full">Subject
