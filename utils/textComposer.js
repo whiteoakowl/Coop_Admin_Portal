@@ -9,6 +9,7 @@
 // listCampaigns shape.
 const db = require('../db');
 const { notify } = require('./notifications');
+const { easternInputToUtcText } = require('./dates');
 
 const MAX_WORDS = 50;
 
@@ -32,19 +33,24 @@ async function createAndSend({ body, recipientAccountIds, sentByAccountId, sentB
 
 async function createScheduled({ body, recipientAccountIds, scheduledAt, sentByAccountId, sentByPortal }) {
   const recipients = [...new Set(recipientAccountIds)];
+  // scheduledAt arrives as a raw <input type="datetime-local"> value
+  // ("2026-10-28T14:30", no timezone) - converted to the same UTC
+  // 'YYYY-MM-DD HH:MM:SS' text now_text() produces so utils/
+  // scheduledCampaigns.js's own dispatcher can compare it against
+  // now_text() with plain string operators (a real bug this fixed: the
+  // raw, unconverted value was stored and compared as-is before).
   const info = await db
     .prepare(
       `INSERT INTO text_campaigns (body, recipient_account_ids, recipient_count, status, scheduled_at, sent_by_portal, created_by_account_id)
        VALUES (?, ?, ?, 'scheduled', ?, ?, ?) RETURNING id`
     )
-    .get(body, JSON.stringify(recipients), recipients.length, scheduledAt, sentByPortal, sentByAccountId);
+    .get(body, JSON.stringify(recipients), recipients.length, easternInputToUtcText(scheduledAt), sentByPortal, sentByAccountId);
   return { id: info.id, recipientCount: recipients.length };
 }
 
-// Same "Schedule saves it, an admin still has to press Send" pattern as
-// utils/emailComposer.js's own sendScheduled() - see that module's own
-// comment for why (no real send provider is wired up anywhere in this
-// app).
+// Called both by the admin's own manual Send button (POST /text/:id/send)
+// and by utils/scheduledCampaigns.js's automatic dispatcher once
+// scheduled_at is actually due.
 async function sendScheduled(id) {
   const campaign = await db.prepare('SELECT * FROM text_campaigns WHERE id = ?').get(id);
   if (!campaign || campaign.status === 'sent') return null;

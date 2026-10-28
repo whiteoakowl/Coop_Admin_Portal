@@ -385,6 +385,17 @@ app.use(
 // Completely independent of the single shared Admin session below.
 app.use(loadPortalSession);
 
+// Opportunistic dispatch for "Schedule Later" text broadcasts (see
+// utils/scheduledCampaigns.js's own header comment for why this runs
+// here, on every request, instead of a real cron job). Fire-and-forget -
+// never delays or fails the actual request it rides along with.
+app.use((req, res, next) => {
+  require('./utils/scheduledCampaigns')
+    .dispatchDueTextCampaigns()
+    .catch((err) => console.error('dispatchDueTextCampaigns failed:', err.message));
+  next();
+});
+
 // Member photos may live in Supabase Storage or on local disk (see
 // utils/uploadBackend.js and MIGRATION.md) - computed once at boot, not
 // per-request, since createStorageClient() just builds a lightweight

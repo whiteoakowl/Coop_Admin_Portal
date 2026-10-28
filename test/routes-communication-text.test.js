@@ -25,6 +25,7 @@ process.env.MAIN_ADMIN_PASSWORD = 'changeme123';
 const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
+const scheduledCampaigns = require('../utils/scheduledCampaigns');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -174,6 +175,96 @@ test('Main Admin Text: scheduling saves a scheduled text without notifying yet, 
 
   notif = await db.prepare("SELECT * FROM notifications WHERE type_key = 'text_message' AND member_account_id = ? AND body = 'See you Monday.'").get(accountId);
   assert.ok(notif);
+});
+
+// A real request: "Scheduling text to be sent later. Repair this
+// feature so that when it is scheduled it will automatically send
+// according to that schedule instead of having to come back and click
+// send manually." utils/scheduledCampaigns.js's own dispatchDueTextCampaigns()
+// runs opportunistically on every request (server.js) - exercised here
+// directly rather than via a real request, so the test doesn't depend
+// on the in-process debounce timing.
+test('scheduledAt is stored in the same now_text()-comparable format sent_at already uses', async () => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+  const accountId = await seedStudentAccount('mainFormat');
+
+  await request(app)
+    .post('/main-admin/announcements/text/send')
+    .type('form')
+    .set('Cookie', cookie)
+    .send({ _csrf: csrfToken, recipientIds: [String(accountId)], body: 'Format check.', sendOption: 'schedule', scheduledAt: '2027-06-01T09:30' });
+
+  const campaign = await db.prepare("SELECT * FROM text_campaigns WHERE body = 'Format check.'").get();
+  assert.match(campaign.scheduled_at, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/, 'should be stored as a plain UTC "YYYY-MM-DD HH:MM:SS" string, not the raw datetime-local input');
+});
+
+test('a text scheduled for a time already past gets automatically sent, with no admin action', async () => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+  const accountId = await seedStudentAccount('mainAuto');
+
+  await request(app)
+    .post('/main-admin/announcements/text/send')
+    .type('form')
+    .set('Cookie', cookie)
+    .send({ _csrf: csrfToken, recipientIds: [String(accountId)], body: 'Auto-send me.', sendOption: 'schedule', scheduledAt: '2020-01-01T09:00' });
+
+  let campaign = await db.prepare("SELECT * FROM text_campaigns WHERE body = 'Auto-send me.'").get();
+  assert.equal(campaign.status, 'scheduled');
+
+  scheduledCampaigns.resetDebounceForTest();
+  await scheduledCampaigns.dispatchDueTextCampaigns();
+
+  campaign = await db.prepare('SELECT * FROM text_campaigns WHERE id = ?').get(campaign.id);
+  assert.equal(campaign.status, 'sent', 'a past-due scheduled text should be sent without anyone clicking Send');
+
+  const notif = await db.prepare("SELECT * FROM notifications WHERE type_key = 'text_message' AND member_account_id = ? AND body = 'Auto-send me.'").get(accountId);
+  assert.ok(notif);
+});
+
+test('a text scheduled for the future is left alone by the automatic dispatcher', async () => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+  const accountId = await seedStudentAccount('mainFuture');
+
+  await request(app)
+    .post('/main-admin/announcements/text/send')
+    .type('form')
+    .set('Cookie', cookie)
+    .send({ _csrf: csrfToken, recipientIds: [String(accountId)], body: 'Not yet.', sendOption: 'schedule', scheduledAt: '2099-01-01T09:00' });
+
+  scheduledCampaigns.resetDebounceForTest();
+  await scheduledCampaigns.dispatchDueTextCampaigns();
+
+  const campaign = await db.prepare("SELECT * FROM text_campaigns WHERE body = 'Not yet.'").get();
+  assert.equal(campaign.status, 'scheduled', 'a future-scheduled text must not be sent early');
+});
+
+test('the dispatcher debounces - calling it again immediately does not re-check for due campaigns', async () => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+  const accountId = await seedStudentAccount('mainDebounce');
+
+  await request(app)
+    .post('/main-admin/announcements/text/send')
+    .type('form')
+    .set('Cookie', cookie)
+    .send({ _csrf: csrfToken, recipientIds: [String(accountId)], body: 'Debounce check.', sendOption: 'schedule', scheduledAt: '2020-01-01T09:00' });
+
+  // First call (debounce reset) actually checks and sends it.
+  scheduledCampaigns.resetDebounceForTest();
+  await scheduledCampaigns.dispatchDueTextCampaigns();
+  let campaign = await db.prepare("SELECT * FROM text_campaigns WHERE body = 'Debounce check.'").get();
+  assert.equal(campaign.status, 'sent');
+
+  // A second scheduled text created right after, without resetting the
+  // debounce, should NOT be auto-sent by an immediate second call - the
+  // debounce is still within its window.
+  await request(app)
+    .post('/main-admin/announcements/text/send')
+    .type('form')
+    .set('Cookie', cookie)
+    .send({ _csrf: csrfToken, recipientIds: [String(accountId)], body: 'Debounced away.', sendOption: 'schedule', scheduledAt: '2020-01-01T09:00' });
+  await scheduledCampaigns.dispatchDueTextCampaigns();
+  campaign = await db.prepare("SELECT * FROM text_campaigns WHERE body = 'Debounced away.'").get();
+  assert.equal(campaign.status, 'scheduled', 'still within the debounce window, so this call should have been a no-op');
 });
 
 test('Co-op Admin Text tab: same wiring, reached at /admin/announcements/text', async () => {
