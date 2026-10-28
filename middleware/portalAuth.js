@@ -80,7 +80,12 @@ async function loadPortalSession(req, res, next) {
   const accountId = req.session && req.session.portalAccountId;
   if (!accountId) return next();
   const account = await findAccountById(accountId);
-  if (!account || account.status !== 'active') {
+  // A real request: "be able to lock members and they won't be able to
+  // log in, unless to see and pay their account balance" - a 'suspended'
+  // (Locked, in Main Admin Members' own UI) account keeps its session
+  // instead of being logged out here like 'pending' still is; requirePortalAuth
+  // below is what actually confines a locked account to /accounting.
+  if (!account || (account.status !== 'active' && account.status !== 'suspended')) {
     req.session.portalAccountId = null;
     return next();
   }
@@ -105,9 +110,22 @@ function loginRedirectUrl(req) {
 }
 
 // Requires a signed-in, active account - anything past this point can
-// read req.portalAccount safely.
+// read req.portalAccount safely. A 'suspended' (Locked) account is
+// signed in (attachPortalAccount above keeps its session) but confined
+// to /accounting - "unless to see and pay their account balance" - so
+// every OTHER requirePortalAuth-gated route (every portal router already
+// mounts this at the top) redirects it there instead of letting it
+// through, with no changes needed in any of those individual routers.
 function requirePortalAuth(req, res, next) {
   if (!req.portalAccount) return res.redirect(loginRedirectUrl(req));
+  // req.originalUrl (not req.path, which is relative to wherever this
+  // middleware is mounted - e.g. '/' inside routes/accounting.js's own
+  // router.use(requirePortalAuth)) always carries the real, full request
+  // path, so this check is correct regardless of which router this runs
+  // inside of.
+  if (req.portalAccount.status === 'suspended' && !req.originalUrl.split('?')[0].startsWith('/accounting')) {
+    return res.redirect('/accounting?locked=1');
+  }
   next();
 }
 
@@ -120,6 +138,9 @@ function requirePortalAuth(req, res, next) {
 function requirePortal(roleKey) {
   return function (req, res, next) {
     if (!req.portalAccount) return res.redirect(loginRedirectUrl(req));
+    if (req.portalAccount.status === 'suspended' && !req.originalUrl.split('?')[0].startsWith('/accounting')) {
+      return res.redirect('/accounting?locked=1');
+    }
     if (!req.portalRoles.some((r) => r.key === roleKey)) {
       return res
         .status(403)
@@ -136,6 +157,9 @@ function requirePortal(roleKey) {
 function requirePortalPermission(permissionKey) {
   return function (req, res, next) {
     if (!req.portalAccount) return res.redirect(loginRedirectUrl(req));
+    if (req.portalAccount.status === 'suspended' && !req.originalUrl.split('?')[0].startsWith('/accounting')) {
+      return res.redirect('/accounting?locked=1');
+    }
     if (!req.portalPermissions.has(permissionKey)) {
       return res
         .status(403)

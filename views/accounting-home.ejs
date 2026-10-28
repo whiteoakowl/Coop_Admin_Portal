@@ -20,6 +20,13 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
+    <%# A real request: "be able to lock members and they won't be able
+        to log in, unless to see and pay their account balance" - a
+        locked account lands here (middleware/portalAuth.js's own
+        requirePortalAuth) instead of wherever it was actually headed. %>
+    <% if (locked) { %>
+      <div class="alert alert-error">Your account has been locked by an administrator. You can still view and pay your balance here - contact an admin for anything else.</div>
+    <% } %>
     <% if (!member) { %>
       <h1>Accounting</h1>
       <p class="hint">No account on file yet.</p>

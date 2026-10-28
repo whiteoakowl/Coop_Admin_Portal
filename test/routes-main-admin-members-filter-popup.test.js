@@ -77,7 +77,14 @@ test('combining Type and Family in one submission filters the member list by bot
 
   const res = await request(app).get(`/main-admin/members?tab=members&type=student&family=${familyA}`).set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /Student In A/);
-  assert.doesNotMatch(res.text, /Parent In A/, 'Type=student should exclude a parent in the same family');
-  assert.doesNotMatch(res.text, /Student In B/, 'Family=A should exclude a student in a different family');
+  // Scoped to the actual roster row link (member-row-name-link), not
+  // just "does this name appear anywhere on the page" - a real request
+  // ("all filter buttons... should have a member name dropdown") now
+  // also lists every member site-wide in the Filter dialog's own Member
+  // Name <select> (views/partials/members-type-filter.ejs), by design
+  // including ones the current Type/Family filter excludes from the
+  // table itself, so a bare text match would now also hit that dropdown.
+  assert.match(res.text, /class="member-row-name-link" href="[^"]+">Student In A</);
+  assert.doesNotMatch(res.text, /class="member-row-name-link" href="[^"]+">Parent In A</, 'Type=student should exclude a parent in the same family');
+  assert.doesNotMatch(res.text, /class="member-row-name-link" href="[^"]+">Student In B</, 'Family=A should exclude a student in a different family');
 });

@@ -1,6 +1,20 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <%# A real request: "members pdf and print. it should look like the
+      page on the website. It looks like code" - traced to this view
+      missing the <base> tag utils/pdfRender.js's own renderViewToPdf
+      sets pdfBaseUrl for (see that file's own comment): without it,
+      Chromium has no "current page URL" to resolve this page's relative
+      /css/styles.css, /img/logo.png against during the internal
+      req.app.render() the Download PDF button uses, so the PDF rendered
+      with none of this app's own styling at all - same fix every other
+      *-print.ejs view already carries (e.g. views/admin-schedule-
+      print.ejs's own matching comment). A real visit to this same page
+      in a browser (the Print button's own target) never sets pdfBaseUrl,
+      so this <base> tag is simply absent there and the page's own URL
+      already does that job. %>
+  <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
   <%- include('partials/head', { title }) %>
 </head>
 <body>
@@ -20,8 +34,14 @@
       else if (typeFilter === 'admin') filterLabelParts.push('Admin');
       if (selectedFamily) filterLabelParts.push(selectedFamily.name + ' Family');
     %>
+    <%# A real request: "members, archive. add export, print and pdf
+        icons" - this same print preview now also serves the Archive
+        tab's own Export/Print/PDF icons (routes/main-admin-members.js's
+        own GET /print|/download.pdf|/export.csv, archived=1), so its
+        heading/labels swap the same way the live page's own already do
+        (main-admin-members.ejs's showArchived). %>
     <div class="print-preview-header no-print">
-      <h1>Members<% if (filterLabelParts.length > 0) { %> &mdash; <%= filterLabelParts.join(', ') %><% } %></h1>
+      <h1><%= typeof showArchived !== 'undefined' && showArchived ? 'Archive' : 'Members' %><% if (filterLabelParts.length > 0) { %> &mdash; <%= filterLabelParts.join(', ') %><% } %></h1>
       <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
     </div>
 
@@ -29,12 +49,12 @@
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub">Members</p>
+        <p class="print-header-sub"><%= typeof showArchived !== 'undefined' && showArchived ? 'Archived Members' : 'Members' %></p>
       </div>
     </div>
 
     <div class="members-section-label-row">
-      <span class="members-section-label">MEMBERS</span>
+      <span class="members-section-label"><%= typeof showArchived !== 'undefined' && showArchived ? 'ARCHIVE' : 'MEMBERS' %></span>
       <span class="members-count-pill"><%= members.length %> member<%= members.length === 1 ? '' : 's' %></span>
     </div>
 

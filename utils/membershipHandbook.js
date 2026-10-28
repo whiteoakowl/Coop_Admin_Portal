@@ -20,6 +20,7 @@ const HANDBOOK_HTML_KEY = 'membership_handbook_html';
 const HANDBOOK_FILE_KEY = 'membership_handbook_file';
 const PAYMENT_INSTRUCTIONS_KEY = 'membership_payment_instructions';
 const FEE_CENTS_KEY = 'membership_fee_cents';
+const CATEGORY_ID_KEY = 'membership_fee_category_id';
 
 async function getHandbookHtml() {
   return (await appSetting(HANDBOOK_HTML_KEY, '')) || '';
@@ -58,12 +59,27 @@ async function setHandbookFile(file) {
 async function getPaymentInfo() {
   const cents = parseInt((await appSetting(FEE_CENTS_KEY, '0')) || '0', 10);
   const instructions = (await appSetting(PAYMENT_INSTRUCTIONS_KEY, '')) || '';
-  return { feeCents: Number.isFinite(cents) && cents > 0 ? cents : 0, instructions };
+  const rawCategoryId = await appSetting(CATEGORY_ID_KEY, '');
+  const categoryId = rawCategoryId ? parseInt(rawCategoryId, 10) : null;
+  return {
+    feeCents: Number.isFinite(cents) && cents > 0 ? cents : 0,
+    instructions,
+    categoryId: Number.isFinite(categoryId) ? categoryId : null,
+  };
 }
 
-async function setPaymentInfo(feeCents, instructions) {
+// A real request: "add a drop down menu for selecting which payment
+// category to use." This fee is still informational only (see this
+// file's own header comment - no online charge is created from it), so
+// the category picked here isn't attached to anything automatically; it
+// just records which of the existing accounting categories (utils/
+// events.js's own listAccountingCategories, the same list the manual
+// Add Charge form on the Accounting page uses) an admin creating that
+// charge by hand should file it under.
+async function setPaymentInfo(feeCents, instructions, categoryId) {
   await setAppSetting(FEE_CENTS_KEY, String(Math.max(0, Math.round(feeCents) || 0)));
   await setAppSetting(PAYMENT_INSTRUCTIONS_KEY, instructions || '');
+  await setAppSetting(CATEGORY_ID_KEY, categoryId ? String(categoryId) : '');
 }
 
 module.exports = { getHandbookHtml, setHandbookHtml, getHandbookFile, setHandbookFile, getPaymentInfo, setPaymentInfo };

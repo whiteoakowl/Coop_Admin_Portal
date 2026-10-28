@@ -164,23 +164,30 @@ async function createParentMember(familyId, address, parent, createdByAccountId)
   // email to log in with, or that email already belongs to someone
   // else's account - routes/main-admin-members.js's own /bulk-create-
   // accounts still exists to retrofit whoever predates this and needs an
-  // email added first.
-  await ensurePortalAccountForMember(info.lastInsertRowid, parent.email, createdByAccountId);
+  // email added first. parent.password (optional) is whatever the admin
+  // typed into this form's own Password box - see ensurePortalAccountFor
+  // Member's own comment.
+  await ensurePortalAccountForMember(info.lastInsertRowid, parent.email, createdByAccountId, parent.password);
   return info.lastInsertRowid;
 }
 
-// child: { name, birthday, gradeLevel, medicalNotes, customFieldValues },
-// photoFile: a multer file object or null/undefined.
-async function createChildMember(familyId, address, child, photoFile) {
+// child: { name, birthday, gradeLevel, medicalNotes, email, password,
+// customFieldValues }, photoFile: a multer file object or null/undefined.
+// A real request: "student should have an email request and password
+// request line, not mandatory" - a student portal account is entirely
+// optional (ensurePortalAccountForMember already no-ops with no email),
+// unlike a parent's, which this same form always creates one for.
+async function createChildMember(familyId, address, child, photoFile, createdByAccountId) {
   const memberCode = await generateMemberCode();
   const photoPath = photoFile ? await savePhotoFile(photoFile) : null;
   const info = await db
     .prepare(
-      `INSERT INTO members (name, barcode, member_code, member_type, family_id, address, city, state, zip, birthday, grade_level, medical_notes, photo_path)
-       VALUES (?, ?, ?, 'student', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO members (name, barcode, member_code, member_type, family_id, address, city, state, zip, birthday, grade_level, medical_notes, photo_path, email)
+       VALUES (?, ?, ?, 'student', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(child.name, memberCode, memberCode, familyId, address.address, address.city, address.state, address.zip, child.birthday || null, child.gradeLevel || null, child.medicalNotes || null, photoPath);
+    .run(child.name, memberCode, memberCode, familyId, address.address, address.city, address.state, address.zip, child.birthday || null, child.gradeLevel || null, child.medicalNotes || null, photoPath, child.email || null);
   await membershipFormFields.saveFieldValues(info.lastInsertRowid, 'child', child.customFieldValues);
+  await ensurePortalAccountForMember(info.lastInsertRowid, child.email, createdByAccountId, child.password);
   return info.lastInsertRowid;
 }
 
