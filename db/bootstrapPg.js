@@ -769,6 +769,52 @@ async function backfillScheduleCardColors(db) {
   await db.prepare('UPDATE schedule_card_templates SET layout_json = ? WHERE id = 1').run(JSON.stringify({ ...layout, elements }));
 }
 
+// Genuine one-time backfill for an already-deployed database's EXISTING
+// schedule_card_templates row, saved under the OLD, cramped spacing (a
+// real bug report: "make sure there is some space division between
+// Monday and Wednesday schedule. Expand the schedule grids just a bit
+// still leaving a strong boarder of space") - the two tables used to sit
+// only 2px apart, reading as one continuous grid rather than two
+// separate days. Only snaps an element's x/y/width/height back to the
+// current default's own values when they still EXACTLY match that old
+// layout's known position for that same element id - same "only touch
+// what still matches the retired default" rule backfillScheduleCardColors
+// above follows, so an admin who already dragged a table/label to their
+// own spot (or resized one in the editor) is left untouched.
+const SCHEDULE_CARD_OLD_SPACING = {
+  allergy: { x: 8, y: 5, width: 210, height: 14 },
+  'parent-phone': { x: 222, y: 5, width: 106, height: 14 },
+  'mon-label': { x: 8, y: 21, width: 320, height: 11 },
+  'mon-table': { x: 8, y: 33, width: 320, height: 82 },
+  'wed-label': { x: 8, y: 117, width: 320, height: 11 },
+  'wed-table': { x: 8, y: 129, width: 320, height: 79 },
+};
+
+async function backfillScheduleCardSpacing(db) {
+  const row = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+  if (!row) return;
+  let layout;
+  try {
+    layout = normalizeLayout(JSON.parse(row.layout_json));
+  } catch (err) {
+    return;
+  }
+  if (!layout || !Array.isArray(layout.elements)) return;
+
+  let changed = false;
+  const elements = layout.elements.map((el) => {
+    const old = SCHEDULE_CARD_OLD_SPACING[el.id];
+    const current = SCHEDULE_CARD_DEFAULT_LAYOUT.elements.find((d) => d.id === el.id);
+    if (!old || !current) return el;
+    if (el.x !== old.x || el.y !== old.y || el.width !== old.width || el.height !== old.height) return el;
+    changed = true;
+    return { ...el, x: current.x, y: current.y, width: current.width, height: current.height };
+  });
+  if (!changed) return;
+
+  await db.prepare('UPDATE schedule_card_templates SET layout_json = ? WHERE id = 1').run(JSON.stringify({ ...layout, elements }));
+}
+
 // The split shape this backfill installs - NOT sourced from
 // DEFAULT_LAYOUTS.parent, which now holds the later merged setupCleanupDays
 // shape instead (see backfillParentSetupCleanupMerge below). Kept as its
@@ -942,6 +988,7 @@ module.exports = {
   backfillScheduleCardAllergy,
   backfillScheduleCardAutoFit,
   backfillScheduleCardColors,
+  backfillScheduleCardSpacing,
   backfillParentSetupCleanupDays,
   backfillParentSetupCleanupMerge,
   backfillParentRemoveLegacyCleanupTeamElement,

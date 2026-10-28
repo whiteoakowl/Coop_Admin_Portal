@@ -32,12 +32,29 @@ const TABLE_FIELDS = [
 // for how each table's own column widths adapt to fit their content
 // within that fixed box. The card's own size (CARD_WIDTH/CARD_HEIGHT)
 // never changes.
+//
+// A real request: "make sure there is some space division between
+// Monday and Wednesday schedule. Expand the schedule grids just a bit
+// still leaving a strong boarder of space to help with any print
+// issues." The two tables used to sit just 2px apart (wed-label started
+// essentially right against mon-table's own bottom edge, reading as one
+// continuous grid rather than two days), with an uneven 5/8/8px margin
+// on top/sides/bottom. A uniform 6px margin on every edge frees a little
+// extra width for both tables (320->324) while still leaving the same
+// kind of solid border print-shrink-to-fit relies on elsewhere; trimming
+// the header row and the two day labels by a couple px each (autoFitText
+// only ever shrinks a field to fit its box's WIDTH, and badge-autofit.js's
+// own real-browser height correction already guards every field against
+// clipping regardless - see name-tag-render-core.js's fitFontSize) funds
+// both a genuinely wider Monday/Wednesday gap (2px -> 7px) and a little
+// extra height on each table, with the outer border left just as solid
+// as before.
 const DEFAULT_LAYOUT = {
   background: '#ffffff',
   backgroundOpacity: 1,
   elements: [
-    { id: 'allergy', type: 'text', field: 'allergy', x: 8, y: 5, width: 210, height: 14, fontSize: 11, color: '#dc2626', bold: true, align: 'left', valign: 'middle', autoFitText: true },
-    { id: 'parent-phone', type: 'text', field: 'primaryParentPhone', x: 222, y: 5, width: 106, height: 14, fontSize: 8, color: '#5b6b7c', bold: false, align: 'right', valign: 'middle', autoFitText: true },
+    { id: 'allergy', type: 'text', field: 'allergy', x: 6, y: 6, width: 214, height: 12, fontSize: 11, color: '#dc2626', bold: true, align: 'left', valign: 'middle', autoFitText: true },
+    { id: 'parent-phone', type: 'text', field: 'primaryParentPhone', x: 224, y: 6, width: 106, height: 12, fontSize: 8, color: '#5b6b7c', bold: false, align: 'right', valign: 'middle', autoFitText: true },
     // A real request: "make the lines on the table of the schedule cards
     // black so it stands out more. make the font black. make the blue
     // Monday/Wednesday titles stand out more." borderColor was a barely-
@@ -47,10 +64,10 @@ const DEFAULT_LAYOUT = {
     // text (the table's own font color is set unconditionally in
     // renderTableEl - it isn't admin-configurable, so there's no
     // corresponding field to change here).
-    { id: 'mon-label', type: 'text', field: 'custom', text: 'Monday', x: 8, y: 21, width: 320, height: 11, fontSize: 9, color: '#0b3d91', bold: true, align: 'center', valign: 'middle' },
-    { id: 'mon-table', type: 'table', field: 'mondaySchedule', x: 8, y: 33, width: 320, height: 82, fontSize: 8, borderColor: '#000000', headerColor: '#eaf4fd' },
-    { id: 'wed-label', type: 'text', field: 'custom', text: 'Wednesday', x: 8, y: 117, width: 320, height: 11, fontSize: 9, color: '#0b3d91', bold: true, align: 'center', valign: 'middle' },
-    { id: 'wed-table', type: 'table', field: 'wednesdaySchedule', x: 8, y: 129, width: 320, height: 79, fontSize: 8, borderColor: '#000000', headerColor: '#eaf4fd' },
+    { id: 'mon-label', type: 'text', field: 'custom', text: 'Monday', x: 6, y: 19, width: 324, height: 10, fontSize: 9, color: '#0b3d91', bold: true, align: 'center', valign: 'middle' },
+    { id: 'mon-table', type: 'table', field: 'mondaySchedule', x: 6, y: 30, width: 324, height: 83, fontSize: 8, borderColor: '#000000', headerColor: '#eaf4fd' },
+    { id: 'wed-label', type: 'text', field: 'custom', text: 'Wednesday', x: 6, y: 120, width: 324, height: 10, fontSize: 9, color: '#0b3d91', bold: true, align: 'center', valign: 'middle' },
+    { id: 'wed-table', type: 'table', field: 'wednesdaySchedule', x: 6, y: 131, width: 324, height: 79, fontSize: 8, borderColor: '#000000', headerColor: '#eaf4fd' },
   ],
 };
 
