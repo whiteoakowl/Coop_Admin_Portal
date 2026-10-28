@@ -51,7 +51,11 @@ router.post('/preferences', async (req, res) => {
   const types = await notifications.listTypes();
   for (const type of types) {
     await notifications.setPreference(req.portalAccount.id, type.key, 'email', req.body[`email_${type.key}`] === '1');
-    await notifications.setPreference(req.portalAccount.id, type.key, 'sms', req.body[`sms_${type.key}`] === '1');
+    // A type that's always email-only (sms_enabled off) has no SMS
+    // checkbox on the form at all - skip writing a preference row for
+    // it rather than saving a meaningless "opted out" from a field that
+    // was never shown.
+    if (type.sms_enabled) await notifications.setPreference(req.portalAccount.id, type.key, 'sms', req.body[`sms_${type.key}`] === '1');
     await notifications.setPreference(req.portalAccount.id, type.key, 'push', req.body[`push_${type.key}`] === '1');
   }
   res.redirect('/notifications/preferences?notice=' + encodeURIComponent('Saved.'));

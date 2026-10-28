@@ -63,9 +63,13 @@ async function recordDelivery(notificationId, channel, result) {
 // notification. Always creates the in-app notification. If the type's
 // auto_send_enabled is off, that's the only channel attempted - a Main
 // Admin turning off a type's auto-send stops it from reaching email/sms
-// at all, without touching code. Otherwise email/sms are each attempted
-// only when the recipient hasn't opted out of that channel for this
-// type.
+// at all, without touching code. Otherwise email is attempted whenever
+// the recipient hasn't opted out of it for this type; SMS additionally
+// requires the type's own sms_enabled (a real request: several types -
+// waitlist/registration confirmations, submission decisions, forum
+// replies, announcements, newsletter - are email-only by design, not
+// just by a recipient's own preference) on top of the same opt-out
+// check.
 async function notify(accountId, typeKey, { title, body, linkUrl = null, mediaUrl = null } = {}) {
   const type = await getType(typeKey);
   if (!type) throw new Error(`Unknown notification type: ${typeKey}`);
@@ -83,10 +87,11 @@ async function notify(accountId, typeKey, { title, body, linkUrl = null, mediaUr
   } else {
     await recordDelivery(notificationId, 'email', { status: 'skipped', detail: 'Recipient opted out of this notification type by email.' });
   }
-  if (await accountPrefersChannel(accountId, typeKey, 'sms')) {
+  if (type.sms_enabled && (await accountPrefersChannel(accountId, typeKey, 'sms'))) {
     await recordDelivery(notificationId, 'sms', await smsProvider.send(account?.phone, `${title}: ${body}`, mediaUrl));
   } else {
-    await recordDelivery(notificationId, 'sms', { status: 'skipped', detail: 'Recipient opted out of this notification type by SMS.' });
+    const detail = type.sms_enabled ? 'Recipient opted out of this notification type by SMS.' : 'This notification type is email-only - text is never sent for it.';
+    await recordDelivery(notificationId, 'sms', { status: 'skipped', detail });
   }
 
   return notificationId;

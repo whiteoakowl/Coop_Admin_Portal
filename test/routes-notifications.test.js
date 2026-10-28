@@ -180,6 +180,27 @@ test('a member opting out of email for one type is recorded as skipped, not atte
   assert.match(stillOnEmail.detail, /No email provider configured/);
 });
 
+test('an email-only notification type (sms_enabled off) never attempts SMS, even when the recipient has not opted out of it', async () => {
+  const parent = await createParentAccount();
+
+  // Default preferences (no override saved) - SMS would normally be
+  // attempted for any type, confirming this is genuinely the type-level
+  // sms_enabled gate, not a leftover per-account opt-out from another test.
+  const emailOnlyId = await notifications.notify(parent.accountId, 'forum_reply', { title: 'Reply', body: 'Someone replied.' });
+  const emailOnlySms = (await db.prepare('SELECT * FROM notification_deliveries WHERE notification_id = ? AND channel = ?').all(emailOnlyId, 'sms'))[0];
+  assert.equal(emailOnlySms.status, 'skipped');
+  assert.match(emailOnlySms.detail, /email-only/);
+
+  // floater_assignment stays SMS-capable - the whole point of that
+  // feature is the text itself - so it hits smsProvider.send()'s own
+  // normal skip reason (the test fixture account has no phone on file)
+  // instead of the email-only gate above.
+  const floaterId = await notifications.notify(parent.accountId, 'floater_assignment', { title: 'Floater Assignment', body: "You're assigned: Hallway Monitor." });
+  const floaterSms = (await db.prepare('SELECT * FROM notification_deliveries WHERE notification_id = ? AND channel = ?').all(floaterId, 'sms'))[0];
+  assert.equal(floaterSms.status, 'skipped');
+  assert.doesNotMatch(floaterSms.detail, /email-only/);
+});
+
 test("turning a type's auto-send off stops email/sms but keeps the in-app notification", async () => {
   const admin = await loginAsMainAdmin();
   const parent = await createParentAccount();

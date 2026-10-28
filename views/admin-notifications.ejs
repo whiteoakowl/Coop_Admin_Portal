@@ -22,7 +22,7 @@
         <tbody>
           <% types.forEach(function(t) { %>
             <tr>
-              <td><%= t.label %></td>
+              <td><%= t.label %><% if (!t.sms_enabled) { %> <span class="badge-pill badge-pill-gray">Email only</span><% } %></td>
               <td><%= t.description %></td>
               <td><span class="badge-pill badge-pill-<%= t.auto_send_enabled ? 'green' : 'gray' %>"><%= t.auto_send_enabled ? 'On' : 'Off' %></span></td>
               <td>
