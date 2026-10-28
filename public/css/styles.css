@@ -6649,28 +6649,29 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 .floater-card-position { font-weight: 600; }
 .floater-card-unassigned { color: var(--muted); font-style: italic; }
 
-/* "Text Notification" select-mode column (public/js/floater-text-
-   notify.js) - hidden until the toolbar's own Text Notification button
-   is clicked once, and only on this one table: .floater-card-table's
-   own nth-child widths above are shared with two unrelated tables
-   (Setup/Cleanup Assignments, floater-assignment-cards) that don't have
-   this column at all, so the override below needs the extra .floater-
-   chart-table specificity rather than touching those shared rules. */
-.floater-notify-col { display: none; }
-.floater-notify-select-mode .floater-notify-col { display: table-cell; }
+/* "Text Notification" column (public/js/floater-text-notify.js) - only
+   on this one table: .floater-card-table's own nth-child widths above
+   are shared with two unrelated tables (Setup/Cleanup Assignments,
+   floater-assignment-cards) that don't have this column at all, so the
+   override below needs the extra .floater-chart-table specificity
+   rather than touching those shared rules. A real request removed the
+   old page-level "Text Notification" toggle button entirely ("Not
+   [the] orange send text button at the top... Just the send text
+   buttons on each hour title bar") - these checkboxes are therefore
+   always visible now, not gated behind clicking that button first.
+   .floater-card-table.floater-chart-table th:nth-child(1)/td:nth-
+   child(1) below already sizes this column. */
+.floater-notify-col { display: table-cell; }
 /* A real request: "click the checkboxes on each assignment or the
-   whole card." Same select-mode gating as .floater-notify-col above,
-   just living in .floater-card-header (a flex row - margin-left: auto
-   pushes it to the header's own far right) instead of a table column. */
-.floater-card-select-all { display: none; align-items: center; gap: 0.3rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
-.floater-notify-select-mode .floater-card-select-all { display: inline-flex; }
+   whole card." Always visible, living in .floater-card-header (a flex
+   row) rather than a table column. */
+.floater-card-select-all { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
 /* A real request: "Send text button on hour title bar, shrink to fit."
-   Always visible (not select-mode gated like .floater-card-select-all
-   above) - a one-click shortcut straight to the compose popup for
-   everyone assigned this hour. margin-left: auto pushes it (and,
-   whenever Select All is also showing, the pair of them) to the
-   header's own far right; width/padding sized to its own text rather
-   than stretching, matching this app's other shrink-to-fit buttons. */
+   A one-click send to whichever checkboxes (individual rows, or the
+   Select All checkbox above) are currently checked in this one card.
+   margin-left: auto pushes it to the header's own far right; width/
+   padding sized to its own text rather than stretching, matching this
+   app's other shrink-to-fit buttons. */
 .floater-card-send-text-btn {
   margin-left: auto;
   width: fit-content;
@@ -6685,6 +6686,7 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
   cursor: pointer;
 }
 .floater-card-send-text-btn:hover { background: #fff; }
+.floater-card-send-text-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .floater-card-table.floater-chart-table th:nth-child(1), .floater-card-table.floater-chart-table td:nth-child(1) { width: 2.2rem; }
 .floater-card-table.floater-chart-table th:nth-child(2), .floater-card-table.floater-chart-table td:nth-child(2) { width: 38%; }
 .floater-card-table.floater-chart-table th:nth-child(3), .floater-card-table.floater-chart-table td:nth-child(3) { width: 23%; }

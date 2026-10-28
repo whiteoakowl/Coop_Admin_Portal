@@ -2,12 +2,17 @@
 // button that says text notification. When you click this button a
 // check box appears next to each floater assignment. When you click
 // the check boxes then click text notifications. It send a notification
-// showing the floater position, hour and room number." The checkbox
-// itself is a client-only toggle (public/js/floater-text-notify.js) -
-// this covers the server side: GET /manage renders a checkbox per
-// assigned slot, and POST /floater-text-notify actually sends, routing
-// through notify() (utils/notifications.js) so SMS opt-out preferences
-// are respected the same way any other notification type's are.
+// showing the floater position, hour and room number." A later real
+// request removed that page-level button: "Not [the] orange send text
+// button at the top... Just the send text buttons on each hour title
+// bar. Select all assigned floaters by clicking the check box on the
+// title bars or select individual rows to send notifications to that
+// hour then click send text." The checkboxes/Send Text buttons are a
+// client-only concern (public/js/floater-text-notify.js) - this covers
+// the server side: GET /manage renders a checkbox per assigned slot,
+// and POST /floater-text-notify actually sends, routing through
+// notify() (utils/notifications.js) so SMS opt-out preferences are
+// respected the same way any other notification type's are.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -91,14 +96,17 @@ async function setUpAssignedFloater({ cookie, day, hourPosition, className, room
   return { memberId, date, classId, slotId };
 }
 
-test('GET /manage renders a Text Notification button and a checkbox for an assigned floater slot, none for an unassigned one', async () => {
+test('GET /manage renders a checkbox for an assigned floater slot (none for an unassigned one), a Select All checkbox, and a Send Text button for that hour', async () => {
   const cookie = await loginAsAdmin();
   const day = 'monday';
   const { date } = await setUpAssignedFloater({ cookie, day, hourPosition: 1, className: 'Notify Checkbox Class', room: 'Room 9', memberName: 'Checkbox Floater', barcode: 'notify-checkbox-floater', phone: '555-222-3333' });
 
   const page = await request(app).get(`/admin/volunteers/${day}/manage?date=${date}`).set('Cookie', cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /id="floater-text-notify-btn"/);
+  // A real request removed the page-level toggle button entirely:
+  // "Not [the] orange send text button at the top... Just the send
+  // text buttons on each hour title bar."
+  assert.doesNotMatch(page.text, /id="floater-text-notify-btn"/);
   assert.match(page.text, /floater-notify-checkbox/);
   assert.match(page.text, /data-member-id="\d+"/);
   // A real request: "click the check boxes on each assignment or the
@@ -106,8 +114,9 @@ test('GET /manage renders a Text Notification button and a checkbox for an assig
   // its own Select All checkbox.
   assert.match(page.text, /floater-card-select-all-checkbox/);
   // A later real request: "Send text button on hour title bar, shrink
-  // to fit" - same hour gets its own always-available Send Text button.
-  assert.match(page.text, /floater-card-send-text-btn/);
+  // to fit" - same hour gets its own Send Text button, disabled until
+  // something in that card is checked.
+  assert.match(page.text, /class="floater-card-send-text-btn no-print" disabled/);
 });
 
 test('POST /floater-text-notify texts an assigned floater with an active portal account, routed through notify()', async () => {
