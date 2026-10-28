@@ -66,7 +66,7 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
           <% } %>
         </div>
         <table class="floater-card-table floater-chart-table">
-          <thead><tr><th class="floater-notify-col no-print">Text</th><th>Position</th><th>Room</th><th>Floater</th></tr></thead>
+          <thead><tr><th class="floater-notify-col no-print"><span class="sr-only">Text</span></th><th>Position</th><th>Room</th><th>Floater</th></tr></thead>
           <tbody>
             <% hour.slots.forEach(function(slot) { %>
               <% var isApproved = slot.assigned && slot.assigned.status === 'approved'; %>
