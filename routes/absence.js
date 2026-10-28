@@ -6,6 +6,7 @@ const { getMemberRostersForDate } = require('../utils/rosters');
 const { activeParentAndAdminOptions, familyGroupsByMember, loadFamilyMember } = require('../utils/members');
 const { createRateLimiter } = require('../utils/rateLimit');
 const { unassignMemberForDate } = require('../utils/substitutes');
+const { unassignMemberTasksForDate } = require('../utils/setup');
 
 // Generous cap for real use (a parent reporting for several kids, or
 // retrying after a typo) that still stops a script from hammering this
@@ -86,26 +87,34 @@ router.post('/absence/submit', async (req, res) => {
   if (!isValidISODate(sessionDate)) return fail('Please choose a class date.');
   if (!reasonCategory) return fail('Please select Personal or Medical.');
 
-  let totalRosters = 0;
-  let totalSkippedAsPresent = 0;
   const namesRecorded = [];
 
   for (const student of students) {
     const rosters = await getMemberRostersForDate(student.id, sessionDate);
     if (rosters.length === 0) continue;
 
-    let skippedAsPresent = 0;
+    const status = type === 'late' ? 'late' : 'absent';
     for (const roster of rosters) {
+      // A real request: "if someone is manually marked absent after
+      // checking in it should mark them absent everywhere." This used
+      // to skip a roster entirely once its attendance row already read
+      // 'present' - meant to protect a real same-day check-in from
+      // being "yanked" by a stale/mistaken form, but it also silently
+      // dropped the submission outright: no attendance row ever
+      // actually flipped to absent/late, so it never showed up as
+      // absent anywhere that reads live attendance (Setup/Cleanup's
+      // absentMemberIdsForDate, the Floater board), and - since the
+      // absence_submissions insert below sat on the same, now-skipped
+      // code path - it never even reached the Attendance page's own
+      // Alerts box or the Home dashboard's Alert Log (utils/alerts.js's
+      // absenceFormAlertsForDay/absenceFormSubmissionsForRoster, both
+      // read a live attendance row with source = 'absence_form'). A
+      // manually-submitted absence/late now always overrides whatever
+      // the live attendance row currently says, present or not.
       const existing = await db
         .prepare('SELECT * FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?')
         .get(student.id, roster.id, sessionDate);
 
-      if (existing && existing.status === 'present') {
-        skippedAsPresent++;
-        continue;
-      }
-
-      const status = type === 'late' ? 'late' : 'absent';
       if (existing) {
         await db
           .prepare(`UPDATE attendance SET status = ?, source = 'absence_form', reason_category = ?, reason_text = ?, recorded_at = now_text() WHERE id = ?`)
@@ -132,18 +141,14 @@ router.post('/absence/submit', async (req, res) => {
         )
         .run(student.id, roster.id, sessionDate, status, reasonCategory, reason);
     }
+
     // A real request: "if someone submits an absence form and they are
     // currently assigned as a floater, it should automatically unassign
-    // them." Only once a real absent/late row was actually written for
-    // this date (skippedAsPresent < rosters.length) - someone already
-    // checked in as present that day shouldn't have a same-day floater
-    // assignment yanked out from under them.
-    if (skippedAsPresent < rosters.length) {
-      await unassignMemberForDate(sessionDate, student.id);
-    }
+    // them... [and] unassign them to their floater positions" even
+    // after already checking in, "including setup/cleanup."
+    await unassignMemberForDate(sessionDate, student.id);
+    await unassignMemberTasksForDate(sessionDate, student.id);
 
-    totalRosters += rosters.length;
-    totalSkippedAsPresent += skippedAsPresent;
     namesRecorded.push(student.name);
   }
 
@@ -152,12 +157,7 @@ router.post('/absence/submit', async (req, res) => {
   }
 
   const label = type === 'late' ? 'Late notice' : 'Absence';
-  let message = `${label} recorded for ${namesRecorded.join(', ')} on ${formatDateLabel(sessionDate)}.`;
-  if (totalSkippedAsPresent === totalRosters && totalRosters > 0) {
-    message = `${namesRecorded.join(', ')} already checked in as present for ${formatDateLabel(sessionDate)}, so no change was made.`;
-  } else if (totalSkippedAsPresent > 0) {
-    message += ' (Anyone already checked in as present was left unchanged.)';
-  }
+  const message = `${label} recorded for ${namesRecorded.join(', ')} on ${formatDateLabel(sessionDate)}.`;
 
   res.render('absence', {
     title: 'Absence/Late Form',

@@ -286,6 +286,18 @@ async function setTaskAssignment(day, memberId, date, slot, taskItemId, semester
     .run(day, memberId, date, sid, taskItemId);
 }
 
+// A real request: "if someone is manually marked absent after checking
+// in it should mark them absent everywhere, including setup/cleanup and
+// unassign them to their floater positions." Mirrors utils/substitutes.js's
+// own unassignMemberForDate (delete by date + member alone, no day/
+// semester ambiguity - a member only ever has one real session on a
+// given calendar date) - called from routes/absence.js right alongside
+// that function once an Absence/Late form is actually recorded for a
+// date, regardless of whether the member had already checked in.
+async function unassignMemberTasksForDate(date, memberId) {
+  await db.prepare('DELETE FROM setup_task_assignments WHERE session_date = ? AND member_id = ?').run(date, memberId);
+}
+
 // Splits a day's dates into "today or later" (what the Assignments page's
 // own date dropdown offers - there's no reason to suggest a task for a
 // date that's already passed) and "before today" (what the Archive tab
@@ -569,6 +581,7 @@ module.exports = {
   removeSetupDate,
   taskAssignmentsForDate,
   setTaskAssignment,
+  unassignMemberTasksForDate,
   splitDatesByToday,
   teamsWithMembers,
   scannedTasksForMemberDate,
