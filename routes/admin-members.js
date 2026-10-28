@@ -1,9 +1,17 @@
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const db = require('../db');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { sendCsv, toCsvRow } = require('../utils/spreadsheet');
 const { renderViewToPdf } = require('../utils/pdfRender');
+const { imageFileFilter } = require('../utils/uploads');
+const { createStorageClient } = require('../utils/storage');
+const { saveUpload, urlForUpload } = require('../utils/uploadBackend');
+const { notify } = require('../utils/notifications');
+const smsProvider = require('../utils/smsProvider');
 
 function sendPdf(res, filename, pdfBuffer) {
   res.set('Content-Type', 'application/pdf');
@@ -41,6 +49,27 @@ const memberImport = require('../utils/memberImport');
 const { clearVolunteerMembershipIfNotParent } = require('../utils/volunteers');
 
 router.use(requireFullAdmin);
+
+// A real request: "Main admin portal and co-op admin portal. Members.
+// Add a text icon to click and a pop up appears allowing you type a
+// text message, add an image and send text button and close button."
+// Same optional-MMS-image upload pattern routes/admin-volunteers.js's
+// own /floater-text-notify and routes/admin-setup.js's own /setup-text-
+// notify already use, just its own bucket/dir - a private bucket has no
+// fetchable URL for Telnyx's own servers to pull the image from, same
+// reasoning those two routes' own comments give for why theirs are
+// public too.
+const MAX_MEMBER_TEXT_IMAGE_BYTES = 5 * 1024 * 1024;
+const MEMBER_TEXT_IMAGE_BUCKET = 'member-text-images';
+const MEMBER_TEXT_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'member-text-images');
+if (!createStorageClient() && !fs.existsSync(MEMBER_TEXT_IMAGE_DIR)) {
+  try {
+    fs.mkdirSync(MEMBER_TEXT_IMAGE_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${MEMBER_TEXT_IMAGE_DIR}:`, err.message);
+  }
+}
+const memberTextImageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_MEMBER_TEXT_IMAGE_BYTES }, fileFilter: imageFileFilter });
 
 // 'admin' is co-op staff/leaders who mainly just need a printable badge
 // (see members.member_type's own schema comment) - no family/grade/setup
@@ -773,6 +802,57 @@ router.post('/members/:id/notes', async (req, res) => {
   const notes = (req.body.notes || '').trim();
   await db.prepare('UPDATE members SET notes = ? WHERE id = ?').run(notes || null, id);
   res.redirect('/admin/members');
+});
+
+// A real request: "Add a text icon to click and a pop up appears
+// allowing you type a text message, add an image and send text button
+// and close button." A single, always-one-recipient send - unlike
+// Floater/Setup's own text-notify routes, there's no per-recipient
+// templating here (the admin just types whatever they want), so this
+// reuses the existing 'text_message' notification type Communication's
+// own Text campaign feature already seeded (utils/textComposer.js) -
+// an admin who's opted a type's SMS channel off in Settings, or a
+// member who's personally opted out of it, is respected exactly the
+// same way either way. A member with no portal account texts directly
+// off their own members.phone instead (same "that shouldn't matter"
+// fallback Floater/Setup's own text-notify routes use).
+router.post('/members/:id/text', memberTextImageUpload.single('image'), async (req, res) => {
+  const memberId = parseInt(req.params.id, 10);
+  const member = await db.prepare('SELECT id, name, phone FROM members WHERE id = ?').get(memberId);
+  if (!member) return res.status(404).json({ ok: false, error: 'Member not found.' });
+  if (!member.phone) return res.status(400).json({ ok: false, error: 'This member has no phone on file.' });
+  const body = (req.body.message || '').trim();
+  if (!body) return res.status(400).json({ ok: false, error: 'A message is required.' });
+
+  let mediaUrl = null;
+  if (req.file) {
+    const client = createStorageClient();
+    const key = await saveUpload({
+      client,
+      bucket: MEMBER_TEXT_IMAGE_BUCKET,
+      localDir: MEMBER_TEXT_IMAGE_DIR,
+      buffer: req.file.buffer,
+      originalName: req.file.originalname,
+      contentType: req.file.mimetype,
+    });
+    mediaUrl = urlForUpload({ client, bucket: MEMBER_TEXT_IMAGE_BUCKET, webDir: '/uploads/member-text-images', key });
+  }
+
+  const account = await db.prepare("SELECT id FROM member_accounts WHERE member_id = ? AND status = 'active'").get(memberId);
+  let status;
+  let detail;
+  if (account) {
+    const notificationId = await notify(account.id, 'text_message', { title: 'Text Message', body, mediaUrl });
+    const delivery = await db.prepare("SELECT status, detail FROM notification_deliveries WHERE notification_id = ? AND channel = 'sms'").get(notificationId);
+    status = delivery ? delivery.status : 'skipped';
+    detail = delivery ? delivery.detail : null;
+  } else {
+    const result = await smsProvider.send(member.phone, body, mediaUrl);
+    status = result.status;
+    detail = result.detail;
+  }
+
+  res.json({ ok: true, status, detail });
 });
 
 // A real request: "add an icon that shows sending something. when you
