@@ -6662,8 +6662,29 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
    whole card." Same select-mode gating as .floater-notify-col above,
    just living in .floater-card-header (a flex row - margin-left: auto
    pushes it to the header's own far right) instead of a table column. */
-.floater-card-select-all { display: none; align-items: center; gap: 0.3rem; margin-left: auto; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+.floater-card-select-all { display: none; align-items: center; gap: 0.3rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
 .floater-notify-select-mode .floater-card-select-all { display: inline-flex; }
+/* A real request: "Send text button on hour title bar, shrink to fit."
+   Always visible (not select-mode gated like .floater-card-select-all
+   above) - a one-click shortcut straight to the compose popup for
+   everyone assigned this hour. margin-left: auto pushes it (and,
+   whenever Select All is also showing, the pair of them) to the
+   header's own far right; width/padding sized to its own text rather
+   than stretching, matching this app's other shrink-to-fit buttons. */
+.floater-card-send-text-btn {
+  margin-left: auto;
+  width: fit-content;
+  white-space: nowrap;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.85);
+  color: inherit;
+  cursor: pointer;
+}
+.floater-card-send-text-btn:hover { background: #fff; }
 .floater-card-table.floater-chart-table th:nth-child(1), .floater-card-table.floater-chart-table td:nth-child(1) { width: 2.2rem; }
 .floater-card-table.floater-chart-table th:nth-child(2), .floater-card-table.floater-chart-table td:nth-child(2) { width: 38%; }
 .floater-card-table.floater-chart-table th:nth-child(3), .floater-card-table.floater-chart-table td:nth-child(3) { width: 23%; }

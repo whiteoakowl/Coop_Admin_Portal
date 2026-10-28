@@ -105,6 +105,9 @@ test('GET /manage renders a Text Notification button and a checkbox for an assig
   // whole card" - every hour with at least one assigned slot also gets
   // its own Select All checkbox.
   assert.match(page.text, /floater-card-select-all-checkbox/);
+  // A later real request: "Send text button on hour title bar, shrink
+  // to fit" - same hour gets its own always-available Send Text button.
+  assert.match(page.text, /floater-card-send-text-btn/);
 });
 
 test('POST /floater-text-notify texts an assigned floater with an active portal account, routed through notify()', async () => {

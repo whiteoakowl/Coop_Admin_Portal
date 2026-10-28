@@ -13,6 +13,15 @@
 // per-slot assign/unassign <form> (forms can't nest), and the image
 // upload + async per-recipient status report both need a real response
 // to react to.
+//
+// Two later real requests: (1) "Should not be able to click on send
+// text button on the page if no check boxes are selected" - click #2
+// above is now disabled rather than clickable-with-a-warning whenever
+// nothing is checked. (2) "Add a check box to the hour title bar of
+// each hour card... Send text button on hour title bar, shrink to fit,
+// when you click send text on title bar it will create a pop up" - a
+// per-card shortcut button, always available, straight to the same
+// popup for every assigned position in that one card.
 (function () {
   const toggleBtn = document.getElementById('floater-text-notify-btn');
   const container = document.getElementById('floater-cards-container');
@@ -55,6 +64,19 @@
     status.textContent = '';
   }
 
+  // A real request: "Should not be able to click on send text button
+  // on the page if no check boxes are selected." Only applies once
+  // select mode is on (the button's first click, entering select mode,
+  // never needs anything checked yet) - disabled rather than a popup
+  // telling the admin to go check something first.
+  function updateToggleBtnDisabled() {
+    if (!selectMode) {
+      toggleBtn.disabled = false;
+      return;
+    }
+    toggleBtn.disabled = !container.querySelector('.floater-notify-checkbox:checked');
+  }
+
   function setSelectMode(on) {
     selectMode = on;
     container.classList.toggle('floater-notify-select-mode', on);
@@ -62,17 +84,34 @@
     if (!on) {
       container.querySelectorAll('.floater-card-select-all-checkbox').forEach((cb) => { cb.checked = false; });
     }
+    updateToggleBtnDisabled();
   }
 
   // "Click the check boxes on each assignment or the whole card" - a
   // card's own Select All checkbox checks/unchecks every assignment
   // checkbox inside that SAME card only, never another hour's.
   container.addEventListener('change', (e) => {
-    if (!e.target.classList.contains('floater-card-select-all-checkbox')) return;
-    const card = e.target.closest('.floater-card');
-    if (!card) return;
-    card.querySelectorAll('.floater-notify-checkbox').forEach((cb) => { cb.checked = e.target.checked; });
+    if (e.target.classList.contains('floater-card-select-all-checkbox')) {
+      const card = e.target.closest('.floater-card');
+      if (card) card.querySelectorAll('.floater-notify-checkbox').forEach((cb) => { cb.checked = e.target.checked; });
+    }
+    if (e.target.classList.contains('floater-card-select-all-checkbox') || e.target.classList.contains('floater-notify-checkbox')) {
+      updateToggleBtnDisabled();
+    }
   });
+
+  // Opens the same compose popup either path (the page-level toggle
+  // button, or a card's own Send Text shortcut) ends up using, from
+  // whichever list of checkboxes that path gathered.
+  function openComposeDialog(checkboxes) {
+    pendingNotify = checkboxes.map((cb) => ({ memberId: cb.dataset.memberId }));
+    const first = checkboxes[0].dataset;
+    messageField.value = fillMessageTemplate(first);
+    recipientsHint.textContent = `Sending to ${checkboxes.length} floater${checkboxes.length === 1 ? '' : 's'}.`;
+    const fileInput = form.querySelector('input[type="file"]');
+    if (fileInput) fileInput.value = '';
+    dialog.showModal();
+  }
 
   toggleBtn.addEventListener('click', () => {
     if (!selectMode) {
@@ -82,22 +121,24 @@
     }
 
     const checked = Array.from(container.querySelectorAll('.floater-notify-checkbox:checked'));
-    if (checked.length === 0) {
-      // A real request: this should be a popup, not the page's own
-      // inline status banner - same window.alert() the Send Now error
-      // path below already uses for a popup-style message.
-      window.alert('No members have been selected.');
-      return;
-    }
+    if (checked.length === 0) return;
     clearMessage();
+    openComposeDialog(checked);
+  });
 
-    pendingNotify = checked.map((cb) => ({ memberId: cb.dataset.memberId }));
-    const first = checked[0].dataset;
-    messageField.value = fillMessageTemplate(first);
-    recipientsHint.textContent = `Sending to ${checked.length} floater${checked.length === 1 ? '' : 's'}.`;
-    const fileInput = form.querySelector('input[type="file"]');
-    if (fileInput) fileInput.value = '';
-    dialog.showModal();
+  // "Send text button on hour title bar... when you click send text on
+  // title bar it will create a pop up" - a one-click shortcut straight
+  // to the compose popup for every assigned position in that one card,
+  // regardless of select mode or which boxes happen to be checked.
+  container.addEventListener('click', (e) => {
+    const sendBtn = e.target.closest('.floater-card-send-text-btn');
+    if (!sendBtn) return;
+    const card = sendBtn.closest('.floater-card');
+    if (!card) return;
+    const assigned = Array.from(card.querySelectorAll('.floater-notify-checkbox'));
+    if (assigned.length === 0) return;
+    clearMessage();
+    openComposeDialog(assigned);
   });
 
   form.addEventListener('submit', (e) => {

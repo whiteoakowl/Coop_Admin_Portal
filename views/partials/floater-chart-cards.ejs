@@ -46,12 +46,19 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
               or the whole card." Only meaningful (and only ever shown)
               once at least one position this hour is actually assigned
               - public/js/floater-text-notify.js wires this to check/
-              uncheck every .floater-notify-checkbox in this one card. %>
+              uncheck every .floater-notify-checkbox in this one card.
+              A later real request: "Send text button on hour title bar...
+              when you click send text on title bar it will create a
+              pop up" - a dedicated per-hour shortcut, always available
+              (not gated behind the page-level Text Notification toggle
+              the way Select All is), straight to the same compose popup
+              pre-filled with every assigned position this hour. %>
           <% if (hour.slots.some(function (s) { return s.assigned; })) { %>
             <label class="floater-card-select-all no-print">
               <input type="checkbox" class="floater-card-select-all-checkbox" aria-label="Select all floaters for <%= hour.label %>" />
               Select All
             </label>
+            <button type="button" class="floater-card-send-text-btn no-print" aria-label="Send a text to everyone assigned for <%= hour.label %>">Send Text</button>
           <% } %>
         </div>
         <table class="floater-card-table floater-chart-table">
