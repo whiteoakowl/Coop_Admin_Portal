@@ -38,7 +38,7 @@ test.after(() => {
 async function loginAsMainAdmin() {
   const loginRes = await request(app).post('/login').type('form').send({ email: process.env.MAIN_ADMIN_EMAIL, password: process.env.MAIN_ADMIN_PASSWORD, next: '/main-admin' });
   const cookie = loginRes.headers['set-cookie'];
-  const page = await request(app).get('/main-admin/announcements/text').set('Cookie', cookie);
+  const page = await request(app).get('/main-admin/announcements/text-email').set('Cookie', cookie);
   const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
   return { cookie, csrfToken };
 }
@@ -46,7 +46,7 @@ async function loginAsMainAdmin() {
 async function loginAsAdmin() {
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   const cookie = loginRes.headers['set-cookie'];
-  const page = await request(app).get('/admin/announcements/text').set('Cookie', cookie);
+  const page = await request(app).get('/admin/announcements/text-email').set('Cookie', cookie);
   const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
   return { cookie, csrfToken };
 }
@@ -68,27 +68,33 @@ async function seedStudentAccount(suffix, { phone = null } = {}) {
   return accountId;
 }
 
-test('Main Admin Text tab: same candidate list/filter/select-all wiring as Email, reached at /main-admin/announcements/text', async () => {
+test('GET /main-admin/announcements/text redirects to the combined Text/Email page', async () => {
+  const { cookie } = await loginAsMainAdmin();
+  const res = await request(app).get('/main-admin/announcements/text').set('Cookie', cookie);
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /\/main-admin\/announcements\/text-email$/);
+});
+
+test('Main Admin Text/Email Filter page: same candidate list/filter/select-all wiring as Email, reached at /main-admin/announcements/text-email/filter', async () => {
   const { cookie } = await loginAsMainAdmin();
   const accountId = await seedStudentAccount('mainA');
 
-  const page = await request(app).get('/main-admin/announcements/text').set('Cookie', cookie);
+  const page = await request(app).get('/main-admin/announcements/text-email/filter').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, new RegExp(`value="${accountId}" data-email-checkbox`));
-  assert.match(page.text, />Filter</);
   assert.match(page.text, /id="email-select-all"/);
-  assert.match(page.text, />Create Text</);
+  assert.match(page.text, />Save Filter</);
 });
 
 // A real request: "Remove select all and select none buttons. Instead
 // put a check box on the title row of the 1st column... Lists should
 // show just name, email and phone number. Shrink to fit tables in
 // mobile view."
-test('Main Admin Text tab: the candidate table shows only Name/Email/Phone columns, with Select All in the header cell, and shrinks instead of stacking on mobile', async () => {
+test('Main Admin Text/Email Filter page: the candidate table shows only Name/Email/Phone columns, with Select All in the header cell, and shrinks instead of stacking on mobile', async () => {
   const { cookie } = await loginAsMainAdmin();
   await seedStudentAccount('mainPhone', { phone: '555-456-7890' });
 
-  const page = await request(app).get('/main-admin/announcements/text').set('Cookie', cookie);
+  const page = await request(app).get('/main-admin/announcements/text-email/filter').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /<table class="roster-table condensed-table" id="email-candidate-table">/);
   assert.doesNotMatch(page.text, /id="email-candidate-table"[^>]*table-stack-mobile|table-stack-mobile[^>]*id="email-candidate-table"/);
@@ -267,11 +273,11 @@ test('the dispatcher debounces - calling it again immediately does not re-check 
   assert.equal(campaign.status, 'scheduled', 'still within the debounce window, so this call should have been a no-op');
 });
 
-test('Co-op Admin Text tab: same wiring, reached at /admin/announcements/text', async () => {
+test('Co-op Admin Text/Email Filter page: same wiring, reached at /admin/announcements/text-email/filter', async () => {
   const { cookie, csrfToken } = await loginAsAdmin();
   const accountId = await seedStudentAccount('coopA', { phone: '555-222-3344' });
 
-  const page = await request(app).get('/admin/announcements/text').set('Cookie', cookie);
+  const page = await request(app).get('/admin/announcements/text-email/filter').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, new RegExp(`value="${accountId}" data-email-checkbox`));
   assert.match(page.text, /<tr><th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" \/><\/th><th>Name<\/th><th>Email<\/th><th>Phone<\/th><\/tr>/);

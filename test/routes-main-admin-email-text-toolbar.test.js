@@ -4,16 +4,18 @@
 // professional. same with text tab." Main Admin's Email/Text tabs had
 // moved to a single combined checkbox in the table header, then to a
 // Select All/Select None checkbox pair in their own toolbar row, then to
-// just Select All after "remove select none option."
+// just Select All after "remove select none option," then to a single
+// header-cell checkbox after "remove select all and select none buttons."
 //
-// A later real request reversed course again: "Remove select all and
-// select none buttons. Instead put a check box on the title row of the
-// 1st column. Selecting this box checks everyone. Unchecking that box
-// unchecks everyone." Select All is back in the table's own header cell
-// (see test/routes-communication-email.test.js/routes-communication-
-// text.test.js for the full select-all-checkbox behavior) - Filter/Create
-// Email/Text are the toolbar's only buttons now, both plain
-// .roster-action-btn, same class/size.
+// A later real request combined Email and Text into one Text/Email page
+// with "three buttons at the top. Filter, send text, send email" -
+// Filter is no longer a dialog trigger that shares a row with a
+// Create-Email/Text button; it is its own button on the combined landing
+// page, next to Send Text/Send Email, all three the same
+// .roster-action-btn class/size this earlier request asked for. Select
+// All still lives in the Filter page's own table header cell (see
+// test/routes-communication-email.test.js/routes-communication-
+// text.test.js for the full select-all-checkbox behavior).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -44,30 +46,23 @@ async function loginAsMainAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
-function checkToolbar(text) {
-  const rows = [...text.matchAll(/<div class="roster-btn-row email-toolbar-row">([\s\S]*?)<\/div>/g)].map((m) => m[1]);
-  assert.equal(rows.length, 1, 'expected a single email-toolbar-row div - Select All no longer gets its own row');
-  const filterRow = rows[0];
-  assert.match(filterRow, /class="roster-action-btn" onclick="document\.getElementById\('email-filter-dialog'\)\.showModal\(\)">Filter</);
-  // Create Email/Text is a plain roster-action-btn, same class/size as Filter - not .primary-btn.
-  assert.doesNotMatch(filterRow, /primary-btn/);
-  assert.doesNotMatch(filterRow, /Select All|Select None/);
-  // Select All now lives in the table's own first-column header cell.
-  assert.match(text, /<th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" \/><\/th>/);
-}
-
-test('Main Admin Email tab: Filter/Create Email share one toolbar row, and Select All lives in the table header', async () => {
+test('Main Admin Text/Email page: Filter/Send Text/Send Email share one toolbar row, same class/size', async () => {
   const cookie = await loginAsMainAdmin();
-  const res = await request(app).get('/main-admin/announcements/email').set('Cookie', cookie);
+  const res = await request(app).get('/main-admin/announcements/text-email').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  checkToolbar(res.text);
-  assert.match(res.text, /class="roster-action-btn">Create Email</);
+  const rows = [...res.text.matchAll(/<div class="roster-btn-row">([\s\S]*?)<\/div>/g)].map((m) => m[1]);
+  assert.equal(rows.length, 1, 'expected a single toolbar row for Filter/Send Text/Send Email');
+  const row = rows[0];
+  assert.match(row, /class="roster-action-btn" href="\/main-admin\/announcements\/text-email\/filter">Filter</);
+  assert.match(row, /class="roster-action-btn" href="\/main-admin\/announcements\/text-email\/send-text">Send Text</);
+  assert.match(row, /class="roster-action-btn" href="\/main-admin\/announcements\/text-email\/send-email">Send Email</);
 });
 
-test('Main Admin Text tab: same toolbar treatment as Email', async () => {
+test('Main Admin Text/Email Filter page: Select All lives in the candidate table header, and Save Filter is the only submit button', async () => {
   const cookie = await loginAsMainAdmin();
-  const res = await request(app).get('/main-admin/announcements/text').set('Cookie', cookie);
+  const res = await request(app).get('/main-admin/announcements/text-email/filter').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  checkToolbar(res.text);
-  assert.match(res.text, /class="roster-action-btn">Create Text</);
+  assert.match(res.text, /<th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" \/><\/th>/);
+  assert.match(res.text, /class="primary-btn">Save Filter</);
+  assert.doesNotMatch(res.text, /Select All|Select None/);
 });

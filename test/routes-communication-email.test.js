@@ -39,7 +39,7 @@ test.after(() => {
 async function loginAsMainAdmin() {
   const loginRes = await request(app).post('/login').type('form').send({ email: process.env.MAIN_ADMIN_EMAIL, password: process.env.MAIN_ADMIN_PASSWORD, next: '/main-admin' });
   const cookie = loginRes.headers['set-cookie'];
-  const page = await request(app).get('/main-admin/announcements/email').set('Cookie', cookie);
+  const page = await request(app).get('/main-admin/announcements/text-email').set('Cookie', cookie);
   const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
   return { cookie, csrfToken };
 }
@@ -47,7 +47,7 @@ async function loginAsMainAdmin() {
 async function loginAsAdmin() {
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   const cookie = loginRes.headers['set-cookie'];
-  const page = await request(app).get('/admin/announcements/email').set('Cookie', cookie);
+  const page = await request(app).get('/admin/announcements/text-email').set('Cookie', cookie);
   const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
   return { cookie, csrfToken };
 }
@@ -84,18 +84,24 @@ async function seedStudentAccount(suffix, { grade = '3rd Grade', registerForClas
   return { accountId, memberId };
 }
 
-test('Main Admin Email tab: candidate rows carry role/section/grade/age/registration data attributes for client-side filtering', async () => {
+test('GET /main-admin/announcements/email redirects to the combined Text/Email page', async () => {
+  const { cookie } = await loginAsMainAdmin();
+  const res = await request(app).get('/main-admin/announcements/email').set('Cookie', cookie);
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /\/main-admin\/announcements\/text-email$/);
+});
+
+test('Main Admin Text/Email Filter page: candidate rows carry role/section/grade/age/registration data attributes for client-side filtering', async () => {
   const { cookie } = await loginAsMainAdmin();
   const { accountId } = await seedStudentAccount('mainA', { grade: '5th Grade', registerForClass: true, inSection: true });
 
-  const page = await request(app).get('/main-admin/announcements/email').set('Cookie', cookie);
+  const page = await request(app).get('/main-admin/announcements/text-email/filter').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, new RegExp(`value="${accountId}" data-email-checkbox`));
   assert.match(page.text, /data-role="student"/);
   assert.match(page.text, /data-grade="5th Grade"/);
   assert.match(page.text, /data-registered="yes"/);
   assert.match(page.text, /data-section="Teen Co-op"/);
-  assert.match(page.text, />Filter</);
   assert.match(page.text, /id="email-select-all"/);
   assert.doesNotMatch(page.text, /data-email-select="all"/, 'Select All/Select None buttons were replaced by a single header checkbox');
 });
@@ -104,11 +110,11 @@ test('Main Admin Email tab: candidate rows carry role/section/grade/age/registra
 // put a check box on the title row of the 1st column... Lists should
 // show just name, email and phone number. Shrink to fit tables in
 // mobile view."
-test('Main Admin Email tab: the candidate table shows only Name/Email/Phone columns, with Select All in the header cell, and shrinks instead of stacking on mobile', async () => {
+test('Main Admin Text/Email Filter page: the candidate table shows only Name/Email/Phone columns, with Select All in the header cell, and shrinks instead of stacking on mobile', async () => {
   const { cookie } = await loginAsMainAdmin();
   await seedStudentAccount('mainPhone', { phone: '555-123-9876' });
 
-  const page = await request(app).get('/main-admin/announcements/email').set('Cookie', cookie);
+  const page = await request(app).get('/main-admin/announcements/text-email/filter').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /<table class="roster-table condensed-table" id="email-candidate-table">/);
   assert.doesNotMatch(page.text, /id="email-candidate-table"[^>]*table-stack-mobile|table-stack-mobile[^>]*id="email-candidate-table"/);
@@ -187,7 +193,7 @@ test('Main Admin Email: scheduling saves a scheduled campaign without notifying 
   let notif = await db.prepare("SELECT * FROM notifications WHERE type_key = 'email_campaign' AND member_account_id = ? AND title = 'Scheduled note'").get(accountId);
   assert.equal(notif, undefined, 'a scheduled email must not notify anyone until it is actually sent');
 
-  const listPage = await request(app).get('/main-admin/announcements/email').set('Cookie', cookie);
+  const listPage = await request(app).get('/main-admin/announcements/text-email').set('Cookie', cookie);
   assert.match(listPage.text, /Scheduled note/);
   assert.match(listPage.text, />Send Now</);
 
@@ -205,13 +211,13 @@ test('Main Admin Email: scheduling saves a scheduled campaign without notifying 
   assert.ok(notif);
 });
 
-test('Co-op Admin Email tab: same filter/select-all/compose wiring, reached at /admin/announcements/email', async () => {
+test('Co-op Admin Text/Email Filter page: same filter/select-all/compose wiring, reached at /admin/announcements/text-email/filter', async () => {
   const { cookie, csrfToken } = await loginAsAdmin();
   const { accountId } = await seedStudentAccount('coopA', { phone: '555-000-1111' });
 
-  const page = await request(app).get('/admin/announcements/email').set('Cookie', cookie);
+  const page = await request(app).get('/admin/announcements/text-email/filter').set('Cookie', cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /<h1>Email<\/h1>/);
+  assert.match(page.text, /<h1>Filter Recipients<\/h1>/);
   assert.match(page.text, new RegExp(`value="${accountId}" data-email-checkbox`));
   assert.match(page.text, /<tr><th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" \/><\/th><th>Name<\/th><th>Email<\/th><th>Phone<\/th><\/tr>/);
   assert.match(page.text, />555-000-1111</);

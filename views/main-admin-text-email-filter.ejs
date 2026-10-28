@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Communication' },
+      { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
+      { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
+      { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/main-admin/announcements/text-email">&larr; Back</a></p>
+    <h1>Filter Recipients</h1>
+    <p class="hint">Choose who Send Text and Send Email will reach. Leave everyone unchecked (or Clear Filters) to send to every active member instead.</p>
+
+    <form method="POST" action="/main-admin/announcements/text-email/filter" id="email-select-form">
+      <div class="stack-form" id="email-filter-controls">
+        <label>Role
+          <select id="email-filter-role">
+            <option value="">Any</option>
+            <% roles.forEach(function(r) { %><option value="<%= r.key %>"><%= r.label %></option><% }); %>
+          </select>
+        </label>
+        <label>Section
+          <select id="email-filter-section">
+            <option value="">Any</option>
+            <% sections.forEach(function(s) { %><option value="<%= s.name %>"><%= s.name %></option><% }); %>
+          </select>
+        </label>
+        <label>Grade Level
+          <select id="email-filter-grade">
+            <option value="">Any</option>
+            <% gradeLevels.forEach(function(g) { %><option value="<%= g %>"><%= g %></option><% }); %>
+          </select>
+        </label>
+        <label>Age Group
+          <select id="email-filter-age">
+            <option value="">Any</option>
+            <% ageGroups.forEach(function(g) { %><option value="<%= g.key %>"><%= g.label %></option><% }); %>
+          </select>
+        </label>
+        <label>Registered for Classes
+          <select id="email-filter-registered">
+            <option value="">Any</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <button type="button" class="btn-secondary" data-email-filter-clear>Clear Filters</button>
+      </div>
+
+      <p class="hint" id="email-select-count"></p>
+
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table" id="email-candidate-table">
+          <thead>
+            <tr><th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" /></th><th>Name</th><th>Email</th><th>Phone</th></tr>
+          </thead>
+          <tbody>
+            <% candidates.forEach(function(c) { %>
+              <tr
+                data-email-row
+                data-role="<%= c.roles.join(',') %>"
+                data-section="<%= c.sections.join('|') %>"
+                data-grade="<%= c.gradeLevel || '' %>"
+                data-age-group="<%= c.ageGroup || '' %>"
+                data-registered="<%= c.registeredForClasses ? 'yes' : 'no' %>"
+              >
+                <td><input type="checkbox" name="recipientIds" value="<%= c.accountId %>" data-email-checkbox <%= selectedIds.has(c.accountId) ? 'checked' : '' %> /></td>
+                <td><%= c.name %></td>
+                <td><%= c.email || '' %></td>
+                <td><%= c.phone || '' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+        <% if (candidates.length === 0) { %><p class="roster-empty">No active members yet.</p><% } %>
+      </div>
+
+      <div class="member-form-footer">
+        <div class="member-form-footer-edit">
+          <button type="submit" class="primary-btn">Save Filter</button>
+        </div>
+      </div>
+    </form>
+  </main>
+  <script src="/js/email-composer-filters.js"></script>
+</body>
+</html>
