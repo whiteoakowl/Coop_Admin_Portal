@@ -18,8 +18,13 @@ async function getType(key) {
   return db.prepare('SELECT * FROM notification_types WHERE key = ?').get(key);
 }
 
-async function setAutoSend(key, enabled) {
-  await db.prepare('UPDATE notification_types SET auto_send_enabled = ? WHERE key = ?').run(enabled ? 1 : 0, key);
+// A real request: "two columns of checkboxes titled text and email.
+// Admin can click each box to select if it will be a text notification,
+// email notification or both." Replaces the old single combined
+// auto_send_enabled toggle with two fully independent per-channel
+// switches on the same notification_types row.
+async function setChannelsEnabled(key, { textEnabled, emailEnabled }) {
+  await db.prepare('UPDATE notification_types SET sms_enabled = ?, email_enabled = ? WHERE key = ?').run(textEnabled ? 1 : 0, emailEnabled ? 1 : 0, key);
 }
 
 // Merges an account's stored overrides onto the "enabled by default"
@@ -60,16 +65,13 @@ async function recordDelivery(notificationId, channel, result) {
 }
 
 // The single entry point every feature calls to generate a
-// notification. Always creates the in-app notification. If the type's
-// auto_send_enabled is off, that's the only channel attempted - a Main
-// Admin turning off a type's auto-send stops it from reaching email/sms
-// at all, without touching code. Otherwise email is attempted whenever
-// the recipient hasn't opted out of it for this type; SMS additionally
-// requires the type's own sms_enabled (a real request: several types -
-// waitlist/registration confirmations, submission decisions, forum
-// replies, announcements, newsletter - are email-only by design, not
-// just by a recipient's own preference) on top of the same opt-out
-// check.
+// notification. Always creates the in-app notification. email_enabled
+// and sms_enabled are each independent, admin-controlled ceilings per
+// type (the Notifications settings page's own two checkbox columns) -
+// a type with both off behaves exactly like the old auto_send_enabled
+// off did (in-app only). On top of whichever channels the type itself
+// allows, a recipient's own per-account preference can still opt that
+// one account out of a channel the type otherwise permits.
 async function notify(accountId, typeKey, { title, body, linkUrl = null, mediaUrl = null } = {}) {
   const type = await getType(typeKey);
   if (!type) throw new Error(`Unknown notification type: ${typeKey}`);
@@ -78,14 +80,13 @@ async function notify(accountId, typeKey, { title, body, linkUrl = null, mediaUr
   const notificationId = info.lastInsertRowid;
   await recordDelivery(notificationId, 'in_app', { status: 'sent', detail: null });
 
-  if (!type.auto_send_enabled) return notificationId;
-
   const account = await db.prepare('SELECT ma.email, m.phone FROM member_accounts ma LEFT JOIN members m ON m.id = ma.member_id WHERE ma.id = ?').get(accountId);
 
-  if (await accountPrefersChannel(accountId, typeKey, 'email')) {
+  if (type.email_enabled && (await accountPrefersChannel(accountId, typeKey, 'email'))) {
     await recordDelivery(notificationId, 'email', await emailProvider.send(account?.email, title, body));
   } else {
-    await recordDelivery(notificationId, 'email', { status: 'skipped', detail: 'Recipient opted out of this notification type by email.' });
+    const detail = type.email_enabled ? 'Recipient opted out of this notification type by email.' : 'This notification type is text-only - email is never sent for it.';
+    await recordDelivery(notificationId, 'email', { status: 'skipped', detail });
   }
   if (type.sms_enabled && (await accountPrefersChannel(accountId, typeKey, 'sms'))) {
     await recordDelivery(notificationId, 'sms', await smsProvider.send(account?.phone, `${title}: ${body}`, mediaUrl));
@@ -127,7 +128,7 @@ async function markAllRead(accountId) {
 module.exports = {
   listTypes,
   getType,
-  setAutoSend,
+  setChannelsEnabled,
   preferencesForAccount,
   setPreference,
   notify,

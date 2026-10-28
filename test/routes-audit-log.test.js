@@ -25,6 +25,7 @@ const app = require('../server');
 const db = require('../db');
 const auditLog = require('../utils/auditLog');
 const newsletterUtil = require('../utils/newsletter');
+const notifications = require('../utils/notifications');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -128,15 +129,32 @@ test('deleting a newsletter issue creates an audit entry', async () => {
   assert.equal(entry.detail, 'Audit Test Issue');
 });
 
-test("toggling a notification type's auto-send creates an audit entry, not a fake one", async () => {
+// Builds the full all-types checkbox body POST /channels expects (every
+// row's current text/email state), used by the audit-log and
+// notifications tests below to flip exactly one type's one channel.
+async function fullChannelsBody(csrfToken, overrides = {}) {
+  const types = await notifications.listTypes();
+  const body = { _csrf: csrfToken };
+  for (const t of types) {
+    const key = `text_${t.key}`;
+    if (key in overrides ? overrides[key] : t.sms_enabled) body[key] = '1';
+    const emailKey = `email_${t.key}`;
+    if (emailKey in overrides ? overrides[emailKey] : t.email_enabled) body[emailKey] = '1';
+  }
+  return body;
+}
+
+test("toggling a notification type's text/email channels creates an audit entry, not a fake one", async () => {
   const admin = await loginAsMainAdmin();
-  await request(app).post('/main-admin/notifications/event_registration/auto-send').set('Cookie', admin.cookie).type('form').send({ enabled: '0', _csrf: admin.csrfToken });
+  const body = await fullChannelsBody(admin.csrfToken, { email_event_registration: false });
+  await request(app).post('/main-admin/notifications/channels').set('Cookie', admin.cookie).type('form').send(body);
 
   const entries = await auditLog.list({ targetType: 'notification_type' });
-  assert.ok(entries.some((e) => e.action === 'notification_auto_send_toggled' && e.detail === 'event_registration: off'));
+  assert.ok(entries.some((e) => e.action === 'notification_channels_updated' && e.detail.startsWith('event_registration: ') && e.detail.includes('email=off')));
 
-  // Restore for any later test relying on default auto-send behavior.
-  await request(app).post('/main-admin/notifications/event_registration/auto-send').set('Cookie', admin.cookie).type('form').send({ enabled: '1', _csrf: admin.csrfToken });
+  // Restore for any later test relying on default channel behavior.
+  const restoreBody = await fullChannelsBody(admin.csrfToken, { email_event_registration: true });
+  await request(app).post('/main-admin/notifications/channels').set('Cookie', admin.cookie).type('form').send(restoreBody);
 });
 
 test('the audit log page filters by target type', async () => {

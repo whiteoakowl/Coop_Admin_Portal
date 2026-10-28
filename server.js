@@ -231,10 +231,6 @@ const adminNewsletterRouter = require('./routes/admin-newsletter');
 // utils/notifications.js's own header comment.
 const notificationsRouter = require('./routes/notifications');
 const adminNotificationsRouter = require('./routes/admin-notifications');
-// Contact Admins' own admin-facing inbox (manage_communications) - reads
-// back what the Parent/Student/Teacher-facing /contact-admins page
-// (routes/contact-admins.js) collects into contact_admin_messages.
-const adminContactAdminMessagesRouter = require('./routes/admin-contact-admin-messages');
 // Item 12: Photos/Albums at /photos and Publications/Articles at
 // /publications - both default to visibility='members', 'public' is a
 // deliberate, separate admin choice (never the default, given photo
@@ -514,7 +510,6 @@ app.use('/newsletter', newsletterRouter);
 app.use('/main-admin/newsletter', adminNewsletterRouter);
 app.use('/notifications', notificationsRouter);
 app.use('/main-admin/notifications', adminNotificationsRouter);
-app.use('/main-admin/contact-admin-messages', adminContactAdminMessagesRouter);
 app.use('/photos', photosRouter);
 app.use('/babysitters', babysittersRouter);
 app.use('/nature-news', natureNewsImageRouter);

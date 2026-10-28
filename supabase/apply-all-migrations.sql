@@ -5581,3 +5581,15 @@ update notification_types set sms_enabled = 0 where key in (
   'announcement',
   'newsletter_sent'
 );
+
+-- A real request: "Main admin portal. Settings gear. Add a notifications
+-- card. Here you can see a list of notifications with two columns of
+-- checkboxes titled text and email. Admin can click each box to select
+-- if it will be a text notification, email notification or both."
+-- Pairs with the existing sms_enabled column (20261218010000) so each
+-- notification type has two fully independent per-channel switches
+-- instead of one combined auto_send_enabled toggle. auto_send_enabled
+-- itself is left in place (unused by application code from here on)
+-- rather than dropped, to avoid a destructive column removal for a
+-- column that does no harm sitting unused.
+alter table notification_types add column if not exists email_enabled integer not null default 1;

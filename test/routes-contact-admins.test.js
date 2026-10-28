@@ -187,56 +187,9 @@ test('Parent/Student/Teacher portal nav shows a Contact Admins icon; Main Admin 
   assert.doesNotMatch(mainAdminPage.text, /Contact Admins/);
 });
 
-test('Main Admin: Contact Admin Messages inbox lists a submitted message and can archive it', async () => {
-  const positionId = await addAdminPosition('Fundraising (Inbox Test)');
-  const holder = await loginAsPortalRole('parent');
-  await addAdminPositionForMember(holder.memberId, positionId);
-
-  const sender = await loginAsPortalRole('parent');
-  const page = await request(app).get('/contact-admins').set('Cookie', sender.cookie);
-  const csrfToken = extractCsrf(page.text);
-  await request(app)
-    .post('/contact-admins')
-    .set('Cookie', sender.cookie)
-    .type('form')
-    .send({ positionId, title: 'Inbox Test Subject', message: 'Inbox test body', _csrf: csrfToken });
-
-  const mainAdminCookie = await loginAsMainAdmin();
-  const inboxPage = await request(app).get('/main-admin/contact-admin-messages').set('Cookie', mainAdminCookie);
-  assert.equal(inboxPage.status, 200);
-  assert.match(inboxPage.text, /Inbox Test Subject/);
-  assert.match(inboxPage.text, /Fundraising \(Inbox Test\)/);
-
-  const idMatch = new RegExp('/main-admin/contact-admin-messages/(\\d+)/archive').exec(inboxPage.text);
-  assert.ok(idMatch, 'expected an archive form for the new message');
-  const inboxCsrf = extractCsrf(inboxPage.text);
-  const archiveRes = await request(app)
-    .post(`/main-admin/contact-admin-messages/${idMatch[1]}/archive`)
-    .set('Cookie', mainAdminCookie)
-    .type('form')
-    .send({ _csrf: inboxCsrf });
-  assert.equal(archiveRes.status, 302);
-
-  const activeAfter = await request(app).get('/main-admin/contact-admin-messages').set('Cookie', mainAdminCookie);
-  assert.doesNotMatch(activeAfter.text, /Inbox Test Subject/);
-  const archivedAfter = await request(app).get('/main-admin/contact-admin-messages?archived=1').set('Cookie', mainAdminCookie);
-  assert.match(archivedAfter.text, /Inbox Test Subject/);
-});
-
-test('Main Admin: Contact Admin Messages inbox paginates past the default page size', async () => {
-  await db.prepare("DELETE FROM contact_admin_messages WHERE archived = 0").run();
-  for (let i = 0; i < 55; i += 1) {
-    await db
-      .prepare(`INSERT INTO contact_admin_messages (leadership_team, sender_email, title, message) VALUES (?, ?, ?, ?)`)
-      .run('Pagination Test Dept', 'sender@example.com', `Pagination Message ${i}`, 'Body');
-  }
-
-  const mainAdminCookie = await loginAsMainAdmin();
-  const page1 = await request(app).get('/main-admin/contact-admin-messages').set('Cookie', mainAdminCookie);
-  assert.equal(page1.status, 200);
-  assert.equal((page1.text.match(/Pagination Message \d+/g) || []).length, 50, 'page 1 should only show pageSize (50) rows');
-  assert.match(page1.text, /class="pagination-bar/, 'pagination controls should render once past one page');
-
-  const page2 = await request(app).get('/main-admin/contact-admin-messages?page=2').set('Cookie', mainAdminCookie);
-  assert.equal((page2.text.match(/Pagination Message \d+/g) || []).length, 5, 'page 2 should show the remaining 5 rows');
-});
+// The Main Admin on-site inbox for these messages (admin-contact-admin-messages.js)
+// was removed per a real request: "Members will not be able to read messages
+// on the website. Instead when messages come through it will send directly
+// to their email." Delivery already happened by email before and after that
+// change (see the POST /contact-admins tests above) - only the on-site
+// reading page is gone, so there is nothing left to cover here.

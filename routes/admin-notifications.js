@@ -1,9 +1,13 @@
 // Main Admin's Notification Type controls (Community & Commerce track,
 // item 11) - mounted at /main-admin/notifications, gated the same as
-// Newsletter (manage_communications). The only thing an admin controls
-// here is auto_send_enabled per type - "admin control over which
-// message types actually send automatically," per the handoff. The
-// catalog of types itself is seeded from real callers (see
+// Newsletter (manage_communications). A real request: "Add a
+// notifications card. Here you can see a list of notifications with
+// two columns of checkboxes titled text and email. Admin can click
+// each box to select if it will be a text notification, email
+// notification or both." One form posts every row's two checkboxes at
+// once (POST /channels), same shape as the member-facing Notification
+// Preferences page's own save-the-whole-table pattern. The catalog of
+// types itself is seeded from real callers (see
 // supabase/migrations/20260825110000_notifications.sql), not editable
 // here - a new type means a new real feature calling notify(), not a
 // freeform admin-created row.
@@ -29,10 +33,15 @@ router.get('/', async (req, res) => {
   res.render('admin-notifications', { title: 'Notifications', types, templates, notice: req.query.notice || null });
 });
 
-router.post('/:key/auto-send', async (req, res) => {
-  const enabled = req.body.enabled === '1';
-  await notifications.setAutoSend(req.params.key, enabled);
-  await auditLog.record(req.portalAccount.id, 'notification_auto_send_toggled', 'notification_type', null, `${req.params.key}: ${enabled ? 'on' : 'off'}`);
+router.post('/channels', async (req, res) => {
+  const types = await notifications.listTypes();
+  for (const type of types) {
+    const textEnabled = req.body[`text_${type.key}`] === '1';
+    const emailEnabled = req.body[`email_${type.key}`] === '1';
+    if (textEnabled === !!type.sms_enabled && emailEnabled === !!type.email_enabled) continue;
+    await notifications.setChannelsEnabled(type.key, { textEnabled, emailEnabled });
+    await auditLog.record(req.portalAccount.id, 'notification_channels_updated', 'notification_type', null, `${type.key}: text=${textEnabled ? 'on' : 'off'}, email=${emailEnabled ? 'on' : 'off'}`);
+  }
   res.redirect('/main-admin/notifications?notice=' + encodeURIComponent('Saved.'));
 });
 
