@@ -6741,10 +6741,17 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 }
 .floater-card-send-text-btn:hover { background: #fff; }
 .floater-card-send-text-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* A real request: "Make it to where you can view the entire first and
+   last name in the dropdown choice view. Shrink tables to fit
+   accordingly." Position/Room text is always short ("Hallway Monitor",
+   "Room 12"); a floater's own select has to fit a full first+last name
+   AND the Assign/Unassign button riding along in the same cell
+   (.floater-assign-form's own flex row), so it gets the lion's share
+   of the row now instead of roughly an even three-way split. */
 .floater-card-table.floater-chart-table th:nth-child(1), .floater-card-table.floater-chart-table td:nth-child(1) { width: 2.2rem; }
-.floater-card-table.floater-chart-table th:nth-child(2), .floater-card-table.floater-chart-table td:nth-child(2) { width: 38%; }
-.floater-card-table.floater-chart-table th:nth-child(3), .floater-card-table.floater-chart-table td:nth-child(3) { width: 23%; }
-.floater-card-table.floater-chart-table th:nth-child(4), .floater-card-table.floater-chart-table td:nth-child(4) { width: 35%; }
+.floater-card-table.floater-chart-table th:nth-child(2), .floater-card-table.floater-chart-table td:nth-child(2) { width: 20%; }
+.floater-card-table.floater-chart-table th:nth-child(3), .floater-card-table.floater-chart-table td:nth-child(3) { width: 12%; }
+.floater-card-table.floater-chart-table th:nth-child(4), .floater-card-table.floater-chart-table td:nth-child(4) { width: 66%; }
 
 /* Setup/Cleanup Assignments' own version of .floater-card-table - a real
    request: "just line the assignments under each member like mobile."
@@ -6926,19 +6933,16 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
    applies - a card can never demand more width than the viewport has. */
 .floater-chart-cards-grid { grid-template-columns: repeat(auto-fit, minmax(min(480px, 100%), 1fr)); }
 
-/* 36/16/48, not the base .floater-card-table's 40/24/36 - a real bug at
-   desktop widths: table-layout:fixed locks each column to its header's
-   width, and the old 22/12/66 split left "Room" so narrow that its own
-   header ("ROOM") had nowhere to go but overflow into "Floater" (the
-   inherited .floater-card-table th white-space: nowrap made it worse),
-   while "Position" was narrow enough to wrap long names like "Classroom
-   Hallway Supervisor" one character per line. white-space: normal lets a
-   header wrap instead of overflowing when a column is still tight. */
-.floater-chart-table th:nth-child(1) { width: 32%; }
-.floater-chart-table th:nth-child(2) { width: 20%; }
-.floater-chart-table th:nth-child(3) { width: 48%; }
+/* This table's column widths are set above (.floater-card-table.floater-
+   chart-table th/td:nth-child, 4 columns counting the Text checkbox) -
+   these th:nth-child(1)/(2)/(3) selectors here used to target Position/
+   Room/Floater back when this was still a 3-column table, before the
+   Text Notification column was added; that extra class in the selector
+   above outranks these on specificity now, so a width set here would be
+   silently ignored regardless of what it said. white-space: normal
+   (not nth-child-scoped, so still real) lets a tight header wrap
+   instead of overflowing into its neighbor. */
 .floater-chart-table th { white-space: normal; }
-.floater-chart-table td:nth-child(1), .floater-chart-table td:nth-child(2), .floater-chart-table td:nth-child(3) { width: auto; }
 
 /* A class can now list more than once (one row per missing teacher/
    assistant) - this small line under the class name says who that
