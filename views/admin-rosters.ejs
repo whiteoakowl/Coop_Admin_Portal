@@ -192,12 +192,12 @@
             the existing GET /admin/roster/:tab/export.csv route
             (routes/admin-rosters.js) that already existed but wasn't
             linked from here yet. %>
-        <a class="icon-btn" href="/admin/roster/<%= tab %>/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+        <a class="icon-btn" href="/admin/roster/<%= tab %>/export.csv<%= selectedSemesterId ? '?semesterId=' + selectedSemesterId : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
         <%# A real request: "make sure there is a print preview for all
             attendance print pages" - see the playground tab's own matching
             comment above. %>
-        <a class="icon-btn" href="/admin/rosters/print?tab=<%= tab %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
-        <a class="icon-btn" href="/admin/rosters/download.pdf?tab=<%= tab %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+        <a class="icon-btn" href="/admin/rosters/print?tab=<%= tab %><%= selectedSemesterId ? '&semesterId=' + selectedSemesterId : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        <a class="icon-btn" href="/admin/rosters/download.pdf?tab=<%= tab %><%= selectedSemesterId ? '&semesterId=' + selectedSemesterId : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
       </div>
     </div>
 
@@ -323,7 +323,7 @@
                 <% row.cells.forEach(function(cell) { %>
                   <td>
                     <div class="cell-detailed">
-                      <select class="roster-cell-select roster-cell-select-<%= cell.status || 'blank' %>" data-tab="<%= tab %>" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" data-original="<%= cell.status || '' %>" aria-label="Attendance status for <%= row.member.name %> on <%= cell.date %>">
+                      <select class="roster-cell-select roster-cell-select-<%= cell.status || 'blank' %>" data-tab="<%= tab %>" data-endpoint="/admin/rosters/<%= tab %>/attendance<%= selectedSemesterId ? '?semesterId=' + selectedSemesterId : '' %>" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" data-original="<%= cell.status || '' %>" aria-label="Attendance status for <%= row.member.name %> on <%= cell.date %>">
                         <option value="" <%= !cell.status ? 'selected' : '' %>>—</option>
                         <option value="present" <%= cell.status === 'present' ? 'selected' : '' %>>P</option>
                         <option value="late" <%= cell.status === 'late' ? 'selected' : '' %>>L</option>

@@ -5593,3 +5593,20 @@ update notification_types set sms_enabled = 0 where key in (
 -- rather than dropped, to avoid a destructive column removal for a
 -- column that does no harm sitting unused.
 alter table notification_types add column if not exists email_enabled integer not null default 1;
+
+-- A real bug report: "Spring 2027 - Monday, Spring 2026 Wednesday are
+-- showing rosters and attendance from fall days. It should be its own."
+-- Root cause: Attendance's day-level Parent/Student rosters (utils/
+-- classSchedule.js's ensureDayRoster) were only ever keyed by day+role
+-- (an app_settings row like 'monday_parent_roster_id'), never by
+-- semester - every semester sharing that day literally shared the one
+-- same roster row, same roster_dates, same attendance. This column lets
+-- a day-roster record which semester it belongs to (nullable - every
+-- other roster category, e.g. a class roster, still has no need for it,
+-- and the already-existing mixed-semester rosters are deliberately left
+-- with semester_id null until ensureDayRoster's own first-touch claim
+-- logic assigns one - see that function's own comment for why this is a
+-- "fix going forward" rather than an attempt to retroactively split
+-- already-mixed history, which semesters have no stored date range to
+-- do correctly by).
+alter table rosters add column if not exists semester_id integer references semesters(id) on delete set null;

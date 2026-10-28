@@ -1,6 +1,7 @@
 const db = require('../db');
 const { DAYS } = require('./days');
 const { appSetting, setAppSetting } = require('./appSettings');
+const { getActiveKioskSemesterId } = require('./kioskSettings');
 const {
   CLASS_DAYS,
   CLASS_DAY_ORDER,
@@ -1295,7 +1296,7 @@ async function setEnrollment(classId, studentIds, { skipSync } = {}) {
       for (const position of positions) await removeFromFloaterForHour(day, position, studentId, semesterId);
     }
     if (newlyEnrolled.length > 0) {
-      const studentRosterId = await ensureDayRoster(day, 'student');
+      const studentRosterId = await ensureDayRoster(day, 'student', semesterId);
       for (const studentId of newlyEnrolled) await clearRosterManualRemoval(studentRosterId, studentId);
     }
   }
@@ -1378,14 +1379,14 @@ async function addStaff(classId, memberId, role, { skipSync } = {}) {
     .run(classId, memberId, role === 'assistant' ? 'assistant' : 'teacher');
   await removeFromFloaterForOverlappingHours(classId, memberId);
   await syncClassRosterMembers(classId);
-  const cls = await db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
+  const cls = await db.prepare('SELECT day, semester_id FROM classes WHERE id = ?').get(classId);
   // Being picked up as staff here IS this member's own schedule changing -
   // same reasoning as setEnrollment's own newlyEnrolled handling above,
   // clearing any earlier manual removal from the day's own roster (see
   // that bug report there).
   if (cls) {
     const staffMember = await db.prepare('SELECT member_type FROM members WHERE id = ?').get(memberId);
-    const dayRosterId = await ensureDayRoster(cls.day, staffMember && staffMember.member_type === 'student' ? 'student' : 'parent');
+    const dayRosterId = await ensureDayRoster(cls.day, staffMember && staffMember.member_type === 'student' ? 'student' : 'parent', cls.semester_id);
     await clearRosterManualRemoval(dayRosterId, memberId);
   }
   if (skipSync) return;
@@ -1838,7 +1839,7 @@ async function ensureClassRoster(classId) {
   // none of its own. Copies whatever the Student roster already has at
   // creation time; ON CONFLICT DO NOTHING makes this safe to call even
   // if some of those dates somehow already made it in another way.
-  const studentRosterId = await ensureDayRoster(cls.day, 'student');
+  const studentRosterId = await ensureDayRoster(cls.day, 'student', cls.semester_id);
   const existingDates = await db.prepare('SELECT session_date FROM roster_dates WHERE roster_id = ?').all(studentRosterId);
   const insertDate = db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?) ON CONFLICT (roster_id, session_date) DO NOTHING');
   for (const row of existingDates) await insertDate.run(rosterId, row.session_date);
@@ -1851,8 +1852,21 @@ async function ensureClassRoster(classId) {
 // class roster's own roster_dates never drifts out of sync with the day
 // it belongs to (see ensureClassRoster's own comment on why a class
 // roster needs real rows here, not just a borrowed value at render time).
-async function classRosterIdsForDay(day) {
-  return (await db.prepare('SELECT roster_id FROM classes WHERE day = ? AND roster_id IS NOT NULL').all(day)).map((r) => r.roster_id);
+// semesterId optional (undefined = every semester's classes that day,
+// the original behavior backfillClassRosterDates below still relies on)
+// - routes/admin-rosters.js's own dates/add route passes the semester
+// actually being viewed, so adding a session date to "Spring 2027
+// Monday" only ever touches Spring 2027's own Monday classes, not every
+// other semester's Monday classes too (same semester-bleed bug class
+// ensureDayRoster's own comment describes, just for class rosters
+// instead of the day-level Parent/Student ones).
+async function classRosterIdsForDay(day, semesterId) {
+  if (semesterId === undefined) {
+    return (await db.prepare('SELECT roster_id FROM classes WHERE day = ? AND roster_id IS NOT NULL').all(day)).map((r) => r.roster_id);
+  }
+  return (
+    await db.prepare('SELECT roster_id FROM classes WHERE day = ? AND roster_id IS NOT NULL AND semester_id IS NOT DISTINCT FROM ?').all(day, semesterId)
+  ).map((r) => r.roster_id);
 }
 
 // Genuine one-time backfill for an already-deployed database: before this
@@ -1901,29 +1915,70 @@ async function syncClassRosterMembers(classId) {
   await setRosterMembership(rosterId, memberIds);
 }
 
-function dayRosterSettingKey(day, role) {
-  return `${day}_${role}_roster_id`;
+// A real bug report: "Spring 2027 - Monday, Spring 2026 Wednesday are
+// showing rosters and attendance from fall days. It should be its own."
+// This key used to have no semester component at all - every semester
+// sharing a day literally shared the one roster row. semesterId null/
+// undefined both fold to the same 'none' bucket (a day roster predating
+// this fix, or genuinely created with no semester context) so the two
+// never accidentally diverge into two different "no semester" keys.
+function dayRosterSettingKey(day, role, semesterId) {
+  return `${day}_${role}_roster_id${semesterId == null ? '' : `_sem${semesterId}`}`;
 }
 
-// Creates (once) one of the 4 day-level rosters (Monday/Wednesday x
-// Parent/Student), remembering its id via app_settings, or returns the
-// existing one.
-async function ensureDayRoster(day, role) {
-  const key = dayRosterSettingKey(day, role);
+// Creates (once) one of a day's level rosters (Parent/Student, now also
+// scoped per semester), remembering its id via app_settings, or returns
+// the existing one. semesterId undefined falls back to the site-wide
+// active Kiosk semester, same "unspecified means whatever's active"
+// convention resolveSemesterId-style callers use everywhere else in this
+// app; pass null explicitly for a genuinely semester-agnostic roster.
+//
+// First-touch legacy claim: a day roster created before this fix shipped
+// is still sitting under the OLD, semester-less key (dayRosterSettingKey
+// with no 3rd argument) - with real roster_dates/attendance history an
+// admin would not want to silently lose from view. Rather than attempt
+// to retroactively split that mixed-semester history (semesters have no
+// stored date range to do so correctly by - see this migration's own
+// comment), the FIRST semester to ever resolve that day+role after this
+// fix ships claims the legacy roster outright (tags its semester_id,
+// re-files it under the new semester-scoped key, and clears the old key
+// so nothing else can claim it again) - in practice, almost always
+// whichever semester is already active the moment this deploys. Every
+// OTHER semester for that same day+role, from then on, gets a genuinely
+// new, empty roster of its own, which is the actual bug fix.
+async function ensureDayRoster(day, role, semesterId) {
+  const sid = semesterId !== undefined ? semesterId : await getActiveKioskSemesterId();
+  const key = dayRosterSettingKey(day, role, sid);
   const existingId = await appSetting(key, null);
   if (existingId) {
     const existing = await db.prepare('SELECT id FROM rosters WHERE id = ?').get(existingId);
     if (existing) return existing.id;
   }
+
+  const legacyKey = dayRosterSettingKey(day, role);
+  if (legacyKey !== key) {
+    const legacyId = await appSetting(legacyKey, null);
+    if (legacyId) {
+      const legacy = await db.prepare('SELECT id FROM rosters WHERE id = ?').get(legacyId);
+      if (legacy) {
+        await db.prepare('UPDATE rosters SET semester_id = ? WHERE id = ?').run(sid, legacy.id);
+        await setAppSetting(key, String(legacy.id));
+        await db.prepare('DELETE FROM app_settings WHERE key = ?').run(legacyKey);
+        return legacy.id;
+      }
+    }
+  }
+
   const name = `${CLASS_DAY_LABELS_FULL[day]} ${role === 'parent' ? 'Parents' : 'Students'}`;
   const info = await db
-    .prepare('INSERT INTO rosters (name, category, schedule_day) VALUES (?, ?, ?)')
-    .run(name, 'Class Schedule', day);
+    .prepare('INSERT INTO rosters (name, category, schedule_day, semester_id) VALUES (?, ?, ?, ?)')
+    .run(name, 'Class Schedule', day, sid);
   await setAppSetting(key, String(info.lastInsertRowid));
   return info.lastInsertRowid;
 }
 
-// Ensures all 4 day-level rosters exist and returns their ids.
+// Ensures all 4 day-level rosters exist (for the active Kiosk semester)
+// and returns their ids.
 async function ensureDayMemberRosters() {
   const ids = {};
   for (const day of DAYS) {
