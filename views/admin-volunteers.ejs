@@ -254,7 +254,14 @@
         checked, fills this dialog in, then shows it instead of posting
         straight away - Send Now is what actually fires the request
         (multipart/form-data, since the image rides along as a real
-        file). %>
+        file).
+        A later real request: "if sending a text to everyone assigned
+        that hour it should not allow you to customize the message and
+        it should send each member their own unique assigned
+        assignment." Only a single recipient still gets the editable
+        textarea below - 2+ recipients get the read-only hint instead,
+        and each one's own message is built server-side from their own
+        position/room/hour, never this shared field. %>
     <dialog id="floater-text-notify-dialog" class="class-form-dialog" data-message-template="<%= floaterMessageTemplate %>">
       <form id="floater-text-notify-form" class="stack-form">
         <div class="class-form-dialog-header">
@@ -262,9 +269,10 @@
           <h3>Send Text Notification</h3>
         </div>
         <p class="hint" id="floater-text-notify-recipients-hint"></p>
-        <label>Message
-          <textarea name="message" id="floater-text-notify-message" rows="4" required></textarea>
+        <label id="floater-text-notify-message-label">Message
+          <textarea name="message" id="floater-text-notify-message" rows="4"></textarea>
         </label>
+        <p class="hint" id="floater-text-notify-multi-hint" hidden>Each floater will get their own text with their own position, room and hour - the message can't be customized when sending to more than one person at once.</p>
         <label>Image (optional)
           <input type="file" name="image" accept="image/*" />
         </label>

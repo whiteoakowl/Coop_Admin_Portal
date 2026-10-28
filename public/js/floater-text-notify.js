@@ -27,7 +27,9 @@
   const day = main ? main.dataset.day : '';
   const dialog = document.getElementById('floater-text-notify-dialog');
   const form = document.getElementById('floater-text-notify-form');
+  const messageLabel = document.getElementById('floater-text-notify-message-label');
   const messageField = document.getElementById('floater-text-notify-message');
+  const multiHint = document.getElementById('floater-text-notify-multi-hint');
   const recipientsHint = document.getElementById('floater-text-notify-recipients-hint');
   const sendBtn = document.getElementById('floater-text-notify-send-btn');
   if (!container || !dialog || !form) return;
@@ -89,7 +91,15 @@
 
   // "Send text button on hour title bar... when you click send text on
   // title bar it will create a pop up" - sends to whichever of this
-  // one card's own checkboxes are currently checked.
+  // one card's own checkboxes are currently checked. A later real
+  // request: "if sending a text to everyone assigned that hour it
+  // should not allow you to customize the message and it should send
+  // each member their own unique assigned assignment" - only a single
+  // recipient still gets the editable textarea (pre-filled, same as
+  // before); 2+ recipients hide it entirely in favor of the read-only
+  // hint, and each one's own position/room/hour rides along on
+  // pendingNotify so the server can build each of their own messages
+  // (routes/admin-volunteers.js) rather than sending one shared string.
   container.addEventListener('click', (e) => {
     const sendTextBtn = e.target.closest('.floater-card-send-text-btn');
     if (!sendTextBtn || sendTextBtn.disabled) return;
@@ -99,9 +109,15 @@
     if (checked.length === 0) return;
     clearMessage();
 
-    pendingNotify = checked.map((cb) => ({ memberId: cb.dataset.memberId }));
-    const first = checked[0].dataset;
-    messageField.value = fillMessageTemplate(first);
+    pendingNotify = checked.map((cb) => ({ memberId: cb.dataset.memberId, position: cb.dataset.position, room: cb.dataset.room, hour: cb.dataset.hour }));
+    const isSingle = checked.length === 1;
+    messageLabel.hidden = !isSingle;
+    multiHint.hidden = isSingle;
+    if (isSingle) {
+      messageField.value = fillMessageTemplate(checked[0].dataset);
+    } else {
+      messageField.value = '';
+    }
     recipientsHint.textContent = `Sending to ${checked.length} floater${checked.length === 1 ? '' : 's'}.`;
     const fileInput = form.querySelector('input[type="file"]');
     if (fileInput) fileInput.value = '';
@@ -111,8 +127,9 @@
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     if (pendingNotify.length === 0) return;
+    const isSingle = pendingNotify.length === 1;
     const message = messageField.value.trim();
-    if (!message) {
+    if (isSingle && !message) {
       messageField.focus();
       return;
     }
@@ -120,7 +137,7 @@
     const fileInput = form.querySelector('input[type="file"]');
     const formData = new FormData();
     formData.append('notify', JSON.stringify(pendingNotify));
-    formData.append('message', message);
+    if (isSingle) formData.append('message', message);
     if (fileInput && fileInput.files[0]) formData.append('image', fileInput.files[0]);
 
     sendBtn.disabled = true;

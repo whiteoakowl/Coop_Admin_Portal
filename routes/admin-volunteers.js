@@ -49,7 +49,8 @@ const {
 const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
 const { comboSemesterId, qsSemester, appendSemester, findComboId } = require('../utils/scheduleComboLinks');
 const { notify } = require('../utils/notifications');
-const { getTemplate } = require('../utils/notificationTemplates');
+const { getTemplate, fillPlaceholders } = require('../utils/notificationTemplates');
+const smsProvider = require('../utils/smsProvider');
 const { renderViewToPdf } = require('../utils/pdfRender');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
@@ -378,16 +379,30 @@ router.get('/volunteers/:day/fragment', requireAdmin, requireClassDay, async (re
 // click this button a check box appears next to each floater
 // assignment... click send text notification button. A pop up appears
 // showing an example of the text message that you can edit and add an
-// optional image." Routes through notify() (utils/notifications.js)
-// like every other feature in this app, rather than a raw
-// smsProvider.send() - a member's SMS opt-out preference for this type
-// is respected the same way any other notification is, and it also
-// creates a real in-app Notification Center entry. multipart/form-data
-// now (not plain JSON) since the optional image rides along as a real
-// file upload - public/js/floater-text-notify.js's own popup builds the
-// FormData itself; `notify` arrives as a JSON-encoded string field
-// inside that same form body (a plain array field doesn't survive a
-// multipart encode the way it did as a JSON request body).
+// optional image."
+//
+// Two later real requests changed how this sends:
+// (1) "won't send text because it says the member is not assigned to a
+// portal. That shouldn't matter." A member with no portal account
+// (member_accounts row) now texts directly off their own members.phone
+// via smsProvider.send() - notify() (which creates the in-app
+// Notification Center entry and respects an account's own opt-out
+// preference) is only reachable once an account exists to attach it
+// to, so this falls back to the plain SMS send rather than refusing.
+// (2) "if sending a text to everyone assigned that hour it should not
+// allow you to customize the message and it should send each member
+// their own unique assigned assignment." A single recipient still gets
+// whatever the admin typed/edited in the popup (req.body.message); 2+
+// recipients always get their OWN message built server-side from the
+// admin-editable template (floater_assignment_default), filled with
+// THAT recipient's own position/room/hour - req.body.message is
+// ignored once more than one recipient is involved, since the client
+// no longer offers an editable field in that case at all. multipart/
+// form-data (not plain JSON) since the optional image rides along as a
+// real file upload - public/js/floater-text-notify.js's own popup
+// builds the FormData itself; `notify` arrives as a JSON-encoded string
+// field inside that same form body (a plain array field doesn't
+// survive a multipart encode the way it did as a JSON request body).
 router.post('/volunteers/:day/floater-text-notify', requireAdmin, requireClassDay, notifyImageUpload.single('image'), async (req, res) => {
   let assignments;
   try {
@@ -396,8 +411,11 @@ router.post('/volunteers/:day/floater-text-notify', requireAdmin, requireClassDa
     return res.status(400).json({ ok: false, error: 'Malformed recipient list.' });
   }
   if (!Array.isArray(assignments)) assignments = [];
-  const message = (req.body.message || '').trim();
-  if (!message) return res.status(400).json({ ok: false, error: 'A message is required.' });
+  const customMessage = (req.body.message || '').trim();
+  const isSingleRecipient = assignments.length === 1;
+  if (isSingleRecipient && !customMessage) return res.status(400).json({ ok: false, error: 'A message is required.' });
+
+  const templateRow = isSingleRecipient ? null : await getTemplate('floater_assignment_default');
 
   let mediaUrl = null;
   if (req.file) {
@@ -417,18 +435,22 @@ router.post('/volunteers/:day/floater-text-notify', requireAdmin, requireClassDa
   for (const item of assignments) {
     const memberId = Number(item && item.memberId);
     if (!memberId) continue;
-    const member = await db.prepare('SELECT name FROM members WHERE id = ?').get(memberId);
+    const member = await db.prepare('SELECT name, phone FROM members WHERE id = ?').get(memberId);
     if (!member) continue;
 
-    const account = await db.prepare("SELECT id FROM member_accounts WHERE member_id = ? AND status = 'active'").get(memberId);
-    if (!account) {
-      results.push({ memberId, name: member.name, status: 'skipped', detail: 'No portal account on file.' });
-      continue;
-    }
+    const body = isSingleRecipient
+      ? customMessage
+      : fillPlaceholders(templateRow?.body || '', { position: item?.position || '', hour: item?.hour || '', room: item?.room || '' });
 
-    const notificationId = await notify(account.id, 'floater_assignment', { title: 'Floater Assignment', body: message, mediaUrl });
-    const delivery = await db.prepare("SELECT status, detail FROM notification_deliveries WHERE notification_id = ? AND channel = 'sms'").get(notificationId);
-    results.push({ memberId, name: member.name, status: delivery ? delivery.status : 'skipped', detail: delivery ? delivery.detail : null });
+    const account = await db.prepare("SELECT id FROM member_accounts WHERE member_id = ? AND status = 'active'").get(memberId);
+    if (account) {
+      const notificationId = await notify(account.id, 'floater_assignment', { title: 'Floater Assignment', body, mediaUrl });
+      const delivery = await db.prepare("SELECT status, detail FROM notification_deliveries WHERE notification_id = ? AND channel = 'sms'").get(notificationId);
+      results.push({ memberId, name: member.name, status: delivery ? delivery.status : 'skipped', detail: delivery ? delivery.detail : null });
+    } else {
+      const result = await smsProvider.send(member.phone, body, mediaUrl);
+      results.push({ memberId, name: member.name, status: result.status, detail: result.detail });
+    }
   }
 
   const sentCount = results.filter((r) => r.status === 'sent').length;

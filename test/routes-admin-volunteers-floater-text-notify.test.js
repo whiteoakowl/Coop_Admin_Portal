@@ -149,7 +149,7 @@ test('POST /floater-text-notify texts an assigned floater with an active portal 
   assert.equal(notification.body, "You're assigned: Assistant at 9:00 AM in Room 12.");
 });
 
-test('POST /floater-text-notify requires a message', async () => {
+test('POST /floater-text-notify requires a message for a single recipient', async () => {
   const cookie = await loginAsAdmin();
   const day = 'monday';
   const { memberId } = await setUpAssignedFloater({ cookie, day, hourPosition: 5, className: 'No Message Class', room: 'Room 5', memberName: 'No Message Floater', barcode: 'notify-no-message-floater', phone: '555-111-2222' });
@@ -169,7 +169,12 @@ test('POST /floater-text-notify requires a message', async () => {
   assert.equal(res.body.ok, false);
 });
 
-test('POST /floater-text-notify skips a floater with no portal account on file, without erroring the whole batch', async () => {
+// A real request: "Floater assignments won't send text because it
+// says the member is not assigned to a portal. That shouldn't matter."
+// A floater with no member_accounts row at all now texts directly off
+// their own members.phone (smsProvider.send(), mocked to succeed in
+// this file's own beforeEach) instead of being skipped.
+test('POST /floater-text-notify texts a floater with no portal account on file, straight off their phone number', async () => {
   const cookie = await loginAsAdmin();
   const day = 'monday';
   const { memberId } = await setUpAssignedFloater({ cookie, day, hourPosition: 3, className: 'No Account Class', room: 'Room 3', memberName: 'No Account Floater', barcode: 'notify-no-account-floater', phone: '555-666-7777' });
@@ -186,9 +191,59 @@ test('POST /floater-text-notify skips a floater with no portal account on file, 
 
   assert.equal(res.status, 200);
   assert.equal(res.body.ok, true);
-  assert.equal(res.body.sentCount, 0);
-  assert.equal(res.body.results[0].status, 'skipped');
-  assert.match(res.body.results[0].detail, /No portal account on file/);
+  assert.equal(res.body.sentCount, 1);
+  assert.equal(res.body.results[0].status, 'sent');
+
+  // No member_accounts row means notify() never ran for this member,
+  // so there's no in-app Notification Center entry either - the send
+  // happened straight through smsProvider, not through notify(). This
+  // test's own message text is unique across the whole file, so it's
+  // a safe stand-in for "a notification this specific send would have
+  // created" without needing to join back through a nonexistent account.
+  const notification = await db.prepare("SELECT * FROM notifications WHERE type_key = 'floater_assignment' AND body = ?").get("You're assigned: Assistant at 10:00 AM in Room 3.");
+  assert.equal(notification, undefined);
+});
+
+// A real request: "if sending a text to everyone assigned that hour
+// it should not allow you to customize the message and it should send
+// each member their own unique assigned assignment." Each recipient's
+// own message is built server-side from the admin-editable template
+// (floater_assignment_default), filled with THEIR OWN position/room/
+// hour - a shared req.body.message is only honored for a single
+// recipient.
+test('POST /floater-text-notify with 2+ recipients ignores any message field and builds each one their own templated message', async () => {
+  const cookie = await loginAsAdmin();
+  const day = 'monday';
+  const first = await setUpAssignedFloater({ cookie, day, hourPosition: 6, className: 'Multi Send Class A', room: 'Room 6', memberName: 'Multi Send Floater A', barcode: 'notify-multi-floater-a', phone: '555-111-0001' });
+  const second = await setUpAssignedFloater({ cookie, day, hourPosition: 7, className: 'Multi Send Class B', room: 'Room 7', memberName: 'Multi Send Floater B', barcode: 'notify-multi-floater-b', phone: '555-111-0002' });
+  await db.prepare("INSERT INTO member_accounts (member_id, email, password_hash, status) VALUES (?, 'multi-send-a@example.com', 'x', 'active')").run(first.memberId);
+  await db.prepare("INSERT INTO member_accounts (member_id, email, password_hash, status) VALUES (?, 'multi-send-b@example.com', 'x', 'active')").run(second.memberId);
+
+  const page = await request(app).get(`/admin/volunteers/${day}/manage`).set('Cookie', cookie);
+  const csrfToken = extractCsrf(page.text);
+
+  const res = await request(app)
+    .post(`/admin/volunteers/${day}/floater-text-notify`)
+    .set('Cookie', cookie)
+    .set('X-CSRF-Token', csrfToken)
+    .field('notify', JSON.stringify([
+      { memberId: String(first.memberId), position: 'Assistant', room: 'Room 6', hour: '1:00 PM' },
+      { memberId: String(second.memberId), position: 'Assistant', room: 'Room 7', hour: '2:00 PM' },
+    ]))
+    .field('message', 'This shared message should be ignored entirely.');
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.sentCount, 2);
+
+  const notifA = await db.prepare("SELECT body FROM notifications WHERE type_key = 'floater_assignment' AND member_account_id = (SELECT id FROM member_accounts WHERE member_id = ?)").get(first.memberId);
+  const notifB = await db.prepare("SELECT body FROM notifications WHERE type_key = 'floater_assignment' AND member_account_id = (SELECT id FROM member_accounts WHERE member_id = ?)").get(second.memberId);
+  assert.ok(notifA);
+  assert.ok(notifB);
+  assert.doesNotMatch(notifA.body, /shared message/);
+  assert.doesNotMatch(notifB.body, /shared message/);
+  assert.match(notifA.body, /Room 6/);
+  assert.match(notifB.body, /Room 7/);
+  assert.notEqual(notifA.body, notifB.body);
 });
 
 test('POST /floater-text-notify respects a member who opted out of floater_assignment SMS notifications', async () => {
