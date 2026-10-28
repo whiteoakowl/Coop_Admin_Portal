@@ -267,5 +267,23 @@ test('Grade Level Report: filter by section, schedule grid signup, and family', 
     const filtered = await request(app).get(`/main-admin/members/grade-level-report?familyId=${familyAId}`).set('Cookie', cookie);
     assert.match(filtered.text, /Clear Filter/);
   });
+
+  // A real request: "Grade level report. Filter button should be on the
+  // same row as the icons and be first in the row." - the row is sized
+  // to its own content (roster-btn-row-fit-text), not a fixed-column
+  // grid, so this just confirms Filter's own source order against the
+  // Export/Print/PDF icons (test/routes-main-admin-icon-row-fixed-
+  // columns.test.js's own matching comment on why this page no longer
+  // carries data-fixed-columns).
+  await t.test('Filter is first in the icon row, ahead of Export/Print/PDF', async () => {
+    const res = await request(app).get('/main-admin/members/grade-level-report').set('Cookie', cookie);
+    // The Filter BUTTON (its trigger, not its <dialog>'s own markup,
+    // which sits further down the page outside this row) is the first
+    // child of the roster-btn-row, ahead of the icon links.
+    const filterBtnIndex = res.text.indexOf("onclick=\"document.getElementById('grade-level-report-filter-dialog').showModal()\"");
+    const exportIndex = res.text.indexOf('/main-admin/members/grade-level-report/export.csv');
+    assert.ok(filterBtnIndex > -1 && exportIndex > -1);
+    assert.ok(filterBtnIndex < exportIndex, 'Filter button should come before the Export icon in source order');
+  });
 });
 

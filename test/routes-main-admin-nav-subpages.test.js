@@ -67,6 +67,9 @@ test('Main Admin sidebar: each accordion group lists its real subpages', async (
   assert.match(membersGroup[1], /href="\/main-admin\/members\?tab=approvals">Approvals</);
   assert.match(membersGroup[1], /href="\/main-admin\/members\?tab=archive">Archive</);
   assert.match(membersGroup[1], /href="\/main-admin\/members\?tab=settings">Settings</);
+  // A real request: "add a lock icon on each member. Add a subpage
+  // called locked" - added a 5th Members subpage.
+  assert.match(membersGroup[1], /href="\/main-admin\/members\?tab=locked">Locked</);
 });
 
 // A real request: "Main admin portal, chat, there should be a subpage
@@ -124,7 +127,9 @@ test('Mobile orange bar: every subpages-bearing item gets its own popup trigger 
   assert.equal(res.status, 200);
 
   const sections = [
-    { slug: 'members', tabCount: 4 },
+    // Locked (a real request: "add a lock icon on each member. Add a
+    // subpage called locked") added a 5th Members subpage.
+    { slug: 'members', tabCount: 5 },
     { slug: 'accounting', tabCount: 7 },
     // Contact Admin Messages (the new admin-facing inbox for the
     // Parent/Student/Teacher-facing Contact Admins page) added a 5th

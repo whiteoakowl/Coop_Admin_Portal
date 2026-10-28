@@ -71,6 +71,7 @@ const membershipApprovals = require('../utils/membershipApprovals');
 const membershipHandbook = require('../utils/membershipHandbook');
 const membershipFormFields = require('../utils/membershipFormFields');
 const gradeLevelSettings = require('../utils/gradeLevelSettings');
+const { listAccountingCategories } = require('../utils/events');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_members'));
@@ -148,7 +149,7 @@ function groupAttendanceByRoster(history) {
 // Members/Archive share the exact same roster-listing/pagination/search
 // code below (just showArchived flips), Approvals/Settings each fetch
 // their own small, unrelated dataset instead.
-const MEMBERS_TABS = ['members', 'approvals', 'settings', 'archive'];
+const MEMBERS_TABS = ['members', 'approvals', 'settings', 'archive', 'locked'];
 
 // A real request: "Membership fee and payment should be its own tab...
 // Membership form fields should be its own tab... Approval/denial named
@@ -166,6 +167,31 @@ router.get('/', async (req, res) => {
       title: 'Members',
       activeTab,
       pending: await membershipApprovals.listPendingRequests(),
+      error: req.query.error || null,
+      notice: req.query.notice || null,
+    });
+  }
+
+  // A real request: "add a lock icon on each member. Add a subpage
+  // called locked. be able to lock members" - every member whose portal
+  // account status is 'suspended' (middleware/portalAuth.js's own
+  // requirePortalAuth confines that status to /accounting - see that
+  // file's own matching comment). A member with no account at all has
+  // nothing to lock, so this is necessarily a subset of accounted-for
+  // members, not every member.
+  if (activeTab === 'locked') {
+    const lockedAccounts = await db
+      .prepare(
+        `SELECT m.*, ma.id AS "accountId", ma.email AS "accountEmail" FROM members m
+         JOIN member_accounts ma ON ma.member_id = m.id
+         WHERE ma.status = 'suspended'
+         ORDER BY LOWER(m.name)`
+      )
+      .all();
+    return res.render('main-admin-members', {
+      title: 'Members',
+      activeTab,
+      lockedMembers: lockedAccounts,
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -193,8 +219,10 @@ router.get('/', async (req, res) => {
       handbookHtml: await membershipHandbook.getHandbookHtml(),
       handbookFile: await membershipHandbook.getHandbookFile(),
       paymentInfo: await membershipHandbook.getPaymentInfo(),
+      accountingCategories: await listAccountingCategories(),
       parentFormFields: await membershipFormFields.listFields('parent'),
       childFormFields: await membershipFormFields.listFields('child'),
+      generalFormFields: await membershipFormFields.listFields('general'),
       fieldTypes: membershipFormFields.FIELD_TYPES,
       // A real request: "Under member settings add a tab called grade
       // level settings. Here is a list of graded levels. Next to each
@@ -212,11 +240,36 @@ router.get('/', async (req, res) => {
   const familyFilter = parseInt(req.query.family, 10) || null;
   const showArchived = activeTab === 'archive';
   const q = (req.query.q || '').trim().toLowerCase();
+  // A real request: "all filter buttons across the entire portal should
+  // have member name dropdown, family dropdown, section dropdown with
+  // check boxes, portal dropdown with check boxes, registered for
+  // classes blank, yes, no" - four more filter dimensions alongside the
+  // existing Type/Family: an exact member (memberIdFilter), any-of a set
+  // of Sections, any-of a set of Portal roles, and whether the member has
+  // at least one class enrollment on file at all (registeredFilter).
+  const memberIdFilter = parseInt(req.query.memberId, 10) || null;
+  const sectionFilter = [].concat(req.query.sectionIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  const roleFilter = [].concat(req.query.roleIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  const registeredFilter = ['yes', 'no'].includes(req.query.registered) ? req.query.registered : '';
 
   let withRosters = (await membersWithDetails(typeFilter, familyFilter))
     .filter((m) => (showArchived ? Number(m.active) === 0 : Number(m.active) === 1))
     .map((m) => ({ ...m, age: ageFromBirthday(m.birthday), birthdayLabel: m.birthday ? formatDateNumeric(m.birthday) : null }));
   if (q) withRosters = withRosters.filter((m) => m.name.toLowerCase().includes(q));
+  if (memberIdFilter) withRosters = withRosters.filter((m) => m.id === memberIdFilter);
+  if (sectionFilter.length > 0) {
+    const sectionIdsByMember = await sectionIdsForMembers(withRosters.map((m) => m.id));
+    withRosters = withRosters.filter((m) => sectionFilter.some((id) => (sectionIdsByMember[m.id] || new Set()).has(id)));
+  }
+  if (roleFilter.length > 0) {
+    const portalStatusByMember = await portalStatusForMembers(withRosters.map((m) => m.id));
+    withRosters = withRosters.filter((m) => roleFilter.some((id) => portalStatusByMember[m.id].roleIds.has(id)));
+  }
+  if (registeredFilter) {
+    const enrolledRows = await db.prepare('SELECT DISTINCT student_id AS "studentId" FROM class_enrollments').all();
+    const enrolledIds = new Set(enrolledRows.map((r) => r.studentId));
+    withRosters = withRosters.filter((m) => (registeredFilter === 'yes' ? enrolledIds.has(m.id) : !enrolledIds.has(m.id)));
+  }
 
   const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
   // A real bug report: "the dropdown for the last family on the page is
@@ -233,6 +286,18 @@ router.get('/', async (req, res) => {
   const sections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
   const roles = await db.prepare('SELECT * FROM roles ORDER BY label').all();
   const sectionIdsByMember = await sectionIdsForMembers(pageMemberIds);
+  // A real request: "add a lock icon on each member" - each row's own
+  // Lock button (views/main-admin-members.ejs) needs to know whether
+  // this member already has a portal account at all (nothing to lock
+  // without one) and, if so, whether it's already locked ('suspended'),
+  // to render correctly from a fresh page load, not just after a live
+  // toggle (public/js/member-row-actions.js).
+  const portalStatusByMember = await portalStatusForMembers(pageMemberIds);
+  // Member Name dropdown (members-type-filter.ejs) - every member on
+  // this same tab (active/archived), not just withRosters/the current
+  // page, so picking a name the current filter already excludes is still
+  // possible (same reasoning the Family dropdown above already follows).
+  const allMemberNames = await db.prepare('SELECT id, name FROM members WHERE active = ? ORDER BY LOWER(name)').all(showArchived ? 0 : 1);
 
   res.render('main-admin-members', {
     title: 'Members',
@@ -244,15 +309,25 @@ router.get('/', async (req, res) => {
       `/main-admin/members?tab=${activeTab}&` +
       (typeFilter ? `type=${typeFilter}&` : '') +
       (familyFilter ? `family=${familyFilter}&` : '') +
+      (memberIdFilter ? `memberId=${memberIdFilter}&` : '') +
+      sectionFilter.map((id) => `sectionIds=${id}&`).join('') +
+      roleFilter.map((id) => `roleIds=${id}&`).join('') +
+      (registeredFilter ? `registered=${registeredFilter}&` : '') +
       (q ? `q=${encodeURIComponent(q)}&` : ''),
     typeFilter,
     familyFilter,
+    memberIdFilter,
+    sectionFilter,
+    roleFilter,
+    registeredFilter,
     showArchived,
     q: req.query.q || '',
     families: await allFamilies(),
+    allMemberNames,
     sections,
     roles,
     sectionIdsByMember,
+    portalStatusByMember,
     avatarColorFor,
     error: req.query.error || null,
     notice: req.query.notice || null,
@@ -272,9 +347,13 @@ router.get('/print', async (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   const familyFilter = parseInt(req.query.family, 10) || null;
   const q = (req.query.q || '').trim().toLowerCase();
+  // A real request: "members, archive. add export, print and pdf icons" -
+  // the Archive tab's own copies of these icons carry archived=1 so this
+  // preview shows the ARCHIVED list, not the live one.
+  const showArchived = req.query.archived === '1';
 
   let withRosters = (await membersWithDetails(typeFilter, familyFilter))
-    .filter((m) => Number(m.active) === 1)
+    .filter((m) => (showArchived ? Number(m.active) === 0 : Number(m.active) === 1))
     .map((m) => ({ ...m, age: ageFromBirthday(m.birthday), birthdayLabel: m.birthday ? formatDateNumeric(m.birthday) : null }));
   if (q) withRosters = withRosters.filter((m) => m.name.toLowerCase().includes(q));
 
@@ -282,10 +361,11 @@ router.get('/print', async (req, res) => {
   const sectionIdsByMember = await sectionIdsForMembers(withRosters.map((m) => m.id));
 
   res.render('main-admin-members-print', {
-    title: 'Members Print Preview',
+    title: showArchived ? 'Archive Print Preview' : 'Members Print Preview',
     members: withRosters,
     typeFilter,
     familyFilter,
+    showArchived,
     q,
     families: await allFamilies(),
     sections,
@@ -304,9 +384,10 @@ router.get('/download.pdf', async (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   const familyFilter = parseInt(req.query.family, 10) || null;
   const q = (req.query.q || '').trim().toLowerCase();
+  const showArchived = req.query.archived === '1';
 
   let withRosters = (await membersWithDetails(typeFilter, familyFilter))
-    .filter((m) => Number(m.active) === 1)
+    .filter((m) => (showArchived ? Number(m.active) === 0 : Number(m.active) === 1))
     .map((m) => ({ ...m, age: ageFromBirthday(m.birthday), birthdayLabel: m.birthday ? formatDateNumeric(m.birthday) : null }));
   if (q) withRosters = withRosters.filter((m) => m.name.toLowerCase().includes(q));
 
@@ -314,10 +395,11 @@ router.get('/download.pdf', async (req, res) => {
   const sectionIdsByMember = await sectionIdsForMembers(withRosters.map((m) => m.id));
 
   const pdf = await renderViewToPdf(req, 'main-admin-members-print', {
-    title: 'Members Print Preview',
+    title: showArchived ? 'Archive Print Preview' : 'Members Print Preview',
     members: withRosters,
     typeFilter,
     familyFilter,
+    showArchived,
     q,
     families: await allFamilies(),
     sections,
@@ -325,7 +407,7 @@ router.get('/download.pdf', async (req, res) => {
     avatarColorFor,
     photoUrl: res.locals.photoUrl,
   });
-  sendPdf(res, `members${typeFilter ? '-' + typeFilter : ''}.pdf`, pdf);
+  sendPdf(res, `${showArchived ? 'archive' : 'members'}${typeFilter ? '-' + typeFilter : ''}.pdf`, pdf);
 });
 
 // A real request: "add member button, edit permissions button, edit,
@@ -335,9 +417,15 @@ router.get('/download.pdf', async (req, res) => {
 router.get('/export.csv', async (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   const familyFilter = parseInt(req.query.family, 10) || null;
-  const members = await membersWithDetails(typeFilter, familyFilter);
+  // A real request: "members, archive. add export, print and pdf icons" -
+  // the Archive tab's own copy carries archived=1 so this exports the
+  // ARCHIVED list specifically, instead of the live/import-ready export
+  // every member (active or not) below already defaults to.
+  const showArchived = req.query.archived === '1';
+  let members = await membersWithDetails(typeFilter, familyFilter);
+  if (showArchived) members = members.filter((m) => Number(m.active) === 0);
   const lines = memberImport.buildMembersExportCsvLines(members);
-  sendCsv(res, `members${typeFilter ? '-' + typeFilter : ''}.csv`, lines);
+  sendCsv(res, `${showArchived ? 'archive' : 'members'}${typeFilter ? '-' + typeFilter : ''}.csv`, lines);
 });
 
 router.get('/import-template.xlsx', (req, res) => {
@@ -525,18 +613,21 @@ router.post('/settings/handbook/file/delete', async (req, res) => {
 router.post('/settings/payment', async (req, res) => {
   const dollars = parseFloat(req.body.feeDollars || '0');
   const feeCents = Number.isFinite(dollars) ? Math.round(dollars * 100) : 0;
-  await membershipHandbook.setPaymentInfo(feeCents, (req.body.instructions || '').trim());
+  const categoryId = req.body.categoryId ? Number(req.body.categoryId) : null;
+  await membershipHandbook.setPaymentInfo(feeCents, (req.body.instructions || '').trim(), categoryId);
   res.redirect('/main-admin/members?tab=settings&settingsTab=fee-payment&notice=' + encodeURIComponent('Payment info saved.'));
 });
 
 // A real request: "under members in main admin portal there should be a
 // settings tab for editing and adding parts of the membership form."
-// target is 'parent' or 'child' - which repeatable block (Parent/
-// Guardian vs Student) the new question shows up under on both the
-// admin-entered Membership Form/Add Member forms and the public self-
-// registration application.
+// target is 'parent', 'child', or 'general' - which repeatable block
+// (Parent/Guardian vs Student) the new question shows up under, or
+// (general) asked once per application instead - on both the admin-
+// entered Membership Form/Add Member forms and the public self-
+// registration application. A real request: "add a general field
+// section."
 router.post('/settings/membership-fields', async (req, res) => {
-  const target = req.body.target === 'child' ? 'child' : 'parent';
+  const target = ['child', 'general'].includes(req.body.target) ? req.body.target : 'parent';
   const id = await membershipFormFields.createField(target, req.body.label, req.body.fieldType, req.body.options, req.body.isRequired === '1');
   if (!id) return res.redirect('/main-admin/members?tab=settings&settingsTab=form-fields&error=' + encodeURIComponent('A field label is required.'));
   res.redirect('/main-admin/members?tab=settings&settingsTab=form-fields&notice=' + encodeURIComponent('Field added.'));
@@ -813,6 +904,7 @@ router.get('/new', async (req, res) => {
     gradeLevels: GRADE_LEVELS,
     parentFields: await membershipFormFields.listFields('parent'),
     childFields: await membershipFormFields.listFields('child'),
+    generalFields: await membershipFormFields.listFields('general'),
     error: req.query.error || null,
     notice: null,
   });
@@ -843,17 +935,53 @@ router.post('/new', uploadIntakePhotos('/main-admin/members/new'), async (req, r
     return res.redirect(back + '?error=' + encodeURIComponent('Please add at least one student.'));
   }
 
+  // A real request: "parent/student should have an email and password
+  // text box" - both optional, but a short password is rejected outright
+  // (same 8-character floor the per-member Edit form's own Portal
+  // Settings password box enforces) rather than silently truncated or
+  // ignored, and setting one with no email to log in with makes no
+  // sense. Checked for everyone before any member is actually created,
+  // same "validate the whole family first" shape the parent/student
+  // count checks just above already use.
+  for (const p of parents) {
+    if (p.password && p.password.length < 8) {
+      return res.redirect(back + '?error=' + encodeURIComponent(`${p.name.trim()}'s password must be at least 8 characters.`));
+    }
+    if (p.password && !(p.email || '').trim()) {
+      return res.redirect(back + '?error=' + encodeURIComponent(`An email address is required to set a password for ${p.name.trim()}.`));
+    }
+  }
+  for (const c of children) {
+    if (c.password && c.password.length < 8) {
+      return res.redirect(back + '?error=' + encodeURIComponent(`${c.name.trim()}'s password must be at least 8 characters.`));
+    }
+    if (c.password && !(c.email || '').trim()) {
+      return res.redirect(back + '?error=' + encodeURIComponent(`An email address is required to set a password for ${c.name.trim()}.`));
+    }
+  }
+
   const familyId = await resolveIntakeFamilyId({ familyId: body.familyId, newFamilyName: body.newFamilyName, homeschoolDuration: body.homeschoolDuration });
 
+  let firstParentMemberId = null;
   for (const p of parents) {
-    await createParentMember(familyId, address, {
+    const parentMemberId = await createParentMember(familyId, address, {
       name: p.name.trim(),
       email: (p.email || '').trim() || null,
+      password: p.password || null,
       phone: (p.phone || '').trim() || null,
       isPrimaryParent: p.isPrimaryParent === '1',
       cleanupTeamId: parseInt(p.cleanupTeamId, 10) || null,
       customFieldValues: p.customFields,
     }, req.portalAccount.id);
+    if (firstParentMemberId == null) firstParentMemberId = parentMemberId;
+  }
+  // A real request: "add a general field section" - asked once per
+  // application (see views/member-intake-form.ejs's own matching
+  // comment), not once per parent/student, so its answers are recorded
+  // against the first parent on the form rather than duplicated across
+  // every family member.
+  if (firstParentMemberId != null) {
+    await membershipFormFields.saveFieldValues(firstParentMemberId, 'general', body.customFields);
   }
 
   for (const c of children) {
@@ -866,9 +994,12 @@ router.post('/new', uploadIntakePhotos('/main-admin/members/new'), async (req, r
         birthday: isValidISODate((c.birthday || '').trim()) ? c.birthday.trim() : null,
         gradeLevel: GRADE_LEVELS.includes(c.gradeLevel) ? c.gradeLevel : null,
         medicalNotes: (c.medicalNotes || '').trim() || null,
+        email: (c.email || '').trim() || null,
+        password: c.password || null,
         customFieldValues: c.customFields,
       },
-      photoFile
+      photoFile,
+      req.portalAccount.id
     );
   }
 
@@ -1360,6 +1491,32 @@ router.post('/:id/unarchive', async (req, res) => {
   await db.prepare('UPDATE members SET active = 1, archived_at = NULL WHERE id = ?').run(id);
   if (isFetch(req)) return res.json({ ok: true });
   res.redirect('/main-admin/members?tab=archive&notice=' + encodeURIComponent('Member reactivated.'));
+});
+
+// A real request: "add a lock icon on each member... be able to lock
+// members and they won't be able to log in, unless to see and pay their
+// account balance" - toggles member_accounts.status to/from 'suspended'
+// (middleware/portalAuth.js's own requirePortalAuth confines that status
+// to /accounting from here on). A member with no portal account at all
+// has nothing to lock - there's no login to block - so this is a no-op
+// error rather than silently creating one.
+router.post('/:id/lock', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const account = await db.prepare('SELECT id FROM member_accounts WHERE member_id = ?').get(id);
+  if (!account) {
+    if (isFetch(req)) return res.status(400).json({ ok: false, error: 'This member has no portal account to lock.' });
+    return res.redirect('/main-admin/members?error=' + encodeURIComponent('This member has no portal account to lock.'));
+  }
+  await db.prepare("UPDATE member_accounts SET status = 'suspended' WHERE id = ?").run(account.id);
+  if (isFetch(req)) return res.json({ ok: true });
+  res.redirect('/main-admin/members?notice=' + encodeURIComponent('Member locked.'));
+});
+
+router.post('/:id/unlock', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  await db.prepare("UPDATE member_accounts SET status = 'active' WHERE member_id = ? AND status = 'suspended'").run(id);
+  if (isFetch(req)) return res.json({ ok: true });
+  res.redirect('/main-admin/members?tab=locked&notice=' + encodeURIComponent('Member unlocked.'));
 });
 
 module.exports = router;

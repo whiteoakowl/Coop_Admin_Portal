@@ -103,3 +103,24 @@ test('Settings tab is a card grid, with a Sections card linking to /main-admin/s
   assert.doesNotMatch(gradeLevelsPage.text, /<div class="team-card-grid">/, 'a specific settings sub-page shows its own content, not the card grid');
   assert.match(gradeLevelsPage.text, /href="\/main-admin\/members\?tab=settings">&larr; Settings</);
 });
+
+// A real request: "Main admin portal. Members. Settings. All settings
+// pages should have the title of the page on the page." Every
+// settingsTab sub-page shows a heading matching its own Settings-grid
+// card label - approval-denial was the one gap (its own two Approval/
+// Denial Letter sections had no overall page title of their own).
+test('every Members > Settings sub-page shows its own title/heading on the page', async () => {
+  const cookie = await loginAsMainAdmin();
+  const pages = [
+    { settingsTab: 'grade-levels', heading: 'Grade Level Settings' },
+    { settingsTab: 'fee-payment', heading: 'Membership Fee &amp; Payment' },
+    { settingsTab: 'form-fields', heading: 'Membership Form Fields' },
+    { settingsTab: 'approval-denial', heading: 'Approval/Denial Messages' },
+    { settingsTab: 'handbook', heading: 'Policy Handbook' },
+  ];
+  for (const { settingsTab, heading } of pages) {
+    const res = await request(app).get(`/main-admin/members?tab=settings&settingsTab=${settingsTab}`).set('Cookie', cookie);
+    assert.equal(res.status, 200);
+    assert.match(res.text, new RegExp(`<h[12][^>]*>${heading}<`), `expected a visible heading for settingsTab=${settingsTab}`);
+  }
+});

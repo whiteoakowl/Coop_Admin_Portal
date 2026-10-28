@@ -9,36 +9,44 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Sections</h1>
-    <p class="hint">
-      A section is a named group of members (e.g. "Teen Co-op", "Homeschool Group A"), separate from Family. Events
-      and Classes can each optionally be restricted to specific sections only.
-    </p>
+    <%# A real request: "sections. remove description. add a section
+        button should have a pop up for being able to add a new section.
+        shrink to fit table on mobile." - the explanatory hint paragraph
+        that used to sit here is gone; + Add Section now opens a popup
+        dialog (same .member-picker-dialog shape every other "Add X"
+        popup on this site already uses) instead of an always-visible
+        inline form. %>
+    <div class="roster-toolbar no-print">
+      <h1>Sections</h1>
+      <div class="roster-btn-row">
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-section-dialog').showModal()">+ Add Section</button>
+      </div>
+    </div>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <form method="POST" action="/main-admin/sections/new" class="stack-form member-form-page-panel">
-      <div class="member-form-grid">
+    <dialog id="add-section-dialog" class="member-picker-dialog">
+      <h3>Add Section</h3>
+      <form method="POST" action="/main-admin/sections/new" class="stack-form">
         <label>Section Name
           <input type="text" name="name" placeholder="e.g. Teen Co-op" required />
         </label>
-        <label class="member-form-full">Description
+        <label>Description
           <input type="text" name="description" placeholder="Optional" />
         </label>
-      </div>
-      <div class="member-form-footer">
-        <div class="member-form-footer-edit">
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
           <button type="submit" class="primary-btn">+ Add Section</button>
         </div>
-      </div>
-    </form>
+      </form>
+    </dialog>
 
     <% if (sections.length === 0) { %>
       <p class="roster-empty">No sections yet - add one above.</p>
     <% } else { %>
       <div class="roster-scroll">
-        <table class="roster-table condensed-table">
+        <table class="roster-table condensed-table sections-table">
           <thead><tr><th>Name</th><th>Description</th><th>Members</th><th></th></tr></thead>
           <tbody>
             <% sections.forEach(function(s) { %>
@@ -46,9 +54,9 @@
                 <td class="roster-name-col"><a href="/main-admin/sections/<%= s.id %>"><%= s.name %></a></td>
                 <td><%= s.description || '—' %></td>
                 <td><%= s.memberCount %></td>
-                <td>
+                <td class="actions-cell">
                   <form method="POST" action="/main-admin/sections/<%= s.id %>/delete" class="inline-block-form" onsubmit="return confirm('Delete this section? Event/class restrictions using it will no longer apply.');">
-                    <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                    <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= s.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                   </form>
                 </td>
               </tr>

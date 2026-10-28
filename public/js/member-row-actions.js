@@ -34,8 +34,12 @@
     document.querySelectorAll(`[data-family-key="${CSS.escape(key)}"]`).forEach((r) => r.classList.remove('member-row-collapsed'));
   }
 
+  // The Locked tab's own list (views/main-admin-members.ejs) is a plain
+  // <table>, not the card-based Members/Archive list every other button
+  // here lives on - .member-row-card falls back to the closest <tr> so
+  // Unlock's own removeRow() still works there.
   function removeRow(btn) {
-    const row = btn.closest('.member-row-card');
+    const row = btn.closest('.member-row-card') || btn.closest('tr');
     if (!row) return;
     uncollapseFamily(row);
     row.remove();
@@ -109,6 +113,43 @@
         })
         .catch(() => {
           unarchiveBtn.disabled = false;
+        });
+      return;
+    }
+
+    // A real request: "add a lock icon on each member... be able to lock
+    // members" - Lock (live Members list) just disables itself in place
+    // once it succeeds: a locked member is still a member, just blocked
+    // from logging in, so there's no reason for the row itself to
+    // disappear from the list the way Archive's own does. Unlocking is
+    // the Locked tab's own job instead (its Unlock button below DOES
+    // remove the row - "this member no longer belongs on the view you're
+    // looking at," same as Archive/Reactivate above).
+    const lockBtn = e.target.closest('[data-member-lock-url]');
+    if (lockBtn) {
+      lockBtn.disabled = true;
+      postFetch(lockBtn.dataset.memberLockUrl)
+        .then((res) => {
+          if (!res.ok) throw new Error('Could not lock this member.');
+          lockBtn.setAttribute('title', 'Locked');
+          lockBtn.setAttribute('aria-label', lockBtn.getAttribute('aria-label').replace(/^Lock /, 'Locked '));
+        })
+        .catch(() => {
+          lockBtn.disabled = false;
+        });
+      return;
+    }
+
+    const unlockBtn = e.target.closest('[data-member-unlock-url]');
+    if (unlockBtn) {
+      unlockBtn.disabled = true;
+      postFetch(unlockBtn.dataset.memberUnlockUrl)
+        .then((res) => {
+          if (!res.ok) throw new Error('Could not unlock this member.');
+          removeRow(unlockBtn);
+        })
+        .catch(() => {
+          unlockBtn.disabled = false;
         });
     }
   });

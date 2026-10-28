@@ -57,13 +57,14 @@ router.post('/login', async (req, res) => {
       next,
     });
   }
-  if (account.status === 'suspended') {
-    return res.render('portal-login', { title: 'Member Login', error: 'This account has been suspended. Please contact an administrator.', notice: null, next });
-  }
-
   await db.prepare('UPDATE member_accounts SET last_login_at = now_text() WHERE id = ?').run(account.id);
   req.session.portalAccountId = account.id;
-  res.redirect(next);
+  // A real request: "be able to lock members and they won't be able to
+  // log in, unless to see and pay their account balance" - a 'suspended'
+  // (Locked) account now DOES get a session (middleware/portalAuth.js's
+  // own requirePortalAuth confines it to /accounting from there), rather
+  // than being blocked at login outright the way it used to be.
+  res.redirect(account.status === 'suspended' ? '/accounting?locked=1' : next);
 });
 
 router.post('/logout', (req, res) => {
@@ -140,6 +141,7 @@ router.get('/register', async (req, res) => {
     paymentInfo: await membershipHandbook.getPaymentInfo(),
     parentFields: await membershipFormFields.listFields('parent'),
     childFields: await membershipFormFields.listFields('child'),
+    generalFields: await membershipFormFields.listFields('general'),
   });
 });
 
@@ -155,6 +157,7 @@ async function renderRegisterError(res, error, formValues, children, additionalP
     paymentInfo: await membershipHandbook.getPaymentInfo(),
     parentFields: await membershipFormFields.listFields('parent'),
     childFields: await membershipFormFields.listFields('child'),
+    generalFields: await membershipFormFields.listFields('general'),
   });
 }
 
@@ -407,6 +410,12 @@ router.post('/register', uploadIntakePhotos('/register'), async (req, res) => {
 
   if (newParentMemberId != null) {
     await membershipFormFields.saveFieldValues(newParentMemberId, 'parent', req.body.customFields);
+    // A real request: "add a general field section" - asked once per
+    // application, recorded against the registering parent; same
+    // req.body.customFields object the 'parent' save just above reads,
+    // since saveFieldValues only pulls the keys matching the target it
+    // was called with (see utils/membershipFormFields.js's own comment).
+    await membershipFormFields.saveFieldValues(newParentMemberId, 'general', req.body.customFields);
   }
   for (const child of newChildMemberIds) {
     await membershipFormFields.saveFieldValues(child.memberId, 'child', child.customFields);
@@ -475,6 +484,12 @@ function sortForPortalSwitcher(roles) {
 
 router.get('/portal', async (req, res) => {
   if (!req.portalAccount) return res.redirect('/login?next=%2Fportal');
+  // A real request: "be able to lock members and they won't be able to
+  // log in, unless to see and pay their account balance" - this page
+  // doesn't go through middleware/portalAuth.js's own requirePortalAuth
+  // (its locked-redirect lives there), so a locked account needs the
+  // same check here directly.
+  if (req.portalAccount.status === 'suspended') return res.redirect('/accounting?locked=1');
   const roles = sortForPortalSwitcher(expandPortalRoles(req.portalRoles));
   if (roles.length === 1) return res.redirect(PORTAL_HOME_ROUTES[roles[0].key] || '/portal');
   res.render('portal-switcher', { title: 'My Portals', roles, portalHomeRoutes: PORTAL_HOME_ROUTES });
@@ -490,6 +505,7 @@ router.get('/portal', async (req, res) => {
 // button added per portal each time.
 router.get('/portal/settings', (req, res) => {
   if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fsettings');
+  if (req.portalAccount.status === 'suspended') return res.redirect('/accounting?locked=1');
   res.render('portal-settings', { title: 'Settings' });
 });
 

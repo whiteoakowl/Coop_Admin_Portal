@@ -156,3 +156,91 @@ test('a self-registered parent through /register saves a submitted custom field 
   const values = await membershipFormFields.valuesForMember(parent.id);
   assert.equal(values[id], 'Word of mouth');
 });
+
+// A real request: "Main admin portal. Members. Settings. Extra form
+// fields. Add a general field section." A third kind of extra question
+// (target 'general') asked once per application - shown in its own
+// "General Fields" section on Settings, and on the admin Add Member/
+// Membership Form and public application via the flat 'customFields'
+// top-level name (not nested under any one parent/student block),
+// saved against the first/registering parent.
+test('a General field is managed on Settings and shown on both the admin and public forms', async () => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+  const res = await request(app)
+    .post('/main-admin/members/settings/membership-fields')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ target: 'general', label: 'Referral Source', fieldType: 'short_text', _csrf: csrfToken });
+  assert.equal(res.status, 302);
+
+  const settingsPage = await request(app).get('/main-admin/members?tab=settings&settingsTab=form-fields').set('Cookie', cookie);
+  assert.match(settingsPage.text, /General Fields/);
+  assert.match(settingsPage.text, /Referral Source/);
+
+  const addMemberPage = await request(app).get('/main-admin/members/new').set('Cookie', cookie);
+  assert.match(addMemberPage.text, />General</);
+  assert.match(addMemberPage.text, /Referral Source/);
+
+  const { cookie: coopCookie } = await loginAsCoopAdmin();
+  const membershipFormPage = await request(app).get('/membership').set('Cookie', coopCookie);
+  assert.match(membershipFormPage.text, /Referral Source/);
+
+  const publicForm = await request(app).get('/register');
+  assert.match(publicForm.text, /Referral Source/);
+});
+
+test('a submitted General field answer is saved once, against the first parent, on the admin Add Member form', async () => {
+  const fields = await membershipFormFields.listFields('general');
+  const referralField = fields.find((f) => f.label === 'Referral Source');
+  assert.ok(referralField);
+
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+  const res = await request(app)
+    .post('/main-admin/members/new')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({
+      newFamilyName: 'GeneralFieldFamily',
+      'parents[0][name]': 'General Field Parent',
+      'parents[0][isPrimaryParent]': '1',
+      'children[0][name]': 'General Field Kid',
+      [`customFields[f${referralField.id}]`]: 'Facebook ad',
+      _csrf: csrfToken,
+    });
+  assert.equal(res.status, 302);
+
+  const parent = await db.prepare("SELECT id FROM members WHERE name = 'General Field Parent'").get();
+  assert.ok(parent);
+  const parentValues = await membershipFormFields.valuesForMember(parent.id);
+  assert.equal(parentValues[referralField.id], 'Facebook ad');
+
+  const child = await db.prepare("SELECT id FROM members WHERE name = 'General Field Kid'").get();
+  const childValues = await membershipFormFields.valuesForMember(child.id);
+  assert.equal(childValues[referralField.id], undefined, 'the general answer should not be duplicated onto the student');
+});
+
+test('a self-registered parent through /register saves a submitted General field answer', async () => {
+  const fields = await membershipFormFields.listFields('general');
+  const referralField = fields.find((f) => f.label === 'Referral Source');
+  assert.ok(referralField);
+
+  const res = await request(app)
+    .post('/register')
+    .type('form')
+    .send({
+      firstName: 'General',
+      lastName: 'Registrant',
+      email: 'general.registrant@example.com',
+      password: 'testpassword123',
+      confirmPassword: 'testpassword123',
+      handbookRead: '1',
+      [`customFields[f${referralField.id}]`]: 'Word of mouth',
+    });
+  assert.equal(res.status, 200);
+  assert.match(res.text, /Registration Submitted/);
+
+  const parent = await db.prepare("SELECT id FROM members WHERE LOWER(email) = 'general.registrant@example.com'").get();
+  assert.ok(parent);
+  const values = await membershipFormFields.valuesForMember(parent.id);
+  assert.equal(values[referralField.id], 'Word of mouth');
+});

@@ -5394,6 +5394,28 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 }
 .manage-section h2 { margin-top: 0; }
 
+/* A real request: "add member. remove descriptions. no individual cards
+   for each section just a distinctive line between each section" -
+   views/member-intake-form.ejs's own sections (Choose a Family, Family
+   Address, each Parent/Guardian, each Student) used .manage-section's
+   boxed-card look; this drops the background/border/shadow/padding box
+   in favor of a plain top divider between sections, scoped to just this
+   form (not .manage-section itself - that class is still a real card on
+   92 other pages). The first section has nothing above it to divide
+   from, so it gets no top border/spacing of its own. */
+.member-intake-section {
+  border-top: 1px solid var(--border);
+  padding-top: 1.5rem;
+  margin-top: 1.5rem;
+}
+.member-intake-section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+.member-intake-section h2 { margin-top: 0; display: flex; align-items: center; gap: 0.5rem; }
+.member-intake-section h2 .icon { width: 1.1rem; height: 1.1rem; }
+
 /* A real request: "when you click edit profile for a member, it should
    show the other parents and children's information as well for easy
    editing." Each other family member's own compact inline-edit card
@@ -5451,6 +5473,14 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 
 /* ---------- Settings ---------- */
 
+/* Main Admin Settings > Sections - a real request: "shrink to fit table
+   on mobile" - same smaller-font/tighter-padding shrink as .registrations-
+   table just above, scoped to just this table. */
+@media (max-width: 640px) {
+  .sections-table { font-size: 0.78rem; }
+  .sections-table th, .sections-table td { padding: 0.3rem 0.4rem; }
+}
+
 /* Main Admin Settings > Admins - a real request: "shrink admin table on
    mobile so that all information still fits clean on one row but you
    can see all of it at once." Same mobile-only compacting treatment as
@@ -5472,11 +5502,35 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
    (not just its text) actually fits without a sideways scroll. */
 .grade-level-settings-table th, .grade-level-settings-table td { white-space: normal; }
 .grade-level-settings-age-cell input[type="number"] { width: 4.5rem; display: inline-block; }
+/* The "Age" placeholder still read as a truncated "Ag" even after the
+   !important padding fix below - the browser's own number-input spin
+   buttons (Chromium draws these ~20px wide regardless of the input's own
+   width) were eating most of the already-narrow box, not the padding.
+   Hiding them frees that space back up for the placeholder/value; the
+   up/down arrow keys still work to step the value without the visible
+   buttons, so nothing is lost. */
+.grade-level-settings-age-cell input[type="number"] { -moz-appearance: textfield; }
+.grade-level-settings-age-cell input[type="number"]::-webkit-outer-spin-button,
+.grade-level-settings-age-cell input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 @media (max-width: 640px) {
   .grade-level-settings-table { font-size: 0.78rem; }
   .grade-level-settings-table th, .grade-level-settings-table td { padding: 0.35rem 0.5rem; }
-  .grade-level-settings-age-cell input[type="number"] { width: 3.5rem; }
-  .grade-level-settings-table input[type="date"] { width: 8.5rem; }
+  /* A real request: "shrink table so that you can view the date in the
+     dropdown menu" - shrinking these inputs' own width (above) without
+     also shrinking their padding left them with almost no room for
+     their actual value: the shared/default input padding (~0.55rem
+     0.8rem, line 203's own long :not() chain) alone ate most of a
+     3.5rem-wide number box or an 8.5rem-wide date box, squeezing the
+     digits (and the date picker's own mm/dd/yyyy + calendar icon) down
+     to a barely-visible sliver. !important needed - that base rule's
+     :not() chain out-specifies a plain two-class selector here, same
+     reasoning .admin-corner-search input's own matching comment
+     documents. */
+  .grade-level-settings-age-cell input[type="number"] { width: 3.5rem; padding: 0.35rem 0.4rem !important; }
+  .grade-level-settings-table input[type="date"] { width: 8.5rem; padding: 0.35rem 0.4rem !important; }
 }
 
 /* A real follow-up request: the above still wasn't tight enough to "fit
@@ -5488,8 +5542,8 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 @media (max-width: 480px) {
   .grade-level-settings-table { font-size: 0.7rem; border-collapse: separate; border-spacing: 0 0.15rem; }
   .grade-level-settings-table th, .grade-level-settings-table td { padding: 0.3rem 0.35rem; }
-  .grade-level-settings-age-cell input[type="number"] { width: 2.75rem; }
-  .grade-level-settings-table input[type="date"] { width: 7rem; padding: 0.3rem; }
+  .grade-level-settings-age-cell input[type="number"] { width: 2.75rem; padding: 0.3rem 0.3rem !important; }
+  .grade-level-settings-table input[type="date"] { width: 7rem; padding: 0.3rem !important; }
 }
 
 /* Main Admin Volunteers > Committees list - a real request: "shrink
@@ -7843,7 +7897,10 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
    scan down the list rather than needing its own separate dialog per
    family. */
 .edit-families-list { list-style: none; margin: 0 0 1rem; padding: 0; max-height: 50vh; overflow-y: auto; }
-.edit-families-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
+/* A real request: "adequate space between buttons, text bars and text" -
+   each row's own rename input/Save button/member count/Delete button sat
+   nearly flush against each other and their neighbors above/below. */
+.edit-families-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0; border-bottom: 1px solid var(--border); }
 .edit-families-row:last-child { border-bottom: none; }
 .edit-families-rename-form { display: flex; align-items: center; gap: 0.4rem; flex: 1 1 auto; min-width: 0; }
 .edit-families-rename-form input[type="text"] { flex: 1 1 auto; min-width: 0; }
@@ -7853,8 +7910,14 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
    new" row on top of the same rename/delete list shares the rename
    form's own input+button-inline layout above, with a bit of breathing
    room under it to separate it visually from the list below. */
-.manage-families-add-form { display: flex; align-items: flex-end; gap: 0.4rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
-.manage-families-add-form label { flex: 1 1 auto; min-width: 0; }
+.manage-families-add-form { display: flex; align-items: flex-end; gap: 0.75rem; margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
+/* A real request: "make sure there is adequate space between buttons,
+   text bars and text" - this label had no column layout of its own, so
+   "New Family Name" and its input ran together with no real gap (same
+   .stack-form label shape every other form on the site already uses for
+   this). The Add button next to it also sat right against the input -
+   the row's own gap above was widened too. */
+.manage-families-add-form label { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.35rem; font-weight: 600; font-size: 0.9rem; }
 .manage-families-add-form input[type="text"] { width: 100%; }
 
 /* Events > Settings > Add/Edit Category dialog - a real request: "the
@@ -8739,6 +8802,27 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
   .main-admin-members-btn-row .roster-action-btn {
     font-size: 0.72rem;
     padding: 0.35rem 0.5rem;
+  }
+  /* A real request: "Grade level report button should be on the same row
+     with add member button and add/edit family button. Shrink to fit to
+     make sure all three fit on the same row" - the shared shrink just
+     above still wrapped onto 2 rows under ~375px (Grade Level Report's
+     own label is the longest of the three) - this scopes a further
+     shrink to just this top row instead of every row on the page. */
+  .main-admin-members-top-row.roster-action-btn,
+  .main-admin-members-top-row .roster-action-btn {
+    font-size: 0.64rem;
+    padding: 0.3rem 0.4rem;
+  }
+  /* A real request: "Save grade level settings button and apply to all
+     members buttons should be on the same row, side by side mobile." -
+     their combined content width (both long labels) still wrapped to
+     2 rows inside .roster-btn-row-fit-text's own flex-wrap at this
+     breakpoint even with nowrap text - same shrink-to-fit scoping as
+     .main-admin-members-top-row just above. */
+  .grade-level-settings-btn-row .roster-action-btn {
+    font-size: 0.64rem;
+    padding: 0.3rem 0.35rem;
   }
   /* .class-schedule-archive-controls carries no flex-wrap of its own
      (every other page using it - Class Schedule's own archive controls -

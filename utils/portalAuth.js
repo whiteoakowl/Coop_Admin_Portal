@@ -106,7 +106,12 @@ async function familyForAccount(accountId) {
 // approved it) - Co-op Admin's own separate, older session-based admin
 // login has no such account to attribute it to, so it's null there,
 // which approved_by_account_id already allows.
-async function ensurePortalAccountForMember(memberId, email, createdByAccountId) {
+// password: a real request ("each parent/student should have an email
+// and password text box" on the Add Member form) - an admin filling out
+// this form can type the actual login password right there instead of
+// everyone starting on the same default; falls back to that default
+// ('changeme123') when left blank, same as before this parameter existed.
+async function ensurePortalAccountForMember(memberId, email, createdByAccountId, password) {
   const trimmedEmail = (email || '').trim();
   if (!trimmedEmail) return { status: 'no_email' };
   if (await findAccountByEmail(trimmedEmail)) return { status: 'email_in_use' };
@@ -114,7 +119,7 @@ async function ensurePortalAccountForMember(memberId, email, createdByAccountId)
     .prepare(
       "INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at, approved_by_account_id) VALUES (?, ?, ?, 'active', now_text(), ?)"
     )
-    .run(memberId, trimmedEmail, hashPassword('changeme123'), createdByAccountId || null);
+    .run(memberId, trimmedEmail, hashPassword(password || 'changeme123'), createdByAccountId || null);
   return { status: 'created' };
 }
 

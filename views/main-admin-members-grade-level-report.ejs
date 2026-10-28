@@ -24,7 +24,17 @@
     %>
     <div class="roster-toolbar no-print">
       <h1>Grade Level Report</h1>
-      <div class="roster-btn-row">
+      <%# A real request: "Filter button should be on the same row as the
+          icons and be first in the row" - Filter (a .roster-action-btn)
+          now shares one row with Export/Print/Download PDF (plain
+          .icon-btn) instead of its own row above them. roster-btn-row-
+          fit-text (content-sized flex-wrap, not the equal-width grid
+          data-fixed-columns used to opt into) sizes each to its own
+          content instead of forcing Filter's longer label and the small
+          square icons into equal columns - same fix already used
+          elsewhere for a mixed .roster-action-btn/.icon-btn row (see
+          views/admin-events-list.ejs's own matching comment). %>
+      <div class="roster-btn-row roster-btn-row-fit-text no-print">
         <%# A real request: "Add a filter for grade level report, orange
             button. Filter by section, schedule grid signup, family etc" -
             roster-action-btn is already this app's one orange toolbar
@@ -35,15 +45,6 @@
           <svg class="icon"><use href="#icon-filter"/></svg>
           Filter<% if (filterLabelParts.length > 0) { %>: <%= filterLabelParts.join(', ') %><% } %>
         </button>
-      </div>
-      <%# A real request: "icons and buttons should not be in columns,
-          they should be in rows" - this row's children are .icon-btn, not
-          .roster-action-btn/.btn-secondary, so public/js/roster-btn-row-
-          grid.js's own column-count calc (which only counts those) sees
-          zero items and never sets an explicit column count, leaving the
-          row's mobile `display: grid` (styles.css) at one implicit
-          column. %>
-      <div class="roster-btn-row" data-fixed-columns="3">
         <%# A real request: "all pages/subpages with print, export,
             import, or download buttons should be changed to icons... and
             have all four" - this page only had Print. %>

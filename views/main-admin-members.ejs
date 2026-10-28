@@ -23,7 +23,7 @@
         </div>
       </div>
     <% } %>
-    <h1><%= activeTab === 'approvals' ? 'Approvals' : activeTab === 'archive' ? 'Archive' : activeTab === 'settings' ? 'Settings' : 'Members' %></h1>
+    <h1><%= activeTab === 'approvals' ? 'Approvals' : activeTab === 'archive' ? 'Archive' : activeTab === 'locked' ? 'Locked' : activeTab === 'settings' ? 'Settings' : 'Members' %></h1>
 
     <%# A real request: "under members in main admin portal there should
         be a tab that says approvals... there should be another tab
@@ -87,7 +87,14 @@
             of an equal-width grid, same as .main-admin-members-btn-row's
             own shrink-font rule (styles.css) scoped to every row on this
             page. %>
-        <div class="roster-btn-row roster-btn-row-fit-text main-admin-members-btn-row no-print">
+        <%# A real request: "Grade level report button should be on the
+            same row with add member button and add/edit family button.
+            Shrink to fit to make sure all three fit on the same row" -
+            the shared .main-admin-members-btn-row shrink (styles.css)
+            still wrapped "Grade Level Report" onto its own line at
+            narrower phone widths (~360px and below); main-admin-members-
+            top-row shrinks this specific row further still. %>
+        <div class="roster-btn-row roster-btn-row-fit-text main-admin-members-btn-row main-admin-members-top-row no-print">
           <a class="roster-action-btn" href="/main-admin/members/new">+ Add Member</a>
           <%# A real request: "remove manage family blue bar and make it
               an orange button with the rest of the orange buttons that
@@ -126,15 +133,30 @@
           (styles.css's own :has(#bulk-edit-btn) rule) to leave it and
           Filter the room they need. %>
       <div class="members-search-filter-row no-print">
-        <%- include('partials/members-type-filter', { activeTab, typeFilter, familyFilter, families }) %>
+        <%- include('partials/members-type-filter', { activeTab, typeFilter, familyFilter, families, memberIdFilter, allMemberNames, sectionFilter, sections, roleFilter, roles, registeredFilter }) %>
         <% if (activeTab === 'members') { %>
           <button type="button" class="roster-action-btn" id="bulk-edit-btn">Bulk Edit</button>
+        <% } %>
+        <%# A real request: "members, archive. add export, print and pdf
+            icons. Filter button should be first in the row and the
+            icons next ti [to] the filter button in the same row." -
+            routes/main-admin-members.js's own GET /export.csv|/print|
+            /download.pdf each take archived=1 to scope to this tab's own
+            list instead of the live Members one. %>
+        <% if (activeTab === 'archive') { %>
+          <a class="icon-btn" href="/main-admin/members/export.csv?archived=1<%= typeFilter ? '&type=' + typeFilter : '' %><%= familyFilter ? '&family=' + familyFilter : '' %>" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+          <a class="icon-btn" href="/main-admin/members/print?archived=1<%= typeFilter ? '&type=' + typeFilter : '' %><%= familyFilter ? '&family=' + familyFilter : '' %><%= q ? '&q=' + encodeURIComponent(q) : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+          <a class="icon-btn" href="/main-admin/members/download.pdf?archived=1<%= typeFilter ? '&type=' + typeFilter : '' %><%= familyFilter ? '&family=' + familyFilter : '' %><%= q ? '&q=' + encodeURIComponent(q) : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
         <% } %>
 
         <form method="GET" action="/main-admin/members" class="members-search-bar">
           <input type="hidden" name="tab" value="<%= activeTab %>" />
           <input type="hidden" name="type" value="<%= typeFilter %>" />
           <input type="hidden" name="family" value="<%= familyFilter || '' %>" />
+          <input type="hidden" name="memberId" value="<%= memberIdFilter || '' %>" />
+          <% (sectionFilter || []).forEach(function(id) { %><input type="hidden" name="sectionIds" value="<%= id %>" /><% }); %>
+          <% (roleFilter || []).forEach(function(id) { %><input type="hidden" name="roleIds" value="<%= id %>" /><% }); %>
+          <input type="hidden" name="registered" value="<%= registeredFilter || '' %>" />
           <svg class="icon"><use href="#icon-search"/></svg>
           <input id="q-input" type="search" name="q" value="<%= q %>" placeholder="Search members&hellip;" aria-label="Search members" />
         </form>
@@ -412,6 +434,20 @@
                     delegated listener (public/js/member-row-actions.js)
                     matches by data attribute, not by living inside any
                     particular menu. %>
+                <%# A real request: "add a lock icon on each member...
+                    be able to lock members and they won't be able to
+                    log in, unless to see and pay their account
+                    balance." No account at all means nothing to lock -
+                    same disabled-icon-with-tooltip treatment Email/Phone
+                    above already use for "nothing on file." %>
+                <% var pStatus = (typeof portalStatusByMember !== 'undefined' ? portalStatusByMember[m.id] : null) || { account: null }; %>
+                <% if (!pStatus.account) { %>
+                  <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No portal account to lock"><svg class="icon"><use href="#icon-lock"/></svg></span>
+                <% } else if (pStatus.account.status === 'suspended') { %>
+                  <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="Locked"><svg class="icon"><use href="#icon-lock"/></svg></span>
+                <% } else { %>
+                  <button type="button" class="icon-btn" data-member-lock-url="/main-admin/members/<%= m.id %>/lock" aria-label="Lock <%= m.name %>" title="Lock"><svg class="icon"><use href="#icon-lock"/></svg></button>
+                <% } %>
                 <% if (showArchived) { %>
                   <%# A real request: "next to each members name under
                       archive there should be a button that says
@@ -476,6 +512,33 @@
                         <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete request from <%= p.primaryParentName %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                       </form>
                     </div>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    <% } else if (activeTab === 'locked') { %>
+      <%# A real request: "add a subpage called locked. be able to lock
+          members and they won't be able to log in, unless to see and
+          pay their account balance." lockedMembers comes from routes/
+          main-admin-members.js's own GET / (activeTab === 'locked'
+          branch) - every member whose portal account is currently
+          'suspended'. %>
+      <% if (lockedMembers.length === 0) { %>
+        <p class="roster-empty">No locked members.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Name</th><th>Email</th><th></th></tr></thead>
+            <tbody>
+              <% lockedMembers.forEach(function(m) { %>
+                <tr>
+                  <td class="roster-name-col"><a href="/main-admin/members/<%= m.id %>"><%= m.name %></a></td>
+                  <td><%= m.accountEmail %></td>
+                  <td class="actions-cell">
+                    <button type="button" class="icon-btn" data-member-unlock-url="/main-admin/members/<%= m.id %>/unlock" aria-label="Unlock <%= m.name %>" title="Unlock"><svg class="icon"><use href="#icon-unlock"/></svg></button>
                   </td>
                 </tr>
               <% }); %>
@@ -589,7 +652,7 @@
               confident about (a student matching no rule is left untouched
               - see the util's own comment), never blanks one out - not the
               same risk class as a delete. %>
-          <div class="roster-btn-row roster-btn-row-fit-text" data-fixed-columns="2">
+          <div class="roster-btn-row roster-btn-row-fit-text grade-level-settings-btn-row" data-fixed-columns="2">
             <button type="submit" form="grade-level-settings-form" class="roster-action-btn roster-action-btn-fit">Save Grade Level Settings</button>
             <form method="POST" action="/main-admin/members/settings/grade-levels/apply" class="inline-block-form" data-confirm="Set every matching student's grade level from their birthday, using the rules above? This overwrites their current Grade Level on the member form." data-confirm-yes-label="Apply" data-confirm-icon="icon-refresh" data-confirm-safe="1">
               <button type="submit" class="roster-action-btn roster-action-btn-fit">
@@ -611,6 +674,14 @@
             <label>Membership Fee (USD)
               <input type="number" name="feeDollars" min="0" step="0.01" value="<%= (paymentInfo.feeCents / 100).toFixed(2) %>" />
             </label>
+            <label>Payment Category
+              <select name="categoryId">
+                <option value="">None</option>
+                <% accountingCategories.forEach(function(c) { %>
+                  <option value="<%= c.id %>" <%= paymentInfo.categoryId === c.id ? 'selected' : '' %>><%= c.name %></option>
+                <% }); %>
+              </select>
+            </label>
             <label class="member-form-full">Payment Instructions
               <textarea name="instructions" rows="4" placeholder="e.g. Pay by cash, check, or Venmo once your registration is approved."><%= paymentInfo.instructions %></textarea>
             </label>
@@ -625,6 +696,11 @@
             the public self-registration application. %>
         <div class="manage-section">
           <h2>Membership Form Fields</h2>
+          <%# A real request: "add a general field section" - a third
+              kind of extra question, asked once per application instead
+              of once per parent or once per student (see views/member-
+              intake-form.ejs's own matching comment on where it's saved). %>
+          <%- include('partials/membership-fields-manager', { target: 'general', label: 'General', fields: generalFormFields, fieldTypes }) %>
           <%- include('partials/membership-fields-manager', { target: 'parent', label: 'Parent', fields: parentFormFields, fieldTypes }) %>
           <%- include('partials/membership-fields-manager', { target: 'child', label: 'Student', fields: childFormFields, fieldTypes }) %>
         </div>
@@ -635,7 +711,14 @@
             second real request: "approval and denial messages should
             have the same text editing icons we added to other chat
             boxes" - same forum-editor-toolbar/forum-editor.js rich-text
-            component the Policy Handbook editor uses. %>
+            component the Policy Handbook editor uses.
+            A real request: "all settings pages should have the title of
+            the page on the page" - every other settingsTab branch had
+            its own heading matching its card's own label (views/main-
+            admin-members.ejs's own card grid above); this one only had
+            the two individual letters' own h2s with nothing naming the
+            subpage itself. %>
+        <h2 class="no-print">Approval/Denial Messages</h2>
         <%
           // The two letters were plain text (newline-separated
           // paragraphs) before this editor existed - dropped straight
@@ -722,6 +805,7 @@
     <% } %>
   </main>
   <script src="/js/member-name-tag-request.js"></script>
+  <script src="/js/multi-select-checkbox.js"></script>
   <script src="/js/members-family-accordion.js"></script>
   <script src="/js/edit-families.js"></script>
   <script src="/js/archive-select-toggle.js"></script>

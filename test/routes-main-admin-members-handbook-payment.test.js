@@ -75,3 +75,38 @@ test('POST /main-admin/members/settings/payment saves the fee and instructions, 
   assert.match(publicForm.text, /125\.00/);
   assert.match(publicForm.text, /Pay by Venmo @coop once approved\./);
 });
+
+// A real request: "add a drop down menu for selecting which payment
+// category to use." The dropdown lists the existing Accounting
+// Categories (utils/events.js's own listAccountingCategories, same list
+// the manual Add Charge form on the Accounting page already uses), and
+// the selection persists across page loads.
+test('POST /main-admin/members/settings/payment saves and persists the chosen payment category', async () => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
+
+  const noCategoryPage = await request(app).get('/main-admin/members?tab=settings&settingsTab=fee-payment').set('Cookie', cookie);
+  assert.match(noCategoryPage.text, /Payment Category/);
+  assert.match(noCategoryPage.text, /<option value="">None<\/option>/);
+
+  const categoryRes = await request(app)
+    .post('/main-admin/accounting/accounting-categories')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ name: 'Membership Fees', code: 'MEMB', _csrf: csrfToken });
+  assert.equal(categoryRes.status, 302);
+
+  const pageWithCategory = await request(app).get('/main-admin/members?tab=settings&settingsTab=fee-payment').set('Cookie', cookie);
+  const optionMatch = /<option value="(\d+)"[^>]*>Membership Fees<\/option>/.exec(pageWithCategory.text);
+  assert.ok(optionMatch, 'expected the newly created category to appear as a dropdown option');
+  const categoryId = optionMatch[1];
+
+  const saveRes = await request(app)
+    .post('/main-admin/members/settings/payment')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ feeDollars: '150.00', instructions: 'Pay by check.', categoryId, _csrf: csrfToken });
+  assert.equal(saveRes.status, 302);
+
+  const afterSave = await request(app).get('/main-admin/members?tab=settings&settingsTab=fee-payment').set('Cookie', cookie);
+  assert.match(afterSave.text, new RegExp(`<option value="${categoryId}"[^>]*selected`));
+});

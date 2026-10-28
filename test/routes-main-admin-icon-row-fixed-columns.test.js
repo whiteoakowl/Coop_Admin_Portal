@@ -78,7 +78,16 @@ test('Main Admin pages: icon/button rows that the mobile grid JS cannot auto-cou
     // page's own coverage.
     { url: '/main-admin/photos', columns: 3 },
     { url: '/main-admin/admins', columns: 3 },
-    { url: '/main-admin/members/grade-level-report', columns: 3 },
+    // /main-admin/members/grade-level-report is deliberately NOT here any
+    // more - a later real request ("Grade level report. Filter button
+    // should be on the same row as the icons and be first in the row")
+    // moved this row to roster-btn-row-fit-text too, same reasoning (and
+    // same fix) as /main-admin/events and /main-admin/members just above/
+    // below - a mixed Filter (.roster-action-btn) + Export/Print/PDF
+    // (.icon-btn) row sized to its own content instead of a fixed-column
+    // grid, so it no longer carries data-fixed-columns at all. See
+    // test/routes-main-admin-members-grade-level-report.test.js for this
+    // page's own coverage.
     { url: '/main-admin/name-tags?tab=requests', columns: 3 },
     { url: `/main-admin/volunteers/signup-lists/${signupListId}`, columns: 3 },
     { url: `/main-admin/volunteers/volunteer-lists/${volunteerListId}`, columns: 3 },

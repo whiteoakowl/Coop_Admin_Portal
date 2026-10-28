@@ -20,11 +20,29 @@
 // combine them for the first time - e.g. "Students" in "the Smith
 // Family" at once.
 const selectedFamily = families.find(function (f) { return f.id === familyFilter; });
+// A real request: "all filter buttons across the entire portal should
+// have member name dropdown, family dropdown, section dropdown with
+// check boxes, portal dropdown with check boxes, registered for classes
+// blank, yes, no" - four fields alongside the existing Type/Family,
+// locals from routes/main-admin-members.js's own GET / handler.
+const msMemberIdFilter = typeof memberIdFilter !== 'undefined' ? memberIdFilter : null;
+const msAllMemberNames = typeof allMemberNames !== 'undefined' ? allMemberNames : [];
+const msSectionFilter = (typeof sectionFilter !== 'undefined' ? sectionFilter : []) || [];
+const msSections = typeof sections !== 'undefined' ? sections : [];
+const msRoleFilter = (typeof roleFilter !== 'undefined' ? roleFilter : []) || [];
+const msRoles = typeof roles !== 'undefined' ? roles : [];
+const msRegisteredFilter = typeof registeredFilter !== 'undefined' ? registeredFilter : '';
+const selectedMember = msAllMemberNames.find(function (m) { return m.id === msMemberIdFilter; });
 const filterLabelParts = [];
 if (typeFilter === 'parent') filterLabelParts.push('Parent');
 else if (typeFilter === 'student') filterLabelParts.push('Student');
 else if (typeFilter === 'admin') filterLabelParts.push('Admin');
 if (selectedFamily) filterLabelParts.push(selectedFamily.name + ' Family');
+if (selectedMember) filterLabelParts.push(selectedMember.name);
+if (msSectionFilter.length > 0) filterLabelParts.push(msSectionFilter.length + ' Section' + (msSectionFilter.length === 1 ? '' : 's'));
+if (msRoleFilter.length > 0) filterLabelParts.push(msRoleFilter.length + ' Portal' + (msRoleFilter.length === 1 ? '' : 's'));
+if (msRegisteredFilter === 'yes') filterLabelParts.push('Registered');
+else if (msRegisteredFilter === 'no') filterLabelParts.push('Not Registered');
 %>
 <button type="button" class="roster-action-btn" onclick="document.getElementById('members-filter-dialog').showModal()">
   <svg class="icon"><use href="#icon-filter"/></svg>
@@ -52,6 +70,44 @@ if (selectedFamily) filterLabelParts.push(selectedFamily.name + ' Family');
         </select>
       </div>
     <% } %>
+    <% if (msAllMemberNames.length > 0) { %>
+      <div class="category-filter">
+        <label for="members-filter-member-select">Member Name</label>
+        <select id="members-filter-member-select" name="memberId">
+          <option value="">Any Member</option>
+          <% msAllMemberNames.forEach(function(m) { %>
+            <option value="<%= m.id %>" <%= msMemberIdFilter === m.id ? 'selected' : '' %>><%= m.name %></option>
+          <% }); %>
+        </select>
+      </div>
+    <% } %>
+    <% if (msSections.length > 0) { %>
+      <div class="member-form-full">
+        <span class="checkbox-group-label">Section</span>
+        <%- include('multi-select-checkbox', {
+          name: 'sectionIds',
+          options: msSections.map(function(s) { return { value: s.id, label: s.name }; }),
+          selected: msSectionFilter.map(String),
+          placeholder: 'Any section',
+        }) %>
+      </div>
+    <% } %>
+    <% if (msRoles.length > 0) { %>
+      <div class="member-form-full">
+        <span class="checkbox-group-label">Portal</span>
+        <%- include('multi-select-checkbox', {
+          name: 'roleIds',
+          options: msRoles.map(function(r) { return { value: r.id, label: r.label }; }),
+          selected: msRoleFilter.map(String),
+          placeholder: 'Any portal',
+        }) %>
+      </div>
+    <% } %>
+    <div class="radio-group">
+      <label class="checkbox-option"><input type="radio" name="registered" value="" <%= !msRegisteredFilter ? 'checked' : '' %> /> Registered for Classes: Any</label>
+      <label class="checkbox-option"><input type="radio" name="registered" value="yes" <%= msRegisteredFilter === 'yes' ? 'checked' : '' %> /> Yes</label>
+      <label class="checkbox-option"><input type="radio" name="registered" value="no" <%= msRegisteredFilter === 'no' ? 'checked' : '' %> /> No</label>
+    </div>
     <div class="notes-dialog-actions">
       <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
       <button type="submit" class="primary-btn">Apply Filter</button>

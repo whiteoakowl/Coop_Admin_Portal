@@ -56,6 +56,27 @@
         <% }); %>
       </div>
 
+      <%# A real request: "Main admin portal. Members. Settings. Extra
+          form fields. Add a general field section." A third kind of
+          admin-defined question (utils/membershipFormFields.js's own
+          'general' target, alongside 'parent'/'child') for something
+          asked once per application rather than once per person - same
+          flat 'customFields' top-level namePrefix the Parent/Guardian
+          section above already uses (its own field ids never collide
+          with these, so sharing the same req.body.customFields object
+          is safe - see utils/membershipFormFields.js's own
+          saveFieldValues, which only reads the keys matching the target
+          it's called with). Only shown at all when an admin has actually
+          defined one, same as every other optional section here. %>
+      <% if (generalFields && generalFields.length > 0) { %>
+        <div class="form-section">
+          <h2>General</h2>
+          <% generalFields.forEach(function(f) { %>
+            <%- include('partials/membership-form-field', { field: f, namePrefix: 'customFields', values: formValues.customFields }) %>
+          <% }); %>
+        </div>
+      <% } %>
+
       <%# A real request: "There is a +child button. There should also
           be an add adult button." A second (or third, etc.) parent/
           guardian, kept in its own section rather than crowded into the

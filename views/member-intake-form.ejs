@@ -27,14 +27,19 @@
         with no standalone/single-member path at all. Add to an existing
         family's own Sections/Portal Permissions from the Members list's
         own "Edit Permissions" button instead of a separate form. %>
-    <p class="hint">Add a whole family in one submission - each parent and child still gets their own individual profile.</p>
-
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
+    <%# A real request: "remove descriptions. no individual cards for
+        each section just a distinctive line between each section" -
+        .member-intake-section (styles.css) replaces .manage-section's
+        own boxed-card look (border/shadow/background) with a plain top
+        divider between sections instead, scoped to just this form so
+        the other 92 pages that still use .manage-section as a real card
+        are untouched. %>
     <form method="POST" action="<%= formAction %>" enctype="multipart/form-data" id="member-intake-form" class="stack-form member-form-page-panel">
       <%# "Add/choose family should be at the top of the form." %>
-      <div class="manage-section member-form-section-box member-form-section-green">
+      <div class="member-intake-section">
         <h2><svg class="icon"><use href="#icon-users"/></svg> Choose a Family</h2>
         <label class="member-form-full">Select an Existing Family
           <select name="familyId">
@@ -49,7 +54,7 @@
         </label>
       </div>
 
-      <div class="manage-section">
+      <div class="member-intake-section">
         <h2>Family Address</h2>
         <div class="class-form-row">
           <div class="class-form-field">
@@ -81,11 +86,27 @@
         </div>
       </div>
 
+      <%# A real request: "Main admin portal. Members. Settings. Extra
+          form fields. Add a general field section." Same flat
+          'customFields' top-level name every general-target answer uses
+          site-wide (see views/portal-register.ejs's own matching
+          comment) - distinct from each parent/student block's own
+          nested 'parents[i][customFields]'/'children[i][customFields]',
+          so it's saved once per application rather than once per
+          person. Only shown when an admin has actually defined one. %>
+      <% if (generalFields && generalFields.length > 0) { %>
+        <div class="member-intake-section">
+          <h2>General</h2>
+          <% generalFields.forEach(function(f) { %>
+            <%- include('partials/membership-form-field', { field: f, namePrefix: 'customFields' }) %>
+          <% }); %>
+        </div>
+      <% } %>
+
       <h2>Parents / Guardians</h2>
-      <p class="hint">At least one parent is required. Add up to 4.</p>
       <div id="parents-list">
         <% for (var i = 0; i < 4; i++) { %>
-          <div class="manage-section" data-parent-block <%= i > 0 ? 'hidden' : '' %>>
+          <div class="member-intake-section" data-parent-block <%= i > 0 ? 'hidden' : '' %>>
             <h3>Parent/Guardian <%= i + 1 %><% if (i > 0) { %> (optional)<% } %></h3>
             <div class="class-form-row">
               <div class="class-form-field">
@@ -105,6 +126,18 @@
               <div class="class-form-field">
                 <span class="class-form-field-label">Phone</span>
                 <input type="tel" name="parents[<%= i %>][phone]" placeholder="(123) 456-7890" />
+              </div>
+            </div>
+            <%# A real request: "each parent should have an email and
+                password text boxes as well" - every parent already gets
+                a portal account automatically (ensurePortalAccountFor
+                Member, utils/memberIntake.js's own createParentMember),
+                starting on a shared default password; typing one here
+                sets their real login password at creation time instead. %>
+            <div class="class-form-row">
+              <div class="class-form-field">
+                <span class="class-form-field-label">Password</span>
+                <input type="text" name="parents[<%= i %>][password]" autocomplete="new-password" minlength="8" placeholder="Optional - at least 8 characters" />
               </div>
             </div>
             <%# "Adding to a setup/cleanup team should only show to
@@ -139,9 +172,8 @@
       <button type="button" id="add-parent-btn" class="btn-secondary">+ Add Another Parent</button>
 
       <h2>Students</h2>
-      <p class="hint">At least one student is required. Add as many as you need.</p>
       <div id="children-list">
-        <div class="manage-section" data-child-block>
+        <div class="member-intake-section" data-child-block>
           <h3>Student 1</h3>
           <div class="class-form-row">
             <div class="class-form-field">
@@ -168,6 +200,21 @@
               <textarea name="children[0][medicalNotes]" rows="2" placeholder="Enter any medical conditions, allergies, or important notes"></textarea>
             </div>
           </div>
+          <%# A real request: "student should have an email request and
+              password request line, not mandatory" - unlike a parent,
+              a student gets no portal account at all unless an email is
+              actually given here (createChildMember's own call to
+              ensurePortalAccountForMember no-ops with none). %>
+          <div class="class-form-row">
+            <div class="class-form-field">
+              <span class="class-form-field-label">Email (optional)</span>
+              <input type="email" name="children[0][email]" placeholder="name@example.com" />
+            </div>
+            <div class="class-form-field">
+              <span class="class-form-field-label">Password (optional)</span>
+              <input type="text" name="children[0][password]" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" />
+            </div>
+          </div>
           <div class="class-form-row">
             <div class="class-form-field">
               <span class="class-form-field-label">Photo</span>
@@ -186,7 +233,7 @@
           same "clone from a hidden <template>" pattern public/js/
           membership-form.js already uses for this exact purpose. %>
       <template id="child-block-template">
-        <div class="manage-section" data-child-block>
+        <div class="member-intake-section" data-child-block>
           <div class="roster-toolbar">
             <h3>Student</h3>
             <button type="button" class="icon-btn icon-btn-danger membership-remove-child" aria-label="Remove this student"><svg class="icon"><use href="#icon-trash"/></svg></button>
@@ -214,6 +261,16 @@
             <div class="class-form-field">
               <span class="class-form-field-label">Medical / Allergy Notes</span>
               <textarea name="children[__INDEX__][medicalNotes]" rows="2" placeholder="Enter any medical conditions, allergies, or important notes"></textarea>
+            </div>
+          </div>
+          <div class="class-form-row">
+            <div class="class-form-field">
+              <span class="class-form-field-label">Email (optional)</span>
+              <input type="email" name="children[__INDEX__][email]" placeholder="name@example.com" />
+            </div>
+            <div class="class-form-field">
+              <span class="class-form-field-label">Password (optional)</span>
+              <input type="text" name="children[__INDEX__][password]" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" />
             </div>
           </div>
           <div class="class-form-row">

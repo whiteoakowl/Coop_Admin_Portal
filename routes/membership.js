@@ -43,6 +43,7 @@ router.get('/membership', requireFullAdmin, async (req, res) => {
     gradeLevels: GRADE_LEVELS,
     parentFields: await membershipFormFields.listFields('parent'),
     childFields: await membershipFormFields.listFields('child'),
+    generalFields: await membershipFormFields.listFields('general'),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -73,17 +74,45 @@ router.post('/membership', requireFullAdmin, uploadIntakePhotos('/membership'), 
     return res.redirect(back + '?error=' + encodeURIComponent('Please add at least one student.'));
   }
 
+  // See routes/main-admin-members.js's own matching comment on its POST
+  // /new - same optional email/password validation, this form shares the
+  // exact same view/fields.
+  for (const p of parents) {
+    if (p.password && p.password.length < 8) {
+      return res.redirect(back + '?error=' + encodeURIComponent(`${p.name.trim()}'s password must be at least 8 characters.`));
+    }
+    if (p.password && !(p.email || '').trim()) {
+      return res.redirect(back + '?error=' + encodeURIComponent(`An email address is required to set a password for ${p.name.trim()}.`));
+    }
+  }
+  for (const c of children) {
+    if (c.password && c.password.length < 8) {
+      return res.redirect(back + '?error=' + encodeURIComponent(`${c.name.trim()}'s password must be at least 8 characters.`));
+    }
+    if (c.password && !(c.email || '').trim()) {
+      return res.redirect(back + '?error=' + encodeURIComponent(`An email address is required to set a password for ${c.name.trim()}.`));
+    }
+  }
+
   const familyId = await resolveFamilyId({ familyId: body.familyId, newFamilyName: body.newFamilyName, homeschoolDuration: body.homeschoolDuration });
 
+  let firstParentMemberId = null;
   for (const p of parents) {
-    await createParentMember(familyId, address, {
+    const parentMemberId = await createParentMember(familyId, address, {
       name: p.name.trim(),
       email: (p.email || '').trim() || null,
+      password: p.password || null,
       phone: (p.phone || '').trim() || null,
       isPrimaryParent: p.isPrimaryParent === '1',
       cleanupTeamId: parseInt(p.cleanupTeamId, 10) || null,
       customFieldValues: p.customFields,
     });
+    if (firstParentMemberId == null) firstParentMemberId = parentMemberId;
+  }
+  // A real request: "add a general field section" - see routes/main-
+  // admin-members.js's own matching POST /new comment.
+  if (firstParentMemberId != null) {
+    await membershipFormFields.saveFieldValues(firstParentMemberId, 'general', body.customFields);
   }
 
   for (const c of children) {
@@ -99,6 +128,8 @@ router.post('/membership', requireFullAdmin, uploadIntakePhotos('/membership'), 
         birthday: isValidISODate((c.birthday || '').trim()) ? c.birthday.trim() : null,
         gradeLevel: GRADE_LEVELS.includes(c.gradeLevel) ? c.gradeLevel : null,
         medicalNotes: (c.medicalNotes || '').trim() || null,
+        email: (c.email || '').trim() || null,
+        password: c.password || null,
         customFieldValues: c.customFields,
       },
       photoFile

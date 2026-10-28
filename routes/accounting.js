@@ -47,6 +47,7 @@ router.get('/', async (req, res) => {
   const overview = member ? await payments.accountOverviewForMember(member.id, req.query.year || 'current') : null;
   res.render('accounting-home', {
     title: 'Accounting',
+    locked: req.query.locked === '1',
     member,
     ...(overview || {}),
     invoicesTotalCents: overview ? sumCents(overview.invoices, 'amount_cents') : 0,

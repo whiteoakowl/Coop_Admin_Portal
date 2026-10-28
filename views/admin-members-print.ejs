@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <%# A real request: "members pdf and print. it should look like the
+      page on the website. It looks like code" - see views/main-admin-
+      members-print.ejs's own matching comment: this view was missing
+      the <base> tag that resolves its relative /css/styles.css,
+      /img/logo.png URLs during the internal req.app.render() the
+      Download PDF route (utils/pdfRender.js's renderViewToPdf) uses. %>
+  <% if (typeof pdfBaseUrl !== 'undefined' && pdfBaseUrl) { %><base href="<%= pdfBaseUrl %>/"><% } %>
   <%- include('partials/head', { title }) %>
 </head>
 <body class="admin-page">
