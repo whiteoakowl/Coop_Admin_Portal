@@ -10,6 +10,7 @@
 // settings tab."
 const db = require('../db');
 const notifications = require('./notifications');
+const { renderTemplate } = require('./notificationTemplates');
 const { byLastName } = require('./members');
 const { appSetting, setAppSetting } = require('./classSchedule');
 
@@ -135,13 +136,9 @@ async function decideSubmission(id, approve) {
     .prepare("UPDATE babysitter_profiles SET status = ?, decided_at = now_text(), updated_at = now_text() WHERE id = ?")
     .run(approve ? 'approved' : 'rejected', id);
   if (profile.submitted_by_account_id) {
-    await notifications.notify(profile.submitted_by_account_id, 'babysitter_submission_decided', {
-      title: approve ? 'Babysitter profile approved' : 'Babysitter profile not approved',
-      body: approve
-        ? 'Your babysitter profile is now approved and visible in the directory.'
-        : 'Your babysitter profile submission was not approved. Contact Main Admin for details.',
-      linkUrl: '/parent/babysitters',
-    });
+    const templateKey = approve ? 'babysitter_submission_decided_approved' : 'babysitter_submission_decided_rejected';
+    const rendered = await renderTemplate(templateKey, {});
+    await notifications.notify(profile.submitted_by_account_id, 'babysitter_submission_decided', { title: rendered.subject, body: rendered.body, linkUrl: '/parent/babysitters' });
   }
   return approve ? 'approved' : 'rejected';
 }

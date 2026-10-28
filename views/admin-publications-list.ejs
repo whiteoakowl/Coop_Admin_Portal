@@ -34,6 +34,8 @@
       </table>
     </div>
 
+    <%- include('partials/pagination-controls', { pagination, baseHref }) %>
+
     <dialog id="new-pub-dialog" class="member-picker-dialog">
       <form method="POST" action="/main-admin/publications">
         <h3>New Article</h3>

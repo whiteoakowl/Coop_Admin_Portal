@@ -19,6 +19,7 @@ const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = 
 const store = require('../utils/store');
 const auditLog = require('../utils/auditLog');
 const { byLastName } = require('../utils/members');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_store'));
 
@@ -82,6 +83,9 @@ router.get('/', async (req, res) => {
   let fulfillmentTotals = [];
   let analytics = null;
   let analyticsRange = 'month';
+  let pagination = null;
+  let viewingAll = false;
+  let baseHref = '';
   const storeSettings = await store.getStoreSettings();
 
   if (activeTab === 'products') {
@@ -92,7 +96,18 @@ router.get('/', async (req, res) => {
   } else if (activeTab === 'archived') {
     archived = (await store.listProducts({ status: 'archived' })).map(withImage);
   } else if (activeTab === 'orders') {
-    orders = await store.allOrders();
+    // Full, unbounded order history - never large enough to be a query
+    // bottleneck (see utils/pagination.js's own header comment), but
+    // unpaginated this rendered years of orders as one giant table.
+    const allOrders = await store.allOrders();
+    const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+    pagination = paginate(allOrders, parsePage(req.query.page), pageSize);
+    orders = pagination.items;
+    viewingAll = pageSize === Infinity;
+    // Preserves ?tab=orders on every pagination link - a bare "?page=2"
+    // would otherwise fall back to the Products tab (STORE_TABS default
+    // above) instead of staying on Orders.
+    baseHref = '/main-admin/store?tab=orders&';
     saleProducts = await Promise.all((await store.listProducts({ status: 'active', availability: 'in_person' })).map(withOptions));
     members = (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).sort(byLastName);
     // "button called fulfillment totals. Popup, show counts for all
@@ -119,6 +134,9 @@ router.get('/', async (req, res) => {
     analyticsRange,
     analyticsRanges: ANALYTICS_RANGES,
     storeSettings,
+    pagination,
+    viewingAll,
+    baseHref,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });

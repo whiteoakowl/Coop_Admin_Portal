@@ -18,7 +18,15 @@ module.exports = {
         // grandfathered ad hoc values, not yet migrated
         '480px', '500px', '720px', '760px', '800px', '900px',
       ],
-      'min-width': ['640px', '860px', '1100px', '1400px'],
+      'min-width': [
+        // canonical scale
+        '640px', '860px', '1100px', '1400px',
+        // grandfathered ad hoc values, not yet migrated - 641px/861px
+        // are the deliberate "one above" pairing for an adjacent
+        // max-width: 640px/860px rule, so the two never both match at
+        // the exact boundary pixel.
+        '641px', '861px',
+      ],
     },
 
     // Color-semantic convention: never re-type one of the palette's own

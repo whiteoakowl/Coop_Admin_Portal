@@ -262,6 +262,27 @@ test('album edit page: Save/Archive sit in one row, same size, and there is no D
   assert.match(listPage.text, new RegExp(`action="/main-admin/photos/${albumId}/delete"`));
 });
 
+// Pagination (Phase 4 audit item) - an album's photo grid can grow into
+// the hundreds, so it's paginated the same in-memory way as every other
+// ongoing list/log (utils/pagination.js).
+test('album edit page: photo grid is paginated, page 1 shows only the first page of photos', async () => {
+  const admin = await loginAsMainAdmin();
+  const albumId = await createAlbum(admin, 'members');
+  for (let i = 0; i < 55; i += 1) {
+    await db.prepare("INSERT INTO photo_album_photos (album_id, image_key, caption, status) VALUES (?, ?, ?, 'approved')").run(albumId, `key-${i}`, `Caption ${i}`);
+  }
+
+  const page1 = await request(app).get(`/main-admin/photos/${albumId}/edit`).set('Cookie', admin.cookie);
+  assert.equal(page1.status, 200);
+  assert.equal((page1.text.match(/class="team-info-card"/g) || []).length, 50, 'page 1 should show only the default 50-item page');
+  assert.match(page1.text, /class="pagination-bar no-print"/, 'pagination controls should render once there is more than one page');
+  assert.match(page1.text, /Showing 1&ndash;50 of 55/);
+
+  const page2 = await request(app).get(`/main-admin/photos/${albumId}/edit?page=2`).set('Cookie', admin.cookie);
+  assert.equal(page2.status, 200);
+  assert.equal((page2.text.match(/class="team-info-card"/g) || []).length, 5, 'page 2 should show the remaining 5 photos');
+});
+
 test('a draft publication 404s even by direct URL; publishing makes it visible', async () => {
   const admin = await loginAsMainAdmin();
   const createRes = await request(app).post('/main-admin/publications').set('Cookie', admin.cookie).type('form').send({ title: 'Season Update', _csrf: admin.csrfToken });
@@ -324,4 +345,31 @@ test('unpublishing removes a publication from the public listing again', async (
 
   const view = await request(app).get(`/publications/${id}`);
   assert.equal(view.status, 404);
+});
+
+// Pagination: years of articles used to render as one unbounded table
+// (utils/pagination.js's own in-memory paginate(), not a second SQL
+// round-trip - see its header comment).
+test('Main Admin Publications list paginates past the default page size', async () => {
+  const admin = await loginAsMainAdmin();
+  // A few publications already exist from earlier tests in this file -
+  // only the count ADDED here (past DEFAULT_PAGE_SIZE) matters.
+  const existingTotal = Number((await db.prepare('SELECT COUNT(*) AS n FROM publications').get()).n);
+  const ADDED_PUBLICATIONS = 55; // > utils/pagination.js's DEFAULT_PAGE_SIZE (50)
+  for (let i = 0; i < ADDED_PUBLICATIONS; i++) {
+    await db.prepare(`INSERT INTO publications (title, body_html) VALUES (?, '')`).run(`Bulk Article ${i}`);
+  }
+  const expectedTotal = existingTotal + ADDED_PUBLICATIONS;
+
+  const page1 = await request(app).get('/main-admin/publications').set('Cookie', admin.cookie);
+  assert.equal(page1.status, 200);
+  const rowCount = (page1.text.match(/<tr>\s*<td><a href="\/main-admin\/publications\//g) || []).length;
+  assert.equal(rowCount, 50, 'page 1 should show only the first 50 publications');
+  assert.match(page1.text, /class="pagination-bar no-print"/);
+  assert.match(page1.text, new RegExp(`Showing 1&ndash;50 of ${expectedTotal}`));
+  assert.match(page1.text, /href="\/main-admin\/publications\?page=2">Next/);
+
+  const page2 = await request(app).get('/main-admin/publications?page=2').set('Cookie', admin.cookie);
+  const page2RowCount = (page2.text.match(/<tr>\s*<td><a href="\/main-admin\/publications\//g) || []).length;
+  assert.equal(page2RowCount, expectedTotal - 50, 'page 2 should show the remaining publications');
 });

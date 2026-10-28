@@ -181,8 +181,14 @@ async function buildOrderLines(items, saleType) {
     for (const group of groups) {
       const chosen = group.values.find((v) => wantedIds.has(v.id));
       if (!chosen) throw new Error(`Choose a ${group.name} for "${product.name}".`);
-      if (chosen.quantity != null && quantity > chosen.quantity) {
-        throw new Error(`Only ${chosen.quantity} of "${product.name} - ${chosen.name}" left in stock.`);
+      // Checked and decremented in the one atomic UPDATE, not a separate
+      // SELECT-then-UPDATE - two buyers racing for the last of a limited
+      // option could otherwise both pass a plain `quantity > chosen.quantity`
+      // check (both reading the same not-yet-decremented row) before
+      // either's own decrement ever ran, overselling it.
+      if (chosen.quantity != null) {
+        const dec = await db.prepare('UPDATE store_product_options SET quantity = quantity - ? WHERE id = ? AND quantity >= ?').run(quantity, chosen.id, quantity);
+        if (dec.changes === 0) throw new Error(`Only ${chosen.quantity} of "${product.name} - ${chosen.name}" left in stock.`);
       }
       chosenValues.push({ ...chosen, groupName: group.name });
     }
@@ -191,20 +197,18 @@ async function buildOrderLines(items, saleType) {
       let sum = 0;
       let anyPriced = false;
       for (const value of chosenValues) {
-        if (value.quantity != null) {
-          await db.prepare('UPDATE store_product_options SET quantity = quantity - ? WHERE id = ?').run(quantity, value.id);
-        }
         if (value.price_cents != null) {
           sum += value.price_cents;
           anyPriced = true;
         }
       }
       unitPriceCents = anyPriced ? sum : product.price_cents;
-    } else if (product.inventory_count != null && quantity > product.inventory_count) {
-      throw new Error(`Only ${product.inventory_count} of "${product.name}" left in stock.`);
-    }
-    if (chosenValues.length === 0 && product.inventory_count != null) {
-      await db.prepare('UPDATE store_products SET inventory_count = inventory_count - ? WHERE id = ?').run(quantity, product.id);
+    } else if (product.inventory_count != null) {
+      // Same atomic check-and-decrement as the option quantity above -
+      // the plain pre-check this replaced raced the exact same way for a
+      // simple no-options product.
+      const dec = await db.prepare('UPDATE store_products SET inventory_count = inventory_count - ? WHERE id = ? AND inventory_count >= ?').run(quantity, product.id, quantity);
+      if (dec.changes === 0) throw new Error(`Only ${product.inventory_count} of "${product.name}" left in stock.`);
     }
     totalCents += unitPriceCents * quantity;
     lineItems.push({

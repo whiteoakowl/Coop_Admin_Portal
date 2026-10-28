@@ -38,6 +38,7 @@
           </div>
         <% }); %>
       </div>
+      <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref, viewingAll: viewingAll }) %>
     <% } %>
   </main>
 </body>

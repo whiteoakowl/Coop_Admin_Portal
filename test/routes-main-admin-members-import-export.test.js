@@ -145,6 +145,23 @@ test('GET /main-admin/members/export.csv exports the roster as CSV', async () =>
   assert.match(res.text, /Export Test Member/);
 });
 
+// A real bug: utils/memberImport.js's own buildMembersExportCsvLines
+// only ever distinguished 'parent' from everything else, so an
+// admin-type member (member_type 'admin' - see utils/adminPositions.js's
+// syncMemberAdminStatus) exported with "Student" in the Type column
+// instead of "Admin".
+test('GET /main-admin/members/export.csv labels an admin-type member as Admin, not Student', async () => {
+  const { cookie } = await loginAsMainAdmin();
+  await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Export Admin Member', 'export-admin-1', 'admin', 1)").run();
+
+  const res = await request(app).get('/main-admin/members/export.csv').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  const row = res.text.split('\n').find((line) => line.includes('Export Admin Member'));
+  assert.ok(row, 'the exported admin member should appear in the CSV');
+  assert.match(row, /,"Admin",/);
+  assert.doesNotMatch(row, /,"Student",/);
+});
+
 test('GET /main-admin/members/import-template.xlsx downloads the same template shape as Co-op Admin', async () => {
   const { cookie } = await loginAsMainAdmin();
   const res = await request(app).get('/main-admin/members/import-template.xlsx').set('Cookie', cookie).buffer(true).parse((response, callback) => {

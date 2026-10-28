@@ -234,7 +234,7 @@ test('Main Admin Accounting home: lists every active member, charge history or n
 // directly on the live, editable view.
 test('Main Admin Accounts list Print button links to a read-only print preview', async () => {
   const admin = await loginAsMainAdmin();
-  const parent = await createParentAccount();
+  await createParentAccount();
 
   const list = await request(app).get('/main-admin/accounting').set('Cookie', admin.cookie);
   assert.match(list.text, /href="\/main-admin\/accounting\/print"/);

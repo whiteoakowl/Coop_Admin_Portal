@@ -277,7 +277,17 @@
           as this dialog's own danger action instead of a bare icon
           sitting in the main toolbar. %>
       <dialog id="edit-week-dialog" class="class-form-dialog">
-        <form method="POST" action="/parent/family-school/weekly-planner/<%= selectedWeek.id %>/edit" class="stack-form">
+        <%# A <form> can't contain another <form> - a browser's HTML
+            parser silently drops a nested one, which left the "Delete
+            Week" button submitting this SAME edit form instead (and
+            the real edit form's own closing tag got consumed by the
+            delete form's stray </form>, so "Save Changes" ended up
+            outside any form at all and stopped submitting anything).
+            Fixed by keeping Delete Week's own <form> as a sibling
+            after this one closes, and pointing "Save Changes" back at
+            the edit form by id (the standard HTML `form` attribute)
+            instead of relying on DOM nesting. %>
+        <form method="POST" action="/parent/family-school/weekly-planner/<%= selectedWeek.id %>/edit" id="edit-week-form" class="stack-form">
           <div class="class-form-dialog-header">
             <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
             <h3>Edit Week</h3>
@@ -293,14 +303,14 @@
               <input type="date" name="date" value="<%= grid[i] ? grid[i].date : '' %>" <%= i === 0 ? 'required' : '' %> />
             </label>
           <% } %>
-          <div class="notes-dialog-actions">
-            <form method="POST" action="/parent/family-school/weekly-planner/<%= selectedWeek.id %>/delete" data-confirm="Delete &quot;<%= selectedWeek.title %>&quot;? This removes every assignment in it too." class="inline-block-form">
-              <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete Week</button>
-            </form>
-            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-            <button type="submit" class="primary-btn">Save Changes</button>
-          </div>
         </form>
+        <div class="notes-dialog-actions">
+          <form method="POST" action="/parent/family-school/weekly-planner/<%= selectedWeek.id %>/delete" data-confirm="Delete &quot;<%= selectedWeek.title %>&quot;? This removes every assignment in it too." class="inline-block-form">
+            <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete Week</button>
+          </form>
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" form="edit-week-form" class="primary-btn">Save Changes</button>
+        </div>
       </dialog>
     <% } %>
 

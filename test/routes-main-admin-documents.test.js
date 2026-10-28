@@ -249,3 +249,37 @@ test('each document card has its own edit icon, and scoping it to a few portals 
   const parentPage = await request(app).get('/parent/documents').set('Cookie', parentCookie);
   assert.doesNotMatch(parentPage.text, /Admins Only Doc/, 'a document scoped to coop_admin/main_admin only should not show up for a parent');
 });
+
+// Pagination: years of uploaded documents used to render as one
+// unbounded card grid (utils/pagination.js's own in-memory paginate(),
+// not a second SQL round-trip - see its header comment). The "Uploaded
+// Documents" manage popup still lists every document regardless of
+// page, since that's how an admin finds and deletes any of them.
+test('Documents page paginates past the default page size, and the manage popup still lists every document', async () => {
+  const { cookie } = await loginAsMainAdmin();
+  // A few documents already exist from earlier tests in this file -
+  // only the count ADDED here (past DEFAULT_PAGE_SIZE) matters.
+  const existingTotal = Number((await db.prepare('SELECT COUNT(*) AS n FROM documents').get()).n);
+  const ADDED_DOCUMENTS = 55; // > utils/pagination.js's DEFAULT_PAGE_SIZE (50)
+  for (let i = 0; i < ADDED_DOCUMENTS; i++) {
+    await db
+      .prepare(
+        `INSERT INTO documents (title, file_path, original_name, mime_type, public_token) VALUES (?, 'fake-path', 'fake.pdf', 'application/pdf', ?)`
+      )
+      .run(`Bulk Document ${i}`, `tok-${i}-${Date.now()}`);
+  }
+  const expectedTotal = existingTotal + ADDED_DOCUMENTS;
+
+  const page1 = await request(app).get('/main-admin/documents').set('Cookie', cookie);
+  assert.equal(page1.status, 200);
+  const cardCount = (page1.text.match(/class="document-card-wrap"/g) || []).length;
+  assert.equal(cardCount, 50, 'page 1 of the card grid should show only the first 50 documents');
+  assert.match(page1.text, /class="pagination-bar no-print"/);
+  assert.match(page1.text, new RegExp(`Showing 1&ndash;50 of ${expectedTotal}`));
+  assert.match(page1.text, /href="\/main-admin\/documents\?page=2">Next/);
+
+  // The manage popup's own "Uploaded Documents" list is unaffected by
+  // the grid's pagination - every document is still there to delete.
+  const manageRowCount = (page1.text.match(/class="document-manage-row"/g) || []).length;
+  assert.equal(manageRowCount, expectedTotal, 'the manage popup should still list every document, not just the current page');
+});

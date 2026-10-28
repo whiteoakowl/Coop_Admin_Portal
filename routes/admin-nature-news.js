@@ -8,13 +8,28 @@ const express = require('express');
 const router = express.Router();
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const natureNews = require('../utils/natureNews');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_publications'));
 
 router.get('/', async (req, res) => {
   const pending = await natureNews.listPending();
-  const approved = await natureNews.listApproved(20);
-  res.render('admin-nature-news', { title: 'Nature News', pending, approved, notice: req.query.notice || null });
+  // Was hard-capped at 20 (listApproved(20)) - same truncation problem
+  // every other ongoing list/log in the portal had, fixed the same way
+  // (utils/pagination.js's in-memory paginate(), not a second,
+  // differently-shaped SQL query).
+  const allApproved = await natureNews.listApproved();
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(allApproved, parsePage(req.query.page), pageSize);
+  res.render('admin-nature-news', {
+    title: 'Nature News',
+    pending,
+    approved: pagination.items,
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: '/main-admin/nature-news?',
+    notice: req.query.notice || null,
+  });
 });
 
 router.post('/:id/decide', async (req, res) => {

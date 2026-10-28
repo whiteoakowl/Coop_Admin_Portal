@@ -24,6 +24,7 @@ const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
 const { generateMemberCode } = require('../utils/members');
+const payments = require('../utils/payments');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -102,7 +103,6 @@ test('Category/Fiscal Year subpage: title+code popup, mobile-shrink table, and a
 test('New/Edit Invoice form: Family read-only, Category/Due Date/Admin Notes/Auto-Park persist, Split Invoice creates a 2nd charge, Email Family sends a notification', async () => {
   const admin = await loginAsMainAdmin();
   const memberId = await createMemberWithAccount('Kara Kalna');
-  const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(memberId);
 
   const categoriesPage = await request(app).get('/main-admin/accounting/categories').set('Cookie', admin.cookie);
   await request(app)
@@ -251,6 +251,30 @@ test('Adjustment Type: a refund records refund/exemption/credit/discount, shown 
 
   const memberPage3 = await request(app).get(`/main-admin/accounting/members/${memberId}`).set('Cookie', admin.cookie);
   assert.match(memberPage3.text, /Credit/);
+});
+
+test('a discount on a never-paid charge reduces the balance owed instead of vanishing it or re-billing the full amount', async () => {
+  const admin = await loginAsMainAdmin();
+  const memberId = await createMemberWithAccount('Discount Case');
+  const newInvoicePage = await request(app).get(`/main-admin/accounting/invoices/new?memberId=${memberId}`).set('Cookie', admin.cookie);
+  await request(app)
+    .post('/main-admin/accounting/invoices')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ memberId: String(memberId), description: 'Supply Fee', amount: '100.00', _csrf: extractCsrf(newInvoicePage.text) });
+  const charge = await db.prepare('SELECT * FROM payment_charges WHERE member_id = ?').get(memberId);
+  assert.equal(await payments.balanceForMember(memberId), 10000);
+
+  const memberPage = await request(app).get(`/main-admin/accounting/members/${memberId}`).set('Cookie', admin.cookie);
+  await request(app)
+    .post(`/main-admin/accounting/charges/${charge.id}/payments`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ direction: 'refund', amount: '30.00', adjustmentType: 'discount', _csrf: extractCsrf(memberPage.text) });
+
+  const afterDiscount = await db.prepare('SELECT status FROM payment_charges WHERE id = ?').get(charge.id);
+  assert.equal(afterDiscount.status, 'pending', 'a discount on an unpaid charge must not flip it to refunded');
+  assert.equal(await payments.balanceForMember(memberId), 7000, 'the $30 discount should reduce, not zero out, the $100 balance owed');
 });
 
 test('Accounts page toolbar: no more Past Due Only filter checkbox - two action buttons instead, each emailing a different audience', async () => {

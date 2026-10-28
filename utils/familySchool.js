@@ -21,19 +21,20 @@
 const db = require('../db');
 const fs = require('fs');
 const path = require('path');
-const { todayISO, formatDateLabel, formatDateLong } = require('./dates');
+const { formatDateLabel, formatDateLong } = require('./dates');
 const { byLastName } = require('./members');
 const { createStorageClient, uploadFile, deleteFile, downloadFile, generateKey } = require('./storage');
 const { urlForUpload } = require('./uploadBackend');
 // A real request: "Lesson plans... Be able to make lesson plans
 // available for parents to use to assign to students under family
-// school management, family classes." getLessonPlan/contentItemsForLessonPlan
-// are the same read helpers routes/admin-lesson-plans.js's own admin view
-// uses - a Family Classes lesson that references a plan (source_lesson_
-// plan_id, see createLesson/contentItemsForLesson below) reads its
-// content live from there, never a copy. isLessonPlanLocked is the one
-// shared lock lookup (see its own comment in utils/lessonPlans.js).
-const { getLessonPlan, contentItemsForLessonPlan, isLessonPlanLocked } = require('./lessonPlans');
+// school management, family classes." contentItemsForLessonPlan is the
+// same read helper routes/admin-lesson-plans.js's own admin view uses -
+// a Family Classes lesson that references a plan (source_lesson_plan_id,
+// see createLesson/contentItemsForLesson below) reads its content live
+// from there, never a copy (this file never needs the plan row itself,
+// or its locked flag - see contentItemsForReferencedLessonPlan's own
+// comment below on why).
+const { contentItemsForLessonPlan } = require('./lessonPlans');
 
 // Same bucket/local-dir convention routes/admin-members.js/routes/member-
 // directory.js already established for member photos - read-only reuse

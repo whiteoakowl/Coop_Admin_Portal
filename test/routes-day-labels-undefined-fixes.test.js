@@ -98,11 +98,9 @@ test('the Orientation tracker shows "Tuesday" in the Day column for a family enr
   const classId = await classSchedule.createClass({ day: 'tuesday', hourPosition: 1, className: 'Tuesday Orientation Class' });
 
   const familyId = (await db.prepare('INSERT INTO families (name) VALUES (?)').run('Orientation Tuesday Family')).lastInsertRowid;
-  const parentId = (
-    await db
-      .prepare("INSERT INTO members (name, barcode, member_type, family_id, is_primary_parent, active) VALUES (?, ?, 'parent', ?, 1, 1)")
-      .run('Orientation Tuesday Parent', 'orientation-tuesday-parent', familyId)
-  ).lastInsertRowid;
+  await db
+    .prepare("INSERT INTO members (name, barcode, member_type, family_id, is_primary_parent, active) VALUES (?, ?, 'parent', ?, 1, 1)")
+    .run('Orientation Tuesday Parent', 'orientation-tuesday-parent', familyId);
   const studentId = (
     await db
       .prepare("INSERT INTO members (name, barcode, member_type, family_id, active) VALUES (?, ?, 'student', ?, 1)")

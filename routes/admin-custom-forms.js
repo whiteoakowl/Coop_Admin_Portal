@@ -11,6 +11,7 @@ const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const customForms = require('../utils/customForms');
 const auditLog = require('../utils/auditLog');
 const { byLastName } = require('../utils/members');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_forms'));
 
@@ -110,8 +111,19 @@ router.post('/:id/assignments/:assignmentId/delete', async (req, res) => {
 router.get('/:id/submissions', async (req, res) => {
   const form = await customForms.getForm(req.params.id);
   if (!form) return res.status(404).render('404', { title: 'Not Found' });
-  const submissions = await customForms.submissionsForForm(form.id);
-  res.render('admin-custom-forms-submissions', { title: `Submissions - ${form.title}`, form, submissions });
+  // Grows every time someone submits that form - paginated in-memory
+  // the same way as every other ongoing list/log (utils/pagination.js).
+  const allSubmissions = await customForms.submissionsForForm(form.id);
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(allSubmissions, parsePage(req.query.page), pageSize);
+  res.render('admin-custom-forms-submissions', {
+    title: `Submissions - ${form.title}`,
+    form,
+    submissions: pagination.items,
+    pagination,
+    viewingAll: pageSize === Infinity,
+    baseHref: `/main-admin/forms/${form.id}/submissions?`,
+  });
 });
 
 router.get('/:id/submissions/:submissionId', async (req, res) => {

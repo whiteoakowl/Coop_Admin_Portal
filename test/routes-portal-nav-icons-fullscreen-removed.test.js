@@ -35,10 +35,6 @@ test.after(() => {
   fs.rmSync(testUploadsDir, { recursive: true, force: true });
 });
 
-function extractCsrf(html) {
-  return /name="csrf-token" content="([^"]*)"/.exec(html)[1];
-}
-
 test('Co-op Admin (admin-nav.ejs): no Full Screen View button/script, My Portals uses a computer icon, My Profile appears', async () => {
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   const cookie = loginRes.headers['set-cookie'];

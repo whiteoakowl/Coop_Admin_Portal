@@ -579,7 +579,7 @@ async function questionsForContentItem(contentItemId, { includeAnswerKey = false
     questions.map(async (q) => {
       if (q.type !== 'multiple_choice') return { ...q, choices: [] };
       const choices = await db.prepare('SELECT * FROM quiz_choices WHERE question_id = ? ORDER BY position, id').all(q.id);
-      return { ...q, choices: includeAnswerKey ? choices : choices.map(({ is_correct, ...c }) => c) };
+      return { ...q, choices: includeAnswerKey ? choices : choices.map(({ is_correct: _is_correct, ...c }) => c) };
     })
   );
 }

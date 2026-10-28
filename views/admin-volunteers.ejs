@@ -262,7 +262,7 @@
         straight away - Send Now is what actually fires the request
         (multipart/form-data, since the image rides along as a real
         file). %>
-    <dialog id="floater-text-notify-dialog" class="class-form-dialog">
+    <dialog id="floater-text-notify-dialog" class="class-form-dialog" data-message-template="<%= floaterMessageTemplate %>">
       <form id="floater-text-notify-form" class="stack-form">
         <div class="class-form-dialog-header">
           <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-mail"/></svg></span>

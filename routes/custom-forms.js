@@ -14,6 +14,7 @@ const db = require('../db');
 const { requirePortalAuth } = require('../middleware/portalAuth');
 const { familyForAccount } = require('../utils/portalAuth');
 const { createStorageClient, uploadFile, downloadFile, generateKey } = require('../utils/storage');
+const { lessonAttachmentFileFilter } = require('../utils/uploads');
 const customForms = require('../utils/customForms');
 
 router.use(requirePortalAuth);
@@ -42,7 +43,13 @@ if (!storageClient && !fs.existsSync(FORM_FILES_DIR)) {
 }
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES } });
+// Was missing a fileFilter entirely - every other upload route in this
+// app pairs its size limit with one (utils/uploads.js), checking the
+// declared mimetype against the real extension so a submitted file
+// can't be served back as a type it wasn't validated as. A form file
+// field is a document (e.g. a signed waiver), same set lesson/
+// assignment attachments already accept.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES }, fileFilter: lessonAttachmentFileFilter });
 
 async function roleIdsForAccount(req) {
   return req.portalRoles.map((r) => r.id);

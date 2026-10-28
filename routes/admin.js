@@ -23,6 +23,8 @@ const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginR
 const { setClassCheckinPin, verifyClassCheckinPin } = require('../utils/classCheckinPin');
 const fullscreenPinLimiter = require('../utils/classCheckinPinRateLimit');
 const { computeTrend } = require('../utils/dashboardTrends');
+const notificationTemplates = require('../utils/notificationTemplates');
+const auditLog = require('../utils/auditLog');
 
 // --- Auth ---
 
@@ -371,7 +373,7 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 // It should move to the documents page." - 'documents' is gone from here
 // too; that upload form and management list now live entirely on
 // /admin/documents itself (routes/admin-documents.js).
-const SETTINGS_TABS = ['account', 'classcheckin', 'kiosk', 'semesters', 'quicklinks', 'install'];
+const SETTINGS_TABS = ['account', 'classcheckin', 'kiosk', 'semesters', 'quicklinks', 'install', 'notificationtemplates'];
 const FULL_ADMIN_ONLY_TABS = ['account', 'classcheckin', 'kiosk', 'semesters'];
 
 async function renderSettings(req, res, error, success, activeTab) {
@@ -411,6 +413,15 @@ async function renderSettings(req, res, error, success, activeTab) {
     classDays: tab === 'semesters' ? CLASS_DAYS : null,
     classDayLabels: tab === 'semesters' ? CLASS_DAY_LABELS_FULL : null,
     classSchedules: tab === 'semesters' ? await listClassSchedules() : null,
+    // A real request: "Add a text/email notification settings card.
+    // There you can change the default message for different things
+    // like floater assignments, class wait list, event waitlist, event
+    // registration, class registration, etc." Same
+    // notification_message_templates rows the Main Admin portal's own
+    // /main-admin/notifications page edits - there's only one real
+    // message a member ever receives, so either portal editing it is
+    // the same save.
+    templates: tab === 'notificationtemplates' ? await notificationTemplates.allTemplates() : null,
     error,
     success,
   });
@@ -495,6 +506,21 @@ router.post('/settings/class-checkin-pin', requireAdmin, requireFullAdmin, async
   }
   await setClassCheckinPin(newPin);
   await renderSettings(req, res, null, 'Class Check-In PIN updated.', 'classcheckin');
+});
+
+router.post('/settings/notification-templates/:templateKey', requireAdmin, async (req, res) => {
+  if (!notificationTemplates.TEMPLATE_DEFINITIONS[req.params.templateKey]) return res.status(404).send('Not found');
+  await notificationTemplates.updateTemplate(req.params.templateKey, req.body.subject || '', req.body.body || '');
+  // audit_log.actor_account_id is a real FK against member_accounts -
+  // req.session.adminId (the single shared master-admin login) is a
+  // different id space entirely, not a member_accounts.id, so it can't
+  // be used here the way req.portalAccount.id is everywhere else audit
+  // logging happens. req.portalAccount is only set for a Co-op Admin
+  // reached via an individual portal role account, not the master login -
+  // null is the FK's own "no known actor" case (on delete set null), the
+  // same thing an already-deleted account's old log rows show.
+  await auditLog.record(req.portalAccount ? req.portalAccount.id : null, 'notification_message_template_updated', 'notification_message_template', null, req.params.templateKey);
+  await renderSettings(req, res, null, 'Message saved.', 'notificationtemplates');
 });
 
 // A real request: "there should be a code request to exit full screen

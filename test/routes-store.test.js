@@ -152,6 +152,59 @@ test('inventory is checked live and decremented, rejecting an order that exceeds
   assert.equal(product.inventory_count, 0);
 });
 
+// A real bug, same shape as the plain inventory_count check above but for
+// a per-option quantity (e.g. "Size L: 1 left") - this path had no test
+// coverage at all. Both the plain-product and per-option stock checks
+// used to be a plain SELECT (read the live quantity) followed by a
+// separate UPDATE (decrement it); two buyers racing for the last one
+// could both read "1 left" before either's own decrement committed, both
+// pass, and both get an order, leaving the count negative (oversold).
+// Fixed to one atomic `UPDATE ... WHERE quantity >= ?` per stock check
+// (see utils/store.js's own buildOrderLines) - this just exercises that
+// a second buyer for an option already decremented to 0 is correctly
+// rejected, not charged, and never drives it negative.
+test('a limited product option is checked and decremented live, rejecting a buyer once it is gone', async () => {
+  const admin = await loginAsMainAdmin();
+  const productId = await createActiveProduct(admin, { name: 'Limited Shirt' });
+  await request(app)
+    .post(`/main-admin/store/${productId}`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({
+      name: 'Limited Shirt',
+      price: '15.00',
+      availability: 'both',
+      'groups[0][name]': 'Size',
+      'groups[0][values][0][name]': 'Large',
+      'groups[0][values][0][qty]': '2',
+      'groups[0][values][0][enabled]': '1',
+      _csrf: admin.csrfToken,
+    });
+  const optionValue = await db.prepare("SELECT spo.id FROM store_product_options spo JOIN store_product_option_groups g ON g.id = spo.group_id WHERE g.product_id = ? AND spo.name = 'Large'").get(productId);
+
+  // Takes 1 of the 2 in stock, leaving exactly 1.
+  const parentA = await createParentAccount();
+  const boughtRes = await request(app)
+    .post(`/store/${productId}/buy`)
+    .set('Cookie', parentA.cookie)
+    .type('form')
+    .send({ memberId: String(parentA.memberId), quantity: '1', 'optionValues[0]': String(optionValue.id), _csrf: parentA.csrfToken });
+  assert.match(boughtRes.headers.location, /\/store\/orders\/\d+/);
+
+  // Asks for 2 more when only 1 is actually left - rejected, and the
+  // live quantity must not have been touched (still 1, not -1).
+  const parentB = await createParentAccount();
+  const rejectedRes = await request(app)
+    .post(`/store/${productId}/buy`)
+    .set('Cookie', parentB.cookie)
+    .type('form')
+    .send({ memberId: String(parentB.memberId), quantity: '2', 'optionValues[0]': String(optionValue.id), _csrf: parentB.csrfToken });
+  assert.match(decodeURIComponent(rejectedRes.headers.location), /Only 1 of "Limited Shirt - Large" left in stock/);
+
+  const value = await db.prepare('SELECT quantity FROM store_product_options WHERE id = ?').get(optionValue.id);
+  assert.equal(value.quantity, 1, 'the rejected order should not have decremented the option quantity');
+});
+
 test('cancelling an order restores inventory and cancels its charge instead of leaving it owed', async () => {
   const admin = await loginAsMainAdmin();
   const productId = await createActiveProduct(admin, { name: 'Cancel Me', inventoryCount: '5' });
@@ -202,8 +255,8 @@ test('an account cannot buy for a member outside its own family, and cannot view
 
 test('a real request: "storefront view of product should look exactly like this" - photo on top, name, a price + dot-style in-stock row, and a View button', async () => {
   const admin = await loginAsMainAdmin();
-  const inStockId = await createActiveProduct(admin, { name: 'Card In Stock Widget', inventoryCount: '3' });
-  const outOfStockId = await createActiveProduct(admin, { name: 'Card Out Of Stock Widget', inventoryCount: '0' });
+  await createActiveProduct(admin, { name: 'Card In Stock Widget', inventoryCount: '3' });
+  await createActiveProduct(admin, { name: 'Card Out Of Stock Widget', inventoryCount: '0' });
   const parent = await createParentAccount();
 
   const page = await request(app).get('/store').set('Cookie', parent.cookie);

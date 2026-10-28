@@ -464,8 +464,7 @@ router.post('/:id/register', requirePortalAuth, async (req, res) => {
     return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent(result.error));
   }
 
-  const event = await events.getEvent(eventId);
-  await notifications.notify(req.portalAccount.id, 'event_registration', { title: `Registered: ${event.title}`, body: result.notice, linkUrl: back });
+  await notifications.notify(req.portalAccount.id, 'event_registration', { title: result.subject, body: result.notice, linkUrl: back });
   if (wantsJson(req)) return res.json({ ok: true, notice: result.notice });
   res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent(result.notice));
 });

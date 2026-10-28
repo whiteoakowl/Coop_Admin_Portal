@@ -91,7 +91,11 @@ async function sendAnnouncement({ title, body, targets, sentByAccountId, sentByP
 // own email_campaigns already use - saves a row now, an estimated
 // recipient_count for display, and nothing is notified until
 // sendScheduledAnnouncement actually runs.
-async function scheduleAnnouncement({ title, body, targets, scheduledAt, sentByAccountId, sentByPortal }) {
+// sentByAccountId isn't accepted here (unlike sendAnnouncement above) -
+// announcement_log has no scheduled-by column to put it in, so callers
+// passing one (e.g. routes/main-admin-announcements.js's own
+// req.portalAccount.id) has always been a no-op.
+async function scheduleAnnouncement({ title, body, targets, scheduledAt, sentByPortal }) {
   const normalizedTargets = normalizeTargets(targets);
   const estimatedCount = (await accountIdsForTargets(normalizedTargets)).size;
   const info = await db
@@ -132,8 +136,15 @@ function targetLabels(targets, roleLabelByKey) {
   });
 }
 
+// limit=25 by default; both Communication pages' own "Past Announcements"
+// list pass limit: null to fetch every row with no LIMIT clause at all,
+// ahead of their own in-memory pagination (utils/pagination.js - see its
+// own header comment on why that's the right place to paginate, not a
+// second SQL round-trip here).
 async function listAnnouncementLog(limit = 25) {
-  const rows = await db.prepare('SELECT * FROM announcement_log ORDER BY created_at DESC LIMIT ?').all(limit);
+  const hasLimit = limit !== null && limit !== undefined;
+  const sql = `SELECT * FROM announcement_log ORDER BY created_at DESC${hasLimit ? ' LIMIT ?' : ''}`;
+  const rows = hasLimit ? await db.prepare(sql).all(limit) : await db.prepare(sql).all();
   return rows.map((r) => ({ ...r, targets: JSON.parse(r.targets || '[]') }));
 }
 

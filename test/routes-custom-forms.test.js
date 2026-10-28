@@ -128,6 +128,32 @@ test('an unassigned published form is open to any signed-in account, and answers
   assert.equal(byField.get(subField.id), '1');
 });
 
+// Pagination (Phase 4 audit item) - a form's submissions list grows
+// every time someone submits it, so it's paginated the same in-memory
+// way as every other ongoing list/log (utils/pagination.js).
+test('admin submissions list is paginated, page 1 shows only the first page of submissions', async () => {
+  const admin = await loginAsMainAdmin();
+  const formId = await createAndPublishForm(admin, 'Pagination Test Form');
+
+  for (let i = 0; i < 55; i += 1) {
+    const code = await generateMemberCode();
+    const memberInfo = await db
+      .prepare("INSERT INTO members (name, barcode, member_code, member_type, active) VALUES (?, ?, ?, 'parent', 1)")
+      .run(`Submitter ${i}`, code, code);
+    await db.prepare('INSERT INTO custom_form_submissions (form_id, member_id) VALUES (?, ?)').run(formId, memberInfo.lastInsertRowid);
+  }
+
+  const page1 = await request(app).get(`/main-admin/forms/${formId}/submissions`).set('Cookie', admin.cookie);
+  assert.equal(page1.status, 200);
+  assert.equal((page1.text.match(/Submitter \d+/g) || []).length, 50, 'page 1 should show only the default 50-item page');
+  assert.match(page1.text, /class="pagination-bar no-print"/, 'pagination controls should render once there is more than one page');
+  assert.match(page1.text, /Showing 1&ndash;50 of 55/);
+
+  const page2 = await request(app).get(`/main-admin/forms/${formId}/submissions?page=2`).set('Cookie', admin.cookie);
+  assert.equal(page2.status, 200);
+  assert.equal((page2.text.match(/Submitter \d+/g) || []).length, 5, 'page 2 should show the remaining 5 submissions');
+});
+
 test('multiple_choice stores every selected option, and required fields block submission when missing', async () => {
   const admin = await loginAsMainAdmin();
   const formId = await createAndPublishForm(admin, 'Volunteer Interests');
@@ -246,4 +272,43 @@ test('an account cannot submit a form for a member outside its own family', asyn
 
   const row = await db.prepare('SELECT 1 FROM custom_form_submissions WHERE form_id = ? AND member_id = ?').get(formId, parentB.memberId);
   assert.equal(row, undefined);
+});
+
+// A real gap: the upload for a 'file' field's answer had no fileFilter at
+// all (unlike every other upload route in this app - see utils/uploads.js),
+// so anything could be submitted as a "signed waiver." lessonAttachmentFileFilter
+// now gates it the same way an assignment attachment already is.
+test('a file field rejects a disallowed file type but accepts a real document', async () => {
+  const admin = await loginAsMainAdmin();
+  const formId = await createAndPublishForm(admin, 'Waiver Upload');
+  await request(app)
+    .post(`/main-admin/forms/${formId}/fields`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ fieldType: 'file', label: 'Signed Waiver', _csrf: admin.csrfToken });
+  const field = await db.prepare('SELECT id FROM custom_form_fields WHERE form_id = ?').get(formId);
+
+  const parent = await createParentAccount();
+
+  const rejected = await request(app)
+    .post(`/forms/${formId}/submit?_csrf=` + encodeURIComponent(parent.csrfToken))
+    .set('Cookie', parent.cookie)
+    .field('memberId', String(parent.memberId))
+    .attach(`field_${field.id}`, Buffer.from('<script>alert(1)</script>'), { filename: 'waiver.html', contentType: 'text/html' });
+  assert.equal(rejected.status, 302);
+  const rejectedSubmission = await db.prepare('SELECT id FROM custom_form_submissions WHERE form_id = ? AND member_id = ?').get(formId, parent.memberId);
+  const rejectedAnswer = await db.prepare('SELECT value_text FROM custom_form_answers WHERE submission_id = ? AND field_id = ?').get(rejectedSubmission.id, field.id);
+  assert.ok(!rejectedAnswer.value_text, 'a disallowed file type must be dropped by the fileFilter, never stored');
+
+  await db.prepare('DELETE FROM custom_form_submissions WHERE id = ?').run(rejectedSubmission.id);
+
+  const accepted = await request(app)
+    .post(`/forms/${formId}/submit?_csrf=` + encodeURIComponent(parent.csrfToken))
+    .set('Cookie', parent.cookie)
+    .field('memberId', String(parent.memberId))
+    .attach(`field_${field.id}`, Buffer.from('%PDF-1.4 fake pdf contents'), { filename: 'waiver.pdf', contentType: 'application/pdf' });
+  assert.match(accepted.headers.location, new RegExp(`/forms/${formId}/mine/${parent.memberId}`));
+  const submission = await db.prepare('SELECT id FROM custom_form_submissions WHERE form_id = ? AND member_id = ?').get(formId, parent.memberId);
+  const answer = await db.prepare('SELECT value_text FROM custom_form_answers WHERE submission_id = ? AND field_id = ?').get(submission.id, field.id);
+  assert.ok(answer && answer.value_text, 'an allowed document type must be stored');
 });

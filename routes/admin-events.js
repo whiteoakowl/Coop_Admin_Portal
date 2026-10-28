@@ -14,7 +14,7 @@ const path = require('path');
 const fs = require('fs');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const { requirePortalPermission } = require('../middleware/portalAuth');
-const { imageFileFilter } = require('../utils/uploads');
+const { imageFileFilter, spreadsheetFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, generateKey } = require('../utils/storage');
 const { formatFriendlyTimestamp, formatFriendlyDateAndTime, formatDateLabel } = require('../utils/dates');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
@@ -34,6 +34,7 @@ const {
   signUpForShift,
 } = require('../utils/committeesAndSignupLists');
 const { notify } = require('../utils/notifications');
+const { renderTemplate } = require('../utils/notificationTemplates');
 const { mapWithConcurrency } = require('../utils/concurrency');
 const auditLog = require('../utils/auditLog');
 const { findMemberByBarcodeOrName } = require('../utils/memberLookup');
@@ -413,18 +414,21 @@ function groupEventRegistrationActionsByDate(actions) {
 // data-building step.
 async function buildAttendanceList() {
   const published = await events.listEvents({ status: 'published' });
-  return Promise.all(
-    published.map(async (e) => {
-      const counts = await events.registrationStatusCountsForEvent(e.id);
-      return {
-        ...e,
-        startsLabel: formatFriendlyTimestamp(e.starts_at),
-        registrationCount: counts.confirmed,
-        cancelledCount: counts.cancelled,
-        waitlistCount: counts.waitlisted,
-      };
-    })
-  );
+  // One batched query for every published event's counts (events.
+  // registrationStatusCountsForEvents), not one registrationStatusCounts-
+  // ForEvent round-trip per event - this list only grows (every event the
+  // co-op has ever published), so an N+1 here gets slower every year.
+  const countsByEvent = await events.registrationStatusCountsForEvents(published.map((e) => e.id));
+  return published.map((e) => {
+    const counts = countsByEvent[e.id];
+    return {
+      ...e,
+      startsLabel: formatFriendlyTimestamp(e.starts_at),
+      registrationCount: counts.confirmed,
+      cancelledCount: counts.cancelled,
+      waitlistCount: counts.waitlisted,
+    };
+  });
 }
 
 router.get('/', async (req, res) => {
@@ -799,7 +803,11 @@ router.get('/import-template.xlsx', (req, res) => {
   res.send(buffer);
 });
 
-const importUpload = multer({ storage: multer.memoryStorage() });
+// Same spreadsheetFileFilter/1MB cap every other "Import" button in this
+// app uses for a readRowsFromFile upload (utils/uploads.js's own
+// comment) - missing here before let an arbitrary file type through and
+// had no size limit at all, unlike every sibling import route.
+const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 router.post('/import', importUpload.single('file'), async (req, res) => {
   if (!req.file) return res.redirect('/main-admin/events?error=' + encodeURIComponent('Please choose a file to import.'));
   let rows;
@@ -1125,13 +1133,8 @@ router.post('/:id/status', async (req, res) => {
     const event = await events.getEvent(req.params.id);
     const registrations = await events.registrationsForEvent(req.params.id);
     const accountIds = [...new Set(registrations.filter((r) => r.status !== 'cancelled' && r.registered_by_account_id).map((r) => r.registered_by_account_id))];
-    await mapWithConcurrency(accountIds, 20, (accountId) =>
-      notify(accountId, 'event_cancelled', {
-        title: `Event Cancelled: ${event.title}`,
-        body: `"${event.title}" has been cancelled.`,
-        linkUrl: '/events/' + req.params.id,
-      })
-    );
+    const rendered = await renderTemplate('event_cancelled', { eventTitle: event.title });
+    await mapWithConcurrency(accountIds, 20, (accountId) => notify(accountId, 'event_cancelled', { title: rendered.subject, body: rendered.body, linkUrl: '/events/' + req.params.id }));
   }
 
   res.redirect(`/main-admin/events/${req.params.id}/builder?notice=` + encodeURIComponent(`Marked ${status}.`));
@@ -1554,7 +1557,9 @@ router.get('/:id/registrations/import-template.xlsx', (req, res) => {
   res.send(buffer);
 });
 
-const registrationsImportUpload = multer({ storage: multer.memoryStorage() });
+// Same fix as the events importUpload above - a spreadsheetFileFilter/
+// 1MB cap, matching every other readRowsFromFile import route.
+const registrationsImportUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 router.post('/:id/registrations/import', registrationsImportUpload.single('file'), async (req, res) => {
   const eventId = req.params.id;
   if (!req.file) return res.redirect(`/main-admin/events/${eventId}/registrations?error=` + encodeURIComponent('Please choose a file to import.'));

@@ -50,6 +50,8 @@
         <% }); %>
       </div>
 
+      <%- include('partials/pagination-controls', { pagination, baseHref }) %>
+
       <% documents.forEach(function(d) { %>
         <dialog id="doc-roles-dialog-<%= d.id %>" class="member-picker-dialog">
           <h3>Who Can View &quot;<%= d.title %>&quot;?</h3>
@@ -107,11 +109,14 @@
 
       <div class="manage-section">
         <h4>Uploaded Documents</h4>
-        <% if (documents.length === 0) { %>
+        <%# Every uploaded document, not just the current card-grid page -
+            this list is how an admin finds and deletes any document,
+            regardless of which page of the grid happens to be open. %>
+        <% if (allDocuments.length === 0) { %>
           <p class="hint">No documents uploaded yet.</p>
         <% } else { %>
           <div class="store-options-list">
-            <% documents.forEach(function(d) { %>
+            <% allDocuments.forEach(function(d) { %>
               <div class="document-manage-row">
                 <% if (d.image_path) { %>
                   <img class="document-manage-row-thumb" src="/main-admin/documents/<%= d.id %>/image" alt="" />

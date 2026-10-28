@@ -28,6 +28,7 @@ const { toCsvRow } = require('./spreadsheet');
 const { primaryParentForBilling } = require('./members');
 const { isRegistrationOpenForAccount } = require('./registrationWindows');
 const notifications = require('./notifications');
+const { renderTemplate } = require('./notificationTemplates');
 
 // Co-op Class Settings' own "When a class is restricted by age(s)"
 // setting: either the class's own start date, or a fixed Month/Day
@@ -272,10 +273,11 @@ async function registerForClass({ classId, studentId, accountId, portalRoles, re
     }
   });
 
-  const notice =
-    status === 'confirmed'
-      ? `${student.name} is registered for "${cls.class_name}".`
-      : `${cls.class_name} is full - ${student.name} has been added to the waitlist (#${waitlistPosition}).`;
+  const templateKey = status === 'confirmed' ? 'class_registration_confirmed' : 'class_registration_waitlisted';
+  const rendered = await renderTemplate(templateKey, { className: cls.class_name, studentName: student.name, waitlistPosition });
+  await notifications.notify(accountId, 'class_registration', { title: rendered.subject, body: rendered.body, linkUrl: '/parent/classes' });
+
+  const notice = rendered.body;
   return { ok: true, notice, status, waitlistPosition };
 }
 
@@ -387,9 +389,10 @@ async function unregisterFromClass({ classId, studentId, accountId }) {
       .run(studentId, 'schedule_change', cls.day, `Cancelled registration for "${cls.class_name}" - schedule may need to be reprinted.`);
   }
   if (promoted) {
+    const rendered = await renderTemplate('class_waitlist_promoted', { className: cls.class_name, studentName: promoted.studentName });
     await notifications.notify(promoted.accountId, 'class_waitlist_promoted', {
-      title: `Off the waitlist: ${cls.class_name}`,
-      body: `A spot opened up - ${promoted.studentName} is now confirmed for "${cls.class_name}".`,
+      title: rendered.subject,
+      body: rendered.body,
       linkUrl: '/parent/classes',
     });
   }
@@ -431,9 +434,10 @@ async function adminRemoveStudentFromClass(classId, studentId, adminAccountId) {
   }
   if (promoted) {
     const cls = await db.prepare('SELECT class_name FROM classes WHERE id = ?').get(classId);
+    const rendered = await renderTemplate('class_waitlist_promoted', { className: cls.class_name, studentName: promoted.studentName });
     await notifications.notify(promoted.accountId, 'class_waitlist_promoted', {
-      title: `Off the waitlist: ${cls.class_name}`,
-      body: `A spot opened up - ${promoted.studentName} is now confirmed for "${cls.class_name}".`,
+      title: rendered.subject,
+      body: rendered.body,
       linkUrl: '/parent/classes',
     });
   }

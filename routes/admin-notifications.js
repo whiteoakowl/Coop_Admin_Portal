@@ -11,13 +11,22 @@ const express = require('express');
 const router = express.Router();
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const notifications = require('../utils/notifications');
+const notificationTemplates = require('../utils/notificationTemplates');
 const auditLog = require('../utils/auditLog');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_communications'));
 
 router.get('/', async (req, res) => {
   const types = await notifications.listTypes();
-  res.render('admin-notifications', { title: 'Notifications', types, notice: req.query.notice || null });
+  // A real request: "Add a text/email notification settings card. There
+  // you can change the default message for different things like
+  // floater assignments, class wait list, event waitlist, event
+  // registration, class registration, etc." - same page as the existing
+  // per-type auto-send on/off table above (this page had no link into
+  // it from anywhere before this - the Settings hub card added for this
+  // feature is its first real entry point).
+  const templates = await notificationTemplates.allTemplates();
+  res.render('admin-notifications', { title: 'Notifications', types, templates, notice: req.query.notice || null });
 });
 
 router.post('/:key/auto-send', async (req, res) => {
@@ -25,6 +34,13 @@ router.post('/:key/auto-send', async (req, res) => {
   await notifications.setAutoSend(req.params.key, enabled);
   await auditLog.record(req.portalAccount.id, 'notification_auto_send_toggled', 'notification_type', null, `${req.params.key}: ${enabled ? 'on' : 'off'}`);
   res.redirect('/main-admin/notifications?notice=' + encodeURIComponent('Saved.'));
+});
+
+router.post('/templates/:templateKey', async (req, res) => {
+  if (!notificationTemplates.TEMPLATE_DEFINITIONS[req.params.templateKey]) return res.status(404).send('Not found');
+  await notificationTemplates.updateTemplate(req.params.templateKey, req.body.subject || '', req.body.body || '');
+  await auditLog.record(req.portalAccount.id, 'notification_message_template_updated', 'notification_message_template', null, req.params.templateKey);
+  res.redirect('/main-admin/notifications?notice=' + encodeURIComponent('Message saved.'));
 });
 
 module.exports = router;

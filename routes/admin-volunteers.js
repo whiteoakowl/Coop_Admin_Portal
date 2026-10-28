@@ -49,6 +49,7 @@ const {
 const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
 const { comboSemesterId, qsSemester, appendSemester, findComboId } = require('../utils/scheduleComboLinks');
 const { notify } = require('../utils/notifications');
+const { getTemplate } = require('../utils/notificationTemplates');
 const { renderViewToPdf } = require('../utils/pdfRender');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
@@ -252,10 +253,12 @@ router.get('/volunteers/:day/manage', requireAdmin, requireClassDay, async (req,
   const positionGroups = await groupedPermanentJobsForDay(day, list.semester_id);
   const temporaryPositionGroups = selectedDate ? await groupedTemporaryJobsForDayDate(day, selectedDate, list.semester_id) : [];
   const combos = await listScheduleCombos();
+  const floaterMessageTemplate = (await getTemplate('floater_assignment_default'))?.body || '';
 
   res.render('admin-volunteers', {
     title: `${DAY_LABELS[day]} Floater Assignments`,
     tab: 'floater',
+    floaterMessageTemplate,
     day,
     dayLabel: DAY_LABELS[day],
     activeDays: await listActiveClassDays(),

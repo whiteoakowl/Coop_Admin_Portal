@@ -36,16 +36,22 @@ async function listPending() {
 }
 
 // Homepage card - "a card called nature news that shows the last 3 posts
-// students have made" - approved only, newest first.
-async function listApproved(limit = 3) {
-  return db
-    .prepare(
-      `SELECT p.*, m.name AS member_name FROM nature_news_posts p
+// students have made" - approved only, newest first. `limit` is only
+// used by that homepage card (routes/student-portal.js's own
+// listApproved(3) call); the Main Admin review queue (routes/admin-
+// nature-news.js) calls this with no limit at all to get every approved
+// post, for its own in-memory pagination (utils/pagination.js) rather
+// than a second, differently-shaped query.
+async function listApproved(limit = null) {
+  let sql = `SELECT p.*, m.name AS member_name FROM nature_news_posts p
        JOIN members m ON m.id = p.member_id
-       WHERE p.status = 'approved' ORDER BY p.decided_at DESC, p.created_at DESC
-       LIMIT ?`
-    )
-    .all(limit);
+       WHERE p.status = 'approved' ORDER BY p.decided_at DESC, p.created_at DESC`;
+  const params = [];
+  if (limit != null) {
+    sql += ' LIMIT ?';
+    params.push(limit);
+  }
+  return db.prepare(sql).all(...params);
 }
 
 async function decide(id, approve, accountId) {

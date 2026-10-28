@@ -52,7 +52,6 @@ test('listScheduleCombos labels an untagged (no-semester) combo with just the da
   assert.equal(untagged.label, 'Friday');
 
   const untaggedIdx = combos.indexOf(untagged);
-  const everySemesterTaggedComboIsBeforeIt = combos.slice(0, untaggedIdx).every((c) => c.semesterId != null) || combos.every((c) => c.semesterId == null);
   // Every combo with a semester (there's at least Fall 2026 Untagged Test's Thursday) sorts before this one.
   const taggedAfter = combos.slice(untaggedIdx + 1).some((c) => c.semesterId != null);
   assert.equal(taggedAfter, false, 'no semester-tagged combo sorts after an untagged one');
