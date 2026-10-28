@@ -5610,3 +5610,17 @@ alter table notification_types add column if not exists email_enabled integer no
 -- already-mixed history, which semesters have no stored date range to
 -- do correctly by).
 alter table rosters add column if not exists semester_id integer references semesters(id) on delete set null;
+
+-- A real request: "Add the same exact check box and button system on
+-- floater assignments, on each setup cleanup team and position." The
+-- Setup/Cleanup Assignments page gets its own Select All checkbox +
+-- Send Text button per team card, same as Floater Assignments' own
+-- per-hour card - texts a member their team and currently-assigned
+-- task(s) for the selected date.
+insert into notification_types (key, label, description) values
+  ('setup_cleanup_assignment', 'Setup/Cleanup Assignment', 'You were texted your Setup/Cleanup team and assigned task(s) for an upcoming co-op session.')
+on conflict (key) do nothing;
+
+insert into notification_message_templates (template_key, subject, body) values
+  ('setup_cleanup_assignment_default', '', 'You''re assigned to {{team}}: {{tasks}}.')
+on conflict (template_key) do nothing;

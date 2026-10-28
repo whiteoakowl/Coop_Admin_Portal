@@ -23,6 +23,12 @@ const TEMPLATE_DEFINITIONS = {
     hasSubject: false,
     placeholders: ['position', 'hour', 'room'],
   },
+  setup_cleanup_assignment_default: {
+    label: 'Starting text (editable before every send)',
+    group: 'Setup/Cleanup Assignments',
+    hasSubject: false,
+    placeholders: ['team', 'tasks'],
+  },
   class_waitlist_promoted: {
     label: 'Moved off the waitlist',
     group: 'Class Waitlist',

@@ -6816,6 +6816,15 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
   text-overflow: ellipsis;
 }
 .setup-assignment-table .floater-assign-btn { align-self: center; flex-shrink: 0; font-size: 0.68rem; padding: 0.25rem 0.45rem; }
+/* A real request: "Add the same exact check box and button system on
+   floater assignments, on each setup cleanup team and position." Unlike
+   Floater's own notify checkbox (its own dedicated .floater-notify-col
+   table column, since that table is a real column grid at desktop
+   width), this table is always a stacked, one-full-width-line-per-cell
+   layout (see .setup-assignment-table's own comment above) - the
+   checkbox sits directly inside the Member cell instead, right before
+   the name, and just needs its own small gap so it doesn't touch it. */
+.setup-assignment-table .floater-card-position .floater-notify-checkbox { margin-right: 0.4rem; vertical-align: middle; }
 
 .floater-card-footer {
   display: flex;
