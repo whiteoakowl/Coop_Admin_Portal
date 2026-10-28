@@ -6741,17 +6741,34 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 }
 .floater-card-send-text-btn:hover { background: #fff; }
 .floater-card-send-text-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.floater-card-table.floater-chart-table th:nth-child(1), .floater-card-table.floater-chart-table td:nth-child(1) { width: 2.2rem; }
+/* The roughly-even three-way split below this table's own rows use at
+   any width up to 900px - this table never leaves table-layout:fixed
+   until the @media (max-width: 640px) block further down switches it
+   to the card-style stacked rows instead, so without this, anything in
+   between (a tablet, or a phone in landscape) would otherwise fall
+   through to the wide-desktop split just below, which was never meant
+   for anything narrower than a real desktop window - a real bug report:
+   "Floater assignments the page format on mobile was changed when we
+   were only fixing the name dropdown size on desktop." */
+.floater-card-table.floater-chart-table th:nth-child(2), .floater-card-table.floater-chart-table td:nth-child(2) { width: 38%; }
+.floater-card-table.floater-chart-table th:nth-child(3), .floater-card-table.floater-chart-table td:nth-child(3) { width: 23%; }
+.floater-card-table.floater-chart-table th:nth-child(4), .floater-card-table.floater-chart-table td:nth-child(4) { width: 35%; }
 /* A real request: "Make it to where you can view the entire first and
    last name in the dropdown choice view. Shrink tables to fit
    accordingly." Position/Room text is always short ("Hallway Monitor",
    "Room 12"); a floater's own select has to fit a full first+last name
    AND the Assign/Unassign button riding along in the same cell
-   (.floater-assign-form's own flex row), so it gets the lion's share
-   of the row now instead of roughly an even three-way split. */
-.floater-card-table.floater-chart-table th:nth-child(1), .floater-card-table.floater-chart-table td:nth-child(1) { width: 2.2rem; }
-.floater-card-table.floater-chart-table th:nth-child(2), .floater-card-table.floater-chart-table td:nth-child(2) { width: 20%; }
-.floater-card-table.floater-chart-table th:nth-child(3), .floater-card-table.floater-chart-table td:nth-child(3) { width: 12%; }
-.floater-card-table.floater-chart-table th:nth-child(4), .floater-card-table.floater-chart-table td:nth-child(4) { width: 66%; }
+   (.floater-assign-form's own flex row), so it gets the lion's share of
+   the row on a genuinely wide screen instead of roughly an even three-
+   way split - gated to min-width: 901px (not the table's own general
+   rule above) so a tablet or landscape phone still gets the narrower
+   split above, same as before this fix. */
+@media (min-width: 901px) {
+  .floater-card-table.floater-chart-table th:nth-child(2), .floater-card-table.floater-chart-table td:nth-child(2) { width: 20%; }
+  .floater-card-table.floater-chart-table th:nth-child(3), .floater-card-table.floater-chart-table td:nth-child(3) { width: 12%; }
+  .floater-card-table.floater-chart-table th:nth-child(4), .floater-card-table.floater-chart-table td:nth-child(4) { width: 66%; }
+}
 
 /* Setup/Cleanup Assignments' own version of .floater-card-table - a real
    request: "just line the assignments under each member like mobile."
