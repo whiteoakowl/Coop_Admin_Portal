@@ -25,6 +25,7 @@
 // app_settings key/value table - no new schema needed).
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const payments = require('../utils/payments');
@@ -38,6 +39,8 @@ const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { formatTimestamp, formatDateShort } = require('../utils/dates');
 const { renderViewToPdf } = require('../utils/pdfRender');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
+const { imageFileFilter } = require('../utils/uploads');
+const transactions = require('../utils/accountingTransactions');
 
 function sendPdf(res, filename, pdfBuffer) {
   res.set('Content-Type', 'application/pdf');
@@ -815,6 +818,202 @@ router.post('/charges/:id/cancel', async (req, res) => {
   await payments.cancelCharge(charge.id);
   await auditLog.record(req.portalAccount.id, 'charge_cancelled', 'payment_charge', charge.id, charge.description);
   res.redirect(`/main-admin/accounting/members/${charge.member_id}?notice=` + encodeURIComponent('Charge cancelled.'));
+});
+
+// --- Transactions - a real request: "add a subpage called transactions.
+// Here we can link our bank account securely and track all purchases
+// that happen." No real bank-integration provider (Plaid/Yodlee/Stripe)
+// exists anywhere in this app; the answered scoping question was manual
+// entry for now, with a real bank feed deferred until a provider is
+// chosen - every transaction here is typed in by an admin, same spirit
+// as every payment this router already records. Reuses the same
+// event_accounting_categories list (utils/events.js) the Membership Fee
+// settings dropdown and the Events Finance tab both already read from,
+// rather than a second category list. ---
+
+const receiptUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 }, fileFilter: imageFileFilter });
+
+function transactionsFilterFromQuery(req) {
+  return {
+    startDate: (req.query.startDate || '').trim() || null,
+    endDate: (req.query.endDate || '').trim() || null,
+    type: ['income', 'expense'].includes(req.query.type) ? req.query.type : null,
+  };
+}
+
+router.get('/transactions', async (req, res) => {
+  const filter = transactionsFilterFromQuery(req);
+  const rows = (await transactions.listTransactions(filter)).map((t) => ({ ...t, dateLabel: formatDateShort(t.transaction_date) }));
+  res.render('admin-accounting-transactions', {
+    title: 'Transactions',
+    rows,
+    filter,
+    accountingCategories: await events.listAccountingCategories(),
+    formatCents: payments.formatCents,
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+router.post('/transactions', async (req, res) => {
+  const type = req.body.type === 'income' ? 'income' : 'expense';
+  const name = (req.body.name || '').trim();
+  const transactionDate = (req.body.transactionDate || '').trim();
+  const amountCents = toCents(req.body.amount);
+  if (!name || !transactionDate || amountCents <= 0) {
+    return res.redirect('/main-admin/accounting/transactions?error=' + encodeURIComponent('Name, date, and a positive amount are all required.'));
+  }
+  const accountingCategoryId = req.body.accountingCategoryId ? parseInt(req.body.accountingCategoryId, 10) : null;
+  await transactions.createTransaction({ type, name, transactionDate, amountCents, accountingCategoryId });
+  res.redirect('/main-admin/accounting/transactions?notice=' + encodeURIComponent('Transaction added.'));
+});
+
+// The payment-category dropdown on each row - auto-submits on change, no
+// separate Save button (same convention as every other inline-dropdown
+// field in this app).
+router.post('/transactions/:id/category', async (req, res) => {
+  const txn = await transactions.getTransaction(req.params.id);
+  if (!txn) return res.status(404).render('404', { title: 'Not Found' });
+  const accountingCategoryId = req.body.accountingCategoryId ? parseInt(req.body.accountingCategoryId, 10) : null;
+  await transactions.updateTransactionCategory(txn.id, accountingCategoryId);
+  res.redirect('/main-admin/accounting/transactions?notice=' + encodeURIComponent('Category updated.'));
+});
+
+function uploadReceipt(req, res, next) {
+  receiptUpload.single('receipt')(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') {
+      return res.redirect('/main-admin/accounting/transactions?error=' + encodeURIComponent('That image is too large - receipts are limited to 10MB.'));
+    }
+    next(err);
+  });
+}
+
+// A real request: "Purchases have a receipt icon. When you click this
+// icon a popup occurs and allows you to upload an image of your
+// receipt. And save."
+router.post('/transactions/:id/receipt', uploadReceipt, async (req, res) => {
+  const txn = await transactions.getTransaction(req.params.id);
+  if (!txn) return res.status(404).render('404', { title: 'Not Found' });
+  if (!req.file) return res.redirect('/main-admin/accounting/transactions?error=' + encodeURIComponent('Choose an image to upload first.'));
+  await transactions.saveReceipt(txn.id, req.file);
+  res.redirect('/main-admin/accounting/transactions?notice=' + encodeURIComponent('Receipt saved.'));
+});
+
+// The private-bucket proxy-download for a receipt image - same shape as
+// utils/familySchool.js's own attachment route, just scoped to this one
+// manage_finances-gated router instead of needing a per-family ownership
+// check (every route in this file already requires Main Admin +
+// manage_finances).
+router.get('/transactions/:id/receipt/file', async (req, res) => {
+  const txn = await transactions.getTransaction(req.params.id);
+  if (!txn || !txn.receipt_key) return res.status(404).render('404', { title: 'Not Found' });
+  const buffer = await transactions.receiptBuffer(txn.receipt_key);
+  if (!buffer) return res.status(404).render('404', { title: 'Not Found' });
+  res.set('Content-Type', txn.receipt_content_type || 'application/octet-stream');
+  res.send(buffer);
+});
+
+router.post('/transactions/:id/delete', async (req, res) => {
+  const txn = await transactions.getTransaction(req.params.id);
+  if (!txn) return res.status(404).render('404', { title: 'Not Found' });
+  await transactions.deleteTransaction(txn.id);
+  res.redirect('/main-admin/accounting/transactions?notice=' + encodeURIComponent('Transaction removed.'));
+});
+
+// --- Receipts - a real request: "add a subpage called receipts. Here
+// you can view any of the transactions that have a receipt attached to
+// it." Same Transactions table/data, just pre-filtered to rows that
+// actually have one. ---
+
+router.get('/receipts', async (req, res) => {
+  const filter = { ...transactionsFilterFromQuery(req), receiptOnly: true };
+  const rows = (await transactions.listTransactions(filter)).map((t) => ({ ...t, dateLabel: formatDateShort(t.transaction_date) }));
+  res.render('admin-accounting-receipts', {
+    title: 'Receipts',
+    rows,
+    filter,
+    formatCents: payments.formatCents,
+  });
+});
+
+// --- Reports - a real request: "add a subpage called reports. Here
+// there will be a few link bars each called profit and loss, balance
+// sheet, cash flow statement." Every number below is computed directly
+// from accounting_transactions - the only general income/expense ledger
+// this app has (payment_charges/payment_payments track member billing,
+// a different concept). There's no chart of accounts anywhere in this
+// app, so Balance Sheet deliberately stays honest about what it can
+// actually show (a single running Cash line from recorded transactions)
+// rather than fabricating assets/liabilities/equity data that doesn't
+// exist. ---
+
+router.get('/reports', async (req, res) => {
+  res.render('admin-accounting-reports', { title: 'Reports' });
+});
+
+function reportsDateFilterFromQuery(req) {
+  return {
+    startDate: (req.query.startDate || '').trim() || null,
+    endDate: (req.query.endDate || '').trim() || null,
+  };
+}
+
+router.get('/reports/profit-and-loss', async (req, res) => {
+  const filter = reportsDateFilterFromQuery(req);
+  const rows = await transactions.listTransactions(filter);
+  const byCategory = new Map();
+  let incomeCents = 0;
+  let expenseCents = 0;
+  for (const t of rows) {
+    if (t.type === 'income') incomeCents += t.amount_cents;
+    else expenseCents += t.amount_cents;
+    const key = `${t.type}:${t.category_name || 'Uncategorized'}`;
+    byCategory.set(key, (byCategory.get(key) || 0) + t.amount_cents);
+  }
+  const incomeByCategory = [...byCategory].filter(([k]) => k.startsWith('income:')).map(([k, cents]) => ({ name: k.slice(6), cents }));
+  const expenseByCategory = [...byCategory].filter(([k]) => k.startsWith('expense:')).map(([k, cents]) => ({ name: k.slice(8), cents }));
+  res.render('admin-accounting-report-pl', {
+    title: 'Profit and Loss',
+    filter,
+    incomeByCategory,
+    expenseByCategory,
+    incomeCents,
+    expenseCents,
+    netCents: incomeCents - expenseCents,
+    formatCents: payments.formatCents,
+  });
+});
+
+router.get('/reports/cash-flow', async (req, res) => {
+  const filter = reportsDateFilterFromQuery(req);
+  const rows = await transactions.listTransactions(filter);
+  const cashInCents = rows.filter((t) => t.type === 'income').reduce((sum, t) => sum + t.amount_cents, 0);
+  const cashOutCents = rows.filter((t) => t.type === 'expense').reduce((sum, t) => sum + t.amount_cents, 0);
+  res.render('admin-accounting-report-cash-flow', {
+    title: 'Cash Flow Statement',
+    filter,
+    cashInCents,
+    cashOutCents,
+    netChangeCents: cashInCents - cashOutCents,
+    formatCents: payments.formatCents,
+  });
+});
+
+// A real decision (no chart of accounts exists anywhere in this app):
+// this shows one honest Cash line - the running total of every recorded
+// transaction up through the chosen end date - rather than inventing
+// assets/liabilities/equity figures with no underlying data to back
+// them.
+router.get('/reports/balance-sheet', async (req, res) => {
+  const asOfDate = (req.query.asOfDate || '').trim() || null;
+  const rows = await transactions.listTransactions(asOfDate ? { endDate: asOfDate } : {});
+  const cashCents = rows.reduce((sum, t) => sum + (t.type === 'income' ? t.amount_cents : -t.amount_cents), 0);
+  res.render('admin-accounting-report-balance-sheet', {
+    title: 'Balance Sheet',
+    asOfDate,
+    cashCents,
+    formatCents: payments.formatCents,
+  });
 });
 
 module.exports = router;

@@ -7,117 +7,155 @@
   <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <div class="roster-toolbar no-print">
-      <h1>Family Classes</h1>
-      <div class="roster-btn-row">
-        <%# A real request: "Filter buttons should have student
-            dropdown choice and school year choice." Classes have no
-            school-year field of their own (they're ongoing, not tied
-            to a term) - just a Student choice here, default "All
-            Students". %>
-        <% if (familyStudents.length > 0) { %>
-          <details class="filter-details" data-filter-details>
-            <summary class="roster-action-btn">Filter</summary>
-            <form method="GET" action="/parent/family-school/classes" class="filter-panel">
-              <label for="classes-student-select">Student</label>
-              <select id="classes-student-select" name="studentId" onchange="this.form.submit()">
-                <option value="all" <%= selectedStudentId === 'all' ? 'selected' : '' %>>All Students</option>
-                <% familyStudents.forEach(function(s) { %>
-                  <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
-                <% }); %>
-              </select>
-            </form>
-          </details>
-        <% } %>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog').showModal()">+ New Class</button>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-preplanned-class-dialog').showModal()">+ Preplanned Class</button>
-      </div>
+    <h1>Family Classes</h1>
+
+    <%# A real request: "Available lesson plan tab should be a subpage
+        under family classes" - same ?tab= view-tabs convention every
+        other page in this app uses for a second, substantially
+        different listing on an otherwise single-purpose page. %>
+    <div class="view-tabs no-print">
+      <a class="view-tab<%= activeTab === 'classes' ? ' active' : '' %>" href="/parent/family-school/classes">Family Classes</a>
+      <a class="view-tab<%= activeTab === 'availableLessonPlans' ? ' active' : '' %>" href="/parent/family-school/classes?tab=availableLessonPlans">Available Lesson Plans</a>
     </div>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <%# A real request: "parent can create classed, lessons and
-        assignments and assign these classes to their own students in
-        their family." Completely separate from co-op classes - these
-        cards link into this family's own private class/lesson tree
-        (routes/parent-family-school.js), never the co-op Classes grid. %>
-    <% if (classes.length === 0) { %>
-      <p class="roster-empty">No classes yet. Create one to get started.</p>
-    <% } else { %>
-      <div class="team-card-grid">
-        <% classes.forEach(function(c) { %>
-          <div class="team-col">
-            <a class="team-info-card" href="/parent/family-school/classes/<%= c.id %>">
-              <span class="team-info-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
-              <h3 class="team-info-title"><%= c.class_name %></h3>
-              <% if (c.description) { %><p class="hint"><%= c.description %></p><% } %>
-              <span class="team-info-pill"><%= c.lessonCount %> lesson<%= c.lessonCount === 1 ? '' : 's' %></span>
-              <p class="hint"><%= c.students.length === 0 ? 'Not assigned to any student yet' : c.students.map(function(s) { return s.name; }).join(', ') %></p>
-            </a>
-          </div>
-        <% }); %>
+    <% if (activeTab === 'classes') { %>
+      <div class="roster-toolbar no-print">
+        <%# A real request: "Filter, add new class, add preplanned class
+            buttons should be side by side in the same row. Shrink to
+            fit." roster-btn-row-fit-text is the shared class every
+            other page's own Filter+action-button row already uses for
+            this (see e.g. views/parent-family-school-overview.ejs) -
+            sizes each button/details to its own text instead of
+            stretching them into equal-width grid columns that forced
+            this row to stack on mobile. %>
+        <div class="roster-btn-row roster-btn-row-fit-text">
+          <%# A real request: "Filter buttons should have student
+              dropdown choice and school year choice." Classes have no
+              school-year field of their own (they're ongoing, not tied
+              to a term) - just a Student choice here, default "All
+              Students". %>
+          <% if (familyStudents.length > 0) { %>
+            <details class="filter-details" data-filter-details>
+              <summary class="roster-action-btn">Filter</summary>
+              <form method="GET" action="/parent/family-school/classes" class="filter-panel">
+                <label for="classes-student-select">Student</label>
+                <select id="classes-student-select" name="studentId" onchange="this.form.submit()">
+                  <option value="all" <%= selectedStudentId === 'all' ? 'selected' : '' %>>All Students</option>
+                  <% familyStudents.forEach(function(s) { %>
+                    <option value="<%= s.id %>" <%= selectedStudentId === s.id ? 'selected' : '' %>><%= s.name %></option>
+                  <% }); %>
+                </select>
+              </form>
+            </details>
+          <% } %>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog').showModal()">+ New Class</button>
+          <a class="roster-action-btn" href="/parent/family-school/classes?tab=availableLessonPlans">+ Preplanned Class</a>
+        </div>
       </div>
+
+      <%# A real request: "parent can create classed, lessons and
+          assignments and assign these classes to their own students in
+          their family." Completely separate from co-op classes - these
+          cards link into this family's own private class/lesson tree
+          (routes/parent-family-school.js), never the co-op Classes grid.
+          A later real request: "Family school management classes. Class
+          cards should look like co-op class cards" - same .class-dash-
+          card shape the Student Portal's own Classroom Dashboard and
+          Family Classes list already use, instead of the plain .team-
+          info-card this page used before. family_school_classes has no
+          color/image of its own (see that table's own migration
+          comment), so every card here uses the same fixed accent bar
+          and Family Homeschooling-flavored placeholder icon those pages
+          already settled on. %>
+      <% if (classes.length === 0) { %>
+        <p class="roster-empty">No classes yet. Create one to get started.</p>
+      <% } else { %>
+        <div class="class-dash-grid">
+          <% classes.forEach(function(c) { %>
+            <div class="class-dash-card">
+              <div class="class-dash-card-color-bar" style="background:var(--accent)"></div>
+              <a class="class-dash-card-link" href="/parent/family-school/classes/<%= c.id %>">
+                <div class="class-dash-card-body">
+                  <span class="class-dash-card-image class-dash-card-image-placeholder"><svg class="icon"><use href="#icon-home-heart"/></svg></span>
+                  <div class="class-dash-card-text">
+                    <h3 class="class-dash-card-title"><%= c.class_name %></h3>
+                    <% if (c.description) { %><p class="class-dash-card-meta"><%= c.description %></p><% } %>
+                    <p class="class-dash-card-meta"><%= c.lessonCount %> lesson<%= c.lessonCount === 1 ? '' : 's' %></p>
+                    <p class="class-dash-card-meta"><%= c.students.length === 0 ? 'Not assigned to any student yet' : c.students.map(function(s) { return s.name; }).join(', ') %></p>
+                  </div>
+                </div>
+              </a>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+
+      <dialog id="add-class-dialog" class="class-form-dialog">
+        <%# A real request: "Family school management tab, subpage, pages,
+            popups etc. Make sure all buttons, text bars, lists etc all have
+            adequate space between rows and no overlapping." This dialog
+            reused .class-form-dialog for its outer shell (header/width/
+            shadow) but, unlike every OTHER dialog on the site, never paired
+            it with .stack-form/.dialog-label-stack/.member-picker-dialog -
+            its bare <label> elements had no display:block or margin of
+            their own, so Class Name and Description ran together inline
+            with no real row gap between them. .stack-form (same fix as
+            admin-announcements.ejs's own form) gives every direct child,
+            .notes-dialog-actions included, a real stacked column with
+            space between each row. %>
+        <form method="POST" action="/parent/family-school/classes" class="stack-form">
+          <div class="class-form-dialog-header">
+            <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
+            <h3>New Class</h3>
+          </div>
+          <label>Class Name
+            <input type="text" name="className" required />
+          </label>
+          <label>Description
+            <textarea name="description" rows="2"></textarea>
+          </label>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Create Class</button>
+          </div>
+        </form>
+      </dialog>
+    <% } else { %>
+      <%# A real request: "+preplanned class" button, later changed to
+          pull from the admin's Lesson Plans library instead of a fixed
+          built-in set, then moved from a dropdown dialog onto its own
+          subpage here - "Lessons should show up under add preplanned
+          class button," "Available lesson plan tab should be a subpage
+          under family classes." Only plans an admin flagged for Family
+          School Management show up here (utils/lessonPlans.js's own
+          listFamilySchoolLessonPlans) - each card's own Create Class
+          button posts straight to the same route the old dialog's
+          dropdown used, no picker needed since the card itself is the
+          picker now. %>
+      <% if (lessonPlans.length === 0) { %>
+        <p class="roster-empty">No lesson plans are available for Homeschool family management yet - ask the co-op admin to allow one from the Lesson Plans library.</p>
+      <% } else { %>
+        <div class="team-card-grid">
+          <% lessonPlans.forEach(function(p) { %>
+            <div class="team-col">
+              <div class="team-info-card">
+                <span class="team-info-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
+                <h3 class="team-info-title"><%= p.title %></h3>
+                <% if (p.description) { %><p class="hint"><%= p.description %></p><% } %>
+                <form method="POST" action="/parent/family-school/classes/from-lesson-plan">
+                  <input type="hidden" name="lessonPlanId" value="<%= p.id %>" />
+                  <button type="submit" class="roster-action-btn">Create Class</button>
+                </form>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
     <% } %>
   </main>
-
-  <dialog id="add-class-dialog" class="class-form-dialog">
-    <%# A real request: "Family school management tab, subpage, pages,
-        popups etc. Make sure all buttons, text bars, lists etc all have
-        adequate space between rows and no overlapping." This dialog
-        reused .class-form-dialog for its outer shell (header/width/
-        shadow) but, unlike every OTHER dialog on the site, never paired
-        it with .stack-form/.dialog-label-stack/.member-picker-dialog -
-        its bare <label> elements had no display:block or margin of
-        their own, so Class Name and Description ran together inline
-        with no real row gap between them. .stack-form (same fix as
-        admin-announcements.ejs's own form) gives every direct child,
-        .notes-dialog-actions included, a real stacked column with
-        space between each row. %>
-    <form method="POST" action="/parent/family-school/classes" class="stack-form">
-      <div class="class-form-dialog-header">
-        <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
-        <h3>New Class</h3>
-      </div>
-      <label>Class Name
-        <input type="text" name="className" required />
-      </label>
-      <label>Description
-        <textarea name="description" rows="2"></textarea>
-      </label>
-      <div class="notes-dialog-actions">
-        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-        <button type="submit" class="primary-btn">Create Class</button>
-      </div>
-    </form>
-  </dialog>
-
-  <%# A real request: "Add a button that says +preplanned class" -
-      "Pick from built-in curriculum templates." A small, fixed set of
-      app-provided starter classes (utils/familySchool.js's own
-      PREPLANNED_CLASS_TEMPLATES) - picking one creates the class plus
-      a few starter lessons already in place, rather than starting from
-      a blank Class Name/Description form. %>
-  <dialog id="add-preplanned-class-dialog" class="class-form-dialog">
-    <form method="POST" action="/parent/family-school/classes/from-template" class="stack-form">
-      <div class="class-form-dialog-header">
-        <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
-        <h3>Preplanned Class</h3>
-      </div>
-      <label>Template
-        <select name="templateKey" required>
-          <% preplannedTemplates.forEach(function(t) { %>
-            <option value="<%= t.key %>"><%= t.name %></option>
-          <% }); %>
-        </select>
-      </label>
-      <p class="hint">Creates the class with a starter set of lessons already added - you can edit or remove any of them afterward.</p>
-      <div class="notes-dialog-actions">
-        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-        <button type="submit" class="primary-btn">Create Class</button>
-      </div>
-    </form>
-  </dialog>
   <script src="/js/filter-details-dismiss.js"></script>
 </body>
 </html>

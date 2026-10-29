@@ -88,16 +88,28 @@ router.get('/family-school/weekly-planner', async (req, res) => {
   });
 });
 
+// A real request: "When you click on a family class it has the same
+// tabs as the co-op classes. Details, lessons, grades." Same ?tab=
+// convention and .view-tabs/.view-tab-panel shell as the co-op's own
+// student-class-detail.ejs - Grades reuses gradesForStudent (already
+// built for the flat Homeschool Grades page) filtered down to this one
+// class rather than a second, class-scoped query.
+const FAMILY_CLASS_DETAIL_TABS = ['details', 'lessons', 'grades'];
+
 router.get('/family-school/classes/:id', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const classId = parseInt(req.params.id, 10);
   const classes = await classesForStudent(member.id);
   const cls = classes.find((c) => c.id === classId);
   if (!cls) return res.status(404).render('404', { title: 'Not Found' });
+  const tab = FAMILY_CLASS_DETAIL_TABS.includes(req.query.tab) ? req.query.tab : 'details';
+  const grades = tab === 'grades' ? (await gradesForStudent(member.id)).filter((g) => g.class_id === cls.id) : [];
   res.render('student-family-school-class', {
     title: cls.class_name,
     cls,
-    lessons: await lessonsForStudentView(cls.id, member.id),
+    tab,
+    lessons: tab === 'lessons' ? await lessonsForStudentView(cls.id, member.id) : [],
+    grades,
   });
 });
 

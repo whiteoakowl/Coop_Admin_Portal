@@ -127,6 +127,9 @@ const MAIN_ADMIN_NAV_LINKS = [
     { href: '/main-admin/accounting/invoices', label: 'Invoices' },
     { href: '/main-admin/accounting/payments', label: 'Payments' },
     { href: '/main-admin/accounting/adjustments', label: 'Adjustments' },
+    { href: '/main-admin/accounting/reports', label: 'Reports' },
+    { href: '/main-admin/accounting/transactions', label: 'Transactions' },
+    { href: '/main-admin/accounting/receipts', label: 'Receipts' },
     { href: '/main-admin/accounting/logs', label: 'Logs' },
     { href: '/main-admin/accounting/settings', label: 'Settings' },
   ] },
@@ -422,16 +425,23 @@ const TEACHER_NAV_LINKS = [
 // Their own /absence and /student/name-tag routes are untouched - same
 // "dropped from the nav, not from the route table" precedent this exact
 // group already set once before (Assignments above).
+//
+// A still later real request split the 2 subpages back out into their
+// own standing tabs: "Class schedule should be its own tab and called
+// Co-op Schedule. Classroom dashboard should be its own tab and the
+// beginning of a new section." Co-op Schedule stays here in the primary
+// group (same /student/classes route, just renamed and promoted out of
+// the dropdown); Classroom Dashboard becomes the first (and currently
+// only) entry of its own labeled 3rd section - see COMMUNITY_LINKS_STUDENT/
+// communityLinksTitle further down, the same unused 3rd-section slot
+// Co-op Teacher Portal's own COMMUNITY_LINKS_TEACHER leaves empty.
 const STUDENT_NAV_LINKS = [
   { href: '/student', icon: 'home', label: 'Home' },
   { href: '/events?view=calendar&portal=student', icon: 'calendar-check', label: 'Events', subpages: [
     { href: '/events?view=calendar&portal=student', label: 'Calendar' },
     { href: '/student/events', label: 'My Event Registrations' },
   ] },
-  { href: '/student/classes', icon: 'graduation-cap', label: 'Classes', subpages: [
-    { href: '/student/classes', label: 'Class Schedule' },
-    { href: '/student/classes/dashboard', label: 'Classroom Dashboard' },
-  ] },
+  { href: '/student/classes', icon: 'graduation-cap', label: 'Co-op Schedule', mobileLabel: 'Co-op<br>Schedule' },
   // A real request: "These classes will then appear under the students
   // portal to work ok and complete" - see Parent Portal's own identical
   // nav entry comment just above for the full request; this is the
@@ -561,14 +571,26 @@ const COMMUNITY_LINKS_PARENT = [];
 // TEACHER_NAV_LINKS above, leaving nothing left for a Community section
 // to show.
 const COMMUNITY_LINKS_TEACHER = [];
-// Student Portal gets no separate Community section at all (empty
-// array, same as Main Admin above) - a real request: "dashboard panel
-// tabs. They should be these titles and in this order" gave an exact,
-// exhaustive two-section nav (STUDENT_NAV_LINKS + STUDENT_ACTIVITY_LINKS
-// above); Calendar/Chat already cover Events/Chat, Photos moved into
-// STUDENT_NAV_LINKS itself, and Store isn't in the requested list -
-// still reachable at its own /store URL, just no longer a standing tab.
-const COMMUNITY_LINKS_STUDENT = [];
+// Student Portal's own 3rd section - empty for a long time (see the old
+// comment below, kept for context), until a real request gave it its
+// first entry: "Classroom dashboard should be its own tab and the
+// beginning of a new section on the desktop dashboard menu panel."
+// Rather than inventing a 4th nav slot, this reuses the one real 3rd-
+// section mechanism the template already has (communityLinks) - labeled
+// "Classroom" instead of "Community" for this portal only, via
+// communityLinksTitle below, since a single literal heading wouldn't fit
+// every portal that reuses this same slot.
+//
+// Old reasoning, still true for every other section this array could
+// have held: a real request: "dashboard panel tabs. They should be these
+// titles and in this order" gave an exact, exhaustive two-section nav
+// (STUDENT_NAV_LINKS + STUDENT_ACTIVITY_LINKS above); Calendar/Chat
+// already cover Events/Chat, Photos moved into STUDENT_NAV_LINKS itself,
+// and Store isn't in the requested list - still reachable at its own
+// /store URL, just no longer a standing tab.
+const COMMUNITY_LINKS_STUDENT = [
+  { href: '/student/classes/dashboard', icon: 'grid', label: 'Classroom Dashboard', mobileLabel: 'Classroom<br>Dashboard' },
+];
 // portalTitle is a plain, caller-supplied string ('Main Admin' from every
 // views/main-admin-*.ejs and views/admin-<feature>-*.ejs file - the admin
 // panels themselves reuse this same partial+shell, see their own
@@ -598,6 +620,12 @@ const communityLinks =
     : portalTitle === 'Co-op Teacher Portal' ? COMMUNITY_LINKS_TEACHER
     : portalTitle === 'Student Portal' ? COMMUNITY_LINKS_STUDENT
     : COMMUNITY_LINKS;
+// This 3rd section's own heading - "Community" for every portal that
+// already used this slot for Community & Commerce links, but "Classroom"
+// for Student Portal now that Classroom Dashboard (COMMUNITY_LINKS_STUDENT
+// above) is the one thing it holds - a plain literal heading here would
+// mislabel it.
+const communityLinksTitle = portalTitle === 'Student Portal' ? 'Classroom' : 'Community';
 %>
 <%- include('icon-sprite') %>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -643,7 +671,7 @@ const communityLinks =
     </nav>
   <% } %>
   <% if (communityLinks.length) { %>
-    <p class="portal-nav-title">Community</p>
+    <p class="portal-nav-title"><%= communityLinksTitle %></p>
     <nav id="community-nav-links">
       <% communityLinks.forEach(function(link) { %>
         <a href="<%= link.href %>"><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>

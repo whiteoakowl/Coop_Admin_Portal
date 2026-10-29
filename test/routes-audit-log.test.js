@@ -130,13 +130,13 @@ test('deleting a newsletter issue creates an audit entry', async () => {
 
 test("toggling a notification type's auto-send creates an audit entry, not a fake one", async () => {
   const admin = await loginAsMainAdmin();
-  await request(app).post('/main-admin/notifications/event_registration/auto-send').set('Cookie', admin.cookie).type('form').send({ enabled: '0', _csrf: admin.csrfToken });
+  await request(app).post('/main-admin/notifications/event_registration/auto-send').set('Cookie', admin.cookie).type('form').send({ email: '0', sms: '0', _csrf: admin.csrfToken });
 
   const entries = await auditLog.list({ targetType: 'notification_type' });
-  assert.ok(entries.some((e) => e.action === 'notification_auto_send_toggled' && e.detail === 'event_registration: off'));
+  assert.ok(entries.some((e) => e.action === 'notification_auto_send_toggled' && e.detail === 'event_registration: email off, text off'));
 
   // Restore for any later test relying on default auto-send behavior.
-  await request(app).post('/main-admin/notifications/event_registration/auto-send').set('Cookie', admin.cookie).type('form').send({ enabled: '1', _csrf: admin.csrfToken });
+  await request(app).post('/main-admin/notifications/event_registration/auto-send').set('Cookie', admin.cookie).type('form').send({ email: '1', sms: '1', _csrf: admin.csrfToken });
 });
 
 test('the audit log page filters by target type', async () => {

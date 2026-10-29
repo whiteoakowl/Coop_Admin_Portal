@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Cash Flow Statement</h1>
+
+    <div class="roster-btn-row roster-btn-row-fit-text accounting-list-toolbar no-print">
+      <form method="GET" action="/main-admin/accounting/reports/cash-flow" class="filter-panel-inline">
+        <label for="cf-start-date">From</label>
+        <input type="date" id="cf-start-date" name="startDate" value="<%= filter.startDate || '' %>" />
+        <label for="cf-end-date">To</label>
+        <input type="date" id="cf-end-date" name="endDate" value="<%= filter.endDate || '' %>" />
+        <button type="submit" class="primary-btn">Apply</button>
+      </form>
+    </div>
+
+    <div class="roster-scroll">
+      <table class="roster-table condensed-table">
+        <tbody>
+          <tr><td>Cash In (Income)</td><td><%= formatCents(cashInCents) %></td></tr>
+          <tr><td>Cash Out (Purchases)</td><td><%= formatCents(cashOutCents) %></td></tr>
+          <tr><td><strong>Net Change in Cash</strong></td><td><strong><%= formatCents(netChangeCents) %></strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>

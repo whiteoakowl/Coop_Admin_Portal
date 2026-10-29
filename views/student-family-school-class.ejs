@@ -7,11 +7,59 @@
   <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle"><a href="/student/family-school">&larr; Family School Management</a></p>
     <h1><%= cls.class_name %></h1>
-    <% if (cls.description) { %><p class="hint"><%= cls.description %></p><% } %>
 
-    <%- include('partials/lessons-view', { lessons, canTakeQuiz: true, quizBasePath: '/student/family-school', quizQuery: '' }) %>
+    <%# A real request: "When you click on a family class it has the
+        same tabs as the co-op classes. Details, lessons, grades." Same
+        .view-tabs/.view-tab-panel shell and ?tab= convention as the
+        co-op's own student-class-detail.ejs. %>
+    <div class="view-tabs no-print">
+      <a class="view-tab<%= tab === 'details' ? ' active' : '' %>" href="?tab=details">Details</a>
+      <a class="view-tab<%= tab === 'lessons' ? ' active' : '' %>" href="?tab=lessons">Lessons</a>
+      <a class="view-tab<%= tab === 'grades' ? ' active' : '' %>" href="?tab=grades">Grades</a>
+    </div>
+
+    <div class="view-tab-panel">
+      <% if (tab === 'details') { %>
+        <% if (cls.description) { %>
+          <div class="hint forum-editable-display"><%- cls.description %></div>
+        <% } else { %>
+          <p class="roster-empty">No description set for this class yet.</p>
+        <% } %>
+      <% } else if (tab === 'lessons') { %>
+        <%- include('partials/lessons-view', { lessons, canTakeQuiz: true, quizBasePath: '/student/family-school', quizQuery: '' }) %>
+      <% } else if (tab === 'grades') { %>
+        <% if (grades.length === 0) { %>
+          <p class="roster-empty">No gradable assignments yet.</p>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table table-stack-mobile">
+              <thead>
+                <tr><th>Lesson</th><th>Assignment</th><th>Due</th><th>Submitted</th><th>Grade</th></tr>
+              </thead>
+              <tbody>
+                <% grades.forEach(function(g) { %>
+                  <tr>
+                    <td data-label="Lesson" class="table-stack-heading"><%= g.lesson_title %></td>
+                    <td data-label="Assignment"><%= g.item_title || '(untitled)' %><% if (g.points_possible != null) { %> <span class="hint">(<%= g.points_possible %> pts)</span><% } %></td>
+                    <td data-label="Due"><%= g.dueDateLabel || '—' %></td>
+                    <td data-label="Submitted"><%= g.submission_id ? 'Yes' : 'Not yet' %></td>
+                    <td data-label="Grade">
+                      <% if (g.grade_letter || g.points_earned != null) { %>
+                        <%= g.grade_letter || g.points_earned %>
+                        <% if (g.feedback) { %><p class="hint"><%= g.feedback %></p><% } %>
+                      <% } else { %>
+                        <span class="hint">Not graded yet</span>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      <% } %>
+    </div>
   </main>
 </body>
 </html>

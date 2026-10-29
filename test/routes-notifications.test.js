@@ -184,7 +184,7 @@ test("turning a type's auto-send off stops email/sms but keeps the in-app notifi
   const admin = await loginAsMainAdmin();
   const parent = await createParentAccount();
 
-  await request(app).post('/main-admin/notifications/event_registration/auto-send').set('Cookie', admin.cookie).type('form').send({ enabled: '0', _csrf: admin.csrfToken });
+  await request(app).post('/main-admin/notifications/event_registration/auto-send').set('Cookie', admin.cookie).type('form').send({ email: '0', sms: '0', _csrf: admin.csrfToken });
 
   const eventId = await createPublishedEvent(admin);
   await request(app).post(`/events/${eventId}/register`).set('Cookie', parent.cookie).type('form').send({ memberId: parent.memberId, _csrf: parent.csrfToken });
@@ -192,11 +192,16 @@ test("turning a type's auto-send off stops email/sms but keeps the in-app notifi
   const items = await notifications.listForAccount(parent.accountId);
   assert.equal(items.length, 1);
   const deliveries = await db.prepare('SELECT * FROM notification_deliveries WHERE notification_id = ?').all(items[0].id);
-  assert.equal(deliveries.length, 1);
-  assert.equal(deliveries[0].channel, 'in_app');
+  assert.equal(deliveries.find((d) => d.channel === 'in_app').status, 'sent');
+  const email = deliveries.find((d) => d.channel === 'email');
+  assert.equal(email.status, 'skipped');
+  assert.match(email.detail, /turned off/);
+  const sms = deliveries.find((d) => d.channel === 'sms');
+  assert.equal(sms.status, 'skipped');
+  assert.match(sms.detail, /turned off/);
 
   // Restore for any later test relying on default auto-send behavior.
-  await request(app).post('/main-admin/notifications/event_registration/auto-send').set('Cookie', admin.cookie).type('form').send({ enabled: '1', _csrf: admin.csrfToken });
+  await request(app).post('/main-admin/notifications/event_registration/auto-send').set('Cookie', admin.cookie).type('form').send({ email: '1', sms: '1', _csrf: admin.csrfToken });
 });
 
 // A real request: "a notifications settings card to control email,

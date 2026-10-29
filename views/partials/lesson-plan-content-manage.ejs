@@ -18,6 +18,19 @@
     <label class="member-form-full">Description
       <textarea name="description" rows="2"><%= plan.description || '' %></textarea>
     </label>
+    <%# A real request: "Edit permissions should be check boxes in a
+        single column to the left with first word of each sentence
+        starting next to it. Add allow members to use this lesson plan
+        for Homeschool family management." .checkbox-option already is
+        exactly that shape (checkbox left, text starts right next to
+        it) - a single checkbox today since this is the only permission
+        this plan has, in its own column rather than a grid/table. %>
+    <div class="member-form-full">
+      <label class="checkbox-option">
+        <input type="checkbox" name="allowFamilySchoolUse" value="1" <%= plan.allow_family_school_use ? 'checked' : '' %> />
+        Allow members to use this lesson plan for Homeschool family management
+      </label>
+    </div>
     <div class="member-form-full">
       <button type="submit" class="primary-btn">Save Lesson Plan Details</button>
     </div>

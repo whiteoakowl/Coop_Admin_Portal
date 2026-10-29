@@ -18,8 +18,8 @@ async function getType(key) {
   return db.prepare('SELECT * FROM notification_types WHERE key = ?').get(key);
 }
 
-async function setAutoSend(key, enabled) {
-  await db.prepare('UPDATE notification_types SET auto_send_enabled = ? WHERE key = ?').run(enabled ? 1 : 0, key);
+async function setAutoSend(key, { email, sms }) {
+  await db.prepare('UPDATE notification_types SET auto_send_email_enabled = ?, auto_send_sms_enabled = ? WHERE key = ?').run(email ? 1 : 0, sms ? 1 : 0, key);
 }
 
 // Merges an account's stored overrides onto the "enabled by default"
@@ -60,12 +60,11 @@ async function recordDelivery(notificationId, channel, result) {
 }
 
 // The single entry point every feature calls to generate a
-// notification. Always creates the in-app notification. If the type's
-// auto_send_enabled is off, that's the only channel attempted - a Main
-// Admin turning off a type's auto-send stops it from reaching email/sms
-// at all, without touching code. Otherwise email/sms are each attempted
-// only when the recipient hasn't opted out of that channel for this
-// type.
+// notification. Always creates the in-app notification. Email and SMS
+// are each attempted only when the type's own auto-send flag for that
+// channel is on AND the recipient hasn't opted out of that channel for
+// this type - a Main Admin can turn off just email (or just text) for a
+// type without touching the other channel.
 async function notify(accountId, typeKey, { title, body, linkUrl = null, mediaUrl = null } = {}) {
   const type = await getType(typeKey);
   if (!type) throw new Error(`Unknown notification type: ${typeKey}`);
@@ -74,19 +73,23 @@ async function notify(accountId, typeKey, { title, body, linkUrl = null, mediaUr
   const notificationId = info.lastInsertRowid;
   await recordDelivery(notificationId, 'in_app', { status: 'sent', detail: null });
 
-  if (!type.auto_send_enabled) return notificationId;
-
   const account = await db.prepare('SELECT ma.email, m.phone FROM member_accounts ma LEFT JOIN members m ON m.id = ma.member_id WHERE ma.id = ?').get(accountId);
 
-  if (await accountPrefersChannel(accountId, typeKey, 'email')) {
+  if (type.auto_send_email_enabled && (await accountPrefersChannel(accountId, typeKey, 'email'))) {
     await recordDelivery(notificationId, 'email', await emailProvider.send(account?.email, title, body));
   } else {
-    await recordDelivery(notificationId, 'email', { status: 'skipped', detail: 'Recipient opted out of this notification type by email.' });
+    await recordDelivery(notificationId, 'email', {
+      status: 'skipped',
+      detail: type.auto_send_email_enabled ? 'Recipient opted out of this notification type by email.' : 'Auto-send by email is turned off for this notification type.',
+    });
   }
-  if (await accountPrefersChannel(accountId, typeKey, 'sms')) {
+  if (type.auto_send_sms_enabled && (await accountPrefersChannel(accountId, typeKey, 'sms'))) {
     await recordDelivery(notificationId, 'sms', await smsProvider.send(account?.phone, `${title}: ${body}`, mediaUrl));
   } else {
-    await recordDelivery(notificationId, 'sms', { status: 'skipped', detail: 'Recipient opted out of this notification type by SMS.' });
+    await recordDelivery(notificationId, 'sms', {
+      status: 'skipped',
+      detail: type.auto_send_sms_enabled ? 'Recipient opted out of this notification type by SMS.' : 'Auto-send by SMS is turned off for this notification type.',
+    });
   }
 
   return notificationId;

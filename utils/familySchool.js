@@ -34,7 +34,7 @@ const { urlForUpload } = require('./uploadBackend');
 // from there, never a copy (this file never needs the plan row itself,
 // or its locked flag - see contentItemsForReferencedLessonPlan's own
 // comment below on why).
-const { contentItemsForLessonPlan } = require('./lessonPlans');
+const { contentItemsForLessonPlan, listFamilySchoolLessonPlans, getLessonPlan } = require('./lessonPlans');
 
 // Same bucket/local-dir convention routes/admin-members.js/routes/member-
 // directory.js already established for member photos - read-only reuse
@@ -188,33 +188,21 @@ async function createClass({ familyId, className, description, createdByAccountI
   return info.lastInsertRowid;
 }
 
-// A real request: "Add a button that says +preplanned class" - "Pick
-// from built-in curriculum templates." A small, fixed, app-provided
-// starter set (not a parent- or admin-authored template library, which
-// would be a whole separate feature) - each one a common homeschool
-// subject with a few starter lesson titles, a quick way to get a new
-// class off the ground rather than starting from a blank Class Name/
-// Description form every time.
-const PREPLANNED_CLASS_TEMPLATES = [
-  { key: 'math', name: 'Math', description: 'Core math skills and problem solving.', lessons: ['Numbers & Operations', 'Fractions & Decimals', 'Geometry Basics', 'Word Problems'] },
-  { key: 'language_arts', name: 'Language Arts', description: 'Reading comprehension, grammar, and writing.', lessons: ['Reading Comprehension', 'Grammar & Punctuation', 'Creative Writing', 'Vocabulary Building'] },
-  { key: 'science', name: 'Science', description: 'Hands-on exploration of the natural world.', lessons: ['Scientific Method', 'Life Science', 'Earth & Space', 'Simple Experiments'] },
-  { key: 'history', name: 'History & Social Studies', description: 'People, places, and events through time.', lessons: ['World Geography', 'Early Civilizations', 'American History', 'Civics & Government'] },
-  { key: 'art', name: 'Art', description: 'Drawing, painting, and creative expression.', lessons: ['Drawing Fundamentals', 'Color Theory', 'Mixed Media Projects', 'Art History'] },
-  { key: 'pe_health', name: 'PE & Health', description: 'Physical activity and healthy habits.', lessons: ['Fitness Basics', 'Nutrition', 'Team Sports', 'Mindfulness & Wellness'] },
-];
-
-function preplannedClassTemplates() {
-  return PREPLANNED_CLASS_TEMPLATES;
-}
-
-async function createClassFromTemplate(templateKey, familyId, createdByAccountId) {
-  const template = PREPLANNED_CLASS_TEMPLATES.find((t) => t.key === templateKey);
-  if (!template) return null;
-  const classId = await createClass({ familyId, className: template.name, description: template.description, createdByAccountId });
-  for (const lessonTitle of template.lessons) {
-    await createLesson({ classId, title: lessonTitle, description: null, createdByAccountId });
-  }
+// A real request: "+preplanned class" button, later changed to pull
+// from the admin's own Lesson Plans library instead of a fixed built-in
+// set: "Lessons should show up under add preplanned class button." Only
+// plans an admin flagged allow_family_school_use (utils/lessonPlans.js's
+// own listFamilySchoolLessonPlans) are offered - picking one creates a
+// new class named after the plan, with one lesson already added that
+// references the plan (same live read-through "Choose from Lesson Plans
+// library" source createLesson's own sourceLessonPlanId already gives
+// the "+ New Lesson" dialog), so it stays in sync with the admin's
+// original and can never be edited out from under them if locked.
+async function createClassFromLessonPlan(lessonPlanId, familyId, createdByAccountId) {
+  const plan = await getLessonPlan(lessonPlanId);
+  if (!plan || !plan.allow_family_school_use) return null;
+  const classId = await createClass({ familyId, className: plan.title, description: plan.description, createdByAccountId });
+  await createLesson({ classId, title: plan.title, description: plan.description, createdByAccountId, sourceLessonPlanId: plan.id });
   return classId;
 }
 
@@ -1209,17 +1197,43 @@ async function moveWeekAssignment(assignmentId, newWeekDateId) {
 // (not video/text/file) across every class this family has ever
 // created, regardless of which student(s) it's assigned to - the
 // planner entry this backs isn't itself student-scoped the way a real
-// assignment submission is.
+// assignment submission is. A real request later added a second source:
+// "Assignment/lessons should also show up under weekly planner add
+// lessons" for a lesson that references a Lesson Plans library plan
+// (source_lesson_plan_id) - its assignment items are virtual (read live
+// from lesson_plan_content_items, see contentItemsForReferencedLessonPlan
+// above), never rows in family_school_content_items, so they need their
+// own query here. Those ids are prefixed 'plan-' (lesson_plan_content_
+// items has its own, separately-numbered id sequence - a plain integer
+// id could collide with a real family_school_content_items one) so the
+// route below can tell which table an id came from, since content_
+// item_id on family_school_week_assignments is a real foreign key into
+// family_school_content_items only - a plan-sourced pick is saved with
+// contentItemId left null (title/subject are still copied over by
+// value), the same as "Add New Assignment" already does.
 async function assignmentOptionsForFamily(familyId) {
-  return db
+  const own = await db
     .prepare(
       `SELECT ci.id, ci.title, c.class_name FROM family_school_content_items ci
        JOIN family_school_lessons l ON l.id = ci.lesson_id
        JOIN family_school_classes c ON c.id = l.class_id
-       WHERE c.family_id = ? AND ci.type IN ('assignment_upload', 'assignment_submission')
-       ORDER BY c.class_name COLLATE "C", ci.title COLLATE "C"`
+       WHERE c.family_id = ? AND ci.type IN ('assignment_upload', 'assignment_submission')`
     )
     .all(familyId);
+  const fromPlans = await db
+    .prepare(
+      `SELECT lpci.id, lpci.title, c.class_name FROM lesson_plan_content_items lpci
+       JOIN lesson_plans lp ON lp.id = lpci.lesson_plan_id
+       JOIN family_school_lessons l ON l.source_lesson_plan_id = lp.id
+       JOIN family_school_classes c ON c.id = l.class_id
+       WHERE c.family_id = ? AND lp.allow_family_school_use = true AND lpci.type IN ('assignment_upload', 'assignment_submission')`
+    )
+    .all(familyId);
+  const options = [
+    ...own.map((r) => ({ id: String(r.id), title: r.title, class_name: r.class_name })),
+    ...fromPlans.map((r) => ({ id: `plan-${r.id}`, title: r.title, class_name: r.class_name })),
+  ];
+  return options.sort((a, b) => a.class_name.localeCompare(b.class_name) || a.title.localeCompare(b.title));
 }
 
 // --- Portfolio (its own subpage - a real request: "add a subpage
@@ -1344,8 +1358,7 @@ module.exports = {
   classesForFamily,
   getClass,
   createClass,
-  preplannedClassTemplates,
-  createClassFromTemplate,
+  createClassFromLessonPlan,
   updateClass,
   deleteClass,
   studentsForClass,

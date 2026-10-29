@@ -20,6 +20,16 @@ async function listLessonPlans() {
   return db.prepare('SELECT * FROM lesson_plans ORDER BY title').all();
 }
 
+// A real request: "Allow members to use this lesson plan for Homeschool
+// family management... lesson should appear on available lesson plans
+// page... should show up under add preplanned class button... weekly
+// planner add lessons." The one filtered lookup every Family School
+// Management surface that lists lesson plans calls, instead of each
+// route re-querying lesson_plans.allow_family_school_use on its own.
+async function listFamilySchoolLessonPlans() {
+  return db.prepare('SELECT * FROM lesson_plans WHERE allow_family_school_use = true ORDER BY title').all();
+}
+
 async function getLessonPlan(id) {
   return db.prepare('SELECT * FROM lesson_plans WHERE id = ?').get(id);
 }
@@ -31,8 +41,10 @@ async function createLessonPlan({ title, description, createdByAccountId }) {
   return info.lastInsertRowid;
 }
 
-async function updateLessonPlan(id, { title, description }) {
-  await db.prepare("UPDATE lesson_plans SET title = ?, description = ?, updated_at = now_text() WHERE id = ?").run(title, description || null, id);
+async function updateLessonPlan(id, { title, description, allowFamilySchoolUse }) {
+  await db
+    .prepare('UPDATE lesson_plans SET title = ?, description = ?, allow_family_school_use = ?, updated_at = now_text() WHERE id = ?')
+    .run(title, description || null, !!allowFamilySchoolUse, id);
 }
 
 // A real request: "Lesson plan so that if a teacher uses it for co-op
@@ -235,6 +247,7 @@ async function assignLessonPlanToClass(lessonPlanId, classId, createdByAccountId
 
 module.exports = {
   listLessonPlans,
+  listFamilySchoolLessonPlans,
   getLessonPlan,
   createLessonPlan,
   updateLessonPlan,

@@ -88,7 +88,10 @@ test('Settings tab is a card grid, with a Sections card linking to /main-admin/s
   const cookie = await loginAsMainAdmin();
   const res = await request(app).get('/main-admin/members?tab=settings').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /<div class="team-card-grid">/);
+  // A real request ("Members Settings. Mobile. Settings cards should be
+  // two columns, shrink to fit") added a 2nd class to this grid
+  // (settings-hub-card-grid) alongside the shared team-card-grid one.
+  assert.match(res.text, /<div class="team-card-grid settings-hub-card-grid">/);
   assert.match(res.text, /href="\/main-admin\/sections"[\s\S]*?Sections/);
   assert.match(res.text, /href="\/main-admin\/members\?tab=settings&settingsTab=grade-levels"/);
   // The old in-page tab strip (a <div class="view-tabs"> of <a

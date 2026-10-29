@@ -119,6 +119,46 @@ test('A lesson plan\'s own manage page: Lesson Plan Details form, add a text con
   assert.match(withQuiz.text, /1 question/);
 });
 
+// A real request: "Add allow members to use this lesson plan for
+// Homeschool family management" - a single checkbox saved alongside
+// title/description on the same Lesson Plan Details form, off by
+// default.
+test('Lesson Plan Details form: the Homeschool family management checkbox defaults off and persists when checked', async () => {
+  const admin = await loginAsAdmin();
+  const createRes = await request(app)
+    .post('/admin/lesson-plans')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Family Use Plan', _csrf: admin.csrfToken });
+  const planId = /\/admin\/lesson-plans\/(\d+)/.exec(createRes.headers.location)[1];
+
+  const manage = await request(app).get(`/admin/lesson-plans/${planId}`).set('Cookie', admin.cookie);
+  assert.match(manage.text, /Allow members to use this lesson plan for Homeschool family management/);
+  assert.doesNotMatch(manage.text, /name="allowFamilySchoolUse" value="1" checked/);
+
+  await request(app)
+    .post(`/admin/lesson-plans/${planId}/edit`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Family Use Plan', description: '', allowFamilySchoolUse: '1', _csrf: admin.csrfToken });
+
+  const plan = await db.prepare('SELECT allow_family_school_use FROM lesson_plans WHERE id = ?').get(planId);
+  assert.equal(plan.allow_family_school_use, true);
+
+  const checkedPage = await request(app).get(`/admin/lesson-plans/${planId}`).set('Cookie', admin.cookie);
+  assert.match(checkedPage.text, /name="allowFamilySchoolUse" value="1" checked/);
+
+  // Saving again without the checkbox (unchecked box never posts a
+  // value) must turn it back off.
+  await request(app)
+    .post(`/admin/lesson-plans/${planId}/edit`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Family Use Plan', description: '', _csrf: admin.csrfToken });
+  const unchecked = await db.prepare('SELECT allow_family_school_use FROM lesson_plans WHERE id = ?').get(planId);
+  assert.equal(unchecked.allow_family_school_use, false);
+});
+
 test('Assign to Class deep-copies the lesson plan as a brand new, fully independent class lesson', async () => {
   const admin = await loginAsAdmin();
   const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'Art Class' });

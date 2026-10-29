@@ -50,6 +50,10 @@ const reading = require('../utils/reading');
 const { GAMES, CATEGORY_LABELS, gameByKey } = require('../utils/gamesCatalog');
 const gameStats = require('../utils/gameStats');
 const natureNews = require('../utils/natureNews');
+// Aliased - this file already has its own local classesForStudent(member)
+// (the co-op's own, a few lines below) with a different signature
+// (member, not a bare studentId).
+const { classesForStudent: familyClassesForStudent } = require('../utils/familySchool');
 const wordOfWeek = require('../utils/wordOfWeek');
 const spellingBee = require('../utils/spellingBee');
 const { imageFileFilter, lessonAttachmentFileFilter } = require('../utils/uploads');
@@ -205,7 +209,7 @@ router.get('/classes', async (req, res) => {
   const classDays = [...new Set(classes.map((c) => c.day))].sort((a, b) => CLASS_DAY_ORDER[a] - CLASS_DAY_ORDER[b]);
 
   res.render('student-classes', {
-    title: 'Class Schedule',
+    title: 'Co-op Schedule',
     classes,
     classDays,
     dayLabels: CLASS_DAY_LABELS_FULL,
@@ -233,6 +237,14 @@ router.get('/classes', async (req, res) => {
 // same "dropped from the nav, not from the route table" precedent as
 // /student/name-tag), and a class's own Assignments tab already lives one
 // click away from every card here.
+// A real request: "Classroom dashboard has all family school management
+// classes and co-op classes together, but categorized and filters, for
+// easier viewing for students." Co-op classes keep their existing day-
+// grouped shape; Homeschool Family Classes (utils/familySchool.js's own
+// classesForStudent - a flat list, this feature has no day/time schedule
+// of its own, see that table's own migration comment) get their own
+// section below it. The Filter narrows to just one category instead of
+// hiding either section's own markup conditionally in the view.
 router.get('/classes/dashboard', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const classes = await classesForStudent(member);
@@ -243,11 +255,18 @@ router.get('/classes/dashboard', async (req, res) => {
   });
   const days = Object.keys(byDay).sort((a, b) => CLASS_DAY_ORDER[a] - CLASS_DAY_ORDER[b]);
   days.forEach((d) => byDay[d].sort(byHourPosition));
+
+  const familyClasses = member ? await familyClassesForStudent(member.id) : [];
+
+  const type = ['coop', 'family'].includes(req.query.type) ? req.query.type : 'all';
+
   res.render('student-class-dashboard', {
     title: 'Classroom Dashboard',
-    days,
+    type,
+    days: type === 'family' ? [] : days,
     dayLabels: CLASS_DAY_LABELS_FULL,
     byDay,
+    familyClasses: type === 'coop' ? [] : familyClasses,
   });
 });
 

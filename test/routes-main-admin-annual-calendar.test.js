@@ -90,6 +90,60 @@ test('Picking a school year transparently creates its own calendar - no separate
   assert.doesNotMatch(page.text, new RegExp(`June ${startYear}`), 'should not include a month before the school year starts');
 });
 
+// A real request: "Year dropdown should be first in the row with the
+// pdf, export and print icons. Same row side by side. Delete
+// description on page."
+test('the School Year select and Print/PDF icons share one row (year first), and the page has no description', async () => {
+  const startYear = nextStartYear();
+  const admin = await loginAsMainAdmin();
+  const { page } = await openCalendar(admin, startYear);
+
+  assert.doesNotMatch(page.text, /Click a key above to select it/);
+
+  const selectIdx = page.text.indexOf('name="schoolYear"');
+  const printIdx = page.text.indexOf('aria-label="Print"');
+  const pdfIdx = page.text.indexOf('aria-label="Download PDF"');
+  assert.ok(selectIdx > -1 && printIdx > -1 && pdfIdx > -1, 'the select and both icons should be present');
+  assert.ok(selectIdx < printIdx && printIdx < pdfIdx, 'the year select should come first, then Print, then PDF');
+
+  // All three share the same .roster-btn-row - no other row markers
+  // (the key-actions row, the key-swatch bar) sit between them.
+  const rowStart = page.text.lastIndexOf('<div class="roster-btn-row', pdfIdx);
+  assert.ok(rowStart > -1 && rowStart < selectIdx, 'the year select, Print, and PDF icons must all be inside the same toolbar row');
+});
+
+// A real bug report: "pdf and print bleed onto 2nd page" - reproduced
+// with keys present (the title + key legend's own margins pushed the
+// fixed-height month grid just past the printable page height). A
+// single-page PDF confirms the fix; the PDF's own page tree always has
+// at least one "/Type /Page" object per page (never "/Type /Pages",
+// the parent node) and this app's printed calendar has nothing else
+// that string would match, so counting occurrences is a reliable page count.
+test('Download PDF stays on one page even with several keys shown', async () => {
+  const startYear = nextStartYear();
+  const admin = await loginAsMainAdmin();
+  const { page, calendar } = await openCalendar(admin, startYear);
+  let csrf = extractCsrf(page.text);
+  for (const label of ['Holiday', 'No School', 'Half Day']) {
+    const res = await request(app)
+      .post('/main-admin/annual-calendar/keys')
+      .set('Cookie', admin.cookie)
+      .type('form')
+      .send({ calendarId: String(calendar.id), label, color: '#ff0000', _csrf: csrf });
+    csrf = extractCsrf((await request(app).get(`/main-admin/annual-calendar?schoolYear=${startYear}`).set('Cookie', admin.cookie)).text);
+    void res;
+  }
+
+  const pdfRes = await request(app).get(`/main-admin/annual-calendar/download.pdf?schoolYear=${startYear}`).set('Cookie', admin.cookie).buffer(true).parse((res, cb) => {
+    const chunks = [];
+    res.on('data', (c) => chunks.push(c));
+    res.on('end', () => cb(null, Buffer.concat(chunks)));
+  });
+  assert.equal(pdfRes.status, 200);
+  const pageObjectMatches = pdfRes.body.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || [];
+  assert.equal(pageObjectMatches.length, 1, 'the calendar should print on a single page, not bleed onto a 2nd');
+});
+
 test('Create key button, add/edit/delete keys, and click dates to color them', async () => {
   const startYear = nextStartYear();
   const admin = await loginAsMainAdmin();

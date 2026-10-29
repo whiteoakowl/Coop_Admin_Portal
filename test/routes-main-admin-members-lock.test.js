@@ -113,6 +113,27 @@ test('locking and unlocking toggles member_accounts.status and the Locked tab li
   assert.match(lockedTab.text, /LockToggleFamily Parent/);
   assert.match(lockedTab.text, /data-member-unlock-url="\/main-admin\/members\/\d+\/unlock"/);
 
+  // A real request: "Locked. Should have the same icons and buttons
+  // formatted in the same rows as the archive page. Shrink to fit table
+  // as well."
+  assert.match(lockedTab.text, /class="members-search-filter-row no-print">/);
+  assert.match(lockedTab.text, /href="\/main-admin\/members\/locked\/export\.csv"/);
+  assert.match(lockedTab.text, /href="\/main-admin\/members\/locked\/print"/);
+  assert.match(lockedTab.text, /href="\/main-admin\/members\/locked\/download\.pdf"/);
+  assert.match(lockedTab.text, /class="roster-table condensed-table locked-table"/);
+
+  const lockedCsv = await request(app).get('/main-admin/members/locked/export.csv').set('Cookie', mainAdmin.cookie);
+  assert.equal(lockedCsv.status, 200);
+  assert.match(lockedCsv.text, /lock\.toggle@example\.com/);
+
+  const lockedPrint = await request(app).get('/main-admin/members/locked/print').set('Cookie', mainAdmin.cookie);
+  assert.equal(lockedPrint.status, 200);
+  assert.match(lockedPrint.text, /LockToggleFamily Parent/);
+
+  const lockedPdf = await request(app).get('/main-admin/members/locked/download.pdf').set('Cookie', mainAdmin.cookie);
+  assert.equal(lockedPdf.status, 200);
+  assert.equal(lockedPdf.headers['content-type'], 'application/pdf');
+
   // The regular Members tab still lists the member, but its own Lock
   // icon becomes a disabled "Locked" indicator instead of a clickable
   // data-member-lock-url button once suspended (views/main-admin-

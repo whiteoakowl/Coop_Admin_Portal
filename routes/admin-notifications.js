@@ -1,12 +1,13 @@
 // Main Admin's Notification Type controls (Community & Commerce track,
 // item 11) - mounted at /main-admin/notifications, gated the same as
 // Newsletter (manage_communications). The only thing an admin controls
-// here is auto_send_enabled per type - "admin control over which
-// message types actually send automatically," per the handoff. The
-// catalog of types itself is seeded from real callers (see
-// supabase/migrations/20260825110000_notifications.sql), not editable
-// here - a new type means a new real feature calling notify(), not a
-// freeform admin-created row.
+// here is each type's auto_send_email_enabled/auto_send_sms_enabled -
+// "admin control over which message types actually send automatically,"
+// per the handoff, independently per channel. The catalog of types
+// itself is seeded from real callers (see supabase/migrations/
+// 20260825110000_notifications.sql), not editable here - a new type
+// means a new real feature calling notify(), not a freeform admin-
+// created row.
 const express = require('express');
 const router = express.Router();
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
@@ -30,9 +31,10 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/:key/auto-send', async (req, res) => {
-  const enabled = req.body.enabled === '1';
-  await notifications.setAutoSend(req.params.key, enabled);
-  await auditLog.record(req.portalAccount.id, 'notification_auto_send_toggled', 'notification_type', null, `${req.params.key}: ${enabled ? 'on' : 'off'}`);
+  const email = req.body.email === '1';
+  const sms = req.body.sms === '1';
+  await notifications.setAutoSend(req.params.key, { email, sms });
+  await auditLog.record(req.portalAccount.id, 'notification_auto_send_toggled', 'notification_type', null, `${req.params.key}: email ${email ? 'on' : 'off'}, text ${sms ? 'on' : 'off'}`);
   res.redirect('/main-admin/notifications?notice=' + encodeURIComponent('Saved.'));
 });
 

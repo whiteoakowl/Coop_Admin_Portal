@@ -25,7 +25,12 @@ const ALLOWED_TAGS = [
   // that shape - see exclusiveFilter below, which drops any input that
   // isn't type="checkbox" (there's nothing else a saved post could use
   // 'input' for; this was never a general form-control allowance).
-  'input',
+  // 'label' is the inert wrapper the editor's own checklist markup puts
+  // around that checkbox (TipTap's official task-item node always
+  // renders one) - carries no attributes here (not in
+  // ALLOWED_ATTRIBUTES), so it's purely a layout wrapper, never a
+  // control of its own.
+  'input', 'label',
   // Video embed (toolbar's Insert Video button). Allowing <iframe> at all
   // is the one real exception to this file's own "no iframe" rule, so
   // it's deliberately narrow: allowedIframeHostnames below strips the src
@@ -66,7 +71,17 @@ const ALLOWED_ATTRIBUTES = {
   h2: ['style', 'dir'],
   h3: ['style', 'dir'],
   h4: ['style', 'dir'],
-  li: ['style', 'dir'],
+  // data-type/data-checked are inert metadata (not a URL, not a style,
+  // nothing executable) - the editor's checklist feature (TipTap's
+  // task-list/task-item nodes) needs them to survive a save, or it can't
+  // tell a checklist <ul>/<li> apart from a plain bullet-list one on the
+  // NEXT page load (its own parser keys off these two attributes, not
+  // the tag alone) and silently downgrades into a plain bullet list,
+  // with the checked/unchecked state lost too (data-checked is what it
+  // actually reads back, not the nested checkbox's own `checked`
+  // attribute). A real bug found by testing the save-reload round trip.
+  ul: ['data-type'],
+  li: ['style', 'dir', 'data-type', 'data-checked'],
   blockquote: ['style', 'dir'],
   input: ['type', 'checked', 'disabled'],
   iframe: ['src', 'width', 'height', 'title', 'allow', 'allowfullscreen', 'frameborder', 'sandbox'],

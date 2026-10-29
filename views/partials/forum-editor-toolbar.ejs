@@ -1,22 +1,30 @@
 <%
-// Toolbar for the shared rich-text editor (public/js/forum-editor.js) -
-// used well beyond chat now (publications, newsletter, announcements/
-// notifications, class/event descriptions, event/class edit forms,
-// emails - "anywhere there is text," a real request, later pinned to one
-// exact reference layout: utility row (source/search/fullscreen/undo-
-// redo/clipboard) - Paragraph/Font/Size dropdowns - inline formatting +
-// colors - alignment/lists/indent - links/media/table/symbols - Clear
-// Formatting. Every button/dropdown here maps to something utils/
-// sanitizeHtml.js actually allows to survive - no control offers
-// formatting the server would just strip back out. A few toolbar-only
-// conveniences that never touch the saved HTML at all (Find & Replace,
-// Spellcheck, Fullscreen, Search, the clipboard row, text direction)
-// have no server-side counterpart to keep in sync with - Direction and
-// Spellcheck specifically aren't part of the reference image at all
-// (pre-existing features here before that image showed up), so they're
-// parked at the end of the utility row instead of sitting inside the
-// align/list row or the link/media row, which otherwise mirror the
-// reference's own button groups one-for-one.
+// Toolbar for the shared rich-text editor - a real request: "upgrade
+// [the editor] to resemble more like editing a real document in
+// Microsoft Word or Google Docs... full editing features." The engine
+// behind public/js/forum-editor.js is now TipTap/ProseMirror (see
+// public/js/forum-editor.source.js, the actual hand-edited source - the
+// served file is esbuild's generated bundle of it, `npm run
+// build:editor`), not document.execCommand, but this markup/button set
+// is unchanged: every data-forum-cmd value here is looked up in that
+// file's own COMMANDS table, so the control layout below still mirrors
+// its original reference image one-for-one. Used well beyond chat now
+// (publications, newsletter, announcements/notifications, class/event
+// descriptions, event/class edit forms, emails - "anywhere there is
+// text"): utility row (source/search/fullscreen/undo-redo/clipboard) -
+// Paragraph/Font/Size dropdowns - inline formatting + colors -
+// alignment/lists/indent - links/media/table/symbols - Clear Formatting.
+// Every button/dropdown here maps to something utils/sanitizeHtml.js
+// actually allows to survive - no control offers formatting the server
+// would just strip back out. A few toolbar-only conveniences that never
+// touch the saved HTML at all (Find & Replace, Spellcheck, Fullscreen,
+// Search, the clipboard row, text direction) have no server-side
+// counterpart to keep in sync with - Direction and Spellcheck
+// specifically aren't part of the reference image at all (pre-existing
+// features here before that image showed up), so they're parked at the
+// end of the utility row instead of sitting inside the align/list row or
+// the link/media row, which otherwise mirror the reference's own button
+// groups one-for-one.
 //
 // Icons: every icon below is a plain-stroke SVG from icon-sprite.ejs,
 // drawn to match the reference image's own icon shapes (not just a
@@ -80,10 +88,10 @@
     </select>
     <select data-forum-cmd="fontSize" title="Size">
       <option value="">16px</option>
-      <option value="1">Small</option>
-      <option value="3">Normal (16px)</option>
-      <option value="5">Large</option>
-      <option value="7">Huge</option>
+      <option value="12px">Small</option>
+      <option value="16px">Normal (16px)</option>
+      <option value="24px">Large</option>
+      <option value="32px">Huge</option>
     </select>
   </div>
 

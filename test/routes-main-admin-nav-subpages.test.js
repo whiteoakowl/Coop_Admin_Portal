@@ -130,7 +130,10 @@ test('Mobile orange bar: every subpages-bearing item gets its own popup trigger 
     // Locked (a real request: "add a lock icon on each member. Add a
     // subpage called locked") added a 5th Members subpage.
     { slug: 'members', tabCount: 5 },
-    { slug: 'accounting', tabCount: 7 },
+    // Reports/Transactions/Receipts (a real request: "accounting, add a
+    // subpage called reports... add a subpage called transactions...
+    // add a subpage called receipts") grew this from 7 to 10 subpages.
+    { slug: 'accounting', tabCount: 10 },
     // Contact Admin Messages (the new admin-facing inbox for the
     // Parent/Student/Teacher-facing Contact Admins page) added a 5th
     // subpage here.

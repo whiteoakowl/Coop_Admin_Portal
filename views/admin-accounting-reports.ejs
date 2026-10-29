@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Reports</h1>
+
+    <%# A real request: "add a subpage called reports. Here there will
+        be a few link bars each called profit and loss, balance sheet,
+        cash flow statement." Same .team-card-grid/.team-info-card "pick
+        one of these named things" shape every other Settings/gear hub
+        in this app already uses (views/main-admin-settings-hub.ejs). %>
+    <div class="team-card-grid">
+      <div class="team-col">
+        <a class="team-info-card" href="/main-admin/accounting/reports/profit-and-loss">
+          <span class="team-info-icon"><svg class="icon"><use href="#icon-file-text"/></svg></span>
+          <h3 class="team-info-title">Profit and Loss</h3>
+        </a>
+      </div>
+      <div class="team-col">
+        <a class="team-info-card" href="/main-admin/accounting/reports/balance-sheet">
+          <span class="team-info-icon"><svg class="icon"><use href="#icon-file-text"/></svg></span>
+          <h3 class="team-info-title">Balance Sheet</h3>
+        </a>
+      </div>
+      <div class="team-col">
+        <a class="team-info-card" href="/main-admin/accounting/reports/cash-flow">
+          <span class="team-info-icon"><svg class="icon"><use href="#icon-file-text"/></svg></span>
+          <h3 class="team-info-title">Cash Flow Statement</h3>
+        </a>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

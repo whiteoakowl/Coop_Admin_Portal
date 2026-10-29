@@ -1528,6 +1528,12 @@ body.public-page .roster-empty {
 .checkbox-option input[type="radio"] { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); flex-shrink: 0; }
 .absence-required-msg { color: var(--red); font-weight: 600; margin-top: 0.35rem; }
 
+/* Main Admin > Notifications table: "click to view the popup and edit" -
+   each row opens its own type's dialog instead of an inline toggle. */
+.notification-type-row { cursor: pointer; }
+.notification-type-row:hover td,
+.notification-type-row:focus-visible td { background: var(--orange-bg); }
+
 /* A real bug report: Co-op Class Settings (General tab) forced the whole
    page wider than a phone screen. One contributor: the "Consider the
    student's age on [month] [day] during the academic year..." radio
@@ -5501,6 +5507,14 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
   .sections-table th, .sections-table td { padding: 0.3rem 0.4rem; }
 }
 
+/* Main Admin Members > Locked - a real request: "shrink to fit table as
+   well" (alongside matching Archive's own icon row). Same shrink-to-fit
+   treatment as .sections-table above. */
+@media (max-width: 640px) {
+  .locked-table { font-size: 0.78rem; }
+  .locked-table th, .locked-table td { padding: 0.3rem 0.4rem; }
+}
+
 /* Main Admin Settings > Admins - a real request: "shrink admin table on
    mobile so that all information still fits clean on one row but you
    can see all of it at once." Same mobile-only compacting treatment as
@@ -5537,7 +5551,17 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 }
 @media (max-width: 640px) {
   .grade-level-settings-table { font-size: 0.78rem; }
-  .grade-level-settings-table th, .grade-level-settings-table td { padding: 0.35rem 0.5rem; }
+  .grade-level-settings-table th, .grade-level-settings-table td { padding: 0.3rem 0.4rem; }
+  /* A real follow-up request: "shrinks a lot to fit all columns and
+     titles clean in mobile view" - the 3rd header ("...then they will
+     be in") was visibly longer than the other two, so it alone wrapped
+     to 2 lines while its siblings stayed on 1, leaving a lopsided header
+     row. Headers now run smaller than the body text (rather than the
+     same size), the one real fix that lets all 3 fit on one line again
+     at every width this table already supports, instead of just
+     shrinking everything by the same amount and still hitting the same
+     wrap. */
+  .grade-level-settings-table th { font-size: 0.62rem; line-height: 1.15; }
   /* A real request: "shrink table so that you can view the date in the
      dropdown menu" - shrinking these inputs' own width (above) without
      also shrinking their padding left them with almost no room for
@@ -5548,9 +5572,17 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
      to a barely-visible sliver. !important needed - that base rule's
      :not() chain out-specifies a plain two-class selector here, same
      reasoning .admin-corner-search input's own matching comment
-     documents. */
+     documents.
+     A later real request ("should be able to see the entire date in
+     the dropdown windows") found the date box still too narrow on some
+     real phones' own native date-picker rendering even though Chromium
+     shows it in full - .grade-level-settings-age-suffix stacking "years
+     old" onto its own line below the number input (rather than beside
+     it) frees up column width, which goes straight to widening the
+     date box further below. */
   .grade-level-settings-age-cell input[type="number"] { width: 3.5rem; padding: 0.35rem 0.4rem !important; }
-  .grade-level-settings-table input[type="date"] { width: 8.5rem; padding: 0.35rem 0.4rem !important; }
+  .grade-level-settings-age-suffix { display: block; font-size: 0.68rem; margin-top: 0.1rem; }
+  .grade-level-settings-table input[type="date"] { width: 9.5rem; padding: 0.35rem 0.4rem !important; }
 }
 
 /* A real follow-up request: the above still wasn't tight enough to "fit
@@ -5560,10 +5592,24 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
    breathing room (border-spacing) so the shrunk rows don't feel cramped
    against each other. */
 @media (max-width: 480px) {
-  .grade-level-settings-table { font-size: 0.7rem; border-collapse: separate; border-spacing: 0 0.15rem; }
-  .grade-level-settings-table th, .grade-level-settings-table td { padding: 0.3rem 0.35rem; }
-  .grade-level-settings-age-cell input[type="number"] { width: 2.75rem; padding: 0.3rem 0.3rem !important; }
-  .grade-level-settings-table input[type="date"] { width: 7rem; padding: 0.3rem !important; }
+  .grade-level-settings-table { font-size: 0.68rem; border-collapse: separate; border-spacing: 0 0.15rem; }
+  .grade-level-settings-table th, .grade-level-settings-table td { padding: 0.25rem 0.3rem; }
+  .grade-level-settings-table th { font-size: 0.56rem; }
+  .grade-level-settings-age-cell input[type="number"] { width: 2.5rem; padding: 0.25rem !important; }
+  .grade-level-settings-age-suffix { font-size: 0.56rem; }
+  .grade-level-settings-table input[type="date"] { width: 7.75rem; padding: 0.25rem !important; }
+}
+/* The wider date box above (needed so its own mm/dd/yyyy value isn't
+   clipped) reintroduces a sideways scroll on genuinely tiny phones
+   (~320-359px, e.g. the original iPhone SE) even though 360px+ already
+   fits cleanly - one more pass of the same shrink, scoped narrower. */
+@media (max-width: 359px) {
+  .grade-level-settings-table { font-size: 0.6rem; }
+  .grade-level-settings-table th, .grade-level-settings-table td { padding: 0.2rem 0.2rem; }
+  .grade-level-settings-table th { font-size: 0.5rem; }
+  .grade-level-settings-age-cell input[type="number"] { width: 2.1rem; padding: 0.2rem !important; }
+  .grade-level-settings-age-suffix { font-size: 0.5rem; }
+  .grade-level-settings-table input[type="date"] { width: 6.9rem; padding: 0.2rem !important; }
 }
 
 /* Main Admin Volunteers > Committees list - a real request: "shrink
@@ -8780,8 +8826,21 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
      .btn-secondary (styles.css's own mobile grid rules above), but here
      the ask was for text-width sizing, not an equal-width grid, so the
      fix is this class picking them up instead. */
+  /* A real request: "Family attendance... Filter button, dropdown
+     menus should be the same size shrink to fit" - the Filter <details>
+     (its own clickable box is the <summary>, a .roster-action-btn, but
+     nested one level deeper than the plain buttons above) was never
+     covered by this same rule, so it kept its desktop flex: 1 0 auto/
+     min-width: 5.5rem sizing on mobile while its icon-btn siblings
+     shrank to their own content - a shared fix, not scoped to one page,
+     since every .roster-btn-row-fit-text toolbar with a Filter popover
+     (Overview/Grades/Attendance/Journal/...) has the same mismatch. */
+  .roster-btn-row-fit-text.roster-btn-row > details {
+    flex: 0 1 auto;
+  }
   .roster-btn-row-fit-text.roster-btn-row > .roster-action-btn,
   .roster-btn-row-fit-text.roster-btn-row > form > .roster-action-btn,
+  .roster-btn-row-fit-text.roster-btn-row > details > summary.roster-action-btn,
   .roster-btn-row-fit-text.roster-btn-row > .btn-secondary,
   .roster-btn-row-fit-text.roster-btn-row > .primary-btn {
     width: auto;
@@ -12101,8 +12160,28 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
 .forum-editor-findreplace button { width: auto; height: auto; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.85rem; cursor: pointer; }
 .forum-editor-hint { margin: 0.25rem 0 0; font-size: 0.72rem; color: var(--muted); }
 .forum-editor-hint kbd { display: inline-block; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0.05rem 0.35rem; font-family: inherit; font-size: 0.75rem; background: var(--surface); }
-.forum-editable { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 0.9rem; min-height: 6rem; background: var(--surface); }
-.forum-editable:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+/* A real request: "upgrade [the editor] to resemble more like editing a
+   real document in Microsoft Word or Google Docs" - a "page" card
+   (shadow, generous margins) instead of a plain bordered text box. Kept
+   modest rather than a hard-coded page width/centering: this same class
+   sits inside a dozen+ very differently-sized contexts (a one-line chat
+   composer, a narrow dialog, a full-width settings page, ...), and those
+   containers already size it correctly - fighting that with a fixed
+   max-width here would just break the narrower ones. TipTap mounts its
+   own contenteditable .ProseMirror div INSIDE this element rather than
+   making the element itself editable (public/js/forum-editor.source.js),
+   so focus styling targets the whole card via :focus-within instead of
+   :focus, and the ProseMirror div's own default outline is suppressed in
+   favor of that. */
+.forum-editable { border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1.5rem; min-height: 10rem; background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.08); }
+.forum-editable .ProseMirror { outline: none; min-height: inherit; }
+.forum-editable:focus-within { outline: 2px solid var(--brand); outline-offset: 1px; }
+.forum-editable p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--muted); }
+/* A chat room's own message composer (views/forums-thread.ejs's own
+   data-chat-room-form) shares this exact class but is a single-line
+   message box, not a document - the page treatment above would look
+   wrong there, so it stays compact. */
+[data-chat-room-form] .forum-editable { padding: 0.5rem 0.75rem; min-height: 2.5rem; box-shadow: none; }
 .forum-editable blockquote { border-left: 3px solid var(--border); margin: 0.5rem 0; padding-left: 0.75rem; color: var(--muted); }
 .forum-editable table { border-collapse: collapse; margin: 0.5rem 0; }
 .forum-editable table td, .forum-editable table th { border: 1px solid var(--border); padding: 0.35rem 0.55rem; }
@@ -12110,15 +12189,32 @@ input.forum-editor-color-input { position: absolute; width: 1px !important; heig
 /* Checklist item (toolbar's Checklist button) - the checkbox is always
    saved disabled (utils/sanitizeHtml.js forces it server-side too), so
    it reads as the author's own checked/unchecked marker, not a live
-   control. ul.task-list drops the usual bullet since the checkbox
-   already marks each line. Video embed (toolbar's Insert Video button) -
-   width:100% + aspect-ratio keeps a fixed-size YouTube/Vimeo iframe from
-   overflowing a narrower reading column instead of just clipping at its
-   own hard-coded 560x315. */
-.forum-editable ul.task-list,
-.forum-editable-display ul.task-list { list-style: none; padding-left: 0; }
-.forum-editable ul.task-list input[type="checkbox"],
-.forum-editable-display ul.task-list input[type="checkbox"] { margin-right: 0.45rem; accent-color: var(--brand); vertical-align: -0.15em; }
+   control. Scoped to the actual tag shape TipTap's task-item node (and,
+   post-sanitization, utils/sanitizeHtml.js) always produces - <li> >
+   <label> > checkbox - rather than a `class` attribute: `ul`/`li` have
+   no allowed attributes in that sanitizer at all, so a class here would
+   just be stripped on save and never survive a reload. Drops the usual
+   bullet since the checkbox already marks each line. Video embed
+   (toolbar's Insert Video button) - width:100% + aspect-ratio keeps a
+   fixed-size YouTube/Vimeo iframe from overflowing a narrower reading
+   column instead of just clipping at its own hard-coded 560x315. */
+.forum-editable ul:has(> li > label > input[type="checkbox"]),
+.forum-editable-display ul:has(> li > label > input[type="checkbox"]) { list-style: none; padding-left: 0; }
+/* TipTap's own task-item node puts the checkbox <label> and the text
+   content in a second, sibling <div> (not inside the label) - without a
+   row layout on the <li> itself, that content div (a block element)
+   drops to its own line below the checkbox instead of sitting beside
+   it. */
+.forum-editable li:has(> label > input[type="checkbox"]),
+.forum-editable-display li:has(> label > input[type="checkbox"]) { display: flex; align-items: flex-start; gap: 0.3rem; }
+.forum-editable li > label,
+.forum-editable-display li > label { display: inline-flex; align-items: center; cursor: default; flex: 0 0 auto; }
+.forum-editable li > div:last-child,
+.forum-editable-display li > div:last-child { flex: 1 1 auto; }
+.forum-editable li > div:last-child p,
+.forum-editable-display li > div:last-child p { margin: 0; }
+.forum-editable li > label > input[type="checkbox"],
+.forum-editable-display li > label > input[type="checkbox"] { margin-right: 0.45rem; accent-color: var(--brand); vertical-align: -0.15em; }
 .forum-editable iframe,
 .forum-editable-display iframe { display: block; width: 100%; max-width: 560px; aspect-ratio: 16 / 9; height: auto; border-radius: 8px; margin: 0.5rem 0; }
 .forum-editor-source-view { width: 100%; box-sizing: border-box; font-family: monospace; font-size: 0.85rem; resize: vertical; }
@@ -14023,6 +14119,40 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .member-profile-extra-card { margin-top: 1rem; }
 .member-profile-extra-card p { margin: 0 0 0.5rem; }
 
+/* A real request: "Profile icon. Make sure there is adequate space
+   between buttons, rows and icons." Scoped to the My Profile pages
+   (profile-page on <body>) rather than widening these shared primitives
+   app-wide, since other pages (the admin-side Member Profile card,
+   Members list, etc.) use the same classes at their current, already-
+   reviewed spacing. */
+.profile-page .view-tabs { gap: 0.6rem; }
+.profile-page .member-profile-contact-row { margin: 0.6rem 0; gap: 0.65rem; }
+.profile-page .member-profile-plain-list { gap: 0.55rem; }
+.profile-page .member-profile-banner-actions { gap: 1.25rem; }
+.profile-page .member-form-grid { gap: 1.35rem 1.75rem; }
+.profile-page .roster-btn-row { gap: 0.75rem; }
+
+/* A real request: "My profile icon. Schedules tab. Adequate space
+   between days. Shrink to fit rows of table to view it fully on
+   mobile." .roster-table's own generic mobile rule (font/padding
+   shrink only, cells stay nowrap) still let a long class/room name
+   force .roster-scroll's sideways scroll - same shrink-further-and-
+   wrap-the-long-column recipe already proven on the admin-side Member
+   Profile's own Schedule tab (.schedule-edit-table above) fixes that
+   here too, scoped to this page's own table class so it doesn't touch
+   any other .roster-table elsewhere. */
+.profile-schedule-day-heading { margin-top: 1.1rem; }
+.profile-schedule-day-heading:first-of-type { margin-top: 0.6rem; }
+.profile-page .profile-schedule-table { font-size: 0.78rem; }
+.profile-page .profile-schedule-table th,
+.profile-page .profile-schedule-table td { padding: 0.4rem 0.5rem; white-space: nowrap; }
+@media (max-width: 640px) {
+  .profile-page .profile-schedule-table { font-size: 0.68rem; }
+  .profile-page .profile-schedule-table th,
+  .profile-page .profile-schedule-table td { padding: 0.3rem 0.35rem; }
+  .profile-page .profile-schedule-table td:nth-child(2) { white-space: normal; }
+}
+
 /* A real request: "Main admin, games, shrink all tables to fit in
    mobile. And parent reading challenge. And student reading challenge.
    And vocabulary game, and pets. And nature news." Shared by every
@@ -14064,6 +14194,20 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    button gap between them. */
 .accounting-list-toolbar,
 .accounting-accounts-toolbar-2 { margin-bottom: 0.75rem; }
+
+/* Accounting > Reports' own date filters - a plain inline form (not
+   inside a .filter-details popover, since each Report page's only
+   filter is this one date range/as-of date, not several fields worth
+   hiding behind a Filter button) that still needs the same fit-to-
+   content sizing every other toolbar row already gets. */
+.filter-panel-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+
+/* The receipt image inside Transactions'/Receipts' own per-row dialog -
+   unconstrained, an uploaded photo could be far wider/taller than the
+   dialog itself. */
+.accounting-receipt-preview { max-width: 100%; max-height: 60vh; border: 1px solid var(--border); border-radius: var(--control-radius); }
+
+.accounting-report-net { font-size: 1.1rem; margin-top: 1rem; }
 
 /* Accounts page's own 2nd button row ("filters, email all invoices,
    print preview icon, export icon") - same fit-to-text fix as
@@ -14778,6 +14922,16 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .annual-calendar-print-title { text-align: center; }
 .annual-calendar-print-key-row { justify-content: center; margin-bottom: 1.5rem; }
 @media print {
+  /* A real bug report: "pdf and print bleed onto 2nd page" - once any
+     keys exist, the title + key-legend row above the grid (each with
+     their own on-screen-sized margins) pushed the fixed 9.1in grid just
+     past the @page's own 10in printable height (11in letter minus the
+     0.5in top+bottom margins), spilling a sliver of the last month row
+     onto a second, mostly-blank page. Shrinking just these two
+     elements' print-only margins (never touched on screen, where there
+     was always room to spare) recovers the room the grid needs. */
+  .annual-calendar-print-title { margin: 0 0 0.3rem; font-size: 1rem; }
+  .annual-calendar-print-key-row { margin-bottom: 0.4rem; }
   /* A later real request: "Fill the full page and have even borders" -
      grid-template-rows: repeat(4, 1fr) on an explicit-height grid forces
      every one of the 12 month boxes to the exact same physical size
@@ -14799,6 +14953,13 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
        of the calendars" - bumped up from the original 0.3rem rather
        than adding a second, conflicting gap rule. */
     gap: 0.5rem;
+    /* Belt-and-suspenders alongside the title/key-row shrink above:
+       even if a future change reintroduces a small overflow, this
+       keeps the grid from being split mid-row across two pages - it
+       moves as one block to a 2nd page instead, which reads as
+       intentional rather than broken. */
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
   /* A real request: "it was supposed to be a square border around each
      month calendar" - a box around each whole month (heading + table
@@ -14961,6 +15122,15 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    gap before the 12-month grid, same shape as .fs-toolbar-row-spaced's
    own comment below. */
 .fs-attendance-toolbar-row { margin-bottom: 0.75rem; }
+/* A real request: "Filter button, dropdown menus should be the same
+   size shrink to fit so that we can still see the full name of the
+   member." The shared .filter-details .filter-panel's own min-width
+   (14rem) ties the Choose Student select's own width: 100% to a box
+   that's too narrow for a long full name - widened for this page's own
+   panel specifically (not the shared component every other Filter
+   popover in the app also uses) since a long member name is the one
+   thing this particular dropdown needs room for. */
+.fs-attendance-toolbar-row .filter-panel { min-width: 18rem; }
 @media (max-width: 640px) {
   .fs-attendance-toolbar-row #attendance-student-select {
     font-size: 0.72rem;

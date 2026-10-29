@@ -9,36 +9,88 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Classroom Dashboard</h1>
 
-    <% if (days.length === 0) { %>
+    <%# A real request: "Classroom dashboard has all family school
+        management classes and co-op classes together, but categorized
+        and filters, for easier viewing for students." Same Filter
+        popover convention every other page in the app already uses. %>
+    <div class="roster-btn-row roster-btn-row-fit-text no-print">
+      <details class="filter-details" data-filter-details>
+        <summary class="roster-action-btn">Filter</summary>
+        <form method="GET" action="/student/classes/dashboard" class="filter-panel">
+          <label for="classroom-dashboard-type-select">Show</label>
+          <select id="classroom-dashboard-type-select" name="type" onchange="this.form.submit()">
+            <option value="all" <%= type === 'all' ? 'selected' : '' %>>All Classes</option>
+            <option value="coop" <%= type === 'coop' ? 'selected' : '' %>>Co-op Classes</option>
+            <option value="family" <%= type === 'family' ? 'selected' : '' %>>Homeschool Family Classes</option>
+          </select>
+        </form>
+      </details>
+    </div>
+
+    <% if (days.length === 0 && familyClasses.length === 0) { %>
       <p class="roster-empty">You're not enrolled in any classes yet.</p>
     <% } else { %>
-      <% days.forEach(function(d) { %>
-        <h2><%= dayLabels[d] %></h2>
+      <% if (days.length > 0) { %>
+        <h2>Co-op Classes</h2>
+        <% days.forEach(function(d) { %>
+          <h3><%= dayLabels[d] %></h3>
+          <div class="class-dash-grid">
+            <% byDay[d].forEach(function(c) { %>
+              <div class="class-dash-card">
+                <div class="class-dash-card-color-bar" style="background:<%= c.color %>"></div>
+                <div class="class-dash-card-body">
+                  <% if (c.classImageUrl) { %>
+                    <img class="class-dash-card-image" src="<%= c.classImageUrl %>" alt="" />
+                  <% } else { %>
+                    <span class="class-dash-card-image class-dash-card-image-placeholder"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
+                  <% } %>
+                  <div class="class-dash-card-text">
+                    <h3 class="class-dash-card-title"><%= c.class_name %></h3>
+                    <p class="class-dash-card-meta"><%= c.timeLabel %></p>
+                    <p class="class-dash-card-meta"><%= c.room || 'No room set' %></p>
+                    <p class="class-dash-card-meta"><%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
+                  </div>
+                </div>
+                <div class="class-dash-card-actions">
+                  <a class="roster-action-btn" href="/student/classes/<%= c.id %>">View Class</a>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% }); %>
+      <% } %>
+
+      <%# A real request: "when you click on a family class it has the
+          same tabs as the co-op classes. Details, lessons, grades."
+          Same .class-dash-card shape as the Co-op section above (a real
+          request: "class cards should look like co-op class cards") -
+          family_school_classes has no color/image/day-time of its own
+          (see that table's own migration comment), so every card here
+          uses the same fixed accent bar and a Family Homeschooling-
+          flavored placeholder icon instead. %>
+      <% if (familyClasses.length > 0) { %>
+        <h2>Homeschool Family Classes</h2>
         <div class="class-dash-grid">
-          <% byDay[d].forEach(function(c) { %>
+          <% familyClasses.forEach(function(c) { %>
             <div class="class-dash-card">
-              <div class="class-dash-card-color-bar" style="background:<%= c.color %>"></div>
+              <div class="class-dash-card-color-bar" style="background:var(--accent)"></div>
               <div class="class-dash-card-body">
-                <% if (c.classImageUrl) { %>
-                  <img class="class-dash-card-image" src="<%= c.classImageUrl %>" alt="" />
-                <% } else { %>
-                  <span class="class-dash-card-image class-dash-card-image-placeholder"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
-                <% } %>
+                <span class="class-dash-card-image class-dash-card-image-placeholder"><svg class="icon"><use href="#icon-home-heart"/></svg></span>
                 <div class="class-dash-card-text">
                   <h3 class="class-dash-card-title"><%= c.class_name %></h3>
-                  <p class="class-dash-card-meta"><%= c.timeLabel %></p>
-                  <p class="class-dash-card-meta"><%= c.room || 'No room set' %></p>
-                  <p class="class-dash-card-meta"><%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
+                  <p class="class-dash-card-meta">Homeschool Family Class</p>
+                  <% if (c.description) { %><p class="class-dash-card-meta"><%= c.description %></p><% } %>
                 </div>
               </div>
               <div class="class-dash-card-actions">
-                <a class="roster-action-btn" href="/student/classes/<%= c.id %>">View Class</a>
+                <a class="roster-action-btn" href="/student/family-school/classes/<%= c.id %>">View Class</a>
               </div>
             </div>
           <% }); %>
         </div>
-      <% }); %>
+      <% } %>
     <% } %>
   </main>
+  <script src="/js/filter-details-dismiss.js"></script>
 </body>
 </html>

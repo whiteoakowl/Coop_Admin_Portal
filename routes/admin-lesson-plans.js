@@ -84,7 +84,7 @@ router.post('/lesson-plans/:id/edit', async (req, res) => {
   if (!plan) return res.status(404).send('Not found');
   const title = (req.body.title || '').trim();
   if (!title) return res.redirect(`/admin/lesson-plans/${id}?error=` + encodeURIComponent('A title is required.'));
-  await updateLessonPlan(id, { title, description: (req.body.description || '').trim() });
+  await updateLessonPlan(id, { title, description: (req.body.description || '').trim(), allowFamilySchoolUse: req.body.allowFamilySchoolUse === '1' });
   res.redirect(`/admin/lesson-plans/${id}?notice=` + encodeURIComponent('Lesson plan updated.'));
 });
 

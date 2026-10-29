@@ -23,22 +23,21 @@ const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const { lessonAttachmentFileFilter, imageFileFilter } = require('../utils/uploads');
 // A real request: "Lesson plans... Be able to make lesson plans
 // available for parents to use to assign to students under family
-// school management, family classes." listLessonPlans/getLessonPlan are
-// the same read helpers routes/admin-lesson-plans.js's own admin view
-// uses - every admin-authored plan is eligible to pick from here, same
-// as every co-op class is already eligible for that router's own
-// "Assign to Class" with no visibility flag of its own to gate it.
-// isLessonPlanLocked is the one shared lock lookup (see its own comment
-// in utils/lessonPlans.js).
-const { listLessonPlans, getLessonPlan, isLessonPlanLocked } = require('../utils/lessonPlans');
+// school management, family classes." listFamilySchoolLessonPlans/
+// getLessonPlan are the same read helpers routes/admin-lesson-plans.js's
+// own admin view uses, scoped by a later request to only the plans an
+// admin explicitly flagged allow_family_school_use (no longer every
+// admin-authored plan - that flag didn't exist when this was first
+// built). isLessonPlanLocked is the one shared lock lookup (see its own
+// comment in utils/lessonPlans.js).
+const { listFamilySchoolLessonPlans, getLessonPlan, isLessonPlanLocked } = require('../utils/lessonPlans');
 const {
   CONTENT_ITEM_TYPES,
   classesForFamily,
   overviewForFamily,
   getClass,
   createClass,
-  preplannedClassTemplates,
-  createClassFromTemplate,
+  createClassFromLessonPlan,
   updateClass,
   deleteClass,
   studentsForClass,
@@ -279,7 +278,15 @@ router.get('/family-school/print', async (req, res) => {
 // here, narrowing the card grid to classes that student is actually
 // assigned to; 'all' (the default) keeps today's "every family class"
 // view.
+// A real request: "Available lesson plan tab should be a subpage under
+// family classes" - same ?tab= view-tabs convention every other page in
+// this app already uses for a second, substantially different listing
+// on an otherwise single-purpose page (see e.g. admin-settings.ejs's
+// own tab branches), rather than a new standing nav entry - Parent
+// Portal's own Family School Management nav deliberately has no
+// subpages of its own (see portal-nav.ejs's own comment on that).
 router.get('/family-school/classes', async (req, res) => {
+  const activeTab = req.query.tab === 'availableLessonPlans' ? 'availableLessonPlans' : 'classes';
   const familyId = await familyIdForAccount(req.portalAccount);
   const familyStudents = await studentsForFamily(familyId);
   const selectedStudentId = resolveStudentOrAllFilter(req, familyStudents);
@@ -287,10 +294,11 @@ router.get('/family-school/classes', async (req, res) => {
   const classes = selectedStudentId === 'all' ? allClasses : allClasses.filter((c) => c.students.some((s) => s.id === selectedStudentId));
   res.render('parent-family-school-classes', {
     title: 'Family Classes',
+    activeTab,
     familyStudents,
     selectedStudentId,
     classes,
-    preplannedTemplates: preplannedClassTemplates(),
+    lessonPlans: await listFamilySchoolLessonPlans(),
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
@@ -304,16 +312,16 @@ router.post('/family-school/classes', async (req, res) => {
   res.redirect(`/parent/family-school/classes/${id}?notice=` + encodeURIComponent('Class created.'));
 });
 
-// A real request: "Add a button that says +preplanned class" - "Pick
-// from built-in curriculum templates." See utils/familySchool.js's own
-// PREPLANNED_CLASS_TEMPLATES comment for why this is a small, fixed,
-// app-provided set rather than a new admin-authored template library.
-router.post('/family-school/classes/from-template', async (req, res) => {
+// A real request: "+preplanned class" button, later changed to pull
+// from the admin's own Lesson Plans library instead of a fixed built-in
+// template set - see utils/familySchool.js's own createClassFromLessonPlan
+// comment.
+router.post('/family-school/classes/from-lesson-plan', async (req, res) => {
   const familyId = await familyIdForAccount(req.portalAccount);
-  const templateKey = (req.body.templateKey || '').trim();
-  const id = await createClassFromTemplate(templateKey, familyId, req.portalAccount.id);
-  if (!id) return res.redirect('/parent/family-school/classes?error=' + encodeURIComponent('Choose a template.'));
-  res.redirect(`/parent/family-school/classes/${id}?notice=` + encodeURIComponent('Class created from template.'));
+  const lessonPlanId = parseInt(req.body.lessonPlanId, 10);
+  const id = await createClassFromLessonPlan(lessonPlanId, familyId, req.portalAccount.id);
+  if (!id) return res.redirect('/parent/family-school/classes?tab=availableLessonPlans&error=' + encodeURIComponent('Choose a lesson plan from the library.'));
+  res.redirect(`/parent/family-school/classes/${id}?notice=` + encodeURIComponent('Class created from the Lesson Plans library.'));
 });
 
 router.post('/family-school/classes/:id/delete', async (req, res) => {
@@ -332,7 +340,7 @@ router.get('/family-school/classes/:id', async (req, res) => {
     lessons: await lessonsForClass(cls.id),
     familyStudents: await studentsForFamily(cls.family_id),
     assignedStudents: await studentsForClass(cls.id),
-    lessonPlans: await listLessonPlans(),
+    lessonPlans: await listFamilySchoolLessonPlans(),
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
@@ -373,7 +381,12 @@ router.post('/family-school/classes/:id/lessons', async (req, res) => {
   if (req.body.source === 'plan') {
     const lessonPlanId = parseInt(req.body.lessonPlanId, 10);
     const plan = lessonPlanId ? await getLessonPlan(lessonPlanId) : null;
-    if (!plan) return res.redirect(back + '?error=' + encodeURIComponent('Choose a lesson plan from the library.'));
+    // Re-validated server-side, same reasoning as every other family-
+    // scoped lookup in this file never trusting a posted id blindly - a
+    // tampered lessonPlanId for a plan that isn't flagged for Family
+    // School Management must still be rejected even though the dropdown
+    // itself already only lists flagged plans.
+    if (!plan || !plan.allow_family_school_use) return res.redirect(back + '?error=' + encodeURIComponent('Choose a lesson plan from the library.'));
     const id = await createLesson({
       classId: cls.id,
       title: plan.title,
@@ -1459,24 +1472,31 @@ router.post('/family-school/weekly-planner/dates/:dateId/assignments', uploadWee
   const backUrl = `/parent/family-school/weekly-planner?owner=${encodeURIComponent(owner)}&weekId=${week.id}`;
 
   const familyId = await familyIdForAccount(req.portalAccount);
-  const contentItemId = req.body.contentItemId ? parseInt(req.body.contentItemId, 10) : null;
+  const contentItemIdRaw = (req.body.contentItemId || '').trim();
   let subject = (req.body.subject || '').trim();
   let title = (req.body.title || '').trim();
   const description = (req.body.description || '').trim();
   const linkUrl = (req.body.link || '').trim();
   const grade = (req.body.grade || '').trim();
-  if (contentItemId) {
+  if (contentItemIdRaw) {
     // "Dropdown to choose an assignment from family management
     // assignments from parent created classes" - only ever a real
-    // assignment this same family actually created; never trusts the
-    // posted contentItemId blindly (same join assignmentOptionsForFamily
+    // assignment this same family actually created (or, for a 'plan-'
+    // id, an assignment-type item on a plan a lesson of theirs
+    // references - see assignmentOptionsForFamily's own comment); never
+    // trusts the posted id blindly (same join assignmentOptionsForFamily
     // itself already scopes by family_id).
-    const picked = (await assignmentOptionsForFamily(familyId)).find((a) => a.id === contentItemId);
+    const picked = (await assignmentOptionsForFamily(familyId)).find((a) => a.id === contentItemIdRaw);
     if (!picked) return res.status(404).send('Not found');
     subject = subject || picked.class_name;
     title = title || picked.title || picked.class_name;
   }
   if (!title) return res.redirect(`${backUrl}&error=` + encodeURIComponent('A title is required.'));
+  // content_item_id is a real foreign key into family_school_content_
+  // items only - a 'plan-' id (lesson_plan_content_items' own, separate
+  // sequence) is never a valid value there, so it's left null; the
+  // title/subject copied above are what the planner grid actually shows.
+  const contentItemId = contentItemIdRaw && !contentItemIdRaw.startsWith('plan-') ? parseInt(contentItemIdRaw, 10) : null;
   let fileKey = null;
   let fileName = null;
   let fileMime = null;
