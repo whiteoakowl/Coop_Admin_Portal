@@ -28,8 +28,26 @@
             <% preferences.forEach(function(p) { %>
               <tr>
                 <td><%= p.type.label %><br /><span class="hint"><%= p.type.description %></span></td>
-                <td><input type="checkbox" name="email_<%= p.type.key %>" value="1" <%= p.email ? 'checked' : '' %> /></td>
-                <td><input type="checkbox" name="sms_<%= p.type.key %>" value="1" <%= p.sms ? 'checked' : '' %> /></td>
+                <%# A real request: several types are text-only or
+                    email-only by design (see utils/notifications.js's
+                    own notify() - email_enabled/sms_enabled), not just
+                    by this account's own preference - greyed out
+                    instead of hidden, so it's clear this isn't
+                    something the member can turn on. %>
+                <td>
+                  <% if (p.type.email_enabled) { %>
+                    <input type="checkbox" name="email_<%= p.type.key %>" value="1" <%= p.email ? 'checked' : '' %> />
+                  <% } else { %>
+                    <span class="hint" title="This notification type is always text-only.">N/A</span>
+                  <% } %>
+                </td>
+                <td>
+                  <% if (p.type.sms_enabled) { %>
+                    <input type="checkbox" name="sms_<%= p.type.key %>" value="1" <%= p.sms ? 'checked' : '' %> />
+                  <% } else { %>
+                    <span class="hint" title="This notification type is always email-only.">N/A</span>
+                  <% } %>
+                </td>
                 <%# A real request: "a notifications settings card to
                     control email, text and push notifications." No real
                     push-delivery mechanism exists yet - see utils/

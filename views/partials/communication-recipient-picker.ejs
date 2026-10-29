@@ -1,0 +1,96 @@
+<%
+// Shared by Communication's Text and Email pages (both portals) - a
+// real request: "Communication. Text/email. Page should show a list of
+// all members. Then filter button narrows it down in a popup screen."
+// Used to be its own separate /text-email/filter page (navigate away,
+// save a selection to the session, navigate back) - now the full
+// candidate table lives directly on this page, every row starts
+// checked (Send Text/Send Email reaches everyone by default, no filter
+// required first), and Filter is just a popup over the same client-side
+// role/section/grade/age/registered narrowing public/js/email-composer-
+// filters.js already did - it only ever hides/unchecks rows already in
+// the DOM, so moving its dropdowns into a <dialog> needed no JS changes.
+// locals: mode ('text'|'email'), composeAction, sendLabel, roles,
+// sections, gradeLevels, ageGroups, candidates.
+%>
+<div class="roster-btn-row">
+  <button type="button" class="roster-action-btn" onclick="document.getElementById('<%= mode %>-filter-dialog').showModal()">Filter</button>
+</div>
+
+<dialog id="<%= mode %>-filter-dialog" class="notes-dialog">
+  <h3>Filter Recipients</h3>
+  <div class="stack-form" id="email-filter-controls">
+    <label>Role
+      <select id="email-filter-role">
+        <option value="">Any</option>
+        <% roles.forEach(function(r) { %><option value="<%= r.key %>"><%= r.label %></option><% }); %>
+      </select>
+    </label>
+    <label>Section
+      <select id="email-filter-section">
+        <option value="">Any</option>
+        <% sections.forEach(function(s) { %><option value="<%= s.name %>"><%= s.name %></option><% }); %>
+      </select>
+    </label>
+    <label>Grade Level
+      <select id="email-filter-grade">
+        <option value="">Any</option>
+        <% gradeLevels.forEach(function(g) { %><option value="<%= g %>"><%= g %></option><% }); %>
+      </select>
+    </label>
+    <label>Age Group
+      <select id="email-filter-age">
+        <option value="">Any</option>
+        <% ageGroups.forEach(function(g) { %><option value="<%= g.key %>"><%= g.label %></option><% }); %>
+      </select>
+    </label>
+    <label>Registered for Classes
+      <select id="email-filter-registered">
+        <option value="">Any</option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+    </label>
+    <button type="button" class="btn-secondary" data-email-filter-clear>Clear Filters</button>
+  </div>
+  <div class="notes-dialog-actions">
+    <button type="button" class="primary-btn" onclick="this.closest('dialog').close()">Done</button>
+  </div>
+</dialog>
+
+<p class="hint" id="email-select-count"></p>
+
+<form method="POST" action="<%= composeAction %>">
+  <div class="roster-scroll">
+    <table class="roster-table condensed-table" id="email-candidate-table">
+      <thead>
+        <tr><th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" checked /></th><th>Name</th><th>Email</th><th>Phone</th></tr>
+      </thead>
+      <tbody>
+        <% candidates.forEach(function(c) { %>
+          <tr
+            data-email-row
+            data-role="<%= c.roles.join(',') %>"
+            data-section="<%= c.sections.join('|') %>"
+            data-grade="<%= c.gradeLevel || '' %>"
+            data-age-group="<%= c.ageGroup || '' %>"
+            data-registered="<%= c.registeredForClasses ? 'yes' : 'no' %>"
+          >
+            <td><input type="checkbox" name="recipientIds" value="<%= c.accountId %>" data-email-checkbox checked /></td>
+            <td><%= c.name %></td>
+            <td><%= c.email || '' %></td>
+            <td><%= c.phone || '' %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    <% if (candidates.length === 0) { %><p class="roster-empty">No active members yet.</p><% } %>
+  </div>
+
+  <div class="member-form-footer">
+    <div class="member-form-footer-edit">
+      <button type="submit" class="primary-btn"><%= sendLabel %></button>
+    </div>
+  </div>
+</form>
+<script src="/js/email-composer-filters.js"></script>

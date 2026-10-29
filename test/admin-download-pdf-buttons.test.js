@@ -113,8 +113,8 @@ test('Rosters: Download PDF button + route for both the day/class grid and the P
   const cookie = await loginAsAdmin();
 
   const gridLive = await request(app).get('/admin/rosters?tab=monday-parent').set('Cookie', cookie);
-  assert.match(gridLive.text, /href="\/admin\/rosters\/print\?tab=monday-parent" target="_blank" aria-label="Print"/);
-  assert.match(gridLive.text, /href="\/admin\/rosters\/download\.pdf\?tab=monday-parent" aria-label="Download PDF"/);
+  assert.match(gridLive.text, /href="\/admin\/rosters\/print\?tab=monday-parent(&amp;semesterId=[^"]*)?" target="_blank" aria-label="Print"/);
+  assert.match(gridLive.text, /href="\/admin\/rosters\/download\.pdf\?tab=monday-parent(&amp;semesterId=[^"]*)?" aria-label="Download PDF"/);
 
   const gridPdf = await getBuffer('/admin/rosters/download.pdf?tab=monday-parent', cookie);
   assertRealPdf(gridPdf);

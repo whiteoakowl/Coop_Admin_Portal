@@ -87,14 +87,20 @@ async function classRosterInfo(classId) {
     .get(classId);
 }
 
-async function rosterIdForTab(tab) {
+// A real bug report: "Spring 2027 - Monday, Spring 2026 Wednesday are
+// showing rosters and attendance from fall days. It should be its own."
+// semesterId threads through to ensureDayRoster now - every caller below
+// resolves the semester actually being viewed (comboSemesterId(req)) and
+// passes it here, rather than letting it silently fall back to whatever
+// the site-wide active Kiosk semester happens to be.
+async function rosterIdForTab(tab, semesterId) {
   const classId = classIdFromTab(tab);
   if (classId) {
     const cls = await db.prepare('SELECT roster_id FROM classes WHERE id = ?').get(classId);
     return cls ? cls.roster_id : null;
   }
   const cfg = tabInfo(tab);
-  return cfg ? ensureDayRoster(cfg.day, cfg.role) : null;
+  return cfg ? ensureDayRoster(cfg.day, cfg.role, semesterId) : null;
 }
 
 // A class roster only ever holds students (see ensureClassRoster/
@@ -278,12 +284,14 @@ router.get('/rosters', requireAdmin, async (req, res) => {
   let day;
   let tabLabel;
   let role = null;
+  let classSemesterId;
 
   if (classId) {
     const cls = await classRosterInfo(classId);
     if (!cls) return res.redirect('/admin/rosters?tab=classes');
     day = cls.day;
     tabLabel = `${cls.class_name} (${cls.hourLabel})`;
+    classSemesterId = cls.semester_id;
   } else {
     // A real request: "have it land on the parent roster each time you
     // click the attendance tab. currently it always lands on student
@@ -303,15 +311,19 @@ router.get('/rosters', requireAdmin, async (req, res) => {
   // on floaters, setup cleanup, attendance, classes etc." - same combo
   // picker Floater/Setup-Cleanup/Classes already got, applied to the
   // Parent/Student grid view only (Class Rosters already has its own
-  // Day/Hour/Semester filters above). semesterId is a view-only choice
-  // threaded through for URL consistency with those other pages - like
-  // Classes' own grid, Attendance's roster data has no semester concept
-  // of its own to actually filter by.
+  // Day/Hour/Semester filters above). A later real bug report ("Spring
+  // 2027 - Monday... showing rosters and attendance from fall days")
+  // means this is no longer just a view-only, cosmetic choice - it's
+  // the real semester scope ensureDayRoster (utils/classSchedule.js)
+  // needs to resolve the correct, separate roster for this day/role. A
+  // class tab has its own real semester (the class's own semester_id,
+  // captured above) rather than this combo picker at all - the picker
+  // itself stays hidden for a class tab (combos below), same as before.
   const combos = classId ? null : await listScheduleCombos();
-  const resolvedSemesterId = classId ? null : await resolveSemesterId(comboSemesterId(req));
+  const resolvedSemesterId = classId ? classSemesterId : await resolveSemesterId(comboSemesterId(req));
   const selectedSemesterId = classId ? null : qsSemester(resolvedSemesterId);
 
-  const rosterId = await rosterIdForTab(tab);
+  const rosterId = await rosterIdForTab(tab, resolvedSemesterId);
   const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
   // rosterIdForTab returns a class's roster_id verbatim for a class tab,
   // which is nullable (ON DELETE SET NULL, and not filled in until
@@ -323,7 +335,7 @@ router.get('/rosters', requireAdmin, async (req, res) => {
   // meets when that day's students do), so there's no separate Edit
   // Dates step for it (see the view - Edit Dates/+ Add Member are hidden
   // whenever classId is set).
-  const dates = classId ? await rosterDates(await ensureDayRoster(day, 'student')) : await rosterDates(rosterId);
+  const dates = classId ? await rosterDates(await ensureDayRoster(day, 'student', resolvedSemesterId)) : await rosterDates(rosterId);
   const alertDate = todayIfSessionDay(day);
 
   res.render('admin-rosters', {
@@ -409,11 +421,13 @@ async function rostersPrintLocals(req) {
   let tab = requestedTab;
   let day;
   let tabLabel;
+  let semesterId;
   if (classId) {
     const cls = await classRosterInfo(classId);
     if (!cls) return null;
     day = cls.day;
     tabLabel = `${cls.class_name} (${cls.hourLabel})`;
+    semesterId = cls.semester_id;
   } else {
     const activeDays = await listActiveClassDays();
     const defaultDay = activeDays[0] || 'monday';
@@ -421,12 +435,16 @@ async function rostersPrintLocals(req) {
     const cfg = tabInfo(tab);
     day = cfg.day;
     tabLabel = cfg.label;
+    // Same real semester scope as the live GET /rosters handler - the
+    // print preview/PDF have to show the exact same roster, not
+    // whatever the site-wide active Kiosk semester happens to be.
+    semesterId = await resolveSemesterId(comboSemesterId(req));
   }
 
-  const rosterId = await rosterIdForTab(tab);
+  const rosterId = await rosterIdForTab(tab, semesterId);
   const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
   if (!roster) return null;
-  const dates = classId ? await rosterDates(await ensureDayRoster(day, 'student')) : await rosterDates(rosterId);
+  const dates = classId ? await rosterDates(await ensureDayRoster(day, 'student', semesterId)) : await rosterDates(rosterId);
 
   // partials/roster-archive-grid-table expects the flattened { name, ... }
   // row shape archiveGrid builds (row.member.name -> row.name, and a PII
@@ -515,11 +533,11 @@ router.get('/rosters/download.pdf', requireAdmin, async (req, res) => {
 // "Monday Parents" roster without that date - so a teaching parent
 // reporting their own absence via the public form would be told they
 // "aren't on any roster" for a date their own kids' roster had just fine.
-async function siblingRosterId(tab) {
+async function siblingRosterId(tab, semesterId) {
   const info = tabInfo(tab);
   if (!info) return null;
   const otherRole = info.role === 'parent' ? 'student' : 'parent';
-  return ensureDayRoster(info.day, otherRole);
+  return ensureDayRoster(info.day, otherRole, semesterId);
 }
 
 // A real request: every class meeting a given day should show the same
@@ -531,21 +549,29 @@ async function siblingRosterId(tab) {
 // ensureClassRoster/backfillClassRosterDates for the other two places
 // this same invariant is kept - a class created after dates already
 // exist, and an already-deployed database's existing classes).
-async function dayClassRosterIds(tab) {
+async function dayClassRosterIds(tab, semesterId) {
   const info = tabInfo(tab);
-  return info ? classRosterIdsForDay(info.day) : [];
+  return info ? classRosterIdsForDay(info.day, semesterId) : [];
 }
 
 router.post('/rosters/:tab/dates/add', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
-  const rosterId = await rosterIdForTab(tab);
+  // A real bug report: "Spring 2027 - Monday... showing rosters and
+  // attendance from fall days." Every mutation below has to resolve the
+  // same real semester the admin is actually viewing (the page's own
+  // ?semesterId=, carried on this form's action URL) rather than let
+  // ensureDayRoster silently fall back to the site-wide active Kiosk
+  // semester, which could easily be some OTHER semester than the one on
+  // screen.
+  const semesterId = await resolveSemesterId(comboSemesterId(req));
+  const rosterId = await rosterIdForTab(tab, semesterId);
   if (!rosterId) return res.status(404).send('Not found');
   const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))];
   const insertDate = db.prepare(
     'INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?) ON CONFLICT (roster_id, session_date) DO NOTHING'
   );
-  const siblingId = await siblingRosterId(tab);
-  const classRosterIds = await dayClassRosterIds(tab);
+  const siblingId = await siblingRosterId(tab, semesterId);
+  const classRosterIds = await dayClassRosterIds(tab, semesterId);
   for (const d of dates) {
     await insertDate.run(rosterId, d);
     if (siblingId) await insertDate.run(siblingId, d);
@@ -556,10 +582,11 @@ router.post('/rosters/:tab/dates/add', requireAdmin, async (req, res) => {
 
 router.post('/rosters/:tab/dates/:date/remove', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
-  const rosterId = await rosterIdForTab(tab);
+  const semesterId = await resolveSemesterId(comboSemesterId(req));
+  const rosterId = await rosterIdForTab(tab, semesterId);
   if (!rosterId) return res.status(404).send('Not found');
   const date = req.params.date;
-  const rosterIds = [rosterId, await siblingRosterId(tab), ...(await dayClassRosterIds(tab))].filter(Boolean);
+  const rosterIds = [rosterId, await siblingRosterId(tab, semesterId), ...(await dayClassRosterIds(tab, semesterId))].filter(Boolean);
   const placeholders = rosterIds.map(() => '?').join(',');
   await db.withTransaction(async (tx) => {
     await tx.prepare(`DELETE FROM roster_dates WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
@@ -573,7 +600,7 @@ router.post('/rosters/:tab/dates/:date/remove', requireAdmin, async (req, res) =
 
 router.post('/rosters/:tab/add-member', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
-  const rosterId = await rosterIdForTab(tab);
+  const rosterId = await rosterIdForTab(tab, await resolveSemesterId(comboSemesterId(req)));
   if (!rosterId) return res.status(404).send('Not found');
   const memberIds = [].concat(req.body.memberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
   for (const memberId of memberIds) await addManualRosterMember(rosterId, memberId);
@@ -582,7 +609,7 @@ router.post('/rosters/:tab/add-member', requireAdmin, async (req, res) => {
 
 router.post('/rosters/:tab/remove-member/:memberId', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
-  const rosterId = await rosterIdForTab(tab);
+  const rosterId = await rosterIdForTab(tab, await resolveSemesterId(comboSemesterId(req)));
   if (!rosterId) return res.status(404).send('Not found');
   const memberId = parseInt(req.params.memberId, 10);
   await db.prepare('DELETE FROM roster_members WHERE roster_id = ? AND member_id = ?').run(rosterId, memberId);
@@ -607,7 +634,7 @@ router.post('/rosters/:tab/remove-member/:memberId', requireAdmin, async (req, r
 // scans.
 router.post('/rosters/:tab/attendance', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
-  const rosterId = await rosterIdForTab(tab);
+  const rosterId = await rosterIdForTab(tab, await resolveSemesterId(comboSemesterId(req)));
   if (!rosterId) return res.status(404).send('Not found');
 
   const upsert = db.prepare(
@@ -654,7 +681,7 @@ router.get('/roster/:tab/export.csv', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
   const classId = classIdFromTab(tab);
   const label = classId ? ((await classRosterInfo(classId)) || {}).class_name : (tabInfo(tab) || {}).label;
-  const rosterId = await rosterIdForTab(tab);
+  const rosterId = await rosterIdForTab(tab, await resolveSemesterId(comboSemesterId(req)));
   if (!rosterId || !label) return res.status(404).send('Not found');
   const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
   const data = await buildRosterGridData(roster);

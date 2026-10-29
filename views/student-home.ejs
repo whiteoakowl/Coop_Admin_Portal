@@ -9,6 +9,23 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Welcome, <%= member.name %></h1>
 
+    <%# A real request: "Student portal homepage. Add three cards each a
+        solid color matching the kiosk page. Orange, blue and green...
+        When you click on each of these page it shows all the other
+        pages under that category in card style." Same .landing-card/
+        .landing-grid component the kiosk homepage itself uses -
+        routes/student-portal.js's own STUDENT_DASHBOARD_CATEGORIES
+        builds dashboardCategories (and /student/dashboard/:category
+        renders each one's own 2-column card grid). %>
+    <div class="landing-grid landing-grid-home landing-card-rect">
+      <% dashboardCategories.forEach(function(c) { %>
+        <a class="landing-card landing-card-<%= c.color %>" href="/student/dashboard/<%= c.key %>">
+          <span class="landing-icon"><svg class="icon"><use href="#<%= c.icon %>"/></svg></span>
+          <span class="landing-label"><%= c.title %></span>
+        </a>
+      <% }); %>
+    </div>
+
     <%
       // A real request: "make it look exactly like these photos" (a
       // reference screenshot) - a card-styled header with a title icon

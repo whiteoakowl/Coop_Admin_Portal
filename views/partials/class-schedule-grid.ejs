@@ -12,7 +12,30 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
 <div class="roster-toolbar no-print">
+  <%# A real request: "Co-op admin portal. Class schedules. Mobile. Add
+      class button, edit schedule grid button, on same row." Its own
+      .roster-btn-row (display: flex; flex-wrap: wrap - every item in
+      one row stays side by side instead of each stacking onto its own
+      line) ahead of the Filter/Bulk Edit/view-toggle row below, same
+      "orange buttons in their own row, everything else below" shape the
+      Accounts page's own .accounting-orange-buttons-group already
+      established for this exact request elsewhere in the app. %>
+  <% if (!gridReadOnly) { %>
+    <div class="roster-btn-row">
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog-<%= day %>').showModal()">+ Add Class</button>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-schedule-dialog-<%= day %>').showModal()">Edit Schedule Grids</button>
+    </div>
+  <% } %>
   <div class="filter-row">
+    <%# A real request: "Bulk edit classes filter, select all, list vs
+        grid view all pn [on] the same row, button should all be on the
+        same row, side by side." Moved in from the old combined button
+        row below (data-bulk-edit-toggle/data-bulk-edit-dialog are
+        attribute selectors, not positional - see public/js/class-
+        schedule-bulk-edit.js - so this move needed no JS changes). %>
+    <% if (!gridReadOnly) { %>
+      <button type="button" class="roster-action-btn" data-bulk-edit-toggle="class-bulk-edit-form-<%= day %>" data-bulk-edit-dialog="bulk-edit-dialog-<%= day %>" aria-pressed="false">Bulk Edit</button>
+    <% } %>
     <%# A real request: "Class page filter drop down. Filter button, grade
         level, hour, day, full, for co-op admin" - a follow-up confirmed
         Date/Hour (already standalone dropdowns here) move into this same
@@ -86,6 +109,17 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
         <% } %>
       </div>
     </details>
+    <% if (!gridReadOnly) { %>
+      <%# Bulk Edit's own Select All lives in List view instead of Grid -
+          the checkboxes themselves only exist on the list rows (see
+          below), so there's nothing to select while Grid is showing. %>
+      <div class="class-schedule-archive-controls" id="class-schedule-bulk-edit-controls-<%= day %>" data-bulk-edit-controls="class-bulk-edit-form-<%= day %>" hidden>
+        <label class="checkbox-option class-schedule-select-all">
+          <input type="checkbox" data-select-all-for="class-bulk-edit-form-<%= day %>" />
+          Select All
+        </label>
+      </div>
+    <% } %>
     <%# Grid view already lays every hour out as its own column, so this
         filter's only real effect is on List view's flat row-per-class
         table below - kept visible in both views (a real request) rather
@@ -110,24 +144,14 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
         title="List view"
       ><svg class="icon"><use href="#icon-clipboard-list"/></svg></button>
     </div>
-    <% if (!gridReadOnly) { %>
-      <%# Bulk Edit's own Select All lives in List view instead of Grid -
-          the checkboxes themselves only exist on the list rows (see
-          below), so there's nothing to select while Grid is showing. %>
-      <div class="class-schedule-archive-controls" id="class-schedule-bulk-edit-controls-<%= day %>" data-bulk-edit-controls="class-bulk-edit-form-<%= day %>" hidden>
-        <label class="checkbox-option class-schedule-select-all">
-          <input type="checkbox" data-select-all-for="class-bulk-edit-form-<%= day %>" />
-          Select All
-        </label>
-      </div>
-    <% } %>
   </div>
+  <%# A real request: "Underneath that row should be all of the import,
+      export, pdf and print icons, side by side." Own .roster-btn-row,
+      same "icons together in their own row" shape Row A above and the
+      Accounts page's own icons row already use. %>
   <div class="roster-btn-row">
     <% if (!gridReadOnly) { %>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog-<%= day %>').showModal()">+ Add Class</button>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-schedule-dialog-<%= day %>').showModal()">Edit Schedule Grids</button>
       <button type="button" class="icon-btn" onclick="document.getElementById('import-dialog-<%= day %>').showModal()" aria-label="Import" title="Import"><svg class="icon"><use href="#icon-upload"/></svg></button>
-      <button type="button" class="roster-action-btn" data-bulk-edit-toggle="class-bulk-edit-form-<%= day %>" data-bulk-edit-dialog="bulk-edit-dialog-<%= day %>" aria-pressed="false">Bulk Edit</button>
     <% } %>
     <%# A real request: "Class schedules, add an export button." The CSV
         route itself (/class-schedule/:day/export.csv, routes/admin-
@@ -138,8 +162,8 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
         requireFullAdmin) on that route, same as Print just beside it, so
         it's available outside the !gridReadOnly block above too. %>
     <a class="icon-btn" href="/admin/class-schedule/<%= day %>/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
-    <a class="icon-btn" href="/admin/class-schedule/<%= day %>/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
     <a class="icon-btn" href="/admin/class-schedule/<%= day %>/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+    <a class="icon-btn" href="/admin/class-schedule/<%= day %>/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
   </div>
 </div>
 

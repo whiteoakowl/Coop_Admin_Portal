@@ -278,6 +278,14 @@
               <% } else { %>
                 <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No email on file"><svg class="icon"><use href="#icon-mail"/></svg></span>
               <% } %>
+              <%# A real request: "Add a text icon to click and a pop
+                  up appears allowing you type a text message, add an
+                  image and send text button and close button." %>
+              <% if (m.phone) { %>
+                <button type="button" class="icon-btn" onclick="document.getElementById('text-dialog-<%= m.id %>').showModal()" aria-label="Text <%= m.name %>" title="Text <%= m.name %>"><svg class="icon"><use href="#icon-message-square"/></svg></button>
+              <% } else { %>
+                <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No phone on file"><svg class="icon"><use href="#icon-message-square"/></svg></span>
+              <% } %>
               <%# A real request: "add an icon that shows sending
                   something. when you click it a pop up will appear
                   and ask, do you want to add this name tag to the
@@ -338,6 +346,34 @@
                 <div class="notes-dialog-actions">
                   <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
                   <button type="submit" class="primary-btn">Save</button>
+                </div>
+              </form>
+            </dialog>
+            <%# A real request: "Add a text icon to click and a pop up
+                appears allowing you type a text message, add an image
+                and send text button and close button." Mirrors Floater/
+                Setup's own Send Text popup shape, just a single always-
+                known recipient (no checkbox-selection step needed) -
+                public/js/member-text-notify.js submits this one form by
+                fetch, closing the dialog on a real send and leaving it
+                open with an inline error otherwise. %>
+            <dialog id="text-dialog-<%= m.id %>" class="class-form-dialog">
+              <form class="stack-form member-text-notify-form" data-text-notify-url="/admin/members/<%= m.id %>/text">
+                <div class="class-form-dialog-header">
+                  <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-message-square"/></svg></span>
+                  <h3>Text <%= m.name %></h3>
+                </div>
+                <p class="hint member-text-notify-status" hidden></p>
+                <label>Message
+                  <textarea name="message" rows="4" required maxlength="<%= smsMaxLength %>" data-sms-char-counter="text-char-count-<%= m.id %>"></textarea>
+                </label>
+                <p class="hint" id="text-char-count-<%= m.id %>">0 / <%= smsMaxLength %> characters</p>
+                <label>Image (optional)
+                  <input type="file" name="image" accept="image/*" />
+                </label>
+                <div class="notes-dialog-actions">
+                  <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+                  <button type="submit" class="primary-btn">Send Text</button>
                 </div>
               </form>
             </dialog>
@@ -412,5 +448,7 @@
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/members-bulk-actions.js"></script>
   <script src="/js/member-row-actions.js"></script>
+  <script src="/js/member-text-notify.js"></script>
+  <script src="/js/sms-char-counter.js"></script>
 </body>
 </html>

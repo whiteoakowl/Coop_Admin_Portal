@@ -37,6 +37,10 @@
               <span class="fs-overview-stat-label">Attendance</span>
               <span class="fs-overview-stat-value"><%= student.presentDays %>/<%= student.attendanceTargetDays %></span>
             </div>
+            <div class="fs-overview-stat">
+              <span class="fs-overview-stat-label">Volunteer Hours</span>
+              <span class="fs-overview-stat-value"><%= student.totalVolunteerHours %></span>
+            </div>
           </div>
           <%- include('partials/fs-attendance-bar', { presentDays: student.presentDays, attendanceTargetDays: student.attendanceTargetDays }) %>
 

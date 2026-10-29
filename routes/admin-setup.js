@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
@@ -41,8 +43,13 @@ const {
 } = require('../utils/taskList');
 const { toCsvRow, sendCsv, readRowsFromFile, buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { activeParentAndAdminOptions } = require('../utils/members');
-const { spreadsheetFileFilter } = require('../utils/uploads');
+const { spreadsheetFileFilter, imageFileFilter } = require('../utils/uploads');
 const { getActiveKioskSemesterId } = require('../utils/kioskSettings');
+const { createStorageClient } = require('../utils/storage');
+const { saveUpload, urlForUpload } = require('../utils/uploadBackend');
+const { notify } = require('../utils/notifications');
+const { getTemplate, fillPlaceholders } = require('../utils/notificationTemplates');
+const smsProvider = require('../utils/smsProvider');
 
 // Pages here (unlike Floater Assignments' own manage page) never fetch a
 // single authoritative row of their own to read an effective .semester_id
@@ -54,6 +61,25 @@ async function resolveSemesterId(semesterId) {
 }
 
 const uploadTasks = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
+
+// A real request: "Add the same exact check box and button system on
+// floater assignments, on each setup cleanup team and position" - same
+// optional-MMS-image upload routes/admin-volunteers.js's own
+// /floater-text-notify already wires up, just its own bucket/dir (a
+// private bucket has no fetchable URL for Telnyx's own servers to pull
+// the image from - see that route's own comment on why this one's
+// public, same as the member-photos bucket).
+const MAX_NOTIFY_IMAGE_BYTES = 5 * 1024 * 1024;
+const SETUP_NOTIFY_IMAGE_BUCKET = 'setup-cleanup-notification-images';
+const SETUP_NOTIFY_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'setup-cleanup-notification-images');
+if (!createStorageClient() && !fs.existsSync(SETUP_NOTIFY_IMAGE_DIR)) {
+  try {
+    fs.mkdirSync(SETUP_NOTIFY_IMAGE_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${SETUP_NOTIFY_IMAGE_DIR}:`, err.message);
+  }
+}
+const notifyImageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_NOTIFY_IMAGE_BYTES }, fileFilter: imageFileFilter });
 
 // Lands on Assignments first, same as Floater Assignments' own /volunteers
 // redirect - Assignments is the first of the 4 Setup/Cleanup tabs now
@@ -295,9 +321,85 @@ router.get('/setup/:day/assignments', requireAdmin, requireClassDay, async (req,
     upcomingDates: upcoming.map((d) => ({ date: d, label: formatDateLabel(d) })),
     selectedDate,
     cards: selectedDate ? await assignmentCardsForDate(day, selectedDate, semesterId) : [],
+    // Admin-editable (Settings > Text/Email Notifications > Setup/
+    // Cleanup Assignments) via utils/notificationTemplates.js's own
+    // notification_message_templates row - public/js/setup-text-
+    // notify.js's own fillMessageTemplate() pre-fills a single
+    // recipient's Send Text popup with this, same as Floater
+    // Assignments' own floaterMessageTemplate.
+    setupMessageTemplate: (await getTemplate('setup_cleanup_assignment_default'))?.body || '',
+    smsMaxLength: smsProvider.MAX_SMS_LENGTH,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+// A real request: "Add the same exact check box and button system on
+// floater assignments, on each setup cleanup team and position." Mirrors
+// routes/admin-volunteers.js's own POST /floater-text-notify exactly - a
+// member with no portal account texts directly off their own
+// members.phone; 2+ recipients always get their OWN message built
+// server-side from the admin-editable template
+// (setup_cleanup_assignment_default), filled with THAT recipient's own
+// team/tasks, never the single shared req.body.message (see that
+// route's own comment for the full reasoning, identical here).
+router.post('/setup/:day/assignments/setup-text-notify', requireAdmin, requireClassDay, notifyImageUpload.single('image'), async (req, res) => {
+  let assignments;
+  try {
+    assignments = JSON.parse(req.body.notify || '[]');
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: 'Malformed recipient list.' });
+  }
+  if (!Array.isArray(assignments)) assignments = [];
+  const customMessage = (req.body.message || '').trim();
+  const isSingleRecipient = assignments.length === 1;
+  if (isSingleRecipient && !customMessage) return res.status(400).json({ ok: false, error: 'A message is required.' });
+  // A real request: "Set 160 character length for all texting features
+  // across the app."
+  if (isSingleRecipient && customMessage.length > smsProvider.MAX_SMS_LENGTH) {
+    return res.status(400).json({ ok: false, error: `That message is ${customMessage.length} characters - texts are capped at ${smsProvider.MAX_SMS_LENGTH} characters.` });
+  }
+
+  const templateRow = isSingleRecipient ? null : await getTemplate('setup_cleanup_assignment_default');
+
+  let mediaUrl = null;
+  if (req.file) {
+    const client = createStorageClient();
+    const key = await saveUpload({
+      client,
+      bucket: SETUP_NOTIFY_IMAGE_BUCKET,
+      localDir: SETUP_NOTIFY_IMAGE_DIR,
+      buffer: req.file.buffer,
+      originalName: req.file.originalname,
+      contentType: req.file.mimetype,
+    });
+    mediaUrl = urlForUpload({ client, bucket: SETUP_NOTIFY_IMAGE_BUCKET, webDir: '/uploads/setup-cleanup-notification-images', key });
+  }
+
+  const results = [];
+  for (const item of assignments) {
+    const memberId = Number(item && item.memberId);
+    if (!memberId) continue;
+    const member = await db.prepare('SELECT name, phone FROM members WHERE id = ?').get(memberId);
+    if (!member) continue;
+
+    const body = isSingleRecipient
+      ? customMessage
+      : fillPlaceholders(templateRow?.body || '', { team: item?.team || '', tasks: item?.tasks || '' });
+
+    const account = await db.prepare("SELECT id FROM member_accounts WHERE member_id = ? AND status = 'active'").get(memberId);
+    if (account) {
+      const notificationId = await notify(account.id, 'setup_cleanup_assignment', { title: 'Setup/Cleanup Assignment', body, mediaUrl });
+      const delivery = await db.prepare("SELECT status, detail FROM notification_deliveries WHERE notification_id = ? AND channel = 'sms'").get(notificationId);
+      results.push({ memberId, name: member.name, status: delivery ? delivery.status : 'skipped', detail: delivery ? delivery.detail : null });
+    } else {
+      const result = await smsProvider.send(member.phone, body, mediaUrl);
+      results.push({ memberId, name: member.name, status: result.status, detail: result.detail });
+    }
+  }
+
+  const sentCount = results.filter((r) => r.status === 'sent').length;
+  res.json({ ok: true, sentCount, total: results.length, results });
 });
 
 // A real request: "All print button should show a print preview full

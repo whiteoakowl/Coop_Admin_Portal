@@ -54,6 +54,23 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
         <div class="floater-card-header">
           <span class="floater-card-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
           <h3><%= team.title %></h3>
+          <%# A real request: "Add the same exact check box and button
+              system on floater assignments, on each setup cleanup team
+              and position." Mirrors floater-chart-cards.ejs's own hour
+              title bar exactly - both the Select All checkbox and the
+              per-member checkboxes below are always visible (no page-
+              level toggle), Send Text sends to whichever of this one
+              card's own checkboxes end up checked, and both only ever
+              show once at least one member on this team actually has a
+              task assigned (public/js/setup-text-notify.js keeps Send
+              Text disabled until at least one is checked). %>
+          <% if (isEditable && team.members.some(function (m) { return m.taskItemId || m.taskItemId2 || m.taskItemId3; })) { %>
+            <label class="floater-card-select-all no-print">
+              <input type="checkbox" class="floater-card-select-all-checkbox" aria-label="Select all members for <%= team.title %>" />
+              Select All
+            </label>
+            <button type="button" class="floater-card-send-text-btn no-print" disabled aria-label="Send a text to the checked members for <%= team.title %>">Send Text</button>
+          <% } %>
         </div>
         <%# A real request: "the leader, time, location, all those details
             should show on the kiosk side when you click the setup/cleanup
@@ -144,8 +161,30 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
                   precedence, most severe/specific first: absent, then
                   task(s) complete, then checked out, then late, then
                   checked in - only one should ever show at a time. %>
+              <%
+                // A real request: "Add the same exact check box and
+                // button system on floater assignments, on each setup
+                // cleanup team and position." Mirrors floater-chart-
+                // cards.ejs's own per-slot checkbox - only a member with
+                // at least one task actually assigned gets one, same
+                // "only meaningful once assigned" rule. Embedded inside
+                // the Member cell itself, not a separate table column -
+                // this table is always a stacked, one-full-width-line-
+                // per-cell layout (.setup-assignment-table, unlike
+                // Floater's own table which only stacks at mobile
+                // widths), so a checkbox in its own column would render
+                // as its own bare stacked line rather than sitting next
+                // to the name it's for.
+                var assignedTaskDescs = [m.taskDescription, m.taskDescription2, m.taskDescription3].filter(Boolean);
+              %>
               <tr>
                 <td class="floater-card-position<% if (m.absent) { %> setup-assignment-name-absent<% } else if (m.scannedTasks.length > 0) { %> setup-assignment-name-checked-in<% } else if (m.checkedOut) { %> setup-assignment-name-checked-out<% } else if (m.late) { %> setup-assignment-name-late<% } else if (m.checkedIn) { %> setup-assignment-name-checked-in<% } %>">
+                  <% if (isEditable && assignedTaskDescs.length > 0) { %>
+                    <input type="checkbox" class="floater-notify-checkbox" aria-label="Text <%= m.name %> about their <%= team.title %> task"
+                      data-member-id="<%= m.id %>"
+                      data-team="<%= team.title %>"
+                      data-tasks="<%= assignedTaskDescs.join(', ') %>" />
+                  <% } %>
                   <a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %><% if (m.absent) { %> <span class="floater-card-unassigned">(absent)</span><% } else if (m.scannedTasks.length > 0) { %> <span class="setup-task-complete-badge"><svg class="icon"><use href="#icon-check-circle"/></svg> Task<%= m.scannedTasks.length > 1 ? 's' : '' %> complete: <%= m.scannedTasks.map(function(t) { return t.teamName + '-#' + t.number; }).join(', ') %></span><% } else if (m.checkedOut) { %> <span class="floater-card-unassigned">(checked out)</span><% } else if (m.late) { %> <span class="floater-card-unassigned">(late)</span><% } %>
                 </td>
                 <%

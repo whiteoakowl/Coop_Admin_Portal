@@ -13,6 +13,20 @@
 // behind it.
 const TELNYX_API_URL = 'https://api.telnyx.com/v2/messages';
 
+// A real request: "Set 160 character length for all texting features
+// across the app" - the classic single-segment GSM-7 SMS length, kept
+// here (one shared constant, not a magic number repeated at each
+// compose box) since this is the one file every texting feature's own
+// compose route already goes through on its way to an actual SMS send.
+// Enforced where an admin TYPES a message (routes/admin-members.js,
+// routes/main-admin-members.js, routes/admin-setup.js, routes/admin-
+// volunteers.js, routes/admin-announcements.js, routes/main-admin-
+// announcements.js) - never inside send() itself, which also carries
+// server-built messages (a filled notification template, a multi-
+// recipient Setup/Cleanup or Floater text) that aren't free text an
+// admin typed into a box.
+const MAX_SMS_LENGTH = 160;
+
 function isConfigured() {
   return !!process.env.TELNYX_API_KEY && !!(process.env.TELNYX_MESSAGING_PROFILE_ID || process.env.TELNYX_FROM_NUMBER);
 }
@@ -108,4 +122,4 @@ async function getStatus(messageId) {
   }
 }
 
-module.exports = { isConfigured, send, toE164, getStatus };
+module.exports = { isConfigured, send, toE164, getStatus, MAX_SMS_LENGTH };

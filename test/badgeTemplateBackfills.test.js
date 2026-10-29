@@ -26,6 +26,7 @@ const {
   backfillScheduleCardAllergy,
   backfillScheduleCardAutoFit,
   backfillScheduleCardColors,
+  backfillScheduleCardSpacing,
 } = require('../db/bootstrapPg');
 const { DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
 const { DEFAULT_LAYOUT: SCHEDULE_CARD_DEFAULT_LAYOUT } = require('../utils/scheduleCardBadge');
@@ -372,6 +373,62 @@ test('backfillScheduleCardColors is a no-op for a fresh install already seeded w
   const layout = JSON.parse(after.layout_json);
   assert.equal(layout.elements.find((el) => el.id === 'mon-table').borderColor, '#000000');
   assert.equal(layout.elements.find((el) => el.id === 'mon-label').color, '#0b3d91');
+});
+
+// Coverage for a real request: "make sure there is some space division
+// between Monday and Wednesday schedule. Expand the schedule grids just
+// a bit still leaving a strong boarder of space to help with any print
+// issues." The old default left only 2px between the Monday table and
+// the Wednesday label, and used an uneven 5/8px margin - backfillScheduleCardSpacing
+// snaps each element's old, known position/size back to the new default's
+// own, leaving an admin's own repositioned/resized element exactly as saved.
+test('backfillScheduleCardSpacing widens the Monday/Wednesday gap and the tables on an old-spacing template, leaving an admin\'s own repositioned element untouched', async () => {
+  const db = await createTestDb();
+  const oldSpacing = {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [
+      { id: 'allergy', type: 'text', field: 'allergy', x: 8, y: 5, width: 210, height: 14, fontSize: 11, color: '#dc2626', bold: true, align: 'left', valign: 'middle', autoFitText: true },
+      { id: 'parent-phone', type: 'text', field: 'primaryParentPhone', x: 222, y: 5, width: 106, height: 14, fontSize: 8, color: '#5b6b7c', bold: false, align: 'right', valign: 'middle', autoFitText: true },
+      { id: 'mon-label', type: 'text', field: 'custom', text: 'Monday', x: 8, y: 21, width: 320, height: 11, fontSize: 9, color: '#0b3d91', bold: true, align: 'center', valign: 'middle' },
+      { id: 'mon-table', type: 'table', field: 'mondaySchedule', x: 8, y: 33, width: 320, height: 82, fontSize: 8, borderColor: '#000000', headerColor: '#eaf4fd' },
+      // An admin who already dragged this label to their own spot - must
+      // be left exactly as saved, not snapped to the new default position.
+      { id: 'wed-label', type: 'text', field: 'custom', text: 'Wednesday', x: 40, y: 140, width: 200, height: 11, fontSize: 9, color: '#0b3d91', bold: true, align: 'center', valign: 'middle' },
+      { id: 'wed-table', type: 'table', field: 'wednesdaySchedule', x: 8, y: 129, width: 320, height: 79, fontSize: 8, borderColor: '#000000', headerColor: '#eaf4fd' },
+    ],
+  };
+  await db.prepare('UPDATE schedule_card_templates SET layout_json = ? WHERE id = 1').run(JSON.stringify(oldSpacing));
+
+  await backfillScheduleCardSpacing(db);
+
+  const row = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+  const layout = JSON.parse(row.layout_json);
+  for (const id of ['allergy', 'parent-phone', 'mon-label', 'mon-table', 'wed-table']) {
+    const current = SCHEDULE_CARD_DEFAULT_LAYOUT.elements.find((el) => el.id === id);
+    const got = layout.elements.find((el) => el.id === id);
+    assert.equal(got.x, current.x, `${id} x should snap to the new default`);
+    assert.equal(got.y, current.y, `${id} y should snap to the new default`);
+    assert.equal(got.width, current.width, `${id} width should snap to the new default`);
+    assert.equal(got.height, current.height, `${id} height should snap to the new default`);
+  }
+  const wedLabel = layout.elements.find((el) => el.id === 'wed-label');
+  assert.deepEqual(wedLabel, oldSpacing.elements.find((el) => el.id === 'wed-label'), 'an admin\'s own repositioned element must be untouched');
+
+  const monTable = layout.elements.find((el) => el.id === 'mon-table');
+  assert.ok(monTable.height > 82, 'the Monday table should have grown taller than the old default');
+  const wedTable = layout.elements.find((el) => el.id === 'wed-table');
+  assert.ok(monTable.y + monTable.height + 5 < wedTable.y, 'there should now be a clear gap between the Monday table and the Wednesday table\'s own area, not the old nearly-touching 2px');
+});
+
+test('backfillScheduleCardSpacing is a no-op for a fresh install already seeded with the current default spacing', async () => {
+  const db = await createTestDb();
+  const before = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+
+  await backfillScheduleCardSpacing(db);
+
+  const after = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+  assert.equal(after.layout_json, before.layout_json);
 });
 
 // Coverage for a third, later redesign of the Setup/Cleanup badge - a real

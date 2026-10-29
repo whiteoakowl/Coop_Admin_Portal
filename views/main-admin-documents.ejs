@@ -27,7 +27,7 @@
       <%
         var docColors = ['landing-card-orange', 'landing-card-purple', 'landing-card-green'];
       %>
-      <div class="landing-grid documents-grid">
+      <div class="landing-grid documents-grid landing-card-rect">
         <% documents.forEach(function(d, i) { %>
           <div class="document-card-wrap">
             <a class="landing-card <%= docColors[i % docColors.length] %>" href="/main-admin/documents/<%= d.id %>/view">

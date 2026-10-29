@@ -42,20 +42,31 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
         <div class="floater-card-header">
           <span class="floater-card-icon"><svg class="icon"><use href="#icon-clock"/></svg></span>
           <h3><%= hour.label %></h3>
-          <%# A real request: "click the check boxes on each assignment
-              or the whole card." Only meaningful (and only ever shown)
-              once at least one position this hour is actually assigned
-              - public/js/floater-text-notify.js wires this to check/
-              uncheck every .floater-notify-checkbox in this one card. %>
+          <%# A real request: "Not [the] orange send text button at the
+              top of floater assignment page. Just the send text
+              buttons on each hour title bar. Select all assigned
+              floaters by clicking the check box on the title bars or
+              select individual rows to send notifications to that
+              hour then click send text." Both the Select All checkbox
+              and the row checkboxes below are always visible now (no
+              page-level toggle to reveal them first); Send Text sends
+              to whichever of this card's own checkboxes end up checked
+              - public/js/floater-text-notify.js keeps it disabled
+              until at least one is, and Select All here still only
+              checks/unchecks every .floater-notify-checkbox in this
+              one card, never another hour's. Both only meaningful (and
+              only ever shown) once at least one position this hour is
+              actually assigned. %>
           <% if (hour.slots.some(function (s) { return s.assigned; })) { %>
             <label class="floater-card-select-all no-print">
               <input type="checkbox" class="floater-card-select-all-checkbox" aria-label="Select all floaters for <%= hour.label %>" />
               Select All
             </label>
+            <button type="button" class="floater-card-send-text-btn no-print" disabled aria-label="Send a text to the checked floaters for <%= hour.label %>">Send Text</button>
           <% } %>
         </div>
         <table class="floater-card-table floater-chart-table">
-          <thead><tr><th class="floater-notify-col no-print">Text</th><th>Position</th><th>Room</th><th>Floater</th></tr></thead>
+          <thead><tr><th class="floater-notify-col no-print"><span class="sr-only">Text</span></th><th>Position</th><th>Room</th><th>Floater</th></tr></thead>
           <tbody>
             <% hour.slots.forEach(function(slot) { %>
               <% var isApproved = slot.assigned && slot.assigned.status === 'approved'; %>

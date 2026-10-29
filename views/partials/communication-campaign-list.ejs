@@ -1,0 +1,49 @@
+<%
+// Shared by Communication's Text and Email pages (both portals) - a
+// real request: "List of sent texts and email pages should be a single
+// row. Status next to title the column for number of recipients and
+// column for date and time." One <tr> per campaign (never stacks into
+// several rows on mobile - no table-stack-mobile here, same as this
+// table's own candidate-list sibling above), status shown right next to
+// the title/subject in that same first cell instead of its own column,
+// and Scheduled/Sent collapse into one Date & Time column (whichever
+// one actually applies) instead of two columns where only one is ever
+// filled in. dateTimeLabel/statusLabel are computed server-side (routes/
+// admin-announcements.js, routes/main-admin-announcements.js) via
+// utils/dates.js's own formatFriendlyTimestamp() - "this should be hard
+// coded somewhere so it's always coded this way," the same shared
+// formatter already used across the rest of the site, instead of
+// printing the raw now_text()/scheduled_at string.
+// locals: heading, columnLabel ('Message'/'Subject'), campaigns
+// (pre-formatted: titleText, statusLabel, dateTimeLabel, recipient_count,
+// status, sendNowAction), confirmWord ('text'/'email'), emptyMessage.
+%>
+<h2><%= heading %></h2>
+<% if (campaigns.length === 0) { %>
+  <p class="roster-empty"><%= emptyMessage %></p>
+<% } else { %>
+  <div class="roster-scroll">
+    <table class="roster-table condensed-table">
+      <thead><tr><th><%= columnLabel %></th><th>Recipients</th><th>Date &amp; Time</th><th></th></tr></thead>
+      <tbody>
+        <% campaigns.forEach(function(c) { %>
+          <tr>
+            <td class="roster-name-col">
+              <%= c.titleText %>
+              <span class="badge-pill badge-pill-<%= c.status === 'sent' ? 'green' : 'orange' %>"><%= c.statusLabel %></span>
+            </td>
+            <td><%= c.recipient_count %></td>
+            <td><%= c.dateTimeLabel %></td>
+            <td>
+              <% if (c.status === 'scheduled') { %>
+                <form method="POST" action="<%= c.sendNowAction %>" data-confirm="Send this <%= confirmWord %> now?">
+                  <button type="submit" class="roster-action-btn">Send Now</button>
+                </form>
+              <% } %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>

@@ -12,15 +12,23 @@
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <form method="POST" action="/admin/announcements/text/send" class="stack-form member-form-page-panel">
+    <form method="POST" action="/admin/announcements/text/send" enctype="multipart/form-data" id="text-compose-form" class="stack-form member-form-page-panel">
       <% recipients.forEach(function(r) { %>
         <input type="hidden" name="recipientIds" value="<%= r.accountId %>" />
       <% }); %>
 
-      <label class="member-form-full">Message (<%= maxWords %> words max)
-        <textarea name="body" id="text-body" rows="4" required data-max-words="<%= maxWords %>" placeholder="e.g. Wednesday session is cancelled today."></textarea>
+      <label class="member-form-full">Message
+        <textarea name="body" id="text-body" rows="4" required maxlength="<%= maxLength %>" data-sms-char-counter="text-char-count" placeholder="e.g. Wednesday session is cancelled today."></textarea>
       </label>
-      <p class="hint" id="text-word-count">0 / <%= maxWords %> words</p>
+      <p class="hint" id="text-char-count">0 / <%= maxLength %> characters</p>
+
+      <%# A real request: "It should have an option to upload a photo." -
+          same optional MMS image attachment the Members page's own quick-
+          text popup already offers (public/js/member-text-notify.js),
+          just a bulk send instead of one recipient. %>
+      <label class="member-form-full">Image (optional)
+        <input type="file" name="image" accept="image/*" />
+      </label>
 
       <div class="member-form-full">
         <span class="checkbox-group-label">Send</span>
@@ -42,19 +50,12 @@
       </div>
     </form>
   </main>
+  <script src="/js/sms-char-counter.js"></script>
   <script>
     document.querySelectorAll('[data-send-option]').forEach(function (radio) {
       radio.addEventListener('change', function () {
         document.getElementById('text-scheduled-at').disabled = document.querySelector('[data-send-option]:checked').value !== 'schedule';
       });
-    });
-    const textBody = document.getElementById('text-body');
-    const wordCountLabel = document.getElementById('text-word-count');
-    const maxWords = Number(textBody.dataset.maxWords);
-    textBody.addEventListener('input', function () {
-      const words = textBody.value.trim().split(/\s+/).filter(Boolean);
-      wordCountLabel.textContent = words.length + ' / ' + maxWords + ' words';
-      wordCountLabel.classList.toggle('alert-error', words.length > maxWords);
     });
   </script>
 </body>

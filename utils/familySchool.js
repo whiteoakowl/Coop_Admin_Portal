@@ -599,6 +599,12 @@ async function statsForStudent(student, schoolYear) {
         .get(...(range ? [student.id, range[0], range[1]] : [student.id]))
     ).n
   );
+  // A real request: "overview, which shows volunteer hours, days of
+  // school attendance from family school management, GPA, etc." - the
+  // Portfolio page (below) already computed this total on its own,
+  // separately from this shared stat bundle; folding it in here instead
+  // means the plain Overview page gets it too, for free.
+  const totalVolunteerHours = await totalVolunteerHoursForStudent(student.id);
   return {
     ...student,
     photoUrl: memberPhotoUrl(student.photo_path),
@@ -606,6 +612,7 @@ async function statsForStudent(student, schoolYear) {
     gpa,
     presentDays,
     attendanceTargetDays: ATTENDANCE_TARGET_DAYS,
+    totalVolunteerHours,
   };
 }
 

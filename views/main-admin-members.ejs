@@ -408,6 +408,17 @@
                 <% } else { %>
                   <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No email on file"><svg class="icon"><use href="#icon-mail"/></svg></span>
                 <% } %>
+                <%# A real request: "Add a text icon to click and a pop
+                    up appears allowing you type a text message, add an
+                    image and send text button and close button." Separate
+                    from the Phone icon just below (tel: hands off to the
+                    device's own phone/SMS app) - this one sends through
+                    this app's own Telnyx-backed text system instead. %>
+                <% if (m.phone) { %>
+                  <button type="button" class="icon-btn" onclick="document.getElementById('text-dialog-<%= m.id %>').showModal()" aria-label="Text <%= m.name %>" title="Text <%= m.name %>"><svg class="icon"><use href="#icon-message-square"/></svg></button>
+                <% } else { %>
+                  <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No phone on file"><svg class="icon"><use href="#icon-message-square"/></svg></span>
+                <% } %>
                 <%# A real request: "add a phone icon, linked to their
                     phone number. phone icon opens on your personal
                     cellphone to call or text." tel: is the same
@@ -477,6 +488,31 @@
                 <% } %>
               </div>
             </div>
+            <%# A real request: "Add a text icon to click and a pop up
+                appears allowing you type a text message, add an image
+                and send text button and close button." Mirrors routes/
+                admin-members.js's own matching dialog exactly - see
+                views/admin-members.ejs's own copy of this comment. %>
+            <dialog id="text-dialog-<%= m.id %>" class="class-form-dialog">
+              <form class="stack-form member-text-notify-form" data-text-notify-url="/main-admin/members/<%= m.id %>/text">
+                <div class="class-form-dialog-header">
+                  <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-message-square"/></svg></span>
+                  <h3>Text <%= m.name %></h3>
+                </div>
+                <p class="hint member-text-notify-status" hidden></p>
+                <label>Message
+                  <textarea name="message" rows="4" required maxlength="<%= smsMaxLength %>" data-sms-char-counter="text-char-count-<%= m.id %>"></textarea>
+                </label>
+                <p class="hint" id="text-char-count-<%= m.id %>">0 / <%= smsMaxLength %> characters</p>
+                <label>Image (optional)
+                  <input type="file" name="image" accept="image/*" />
+                </label>
+                <div class="notes-dialog-actions">
+                  <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+                  <button type="submit" class="primary-btn">Send Text</button>
+                </div>
+              </form>
+            </dialog>
           <% }); %>
         </div>
         <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref }) %>
@@ -825,6 +861,8 @@
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/members-bulk-edit.js"></script>
   <script src="/js/member-row-actions.js"></script>
+  <script src="/js/member-text-notify.js"></script>
+  <script src="/js/sms-char-counter.js"></script>
   <% if (activeTab === 'settings') { %>
     <script src="/js/forum-editor.js"></script>
     <script src="/js/membership-field-type-toggle.js"></script>

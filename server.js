@@ -231,10 +231,6 @@ const adminNewsletterRouter = require('./routes/admin-newsletter');
 // utils/notifications.js's own header comment.
 const notificationsRouter = require('./routes/notifications');
 const adminNotificationsRouter = require('./routes/admin-notifications');
-// Contact Admins' own admin-facing inbox (manage_communications) - reads
-// back what the Parent/Student/Teacher-facing /contact-admins page
-// (routes/contact-admins.js) collects into contact_admin_messages.
-const adminContactAdminMessagesRouter = require('./routes/admin-contact-admin-messages');
 // Item 12: Photos/Albums at /photos and Publications/Articles at
 // /publications - both default to visibility='members', 'public' is a
 // deliberate, separate admin choice (never the default, given photo
@@ -385,6 +381,17 @@ app.use(
 // Completely independent of the single shared Admin session below.
 app.use(loadPortalSession);
 
+// Opportunistic dispatch for "Schedule Later" text broadcasts (see
+// utils/scheduledCampaigns.js's own header comment for why this runs
+// here, on every request, instead of a real cron job). Fire-and-forget -
+// never delays or fails the actual request it rides along with.
+app.use((req, res, next) => {
+  require('./utils/scheduledCampaigns')
+    .dispatchDueTextCampaigns()
+    .catch((err) => console.error('dispatchDueTextCampaigns failed:', err.message));
+  next();
+});
+
 // Member photos may live in Supabase Storage or on local disk (see
 // utils/uploadBackend.js and MIGRATION.md) - computed once at boot, not
 // per-request, since createStorageClient() just builds a lightweight
@@ -503,7 +510,6 @@ app.use('/newsletter', newsletterRouter);
 app.use('/main-admin/newsletter', adminNewsletterRouter);
 app.use('/notifications', notificationsRouter);
 app.use('/main-admin/notifications', adminNotificationsRouter);
-app.use('/main-admin/contact-admin-messages', adminContactAdminMessagesRouter);
 app.use('/photos', photosRouter);
 app.use('/babysitters', babysittersRouter);
 app.use('/nature-news', natureNewsImageRouter);

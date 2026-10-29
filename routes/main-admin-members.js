@@ -31,8 +31,11 @@ const { requirePortalAuth, requirePortal, requirePortalPermission } = require('.
 const { formatDateLabel, formatDateNumeric, formatTime, ageFromBirthday, isChildAge, isValidISODate } = require('../utils/dates');
 const { GRADE_LEVELS, CLASS_DAY_LABELS_FULL, listActiveClassDays } = require('../utils/classSchedule');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE, memberFamilyGroupKey } = require('../utils/pagination');
-const { spreadsheetFileFilter, documentFileFilter, DOCUMENT_MIME_BY_EXT } = require('../utils/uploads');
+const { spreadsheetFileFilter, documentFileFilter, DOCUMENT_MIME_BY_EXT, imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, generateKey } = require('../utils/storage');
+const { saveUpload, urlForUpload } = require('../utils/uploadBackend');
+const { notify } = require('../utils/notifications');
+const smsProvider = require('../utils/smsProvider');
 const path = require('path');
 const fs = require('fs');
 const { uploadMemberPhoto, savePhotoFile, deletePhotoFile } = require('../utils/memberPhoto');
@@ -78,6 +81,25 @@ router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermissi
 
 const MEMBER_TYPES = ['student', 'parent', 'admin'];
 const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
+
+// A real request: "Main admin portal and co-op admin portal. Members.
+// Add a text icon to click and a pop up appears allowing you type a
+// text message, add an image and send text button and close button."
+// Same optional-MMS-image upload pattern routes/admin-members.js's own
+// matching /members/:id/text route uses, just this portal's own
+// bucket/dir - see that route's own comment for the full reasoning
+// (public bucket, Telnyx needs a fetchable URL).
+const MAX_MEMBER_TEXT_IMAGE_BYTES = 5 * 1024 * 1024;
+const MEMBER_TEXT_IMAGE_BUCKET = 'member-text-images';
+const MEMBER_TEXT_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'member-text-images');
+if (!createStorageClient() && !fs.existsSync(MEMBER_TEXT_IMAGE_DIR)) {
+  try {
+    fs.mkdirSync(MEMBER_TEXT_IMAGE_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${MEMBER_TEXT_IMAGE_DIR}:`, err.message);
+  }
+}
+const memberTextImageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_MEMBER_TEXT_IMAGE_BYTES }, fileFilter: imageFileFilter });
 
 // A real request: "add an option to upload the policy handbook as a
 // document, pdf, etc." - same local-disk-fallback-or-Supabase-Storage
@@ -331,6 +353,7 @@ router.get('/', async (req, res) => {
     avatarColorFor,
     error: req.query.error || null,
     notice: req.query.notice || null,
+    smsMaxLength: smsProvider.MAX_SMS_LENGTH,
   });
 });
 
@@ -1506,6 +1529,56 @@ router.post('/:id/request-name-tag', async (req, res) => {
   }
   if (isFetch(req)) return res.json({ ok: true });
   res.redirect('/main-admin/members');
+});
+
+// A real request: "Add a text icon to click and a pop up appears
+// allowing you type a text message, add an image and send text button
+// and close button." Mirrors routes/admin-members.js's own identical
+// /members/:id/text route exactly - see that route's own comment for
+// the full reasoning (reuses the existing 'text_message' notification
+// type Communication's own Text campaign feature already seeded, with
+// the same no-portal-account phone fallback Floater/Setup's own text-
+// notify routes use).
+router.post('/:id/text', memberTextImageUpload.single('image'), async (req, res) => {
+  const memberId = parseInt(req.params.id, 10);
+  const member = await db.prepare('SELECT id, name, phone FROM members WHERE id = ?').get(memberId);
+  if (!member) return res.status(404).json({ ok: false, error: 'Member not found.' });
+  if (!member.phone) return res.status(400).json({ ok: false, error: 'This member has no phone on file.' });
+  const body = (req.body.message || '').trim();
+  if (!body) return res.status(400).json({ ok: false, error: 'A message is required.' });
+  // A real request: "Set 160 character length for all texting features
+  // across the app."
+  if (body.length > smsProvider.MAX_SMS_LENGTH) return res.status(400).json({ ok: false, error: `That message is ${body.length} characters - texts are capped at ${smsProvider.MAX_SMS_LENGTH} characters.` });
+
+  let mediaUrl = null;
+  if (req.file) {
+    const client = createStorageClient();
+    const key = await saveUpload({
+      client,
+      bucket: MEMBER_TEXT_IMAGE_BUCKET,
+      localDir: MEMBER_TEXT_IMAGE_DIR,
+      buffer: req.file.buffer,
+      originalName: req.file.originalname,
+      contentType: req.file.mimetype,
+    });
+    mediaUrl = urlForUpload({ client, bucket: MEMBER_TEXT_IMAGE_BUCKET, webDir: '/uploads/member-text-images', key });
+  }
+
+  const account = await db.prepare("SELECT id FROM member_accounts WHERE member_id = ? AND status = 'active'").get(memberId);
+  let status;
+  let detail;
+  if (account) {
+    const notificationId = await notify(account.id, 'text_message', { title: 'Text Message', body, mediaUrl });
+    const delivery = await db.prepare("SELECT status, detail FROM notification_deliveries WHERE notification_id = ? AND channel = 'sms'").get(notificationId);
+    status = delivery ? delivery.status : 'skipped';
+    detail = delivery ? delivery.detail : null;
+  } else {
+    const result = await smsProvider.send(member.phone, body, mediaUrl);
+    status = result.status;
+    detail = result.detail;
+  }
+
+  res.json({ ok: true, status, detail });
 });
 
 router.post('/:id/archive', async (req, res) => {

@@ -42,6 +42,7 @@ const {
   backfillScheduleCardAllergy,
   backfillScheduleCardAutoFit,
   backfillScheduleCardColors,
+  backfillScheduleCardSpacing,
   backfillParentSetupCleanupDays,
   backfillParentSetupCleanupMerge,
   backfillParentRemoveLegacyCleanupTeamElement,
@@ -125,6 +126,7 @@ db.ready = schemaReady
   .then(() => backfillScheduleCardAllergy(db))
   .then(() => backfillScheduleCardAutoFit(db))
   .then(() => backfillScheduleCardColors(db))
+  .then(() => backfillScheduleCardSpacing(db))
   .then(() => backfillParentSetupCleanupDays(db))
   // Must run AFTER backfillParentSetupCleanupDays - see that backfill's
   // own comment on why this one depends on it having already run.

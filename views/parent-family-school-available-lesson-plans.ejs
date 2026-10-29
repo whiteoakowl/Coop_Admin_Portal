@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Family School Management' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="roster-toolbar no-print">
+      <h1>Available Lesson Plans</h1>
+      <%# A real request: "Add a filter button at the top, fit to text.
+          Allows you to filter by grade level, and subject. Be able to
+          select multiple from the dropdown menu with check boxes." Same
+          Filter-button-opens-a-panel convention this page's own sibling
+          (Family Classes) already uses, just two multi-select-checkbox
+          widgets (partials/multi-select-checkbox.ejs, same control
+          Members/Events/Class forms already use for grade/age) instead
+          of a single plain <select>. %>
+      <div class="roster-btn-row roster-btn-row-fit-text">
+        <details class="filter-details" data-filter-details>
+          <summary class="roster-action-btn">Filter</summary>
+          <form method="GET" action="/parent/family-school/classes/available-lesson-plans" class="filter-panel">
+            <label>Grade Level
+              <%- include('partials/multi-select-checkbox', {
+                name: 'gradeLevel',
+                options: gradeLevels.map(function(g) { return { value: g, label: g }; }),
+                selected: selectedGradeLevels,
+                placeholder: 'All grade levels',
+              }) %>
+            </label>
+            <label>Subject
+              <%- include('partials/multi-select-checkbox', {
+                name: 'subject',
+                options: subjects.map(function(s) { return { value: s, label: s }; }),
+                selected: selectedSubjects,
+                placeholder: 'All subjects',
+              }) %>
+            </label>
+            <button type="submit" class="primary-btn">Apply Filter</button>
+          </form>
+        </details>
+      </div>
+    </div>
+
+    <%# "Any lesson plans that admin has created and marked shareable
+        with parent portal will show here as cards in a viewable
+        format, no editing." Read-only all the way down - this card
+        grid never offers Edit/Delete, only a link into the read-only
+        outline below. %>
+    <% if (plans.length === 0) { %>
+      <p class="roster-empty"><%= (selectedGradeLevels.length || selectedSubjects.length) ? 'No shared lesson plans match that filter.' : 'No lesson plans have been shared with Family School Management yet.' %></p>
+    <% } else { %>
+      <div class="team-card-grid">
+        <% plans.forEach(function(p) { %>
+          <div class="team-col">
+            <a class="team-info-card" href="/parent/family-school/classes/available-lesson-plans/<%= p.id %>">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
+              <h3 class="team-info-title"><%= p.title %></h3>
+              <% if (p.description) { %><p class="hint"><%= p.description %></p><% } %>
+              <% if (p.grade_level) { %><span class="team-info-pill"><%= p.grade_level %></span><% } %>
+              <% if (p.subject) { %><span class="team-info-pill"><%= p.subject %></span><% } %>
+            </a>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+  <script src="/js/multi-select-checkbox.js"></script>
+</body>
+</html>

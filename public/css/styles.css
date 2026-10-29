@@ -386,6 +386,46 @@ textarea:focus-visible,
 .landing-card-purple .landing-icon { background: rgba(255,255,255,0.6); color: #4a2050; }
 .landing-card-purple .landing-label { color: #000; }
 
+/* A real request: "Student portal homepage. Add three cards each a
+   solid color matching the kiosk page. Orange, blue and green." No
+   blue variant existed yet (Check In/Out are green, Floater/Setup are
+   purple) - --btn-blue is already a real, defined color (used for this
+   app's own "secondary/info" buttons and links), just never applied to
+   a landing-card before now. --btn-blue is noticeably darker/more
+   saturated than the pastel orange/green/purple above, so (unlike
+   those three) its own label/icon stay WHITE rather than black for
+   real contrast against it. */
+.landing-card-blue { background: var(--btn-blue); border-color: var(--btn-blue); }
+.landing-card-blue:hover { border-color: var(--btn-blue-hover); }
+.landing-card-blue .landing-icon { background: rgba(255,255,255,0.6); color: #0f2d47; }
+.landing-card-blue .landing-label { color: #fff; }
+
+/* A real request: "on student portal homepage the new buttons should be
+   half the height. More rectangle shaped. To save space" - then "the
+   Documents tab on all portals where it exists... Same with the new
+   student portal menu cards system." .landing-card-rect is the reusable
+   SHAPE modifier (icon beside the label instead of above it, shorter
+   padding) - add it to any .landing-grid container that wants shorter
+   rectangular cards instead of the original square ones: the kiosk
+   homepage itself keeps the square shape (never given this class), but
+   the Student Portal homepage's own 3-card row, its Group/Classroom/Fun
+   Dashboard category sub-pages, and every portal's Documents list
+   (.documents-grid - Co-op Admin/Main Admin/Parent) all opt in below. */
+.landing-card-rect .landing-card { flex-direction: row; justify-content: flex-start; padding: 0.85rem 1.25rem; gap: 0.85rem; }
+.landing-card-rect .landing-icon,
+.landing-card-rect .landing-card-image { width: 2.25rem; height: 2.25rem; font-size: 1.2rem; flex-shrink: 0; }
+.landing-card-rect .landing-label { font-size: 1.25rem; text-align: left; }
+
+/* Student Portal homepage's own 3-card category row specifically - its
+   own layout (equal columns, capped width) rather than the fixed-220px
+   columns every other .landing-grid page uses, kept separate from the
+   shape rules above so the Documents list/category sub-pages below keep
+   their own existing column counts. */
+.landing-grid-home { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 56rem; }
+@media (max-width: 720px) {
+  .landing-grid-home { grid-template-columns: 1fr; }
+}
+
 .home-login-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -4829,6 +4869,22 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
   max-width: 100%;
 }
 
+/* A real request: "Click send text button. The mobile view. The full
+   card should fit mobile view width." Compose Text's own card
+   (#text-compose-form) is short on wide content (just a textarea and a
+   couple of radio labels), so .member-form-page-panel's own width:
+   fit-content above settles narrower than the phone's own screen,
+   leaving a stripe of bare page background down the right side instead
+   of the card actually reaching the edge of the content column like
+   every other mobile card on the site. Scoped to this one form (not
+   every .member-form-page-panel - several other pages, e.g. the
+   Membership form, deliberately want their own narrower fit-content
+   width even on mobile) at the same 640px breakpoint this file's other
+   Compose-page mobile rules already use. */
+@media (max-width: 640px) {
+  #text-compose-form.member-form-page-panel { width: 100%; }
+}
+
 /* Phone/Email (icon-wrapped) already get their box treatment from
    .input-with-icon; Birthday and Medical/Allergy Notes are plain direct
    children of .class-form-field, so they need the same input styling
@@ -5419,6 +5475,17 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
   margin-bottom: 1.25rem;
 }
 .manage-section h2 { margin-top: 0; }
+/* A real request: "Check boxes lined up in a single row with text
+   starting at the check box" - a plain <label> wrapping a checkbox and
+   its own text already reads/clicks as one unit; this just keeps the
+   checkbox and text on one baseline with a little breathing room
+   between them and the next label, instead of the browser default's
+   slightly-off vertical alignment. Shared by Notifications Settings'
+   own per-type Text/Email toggles and the Lesson Plan Settings page's
+   own "allow teachers/members to edit" checkboxes. */
+.checkbox-inline-label { display: inline-flex; align-items: center; gap: 0.4rem; margin-right: 1.25rem; cursor: pointer; font-weight: 500; }
+.checkbox-inline-label input[type="checkbox"] { margin: 0; }
+.checkbox-inline-row { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-bottom: 1rem; }
 
 /* A real request: "add member. remove descriptions. no individual cards
    for each section just a distinctive line between each section" -
@@ -6749,25 +6816,72 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 .floater-card-position { font-weight: 600; }
 .floater-card-unassigned { color: var(--muted); font-style: italic; }
 
-/* "Text Notification" select-mode column (public/js/floater-text-
-   notify.js) - hidden until the toolbar's own Text Notification button
-   is clicked once, and only on this one table: .floater-card-table's
-   own nth-child widths above are shared with two unrelated tables
-   (Setup/Cleanup Assignments, floater-assignment-cards) that don't have
-   this column at all, so the override below needs the extra .floater-
-   chart-table specificity rather than touching those shared rules. */
-.floater-notify-col { display: none; }
-.floater-notify-select-mode .floater-notify-col { display: table-cell; }
+/* "Text Notification" column (public/js/floater-text-notify.js) - only
+   on this one table: .floater-card-table's own nth-child widths above
+   are shared with two unrelated tables (Setup/Cleanup Assignments,
+   floater-assignment-cards) that don't have this column at all, so the
+   override below needs the extra .floater-chart-table specificity
+   rather than touching those shared rules. A real request removed the
+   old page-level "Text Notification" toggle button entirely ("Not
+   [the] orange send text button at the top... Just the send text
+   buttons on each hour title bar") - these checkboxes are therefore
+   always visible now, not gated behind clicking that button first.
+   .floater-card-table.floater-chart-table th:nth-child(1)/td:nth-
+   child(1) below already sizes this column. */
+.floater-notify-col { display: table-cell; }
 /* A real request: "click the checkboxes on each assignment or the
-   whole card." Same select-mode gating as .floater-notify-col above,
-   just living in .floater-card-header (a flex row - margin-left: auto
-   pushes it to the header's own far right) instead of a table column. */
-.floater-card-select-all { display: none; align-items: center; gap: 0.3rem; margin-left: auto; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
-.floater-notify-select-mode .floater-card-select-all { display: inline-flex; }
+   whole card." Always visible, living in .floater-card-header (a flex
+   row) rather than a table column. */
+.floater-card-select-all { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+/* A real request: "Send text button on hour title bar, shrink to fit."
+   A one-click send to whichever checkboxes (individual rows, or the
+   Select All checkbox above) are currently checked in this one card.
+   margin-left: auto pushes it to the header's own far right; width/
+   padding sized to its own text rather than stretching, matching this
+   app's other shrink-to-fit buttons. */
+.floater-card-send-text-btn {
+  margin-left: auto;
+  width: fit-content;
+  white-space: nowrap;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.85);
+  color: inherit;
+  cursor: pointer;
+}
+.floater-card-send-text-btn:hover { background: #fff; }
+.floater-card-send-text-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .floater-card-table.floater-chart-table th:nth-child(1), .floater-card-table.floater-chart-table td:nth-child(1) { width: 2.2rem; }
+/* The roughly-even three-way split below this table's own rows use at
+   any width up to 900px - this table never leaves table-layout:fixed
+   until the @media (max-width: 640px) block further down switches it
+   to the card-style stacked rows instead, so without this, anything in
+   between (a tablet, or a phone in landscape) would otherwise fall
+   through to the wide-desktop split just below, which was never meant
+   for anything narrower than a real desktop window - a real bug report:
+   "Floater assignments the page format on mobile was changed when we
+   were only fixing the name dropdown size on desktop." */
 .floater-card-table.floater-chart-table th:nth-child(2), .floater-card-table.floater-chart-table td:nth-child(2) { width: 38%; }
 .floater-card-table.floater-chart-table th:nth-child(3), .floater-card-table.floater-chart-table td:nth-child(3) { width: 23%; }
 .floater-card-table.floater-chart-table th:nth-child(4), .floater-card-table.floater-chart-table td:nth-child(4) { width: 35%; }
+/* A real request: "Make it to where you can view the entire first and
+   last name in the dropdown choice view. Shrink tables to fit
+   accordingly." Position/Room text is always short ("Hallway Monitor",
+   "Room 12"); a floater's own select has to fit a full first+last name
+   AND the Assign/Unassign button riding along in the same cell
+   (.floater-assign-form's own flex row), so it gets the lion's share of
+   the row on a genuinely wide screen instead of roughly an even three-
+   way split - gated to min-width: 901px (not the table's own general
+   rule above) so a tablet or landscape phone still gets the narrower
+   split above, same as before this fix. */
+@media (min-width: 901px) {
+  .floater-card-table.floater-chart-table th:nth-child(2), .floater-card-table.floater-chart-table td:nth-child(2) { width: 20%; }
+  .floater-card-table.floater-chart-table th:nth-child(3), .floater-card-table.floater-chart-table td:nth-child(3) { width: 12%; }
+  .floater-card-table.floater-chart-table th:nth-child(4), .floater-card-table.floater-chart-table td:nth-child(4) { width: 66%; }
+}
 
 /* Setup/Cleanup Assignments' own version of .floater-card-table - a real
    request: "just line the assignments under each member like mobile."
@@ -6815,6 +6929,15 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
   text-overflow: ellipsis;
 }
 .setup-assignment-table .floater-assign-btn { align-self: center; flex-shrink: 0; font-size: 0.68rem; padding: 0.25rem 0.45rem; }
+/* A real request: "Add the same exact check box and button system on
+   floater assignments, on each setup cleanup team and position." Unlike
+   Floater's own notify checkbox (its own dedicated .floater-notify-col
+   table column, since that table is a real column grid at desktop
+   width), this table is always a stacked, one-full-width-line-per-cell
+   layout (see .setup-assignment-table's own comment above) - the
+   checkbox sits directly inside the Member cell instead, right before
+   the name, and just needs its own small gap so it doesn't touch it. */
+.setup-assignment-table .floater-card-position .floater-notify-checkbox { margin-right: 0.4rem; vertical-align: middle; }
 
 .floater-card-footer {
   display: flex;
@@ -6949,19 +7072,16 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
    applies - a card can never demand more width than the viewport has. */
 .floater-chart-cards-grid { grid-template-columns: repeat(auto-fit, minmax(min(480px, 100%), 1fr)); }
 
-/* 36/16/48, not the base .floater-card-table's 40/24/36 - a real bug at
-   desktop widths: table-layout:fixed locks each column to its header's
-   width, and the old 22/12/66 split left "Room" so narrow that its own
-   header ("ROOM") had nowhere to go but overflow into "Floater" (the
-   inherited .floater-card-table th white-space: nowrap made it worse),
-   while "Position" was narrow enough to wrap long names like "Classroom
-   Hallway Supervisor" one character per line. white-space: normal lets a
-   header wrap instead of overflowing when a column is still tight. */
-.floater-chart-table th:nth-child(1) { width: 32%; }
-.floater-chart-table th:nth-child(2) { width: 20%; }
-.floater-chart-table th:nth-child(3) { width: 48%; }
+/* This table's column widths are set above (.floater-card-table.floater-
+   chart-table th/td:nth-child, 4 columns counting the Text checkbox) -
+   these th:nth-child(1)/(2)/(3) selectors here used to target Position/
+   Room/Floater back when this was still a 3-column table, before the
+   Text Notification column was added; that extra class in the selector
+   above outranks these on specificity now, so a width set here would be
+   silently ignored regardless of what it said. white-space: normal
+   (not nth-child-scoped, so still real) lets a tight header wrap
+   instead of overflowing into its neighbor. */
 .floater-chart-table th { white-space: normal; }
-.floater-chart-table td:nth-child(1), .floater-chart-table td:nth-child(2), .floater-chart-table td:nth-child(3) { width: auto; }
 
 /* A class can now list more than once (one row per missing teacher/
    assistant) - this small line under the class name says who that

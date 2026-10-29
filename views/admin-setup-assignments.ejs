@@ -79,8 +79,40 @@
         <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
       </div>
     </dialog>
+
+    <%# A real request: "Add the same exact check box and button system
+        on floater assignments, on each setup cleanup team and
+        position." Mirrors Floater Assignments' own floater-text-
+        notify-dialog exactly - see that dialog's own comment in
+        views/admin-volunteers.ejs for the full reasoning (single
+        recipient gets an editable starting message; 2+ recipients each
+        get their own message built server-side from their own team/
+        tasks instead). %>
+    <dialog id="setup-text-notify-dialog" class="class-form-dialog" data-message-template="<%= setupMessageTemplate %>">
+      <form id="setup-text-notify-form" class="stack-form">
+        <div class="class-form-dialog-header">
+          <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-mail"/></svg></span>
+          <h3>Send Text Notification</h3>
+        </div>
+        <p class="hint" id="setup-text-notify-recipients-hint"></p>
+        <label id="setup-text-notify-message-label">Message
+          <textarea name="message" id="setup-text-notify-message" rows="4" maxlength="<%= smsMaxLength %>" data-sms-char-counter="setup-text-notify-char-count"></textarea>
+          <p class="hint" id="setup-text-notify-char-count">0 / <%= smsMaxLength %> characters</p>
+        </label>
+        <p class="hint" id="setup-text-notify-multi-hint" hidden>Each member will get their own text with their own team and task(s) - the message can't be customized when sending to more than one person at once.</p>
+        <label>Image (optional)
+          <input type="file" name="image" accept="image/*" />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn" id="setup-text-notify-send-btn">Send Now</button>
+        </div>
+      </form>
+    </dialog>
   </main>
   <script src="/js/setup-dates.js"></script>
   <script src="/js/setup-assign.js"></script>
+  <script src="/js/setup-text-notify.js"></script>
+  <script src="/js/sms-char-counter.js"></script>
 </body>
 </html>

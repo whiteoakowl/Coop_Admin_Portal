@@ -14,6 +14,7 @@
 const db = require('../db');
 const { notify } = require('./notifications');
 const emailProvider = require('./emailProvider');
+const { easternInputToUtcText } = require('./dates');
 
 const AGE_GROUPS = [
   { key: 'under5', label: 'Under 5', min: 0, max: 4 },
@@ -173,12 +174,20 @@ async function createAndSend({ subject, bodyHtml, replyTo, sendTo, recipientAcco
 
 async function createScheduled({ subject, bodyHtml, replyTo, sendTo, recipientAccountIds, scheduledAt, sentByAccountId, sentByPortal }) {
   const recipients = [...new Set(recipientAccountIds)];
+  // scheduledAt arrives as a raw <input type="datetime-local">-shaped
+  // value ("2026-10-28T14:30", no timezone) - converted to the same UTC
+  // 'YYYY-MM-DD HH:MM:SS' text now_text() produces, same conversion
+  // utils/textComposer.js's own createScheduled already does, so this
+  // row's scheduled_at reads correctly through utils/dates.js's
+  // formatFriendlyTimestamp() the same way sent_at already does (a real
+  // bug this fixed: the raw, unconverted Eastern wall-clock value used
+  // to be stored and displayed as if it were already UTC).
   const info = await db
     .prepare(
       `INSERT INTO email_campaigns (subject, body_html, reply_to, send_to, recipient_account_ids, recipient_count, status, scheduled_at, sent_by_portal, created_by_account_id)
        VALUES (?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, ?) RETURNING id`
     )
-    .get(subject, bodyHtml, replyTo || null, sendTo || null, JSON.stringify(recipients), recipients.length, scheduledAt, sentByPortal, sentByAccountId);
+    .get(subject, bodyHtml, replyTo || null, sendTo || null, JSON.stringify(recipients), recipients.length, easternInputToUtcText(scheduledAt), sentByPortal, sentByAccountId);
   return { id: info.id, recipientCount: recipients.length };
 }
 

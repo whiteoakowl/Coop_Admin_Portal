@@ -5607,3 +5607,99 @@ create table if not exists accounting_transactions (
 );
 create index if not exists idx_accounting_transactions_date on accounting_transactions(transaction_date);
 create index if not exists idx_accounting_transactions_type on accounting_transactions(type);
+-- A real request: "Class/event wait list or registration, event or
+-- class submission decision, babysitters decision, forum reply,
+-- announcements, newsletter sent, should be email notifications, not
+-- text." sms_enabled is a type-level switch (unlike notification_
+-- preferences, which is an account's own per-type override) - a member
+-- can still turn SMS back on for a type in their own Preferences, but
+-- utils/notifications.js's own notify() now skips the SMS attempt
+-- outright for these types regardless of that preference, the same way
+-- auto_send_enabled already gates both channels together. Default 1
+-- (on) for every existing/future type, so this is additive everywhere
+-- except the 9 rows explicitly flipped off below - floater_assignment
+-- (the whole point of that feature is the text itself), event_cancelled,
+-- membership_approved/denied, text_message, and email_campaign all keep
+-- their current SMS behavior unchanged.
+alter table notification_types add column if not exists sms_enabled integer not null default 1;
+
+update notification_types set sms_enabled = 0 where key in (
+  'class_waitlist_promoted',
+  'event_waitlist_promoted',
+  'class_registration',
+  'event_registration',
+  'event_submission_decided',
+  'babysitter_submission_decided',
+  'forum_reply',
+  'announcement',
+  'newsletter_sent'
+);
+
+-- A real request: "Main admin portal. Settings gear. Add a notifications
+-- card. Here you can see a list of notifications with two columns of
+-- checkboxes titled text and email. Admin can click each box to select
+-- if it will be a text notification, email notification or both."
+-- Pairs with the existing sms_enabled column (20261218010000) so each
+-- notification type has two fully independent per-channel switches
+-- instead of one combined auto_send_enabled toggle. auto_send_enabled
+-- itself is left in place (unused by application code from here on)
+-- rather than dropped, to avoid a destructive column removal for a
+-- column that does no harm sitting unused.
+alter table notification_types add column if not exists email_enabled integer not null default 1;
+
+-- A real bug report: "Spring 2027 - Monday, Spring 2026 Wednesday are
+-- showing rosters and attendance from fall days. It should be its own."
+-- Root cause: Attendance's day-level Parent/Student rosters (utils/
+-- classSchedule.js's ensureDayRoster) were only ever keyed by day+role
+-- (an app_settings row like 'monday_parent_roster_id'), never by
+-- semester - every semester sharing that day literally shared the one
+-- same roster row, same roster_dates, same attendance. This column lets
+-- a day-roster record which semester it belongs to (nullable - every
+-- other roster category, e.g. a class roster, still has no need for it,
+-- and the already-existing mixed-semester rosters are deliberately left
+-- with semester_id null until ensureDayRoster's own first-touch claim
+-- logic assigns one - see that function's own comment for why this is a
+-- "fix going forward" rather than an attempt to retroactively split
+-- already-mixed history, which semesters have no stored date range to
+-- do correctly by).
+alter table rosters add column if not exists semester_id integer references semesters(id) on delete set null;
+
+-- A real request: "Add the same exact check box and button system on
+-- floater assignments, on each setup cleanup team and position." The
+-- Setup/Cleanup Assignments page gets its own Select All checkbox +
+-- Send Text button per team card, same as Floater Assignments' own
+-- per-hour card - texts a member their team and currently-assigned
+-- task(s) for the selected date.
+insert into notification_types (key, label, description) values
+  ('setup_cleanup_assignment', 'Setup/Cleanup Assignment', 'You were texted your Setup/Cleanup team and assigned task(s) for an upcoming co-op session.')
+on conflict (key) do nothing;
+
+insert into notification_message_templates (template_key, subject, body) values
+  ('setup_cleanup_assignment_default', '', 'You''re assigned to {{team}}: {{tasks}}.')
+on conflict (template_key) do nothing;
+
+-- A real request: "Co-op admin portal. Lesson plans tab... allow
+-- teachers to edit/add to the lesson plan, all members to edit/add to
+-- the lesson plan." Both default false - today's existing behavior
+-- (admin-only editing) is unchanged until an admin opts a specific
+-- lesson plan in.
+alter table lesson_plans add column if not exists allow_teacher_edit boolean not null default false;
+alter table lesson_plans add column if not exists allow_member_edit boolean not null default false;
+
+-- A real request: "Family school management portal, family classes.
+-- Add a subpage called available lesson plans. Any lesson plans that
+-- admin has created and marked shareable with parent portal will show
+-- here as cards... Allows you to filter by grade level, and subject."
+-- Both nullable - a plan is still a plain internal template until an
+-- admin sets these. shareable_with_parents defaults false - every
+-- existing plan stays admin/co-op-only until an admin opts it in.
+alter table lesson_plans add column if not exists grade_level text;
+alter table lesson_plans add column if not exists subject text;
+alter table lesson_plans add column if not exists shareable_with_parents boolean not null default false;
+
+-- A real request: "Click send text button... It should have an option
+-- to upload a photo." Same optional-MMS-image column shape the
+-- per-member/floater/setup-cleanup quick-text popups already pass
+-- through to smsProvider.send() - text_campaigns (a bulk Communication >
+-- Text send) never had anywhere to persist one before.
+alter table text_campaigns add column if not exists media_url text;

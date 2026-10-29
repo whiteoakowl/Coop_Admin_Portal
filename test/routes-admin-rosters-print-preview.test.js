@@ -57,7 +57,7 @@ test('GET /admin/rosters/print', async (t) => {
   await t.test('the live Parent/Student grid Print button links to the preview route instead of calling window.print() directly', async () => {
     const res = await request(app).get('/admin/rosters?tab=monday-parent').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, /href="\/admin\/rosters\/print\?tab=monday-parent"/);
+    assert.match(res.text, /href="\/admin\/rosters\/print\?tab=monday-parent(&amp;semesterId=[^"]*)?"/);
     assert.doesNotMatch(res.text, /print-action-btn" onclick="window\.print\(\)"/);
   });
 
@@ -68,8 +68,8 @@ test('GET /admin/rosters/print', async (t) => {
   // newly linked from here as an icon button.
   await t.test('the toolbar now also has an icon Export button wired to the existing per-roster export route', async () => {
     const res = await request(app).get('/admin/rosters?tab=monday-parent').set('Cookie', cookie);
-    assert.match(res.text, /<a class="icon-btn" href="\/admin\/roster\/monday-parent\/export\.csv" aria-label="Export CSV"/);
-    assert.match(res.text, /<a class="icon-btn" href="\/admin\/rosters\/print\?tab=monday-parent" target="_blank" aria-label="Print"/);
+    assert.match(res.text, /<a class="icon-btn" href="\/admin\/roster\/monday-parent\/export\.csv(\?semesterId=[^"]*)?" aria-label="Export CSV"/);
+    assert.match(res.text, /<a class="icon-btn" href="\/admin\/rosters\/print\?tab=monday-parent(&amp;semesterId=[^"]*)?" target="_blank" aria-label="Print"/);
 
     const csv = await request(app).get('/admin/roster/monday-parent/export.csv').set('Cookie', cookie);
     assert.equal(csv.status, 200);

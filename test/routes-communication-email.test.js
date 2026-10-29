@@ -8,6 +8,13 @@
 // filter candidate data on both portals, and the actual create-and-send
 // vs. schedule-then-manually-send behavior once, on Main Admin (Co-op
 // Admin's own routes call the identical shared functions).
+//
+// A later real request: "separate text and email subpages again...
+// Page should show a list of all members. Then filter button narrows
+// it down in a popup screen." Text and Email are two separate pages
+// again (no more combined /text-email + session-backed /text-email/
+// filter page) - the full candidate list and the Filter <dialog> both
+// live directly on GET /email now.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -84,18 +91,29 @@ async function seedStudentAccount(suffix, { grade = '3rd Grade', registerForClas
   return { accountId, memberId };
 }
 
-test('Main Admin Email tab: candidate rows carry role/section/grade/age/registration data attributes for client-side filtering', async () => {
+test('Main Admin Email page: renders directly (no more redirect to a combined Text/Email page), with a Filter button/dialog and the full member list shown, every row checked by default', async () => {
+  const { cookie } = await loginAsMainAdmin();
+  const { accountId } = await seedStudentAccount('mainRenders');
+
+  const page = await request(app).get('/main-admin/announcements/email').set('Cookie', cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<h1>Email<\/h1>/);
+  assert.match(page.text, /showModal\(\)">Filter</);
+  assert.match(page.text, /<dialog id="email-filter-dialog"/);
+  assert.match(page.text, new RegExp(`value="${accountId}" data-email-checkbox checked`));
+});
+
+test('Main Admin Email page: candidate rows carry role/section/grade/age/registration data attributes for client-side filtering', async () => {
   const { cookie } = await loginAsMainAdmin();
   const { accountId } = await seedStudentAccount('mainA', { grade: '5th Grade', registerForClass: true, inSection: true });
 
   const page = await request(app).get('/main-admin/announcements/email').set('Cookie', cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, new RegExp(`value="${accountId}" data-email-checkbox`));
+  assert.match(page.text, new RegExp(`value="${accountId}" data-email-checkbox checked`));
   assert.match(page.text, /data-role="student"/);
   assert.match(page.text, /data-grade="5th Grade"/);
   assert.match(page.text, /data-registered="yes"/);
   assert.match(page.text, /data-section="Teen Co-op"/);
-  assert.match(page.text, />Filter</);
   assert.match(page.text, /id="email-select-all"/);
   assert.doesNotMatch(page.text, /data-email-select="all"/, 'Select All/Select None buttons were replaced by a single header checkbox');
 });
@@ -104,7 +122,7 @@ test('Main Admin Email tab: candidate rows carry role/section/grade/age/registra
 // put a check box on the title row of the 1st column... Lists should
 // show just name, email and phone number. Shrink to fit tables in
 // mobile view."
-test('Main Admin Email tab: the candidate table shows only Name/Email/Phone columns, with Select All in the header cell, and shrinks instead of stacking on mobile', async () => {
+test('Main Admin Email page: the candidate table shows only Name/Email/Phone columns, with Select All in the header cell, and shrinks instead of stacking on mobile', async () => {
   const { cookie } = await loginAsMainAdmin();
   await seedStudentAccount('mainPhone', { phone: '555-123-9876' });
 
@@ -112,7 +130,7 @@ test('Main Admin Email tab: the candidate table shows only Name/Email/Phone colu
   assert.equal(page.status, 200);
   assert.match(page.text, /<table class="roster-table condensed-table" id="email-candidate-table">/);
   assert.doesNotMatch(page.text, /id="email-candidate-table"[^>]*table-stack-mobile|table-stack-mobile[^>]*id="email-candidate-table"/);
-  assert.match(page.text, /<tr><th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" \/><\/th><th>Name<\/th><th>Email<\/th><th>Phone<\/th><\/tr>/);
+  assert.match(page.text, /<tr><th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" checked \/><\/th><th>Name<\/th><th>Email<\/th><th>Phone<\/th><\/tr>/);
   assert.match(page.text, />555-123-9876</);
   assert.doesNotMatch(page.text, />Grade</);
   assert.doesNotMatch(page.text, />Section\(s\)</);
@@ -154,7 +172,7 @@ test('Main Admin Email: Create Email renders the compose screen with hidden reci
     .set('Cookie', cookie)
     .send({ _csrf: csrfToken, recipientIds: [String(accountId)], subject: 'Class update', body: '<p>hi</p>', replyTo: 'board@example.com', sendTo: 'extra@example.com', sendOption: 'now' });
   assert.equal(sendRes.status, 302);
-  assert.match(sendRes.headers.location, /notice=/);
+  assert.match(sendRes.headers.location, /\/main-admin\/announcements\/email\?notice=/);
 
   const campaign = await db.prepare("SELECT * FROM email_campaigns WHERE subject = 'Class update'").get();
   assert.ok(campaign);
@@ -181,7 +199,13 @@ test('Main Admin Email: scheduling saves a scheduled campaign without notifying 
 
   let campaign = await db.prepare("SELECT * FROM email_campaigns WHERE subject = 'Scheduled note'").get();
   assert.equal(campaign.status, 'scheduled');
-  assert.equal(campaign.scheduled_at, scheduledAt);
+  // A real request: "fix date and time format to match the rest of the
+  // site." scheduled_at is now converted the same UTC 'YYYY-MM-DD
+  // HH:MM:SS' way utils/textComposer.js's own createScheduled already
+  // did, instead of storing the raw, unconverted datetime-local value -
+  // so it reads correctly through utils/dates.js's shared
+  // formatFriendlyTimestamp() the same way sent_at already does.
+  assert.match(campaign.scheduled_at, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/, 'should be stored as a plain UTC "YYYY-MM-DD HH:MM:SS" string, not the raw datetime-local input');
   assert.equal(campaign.send_to, 'later-extra@example.com');
 
   let notif = await db.prepare("SELECT * FROM notifications WHERE type_key = 'email_campaign' AND member_account_id = ? AND title = 'Scheduled note'").get(accountId);
@@ -190,6 +214,13 @@ test('Main Admin Email: scheduling saves a scheduled campaign without notifying 
   const listPage = await request(app).get('/main-admin/announcements/email').set('Cookie', cookie);
   assert.match(listPage.text, /Scheduled note/);
   assert.match(listPage.text, />Send Now</);
+  // "List of sent texts and email pages should be a single row. Status
+  // next to title the column for number of recipients and column for
+  // date and time." Same row-shape check as the Text page's own test.
+  assert.match(listPage.text, /<th>Subject<\/th><th>Recipients<\/th><th>Date &amp; Time<\/th><th><\/th>/);
+  const scheduledRowMatch = new RegExp('<td class="roster-name-col">\\s*Scheduled note\\s*<span class="badge-pill badge-pill-orange">Scheduled</span>\\s*</td>').exec(listPage.text);
+  assert.ok(scheduledRowMatch, 'expected the Scheduled status badge directly next to the subject text, in the same cell');
+  assert.match(listPage.text, /Scheduled for January 1, 2027/);
 
   const manualSendRes = await request(app)
     .post(`/main-admin/announcements/email/${campaign.id}/send`)
@@ -205,15 +236,15 @@ test('Main Admin Email: scheduling saves a scheduled campaign without notifying 
   assert.ok(notif);
 });
 
-test('Co-op Admin Email tab: same filter/select-all/compose wiring, reached at /admin/announcements/email', async () => {
+test('Co-op Admin Email page: same filter/select-all/compose wiring, reached directly at /admin/announcements/email', async () => {
   const { cookie, csrfToken } = await loginAsAdmin();
   const { accountId } = await seedStudentAccount('coopA', { phone: '555-000-1111' });
 
   const page = await request(app).get('/admin/announcements/email').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /<h1>Email<\/h1>/);
-  assert.match(page.text, new RegExp(`value="${accountId}" data-email-checkbox`));
-  assert.match(page.text, /<tr><th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" \/><\/th><th>Name<\/th><th>Email<\/th><th>Phone<\/th><\/tr>/);
+  assert.match(page.text, new RegExp(`value="${accountId}" data-email-checkbox checked`));
+  assert.match(page.text, /<tr><th class="no-print"><input type="checkbox" id="email-select-all" aria-label="Select all" checked \/><\/th><th>Name<\/th><th>Email<\/th><th>Phone<\/th><\/tr>/);
   assert.match(page.text, />555-000-1111</);
 
   const sendRes = await request(app)
@@ -222,6 +253,7 @@ test('Co-op Admin Email tab: same filter/select-all/compose wiring, reached at /
     .set('Cookie', cookie)
     .send({ _csrf: csrfToken, recipientIds: [String(accountId)], subject: 'Coop email', body: '<p>hi</p>', sendTo: 'coop-extra@example.com', sendOption: 'now' });
   assert.equal(sendRes.status, 302);
+  assert.match(sendRes.headers.location, /\/admin\/announcements\/email\?notice=/);
 
   const campaign = await db.prepare("SELECT * FROM email_campaigns WHERE subject = 'Coop email'").get();
   assert.ok(campaign);
