@@ -365,8 +365,9 @@
                 </div>
                 <p class="hint member-text-notify-status" hidden></p>
                 <label>Message
-                  <textarea name="message" rows="4" required></textarea>
+                  <textarea name="message" rows="4" required maxlength="<%= smsMaxLength %>" data-sms-char-counter="text-char-count-<%= m.id %>"></textarea>
                 </label>
+                <p class="hint" id="text-char-count-<%= m.id %>">0 / <%= smsMaxLength %> characters</p>
                 <label>Image (optional)
                   <input type="file" name="image" accept="image/*" />
                 </label>
@@ -448,5 +449,6 @@
   <script src="/js/members-bulk-actions.js"></script>
   <script src="/js/member-row-actions.js"></script>
   <script src="/js/member-text-notify.js"></script>
+  <script src="/js/sms-char-counter.js"></script>
 </body>
 </html>

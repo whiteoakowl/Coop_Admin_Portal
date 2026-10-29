@@ -266,6 +266,7 @@ router.get('/members', async (req, res) => {
     notice: req.query.notice || null,
     pendingNameTagMemberIds,
     avatarColorFor,
+    smsMaxLength: smsProvider.MAX_SMS_LENGTH,
   });
 });
 
@@ -823,6 +824,9 @@ router.post('/members/:id/text', memberTextImageUpload.single('image'), async (r
   if (!member.phone) return res.status(400).json({ ok: false, error: 'This member has no phone on file.' });
   const body = (req.body.message || '').trim();
   if (!body) return res.status(400).json({ ok: false, error: 'A message is required.' });
+  // A real request: "Set 160 character length for all texting features
+  // across the app."
+  if (body.length > smsProvider.MAX_SMS_LENGTH) return res.status(400).json({ ok: false, error: `That message is ${body.length} characters - texts are capped at ${smsProvider.MAX_SMS_LENGTH} characters.` });
 
   let mediaUrl = null;
   if (req.file) {

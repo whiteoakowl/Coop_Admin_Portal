@@ -172,6 +172,28 @@ test('POST /setup-text-notify requires a message for a single recipient', async 
   assert.equal(res.body.ok, false);
 });
 
+// A real request: "Set 160 character length for all texting features
+// across the app."
+test('POST /setup-text-notify rejects a single-recipient custom message over 160 characters, and the textarea renders maxlength=160', async () => {
+  const cookie = await loginAsAdmin();
+  const { day, memberId } = await setUpAssignedTeamMember({ cookie, teamTitle: 'Long Message Crew', taskDescription: 'Mop floors', memberName: 'Long Message Member', barcode: 'notify-long-message-setup-member', phone: '555-333-9999' });
+
+  const page = await request(app).get(`/admin/setup/${day}/assignments`).set('Cookie', cookie);
+  assert.match(page.text, /id="setup-text-notify-message" rows="4" maxlength="160" data-sms-char-counter="setup-text-notify-char-count"/);
+  const csrfToken = extractCsrf(page.text);
+
+  const res = await request(app)
+    .post(`/admin/setup/${day}/assignments/setup-text-notify`)
+    .set('Cookie', cookie)
+    .set('X-CSRF-Token', csrfToken)
+    .field('notify', JSON.stringify([{ memberId: String(memberId) }]))
+    .field('message', 'a'.repeat(161));
+
+  assert.equal(res.status, 400);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /capped at 160 characters/);
+});
+
 // A real request: same no-portal-account fallback Floater Assignments'
 // own text notify already has - "that shouldn't matter," so this
 // mirrors it directly for Setup/Cleanup too.

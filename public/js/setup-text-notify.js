@@ -99,6 +99,11 @@
     } else {
       messageField.value = '';
     }
+    // Setting .value directly doesn't fire 'input' on its own -
+    // public/js/sms-char-counter.js's own delegated listener needs this
+    // so the "N / 160 characters" counter reflects a template-filled
+    // message right away, not just once the admin starts typing.
+    messageField.dispatchEvent(new Event('input', { bubbles: true }));
     recipientsHint.textContent = `Sending to ${checked.length} member${checked.length === 1 ? '' : 's'}.`;
     const fileInput = form.querySelector('input[type="file"]');
     if (fileInput) fileInput.value = '';

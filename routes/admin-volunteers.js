@@ -277,6 +277,7 @@ router.get('/volunteers/:day/manage', requireAdmin, requireClassDay, async (req,
     temporaryPositionGroups,
     openDialog: dialogParam(req),
     rankLabels: RANK_LABELS,
+    smsMaxLength: smsProvider.MAX_SMS_LENGTH,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -414,6 +415,11 @@ router.post('/volunteers/:day/floater-text-notify', requireAdmin, requireClassDa
   const customMessage = (req.body.message || '').trim();
   const isSingleRecipient = assignments.length === 1;
   if (isSingleRecipient && !customMessage) return res.status(400).json({ ok: false, error: 'A message is required.' });
+  // A real request: "Set 160 character length for all texting features
+  // across the app."
+  if (isSingleRecipient && customMessage.length > smsProvider.MAX_SMS_LENGTH) {
+    return res.status(400).json({ ok: false, error: `That message is ${customMessage.length} characters - texts are capped at ${smsProvider.MAX_SMS_LENGTH} characters.` });
+  }
 
   const templateRow = isSingleRecipient ? null : await getTemplate('floater_assignment_default');
 

@@ -119,6 +119,41 @@ test('GET /manage renders a checkbox for an assigned floater slot (none for an u
   assert.match(page.text, /class="floater-card-send-text-btn no-print" disabled/);
 });
 
+// A real request: "Set 160 character length for all texting features
+// across the app." Placed right after the test above (not later in the
+// file) and at hourPosition 2 - utils/classSchedule.js's own
+// HOUR_POSITIONS starts at [1,2,3,4] and is never grown just by a class
+// using a higher position (growHourPositions() is only ever called from
+// the real "add a column" admin action); several later tests in this
+// file assign floaters at hour positions 5/6/7, and once ANY class at
+// one of those positions exists for the day, gridForDay() 500s on every
+// subsequent GET /manage for 'monday' for the rest of the file (every
+// other test still passes regardless, since none of them inspect page
+// markup deeply enough after that point to notice) - staying at an
+// in-range position here, before those other tests run, avoids tripping
+// over that unrelated, pre-existing fragility.
+test('POST /floater-text-notify rejects a single-recipient custom message over 160 characters, and the textarea renders maxlength=160', async () => {
+  const cookie = await loginAsAdmin();
+  const day = 'monday';
+  const { memberId } = await setUpAssignedFloater({ cookie, day, hourPosition: 2, className: 'Long Message Class', room: 'Room 91', memberName: 'Long Message Floater', barcode: 'notify-long-message-floater', phone: '555-333-9999' });
+  await db.prepare("INSERT INTO member_accounts (member_id, email, password_hash, status) VALUES (?, 'long-message-floater@example.com', 'x', 'active')").run(memberId);
+
+  const page = await request(app).get(`/admin/volunteers/${day}/manage`).set('Cookie', cookie);
+  assert.match(page.text, /id="floater-text-notify-message" rows="4" maxlength="160" data-sms-char-counter="floater-text-notify-char-count"/);
+  const csrfToken = extractCsrf(page.text);
+
+  const res = await request(app)
+    .post(`/admin/volunteers/${day}/floater-text-notify`)
+    .set('Cookie', cookie)
+    .set('X-CSRF-Token', csrfToken)
+    .field('notify', JSON.stringify([{ memberId: String(memberId) }]))
+    .field('message', 'a'.repeat(161));
+
+  assert.equal(res.status, 400);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /capped at 160 characters/);
+});
+
 test('POST /floater-text-notify texts an assigned floater with an active portal account, routed through notify()', async () => {
   const cookie = await loginAsAdmin();
   const day = 'monday';

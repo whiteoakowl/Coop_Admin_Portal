@@ -96,7 +96,8 @@
         </div>
         <p class="hint" id="setup-text-notify-recipients-hint"></p>
         <label id="setup-text-notify-message-label">Message
-          <textarea name="message" id="setup-text-notify-message" rows="4"></textarea>
+          <textarea name="message" id="setup-text-notify-message" rows="4" maxlength="<%= smsMaxLength %>" data-sms-char-counter="setup-text-notify-char-count"></textarea>
+          <p class="hint" id="setup-text-notify-char-count">0 / <%= smsMaxLength %> characters</p>
         </label>
         <p class="hint" id="setup-text-notify-multi-hint" hidden>Each member will get their own text with their own team and task(s) - the message can't be customized when sending to more than one person at once.</p>
         <label>Image (optional)
@@ -112,5 +113,6 @@
   <script src="/js/setup-dates.js"></script>
   <script src="/js/setup-assign.js"></script>
   <script src="/js/setup-text-notify.js"></script>
+  <script src="/js/sms-char-counter.js"></script>
 </body>
 </html>

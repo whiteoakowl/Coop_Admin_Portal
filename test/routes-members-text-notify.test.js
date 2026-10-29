@@ -138,6 +138,35 @@ test('POST /admin/members/:id/text requires a message', async () => {
   assert.equal(res.body.ok, false);
 });
 
+// A real request: "Set 160 character length for all texting features
+// across the app."
+test('GET /admin/members renders the Text dialog textarea with maxlength=160 and a live character counter, and POST rejects a message over that length', async () => {
+  const cookie = await loginCoopAdmin();
+  // Co-op Admin's own Members list only shows a family with at least one
+  // enrolled student (routes/admin-members.js's own filteredMembers
+  // comment) - a class + enrollment, same as this file's very first
+  // test above, so this member actually renders on the page.
+  const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type, phone) VALUES ('Coop Text Length Member', 'coop-text-length-member', 'student', '555-333-4444') RETURNING id").get()).id;
+  const classId = (await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, 'Text Length Class') RETURNING id").get()).id;
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId, memberId);
+
+  const page = await request(app).get('/admin/members').set('Cookie', cookie);
+  assert.match(page.text, new RegExp(`id="text-dialog-${memberId}"[\\s\\S]*?maxlength="160" data-sms-char-counter="text-char-count-${memberId}"`));
+  assert.match(page.text, new RegExp(`id="text-char-count-${memberId}">0 / 160 characters`));
+  const csrfToken = extractCsrf(page.text);
+
+  const longMessage = 'a'.repeat(161);
+  const res = await request(app)
+    .post(`/admin/members/${memberId}/text`)
+    .set('Cookie', cookie)
+    .set('X-CSRF-Token', csrfToken)
+    .field('message', longMessage);
+
+  assert.equal(res.status, 400);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /capped at 160 characters/);
+});
+
 test('POST /admin/members/:id/text rejects a member with no phone on file', async () => {
   const cookie = await loginCoopAdmin();
   const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Coop Text No Phone Member', 'coop-text-no-phone-member', 'parent') RETURNING id").get()).id;
@@ -177,6 +206,25 @@ test('Main Admin Members: GET /members renders a Text icon, and POST /main-admin
 
   const notification = await db.prepare("SELECT body FROM notifications WHERE type_key = 'text_message' AND body = 'Main Admin text test.'").get();
   assert.ok(notification);
+});
+
+test('Main Admin Members: POST /main-admin/members/:id/text rejects a message over 160 characters', async () => {
+  const cookie = await loginMainAdmin();
+  const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type, phone) VALUES ('Main Text Length Member', 'main-text-length-member', 'parent', '555-777-8888') RETURNING id").get()).id;
+
+  const page = await request(app).get('/main-admin/members').set('Cookie', cookie);
+  assert.match(page.text, new RegExp(`id="text-dialog-${memberId}"[\\s\\S]*?maxlength="160" data-sms-char-counter="text-char-count-${memberId}"`));
+  const csrfToken = extractCsrf(page.text);
+
+  const res = await request(app)
+    .post(`/main-admin/members/${memberId}/text`)
+    .set('Cookie', cookie)
+    .set('X-CSRF-Token', csrfToken)
+    .field('message', 'a'.repeat(161));
+
+  assert.equal(res.status, 400);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /capped at 160 characters/);
 });
 
 test('POST /admin/members/:id/text respects a member who opted out of text_message SMS notifications', async () => {

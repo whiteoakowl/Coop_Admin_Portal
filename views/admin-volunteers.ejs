@@ -270,7 +270,8 @@
         </div>
         <p class="hint" id="floater-text-notify-recipients-hint"></p>
         <label id="floater-text-notify-message-label">Message
-          <textarea name="message" id="floater-text-notify-message" rows="4"></textarea>
+          <textarea name="message" id="floater-text-notify-message" rows="4" maxlength="<%= smsMaxLength %>" data-sms-char-counter="floater-text-notify-char-count"></textarea>
+          <p class="hint" id="floater-text-notify-char-count">0 / <%= smsMaxLength %> characters</p>
         </label>
         <p class="hint" id="floater-text-notify-multi-hint" hidden>Each floater will get their own text with their own position, room and hour - the message can't be customized when sending to more than one person at once.</p>
         <label>Image (optional)
@@ -300,5 +301,6 @@
   <script src="/js/date-list.js"></script>
   <script src="/js/floater-assign.js"></script>
   <script src="/js/floater-text-notify.js"></script>
+  <script src="/js/sms-char-counter.js"></script>
 </body>
 </html>
