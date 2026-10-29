@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/student">&larr; Home</a></p>
+    <h1><%= category.title %></h1>
+
+    <%# A real request: "shows all the other pages under that category
+        in card style, two columns, solid colors matching the website."
+        Reuses the kiosk's own .landing-card/.landing-grid component
+        (public/css/styles.css) standalone inside the normal portal-nav
+        page shell, instead of the kiosk's own full-screen .landing-wrap -
+        .landing-grid-two is that same component's existing 2-column
+        variant. Every card here shares the category's own color, same
+        as the homepage's own category card. %>
+    <div class="landing-grid landing-grid-two landing-card-rect">
+      <% category.links.forEach(function(link) { %>
+        <a class="landing-card landing-card-<%= category.color %>" href="<%= link.href %>">
+          <span class="landing-icon"><svg class="icon"><use href="#<%= link.icon %>"/></svg></span>
+          <span class="landing-label"><%= link.label %></span>
+        </a>
+      <% }); %>
+    </div>
+  </main>
+</body>
+</html>

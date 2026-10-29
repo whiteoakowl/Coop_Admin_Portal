@@ -386,6 +386,46 @@ textarea:focus-visible,
 .landing-card-purple .landing-icon { background: rgba(255,255,255,0.6); color: #4a2050; }
 .landing-card-purple .landing-label { color: #000; }
 
+/* A real request: "Student portal homepage. Add three cards each a
+   solid color matching the kiosk page. Orange, blue and green." No
+   blue variant existed yet (Check In/Out are green, Floater/Setup are
+   purple) - --btn-blue is already a real, defined color (used for this
+   app's own "secondary/info" buttons and links), just never applied to
+   a landing-card before now. --btn-blue is noticeably darker/more
+   saturated than the pastel orange/green/purple above, so (unlike
+   those three) its own label/icon stay WHITE rather than black for
+   real contrast against it. */
+.landing-card-blue { background: var(--btn-blue); border-color: var(--btn-blue); }
+.landing-card-blue:hover { border-color: var(--btn-blue-hover); }
+.landing-card-blue .landing-icon { background: rgba(255,255,255,0.6); color: #0f2d47; }
+.landing-card-blue .landing-label { color: #fff; }
+
+/* A real request: "on student portal homepage the new buttons should be
+   half the height. More rectangle shaped. To save space" - then "the
+   Documents tab on all portals where it exists... Same with the new
+   student portal menu cards system." .landing-card-rect is the reusable
+   SHAPE modifier (icon beside the label instead of above it, shorter
+   padding) - add it to any .landing-grid container that wants shorter
+   rectangular cards instead of the original square ones: the kiosk
+   homepage itself keeps the square shape (never given this class), but
+   the Student Portal homepage's own 3-card row, its Group/Classroom/Fun
+   Dashboard category sub-pages, and every portal's Documents list
+   (.documents-grid - Co-op Admin/Main Admin/Parent) all opt in below. */
+.landing-card-rect .landing-card { flex-direction: row; justify-content: flex-start; padding: 0.85rem 1.25rem; gap: 0.85rem; }
+.landing-card-rect .landing-icon,
+.landing-card-rect .landing-card-image { width: 2.25rem; height: 2.25rem; font-size: 1.2rem; flex-shrink: 0; }
+.landing-card-rect .landing-label { font-size: 1.25rem; text-align: left; }
+
+/* Student Portal homepage's own 3-card category row specifically - its
+   own layout (equal columns, capped width) rather than the fixed-220px
+   columns every other .landing-grid page uses, kept separate from the
+   shape rules above so the Documents list/category sub-pages below keep
+   their own existing column counts. */
+.landing-grid-home { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 56rem; }
+@media (max-width: 720px) {
+  .landing-grid-home { grid-template-columns: 1fr; }
+}
+
 .home-login-card {
   background: var(--surface);
   border: 1px solid var(--border);

@@ -119,6 +119,66 @@ async function announcementsForAccount(accountId) {
     .slice(0, 15);
 }
 
+// A real request: "Student portal homepage. Add three cards each a
+// solid color matching the kiosk page. Orange, blue and green. First
+// says group dashboard, 2nd says classroom dashboard. 3rd says fun
+// dashboard. When you click on each of these page it shows all the
+// other pages under that category in card style, two columns, solid
+// colors matching the website." Groups the existing nav's own pages
+// (STUDENT_NAV_LINKS/STUDENT_ACTIVITY_LINKS, views/partials/portal-
+// nav.ejs) into these three categories rather than adding new pages -
+// every href/icon/label below matches that nav exactly. Every card on
+// a category page shares that category's own color, same as the
+// category card itself on the homepage.
+const STUDENT_DASHBOARD_CATEGORIES = {
+  group: {
+    title: 'Group Dashboard',
+    color: 'orange',
+    icon: 'icon-users',
+    links: [
+      { href: '/events?view=calendar&portal=student', icon: 'icon-calendar-check', label: 'Events Calendar' },
+      { href: '/student/events', icon: 'icon-list-check', label: 'My Event Registrations' },
+      { href: '/forums?portal=student', icon: 'icon-users', label: 'Chat' },
+      { href: '/photos?portal=student', icon: 'icon-camera', label: 'Photos' },
+      { href: '/student/babysitter', icon: 'icon-user', label: 'Babysitter Profile' },
+    ],
+  },
+  classroom: {
+    title: 'Classroom Dashboard',
+    color: 'blue',
+    icon: 'icon-graduation-cap',
+    links: [
+      { href: '/student/classes', icon: 'icon-clock', label: 'Class Schedule' },
+      { href: '/student/classes/dashboard', icon: 'icon-graduation-cap', label: 'Classroom Dashboard' },
+      { href: '/student/resources', icon: 'icon-book', label: 'Resources' },
+      { href: '/student/family-school/overview', icon: 'icon-home-heart', label: 'Homeschool Overview' },
+      { href: '/student/family-school', icon: 'icon-book', label: 'Homeschool Classes' },
+      { href: '/student/family-school/grades', icon: 'icon-file-text', label: 'Homeschool Grades' },
+      { href: '/student/family-school/weekly-planner', icon: 'icon-calendar-check', label: 'Weekly Planner' },
+    ],
+  },
+  fun: {
+    title: 'Fun Dashboard',
+    color: 'green',
+    icon: 'icon-gamepad',
+    links: [
+      { href: '/student/games', icon: 'icon-gamepad', label: 'Games' },
+      { href: '/student/pets', icon: 'icon-paw', label: 'Pet' },
+      { href: '/student/reading', icon: 'icon-book', label: 'Reading Challenge' },
+      { href: '/student/achievements', icon: 'icon-star', label: 'Achievements' },
+      { href: '/student/leaderboard', icon: 'icon-trophy', label: 'Leaderboard' },
+      { href: '/student/nature-news', icon: 'icon-sprout', label: 'Nature News' },
+      { href: '/student/vocabulary', icon: 'icon-type', label: 'Vocabulary' },
+    ],
+  },
+};
+
+router.get('/dashboard/:category', (req, res) => {
+  const category = STUDENT_DASHBOARD_CATEGORIES[req.params.category];
+  if (!category) return res.status(404).send('Not found');
+  res.render('student-dashboard-category', { title: category.title, category });
+});
+
 router.get('/', async (req, res) => {
   // announcementsForAccount/natureNews only need the account id, not
   // `member` - independent of it and of each other, so they run
@@ -132,7 +192,16 @@ router.get('/', async (req, res) => {
   const classes = await classesForStudent(member);
   const words = wordOfWeek.wordsOfTheWeek();
   const wordOfWeekDateLabel = wordOfWeek.currentWeekDateLabel();
-  res.render('student-home', { title: 'Student Portal', member, classes, announcements, natureNewsLatest, words, wordOfWeekDateLabel });
+  res.render('student-home', {
+    title: 'Student Portal',
+    member,
+    classes,
+    announcements,
+    natureNewsLatest,
+    words,
+    wordOfWeekDateLabel,
+    dashboardCategories: Object.entries(STUDENT_DASHBOARD_CATEGORIES).map(([key, c]) => ({ key, title: c.title, color: c.color, icon: c.icon })),
+  });
 });
 
 // A real request: "Registration is added to event registration log on
