@@ -65,13 +65,14 @@ async function activeParentAccount(suffix) {
   return accountId;
 }
 
-test('Main Admin Communication page: 3 tabs (Text/Email combined), checkbox recipients (not a roleKey dropdown)', async () => {
+test('Main Admin Communication page: 4 tabs (Text and Email separate again), checkbox recipients (not a roleKey dropdown)', async () => {
   const { cookie } = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/announcements').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /<h1>Announcements<\/h1>/);
   assert.match(page.text, /href="\/main-admin\/announcements">Announcements</);
-  assert.match(page.text, /href="\/main-admin\/announcements\/text-email">Text\/Email</);
+  assert.match(page.text, /href="\/main-admin\/announcements\/text">Text</);
+  assert.match(page.text, /href="\/main-admin\/announcements\/email">Email</);
   assert.match(page.text, /href="\/main-admin\/newsletter">Newsletter</);
   assert.match(page.text, /name="targets" value="everyone"/);
   assert.match(page.text, /name="targets" value="public"/);
@@ -123,7 +124,7 @@ test('Main Admin: sending with no targets checked is rejected with an error, not
   assert.equal(logRow, undefined);
 });
 
-test('Co-op Admin Communication page: 2 tabs (Text/Email combined, no Newsletter), checkbox recipients, unified Past Announcements log', async () => {
+test('Co-op Admin Communication page: 3 tabs (Text and Email separate, no Newsletter), checkbox recipients, unified Past Announcements log', async () => {
   const { cookie, csrfToken } = await loginAsAdmin();
   const parentAccountId = await activeParentAccount('coopA');
 
@@ -144,7 +145,8 @@ test('Co-op Admin Communication page: 2 tabs (Text/Email combined, no Newsletter
   const page = await request(app).get('/admin/announcements').set('Cookie', cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /<h1>Announcements<\/h1>/);
-  assert.match(page.text, /href="\/admin\/announcements\/text-email">Text\/Email</);
+  assert.match(page.text, /href="\/admin\/announcements\/text">Text</);
+  assert.match(page.text, /href="\/admin\/announcements\/email">Email</);
   assert.doesNotMatch(page.text, /Newsletter/);
   assert.match(page.text, /Coop send/);
 });
@@ -193,14 +195,18 @@ test('Communication "Past Announcements" pagination: page 1 shows only the page 
   assert.equal((coopPage1.text.match(/Pagination Announcement/g) || []).length, 50, 'Co-op Admin portal paginates the same shared log the same way');
 });
 
-test('Text/Email tab renders on both portals instead of 404ing', async () => {
+test('Text and Email tabs each render on both portals instead of 404ing', async () => {
   const main = await loginAsMainAdmin();
-  const mainTextEmail = await request(app).get('/main-admin/announcements/text-email').set('Cookie', main.cookie);
-  assert.equal(mainTextEmail.status, 200);
+  const mainText = await request(app).get('/main-admin/announcements/text').set('Cookie', main.cookie);
+  assert.equal(mainText.status, 200);
+  const mainEmail = await request(app).get('/main-admin/announcements/email').set('Cookie', main.cookie);
+  assert.equal(mainEmail.status, 200);
 
   const coop = await loginAsAdmin();
-  const coopTextEmail = await request(app).get('/admin/announcements/text-email').set('Cookie', coop.cookie);
-  assert.equal(coopTextEmail.status, 200);
+  const coopText = await request(app).get('/admin/announcements/text').set('Cookie', coop.cookie);
+  assert.equal(coopText.status, 200);
+  const coopEmail = await request(app).get('/admin/announcements/email').set('Cookie', coop.cookie);
+  assert.equal(coopEmail.status, 200);
 });
 
 // A real request: "send to should be a clean check dropdown menu of

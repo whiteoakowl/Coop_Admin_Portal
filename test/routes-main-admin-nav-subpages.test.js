@@ -93,7 +93,8 @@ test('Members/Communication/Events/Name Tags/Resource Links/Directory/Classified
   const pages = [
     '/main-admin/members',
     '/main-admin/announcements',
-    '/main-admin/announcements/text-email',
+    '/main-admin/announcements/text',
+    '/main-admin/announcements/email',
     '/main-admin/newsletter',
     '/main-admin/events',
     '/main-admin/name-tags',
@@ -130,11 +131,11 @@ test('Mobile orange bar: every subpages-bearing item gets its own popup trigger 
     // subpage called locked") added a 5th Members subpage.
     { slug: 'members', tabCount: 5 },
     { slug: 'accounting', tabCount: 7 },
-    // Announcements, Text/Email (Email and Text combined into one
-    // subpage), Newsletter - Contact Admin Messages' own inbox subpage
-    // was removed entirely (messages now only ever reach an admin by
-    // email, never read back on the website).
-    { slug: 'communication', tabCount: 3 },
+    // Announcements, Text, Email (separate subpages again), Newsletter -
+    // Contact Admin Messages' own inbox subpage was removed entirely
+    // (messages now only ever reach an admin by email, never read back
+    // on the website).
+    { slug: 'communication', tabCount: 4 },
     { slug: 'events', tabCount: 6 },
     { slug: 'chat', tabCount: 3 },
     { slug: 'volunteers', tabCount: 3 },

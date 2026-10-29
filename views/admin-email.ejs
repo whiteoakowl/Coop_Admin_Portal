@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Email</h1>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <%- include('partials/communication-recipient-picker', {
+      mode: 'email',
+      composeAction: '/admin/announcements/email/compose',
+      sendLabel: 'Send Email',
+      roles,
+      sections,
+      gradeLevels,
+      ageGroups,
+      candidates,
+    }) %>
+
+    <%- include('partials/communication-campaign-list', {
+      heading: 'Past & Scheduled Emails',
+      columnLabel: 'Subject',
+      campaigns: emailCampaigns,
+      confirmWord: 'email',
+      emptyMessage: 'No emails sent yet.',
+    }) %>
+  </main>
+</body>
+</html>

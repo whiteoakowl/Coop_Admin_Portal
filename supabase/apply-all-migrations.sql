@@ -5643,3 +5643,10 @@ alter table lesson_plans add column if not exists allow_member_edit boolean not 
 alter table lesson_plans add column if not exists grade_level text;
 alter table lesson_plans add column if not exists subject text;
 alter table lesson_plans add column if not exists shareable_with_parents boolean not null default false;
+
+-- A real request: "Click send text button... It should have an option
+-- to upload a photo." Same optional-MMS-image column shape the
+-- per-member/floater/setup-cleanup quick-text popups already pass
+-- through to smsProvider.send() - text_campaigns (a bulk Communication >
+-- Text send) never had anywhere to persist one before.
+alter table text_campaigns add column if not exists media_url text;

@@ -4823,6 +4823,22 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
   max-width: 100%;
 }
 
+/* A real request: "Click send text button. The mobile view. The full
+   card should fit mobile view width." Compose Text's own card
+   (#text-compose-form) is short on wide content (just a textarea and a
+   couple of radio labels), so .member-form-page-panel's own width:
+   fit-content above settles narrower than the phone's own screen,
+   leaving a stripe of bare page background down the right side instead
+   of the card actually reaching the edge of the content column like
+   every other mobile card on the site. Scoped to this one form (not
+   every .member-form-page-panel - several other pages, e.g. the
+   Membership form, deliberately want their own narrower fit-content
+   width even on mobile) at the same 640px breakpoint this file's other
+   Compose-page mobile rules already use. */
+@media (max-width: 640px) {
+  #text-compose-form.member-form-page-panel { width: 100%; }
+}
+
 /* Phone/Email (icon-wrapped) already get their box treatment from
    .input-with-icon; Birthday and Medical/Allergy Notes are plain direct
    children of .class-form-field, so they need the same input styling

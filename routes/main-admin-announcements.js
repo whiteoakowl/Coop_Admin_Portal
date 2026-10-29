@@ -9,8 +9,11 @@
 // log (announcement_log) - the old per-portal "Recently Sent" table
 // (grouped notifications rows) and the separate "Public Homepage
 // Announcements" section are both gone in favor of that one log.
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
@@ -18,8 +21,46 @@ const announcements = require('../utils/announcements');
 const emailComposer = require('../utils/emailComposer');
 const textComposer = require('../utils/textComposer');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
+const { formatFriendlyTimestamp } = require('../utils/dates');
+const { imageFileFilter } = require('../utils/uploads');
+const { createStorageClient } = require('../utils/storage');
+const { saveUpload, urlForUpload } = require('../utils/uploadBackend');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('send_announcements'));
+
+// A real request: "Click send text button... It should have an option
+// to upload a photo." Same optional-MMS-image upload pattern routes/
+// admin-announcements.js's own copy of this route uses, just its own
+// bucket/dir (same convention as routes/main-admin-members.js duplicating
+// routes/admin-members.js's own member-text-images bucket).
+const MAX_TEXT_CAMPAIGN_IMAGE_BYTES = 5 * 1024 * 1024;
+const TEXT_CAMPAIGN_IMAGE_BUCKET = 'text-campaign-images';
+const TEXT_CAMPAIGN_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'text-campaign-images');
+if (!createStorageClient() && !fs.existsSync(TEXT_CAMPAIGN_IMAGE_DIR)) {
+  try {
+    fs.mkdirSync(TEXT_CAMPAIGN_IMAGE_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${TEXT_CAMPAIGN_IMAGE_DIR}:`, err.message);
+  }
+}
+const textCampaignImageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_TEXT_CAMPAIGN_IMAGE_BYTES }, fileFilter: imageFileFilter });
+
+// Builds the Past & Scheduled list's own display fields (partials/
+// communication-campaign-list.ejs) server-side - "fix date and time
+// format to match the rest of the site. This should be hard coded
+// somewhere so it's always coded this way" - utils/dates.js's own
+// formatFriendlyTimestamp() is that one shared place, the same
+// formatter already used across the rest of the app, instead of
+// printing the raw now_text()/scheduled_at string.
+function formatCampaignForList(c, { titleField, sendNowAction }) {
+  return {
+    ...c,
+    titleText: c[titleField],
+    statusLabel: c.status.charAt(0).toUpperCase() + c.status.slice(1),
+    dateTimeLabel: c.status === 'sent' ? formatFriendlyTimestamp(c.sent_at) : `Scheduled for ${formatFriendlyTimestamp(c.scheduled_at)}`,
+    sendNowAction,
+  };
+}
 
 router.get('/', async (req, res) => {
   const roles = await db.prepare('SELECT key, label FROM roles ORDER BY label').all();
@@ -70,88 +111,43 @@ router.post('/', async (req, res) => {
   res.redirect('/main-admin/announcements?notice=' + encodeURIComponent(`Sent to ${recipientCount} member(s).`));
 });
 
-// A real request: "Communication tab. There is a sub page for text and
-// a subpage for email. Combine them and call it Text/Email. This page
-// will have three buttons at the top. Filter, send text, send email.
-// When you click on each of these buttons it goes to a new page where
-// you can complete the tasks and write the message." Email and Text's
-// own GET pages (just below) now redirect here - their old embedded
-// filter dialog + candidate table moved out to its own /text-email/filter
-// page (req.session.textEmailRecipientIds carries the selection across),
-// and Send Text/Send Email jump straight to the existing compose screens
-// using whatever that session holds (or every active candidate, if
-// nothing has been filtered yet - Send Text/Send Email are never a dead
-// end waiting on Filter).
-router.get('/text-email', async (req, res) => {
-  const recipientIds = req.session.textEmailRecipientIds || [];
-  const [emailCampaigns, textCampaigns] = await Promise.all([emailComposer.listCampaigns(), textComposer.listCampaigns()]);
-  res.render('main-admin-text-email', {
-    title: 'Communication',
-    recipientCount: recipientIds.length,
-    emailCampaigns,
-    textCampaigns,
-    error: req.query.error || null,
-    notice: req.query.notice || null,
-  });
-});
-
-router.get('/text-email/filter', async (req, res) => {
-  const [roles, sections, gradeLevels, candidates] = await Promise.all([
+// Communication > Email tab (item 12): a real request: "Communication.
+// Text/email. Page should show a list of all members. Then filter
+// button narrows it down in a popup screen." The full candidate
+// checkbox list lives directly on this page now (every row starts
+// checked - Create Email/Send Email reaches everyone by default), with
+// Filter just a <dialog> over the same role/section/grade/age/
+// registered narrowing partials/communication-recipient-picker.ejs's
+// own client-side JS already did when it lived on its own separate
+// /text-email/filter page. See routes/admin-announcements.js's
+// identical tab for the Co-op Admin side.
+router.get('/email', async (req, res) => {
+  const [roles, sections, gradeLevels, candidates, emailCampaigns] = await Promise.all([
     emailComposer.listRoles(),
     emailComposer.listSections(),
     emailComposer.listGradeLevels(),
     emailComposer.listRecipientCandidates(),
+    emailComposer.listCampaigns(),
   ]);
-  const selectedIds = new Set(req.session.textEmailRecipientIds || []);
-  res.render('main-admin-text-email-filter', {
-    title: 'Filter Recipients',
+  res.render('main-admin-email', {
+    title: 'Email',
     roles,
     sections,
     gradeLevels,
     ageGroups: emailComposer.AGE_GROUPS,
     candidates,
-    selectedIds,
+    emailCampaigns: emailCampaigns.map((c) => formatCampaignForList(c, { titleField: 'subject', sendNowAction: `/main-admin/announcements/email/${c.id}/send` })),
+    error: req.query.error || null,
+    notice: req.query.notice || null,
   });
 });
 
-router.post('/text-email/filter', (req, res) => {
-  const recipientIds = [].concat(req.body.recipientIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
-  req.session.textEmailRecipientIds = recipientIds;
-  const notice = recipientIds.length === 0 ? 'Filter cleared - Send Text/Send Email will reach every active member.' : `${recipientIds.length} recipient(s) selected.`;
-  res.redirect('/main-admin/announcements/text-email?notice=' + encodeURIComponent(notice));
-});
-
-async function resolveFilteredOrAllRecipients(req) {
-  const recipientIds = req.session.textEmailRecipientIds || [];
-  if (recipientIds.length > 0) return emailComposer.resolveRecipients({ recipientIds });
-  return emailComposer.listRecipientCandidates();
-}
-
-router.get('/text-email/send-text', async (req, res) => {
-  const recipients = await resolveFilteredOrAllRecipients(req);
-  if (recipients.length === 0) return res.redirect('/main-admin/announcements/text-email?error=' + encodeURIComponent('No active members to text.'));
-  res.render('main-admin-text-compose', { title: 'Compose Text', recipients, maxWords: textComposer.MAX_WORDS, error: null });
-});
-
-router.get('/text-email/send-email', async (req, res) => {
-  const recipients = await resolveFilteredOrAllRecipients(req);
-  if (recipients.length === 0) return res.redirect('/main-admin/announcements/text-email?error=' + encodeURIComponent('No active members to email.'));
-  res.render('main-admin-email-compose', { title: 'Compose Email', recipients, error: null });
-});
-
-// Communication > Email tab (item 12): now a redirect to the combined
-// Text/Email page above - kept as its own route so an old bookmark/link
-// still lands somewhere real. See utils/emailComposer.js's own header
-// comment for why filtering happens in JS against the candidates list
-// rather than in SQL.
-router.get('/email', (req, res) => res.redirect('/main-admin/announcements/text-email'));
-
-// recipientIds (Email/Text tab's own candidate checkboxes) or memberIds
+// recipientIds (Email tab's own candidate checkboxes) or memberIds
 // (Members page's own "Bulk Action > Email" - see emailComposer.js's
 // own resolveRecipients() comment) - either lands here.
 router.post('/email/compose', async (req, res) => {
   const recipients = await emailComposer.resolveRecipients(req.body);
-  if (recipients.length === 0) return res.redirect('/main-admin/announcements/text-email?error=' + encodeURIComponent('Select at least one recipient.'));
+  if (recipients.length === 0) return res.redirect('/main-admin/announcements/email?error=' + encodeURIComponent('Select at least one recipient.'));
   res.render('main-admin-email-compose', {
     title: 'Compose Email',
     recipients,
@@ -186,71 +182,108 @@ router.post('/email/send', async (req, res) => {
 
   if (sendOption === 'schedule') {
     await emailComposer.createScheduled({ subject, bodyHtml: body, replyTo, sendTo, recipientAccountIds: recipientIds, scheduledAt, sentByAccountId: req.portalAccount.id, sentByPortal: 'main_admin' });
-    return res.redirect('/main-admin/announcements/text-email?notice=' + encodeURIComponent(`Scheduled for ${scheduledAt}.`));
+    return res.redirect('/main-admin/announcements/email?notice=' + encodeURIComponent(`Scheduled for ${scheduledAt}.`));
   }
 
   const { recipientCount } = await emailComposer.createAndSend({ subject, bodyHtml: body, replyTo, sendTo, recipientAccountIds: recipientIds, sentByAccountId: req.portalAccount.id, sentByPortal: 'main_admin' });
-  res.redirect('/main-admin/announcements/text-email?notice=' + encodeURIComponent(`Sent to ${recipientCount} member(s).`));
+  res.redirect('/main-admin/announcements/email?notice=' + encodeURIComponent(`Sent to ${recipientCount} member(s).`));
 });
 
 router.post('/email/:id/send', async (req, res) => {
   const campaign = await emailComposer.sendScheduled(req.params.id);
-  if (!campaign) return res.redirect('/main-admin/announcements/text-email?error=' + encodeURIComponent('That email was already sent or does not exist.'));
-  res.redirect('/main-admin/announcements/text-email?notice=' + encodeURIComponent(`Sent to ${campaign.recipient_count} member(s).`));
+  if (!campaign) return res.redirect('/main-admin/announcements/email?error=' + encodeURIComponent('That email was already sent or does not exist.'));
+  res.redirect('/main-admin/announcements/email?notice=' + encodeURIComponent(`Sent to ${campaign.recipient_count} member(s).`));
 });
 
-// Communication > Text tab (item 13): now a redirect to the combined
-// Text/Email page above, same as Email's own redirect.
-router.get('/text', (req, res) => res.redirect('/main-admin/announcements/text-email'));
+// Communication > Text tab (item 13): same "full member list + Filter
+// popup" page shape as Email above, just text_campaigns/textComposer
+// instead of email_campaigns/emailComposer - "separate text and email
+// subpages again. Because they have their own past messages list at the
+// bottom of the page."
+router.get('/text', async (req, res) => {
+  const [roles, sections, gradeLevels, candidates, textCampaigns] = await Promise.all([
+    emailComposer.listRoles(),
+    emailComposer.listSections(),
+    emailComposer.listGradeLevels(),
+    emailComposer.listRecipientCandidates(),
+    textComposer.listCampaigns(),
+  ]);
+  res.render('main-admin-text', {
+    title: 'Text',
+    roles,
+    sections,
+    gradeLevels,
+    ageGroups: emailComposer.AGE_GROUPS,
+    candidates,
+    textCampaigns: textCampaigns.map((c) => formatCampaignForList(c, { titleField: 'body', sendNowAction: `/main-admin/announcements/text/${c.id}/send` })),
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
 
-// recipientIds (Email/Text tab's own candidate checkboxes) or memberIds
+// recipientIds (Text tab's own candidate checkboxes) or memberIds
 // (Members page's own "Bulk Action > Text" - see emailComposer.js's own
 // resolveRecipients() comment) - either lands here.
 router.post('/text/compose', async (req, res) => {
   const recipients = await emailComposer.resolveRecipients(req.body);
-  if (recipients.length === 0) return res.redirect('/main-admin/announcements/text-email?error=' + encodeURIComponent('Select at least one recipient.'));
+  if (recipients.length === 0) return res.redirect('/main-admin/announcements/text?error=' + encodeURIComponent('Select at least one recipient.'));
   res.render('main-admin-text-compose', {
     title: 'Compose Text',
     recipients,
-    maxWords: textComposer.MAX_WORDS,
+    maxLength: textComposer.MAX_SMS_LENGTH,
     error: null,
   });
 });
 
-router.post('/text/send', async (req, res) => {
+router.post('/text/send', textCampaignImageUpload.single('image'), async (req, res) => {
   const recipientIds = [].concat(req.body.recipientIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   const body = (req.body.body || '').trim();
   const sendOption = req.body.sendOption === 'schedule' ? 'schedule' : 'now';
   const scheduledAt = (req.body.scheduledAt || '').trim();
-  const wordCount = textComposer.wordCount(body);
 
   const renderError = async (message) => {
     const candidates = await emailComposer.listRecipientCandidates();
     return res.render('main-admin-text-compose', {
       title: 'Compose Text',
       recipients: candidates.filter((c) => recipientIds.includes(c.accountId)),
-      maxWords: textComposer.MAX_WORDS,
+      maxLength: textComposer.MAX_SMS_LENGTH,
       error: message,
     });
   };
 
   if (recipientIds.length === 0 || !body) return renderError('Recipients and a message are both required. Go back and try again.');
-  if (wordCount > textComposer.MAX_WORDS) return renderError(`That message is ${wordCount} words - texts are capped at ${textComposer.MAX_WORDS} words.`);
+  // A real request: "Set 160 character length for all texting features
+  // across the app."
+  if (body.length > textComposer.MAX_SMS_LENGTH) return renderError(`That message is ${body.length} characters - texts are capped at ${textComposer.MAX_SMS_LENGTH} characters.`);
   if (sendOption === 'schedule' && !scheduledAt) return renderError('Choose a date/time to schedule this text for.');
 
-  if (sendOption === 'schedule') {
-    await textComposer.createScheduled({ body, recipientAccountIds: recipientIds, scheduledAt, sentByAccountId: req.portalAccount.id, sentByPortal: 'main_admin' });
-    return res.redirect('/main-admin/announcements/text-email?notice=' + encodeURIComponent(`Scheduled for ${scheduledAt}.`));
+  let mediaUrl = null;
+  if (req.file) {
+    const client = createStorageClient();
+    const key = await saveUpload({
+      client,
+      bucket: TEXT_CAMPAIGN_IMAGE_BUCKET,
+      localDir: TEXT_CAMPAIGN_IMAGE_DIR,
+      buffer: req.file.buffer,
+      originalName: req.file.originalname,
+      contentType: req.file.mimetype,
+    });
+    mediaUrl = urlForUpload({ client, bucket: TEXT_CAMPAIGN_IMAGE_BUCKET, webDir: '/uploads/text-campaign-images', key });
   }
 
-  const { recipientCount } = await textComposer.createAndSend({ body, recipientAccountIds: recipientIds, sentByAccountId: req.portalAccount.id, sentByPortal: 'main_admin' });
-  res.redirect('/main-admin/announcements/text-email?notice=' + encodeURIComponent(`Sent to ${recipientCount} member(s).`));
+  if (sendOption === 'schedule') {
+    await textComposer.createScheduled({ body, recipientAccountIds: recipientIds, mediaUrl, scheduledAt, sentByAccountId: req.portalAccount.id, sentByPortal: 'main_admin' });
+    return res.redirect('/main-admin/announcements/text?notice=' + encodeURIComponent(`Scheduled for ${scheduledAt}.`));
+  }
+
+  const { recipientCount } = await textComposer.createAndSend({ body, recipientAccountIds: recipientIds, mediaUrl, sentByAccountId: req.portalAccount.id, sentByPortal: 'main_admin' });
+  res.redirect('/main-admin/announcements/text?notice=' + encodeURIComponent(`Sent to ${recipientCount} member(s).`));
 });
 
 router.post('/text/:id/send', async (req, res) => {
   const campaign = await textComposer.sendScheduled(req.params.id);
-  if (!campaign) return res.redirect('/main-admin/announcements/text-email?error=' + encodeURIComponent('That text was already sent or does not exist.'));
-  res.redirect('/main-admin/announcements/text-email?notice=' + encodeURIComponent(`Sent to ${campaign.recipient_count} member(s).`));
+  if (!campaign) return res.redirect('/main-admin/announcements/text?error=' + encodeURIComponent('That text was already sent or does not exist.'));
+  res.redirect('/main-admin/announcements/text?notice=' + encodeURIComponent(`Sent to ${campaign.recipient_count} member(s).`));
 });
 
 // Must come last - /:id matches a single path segment just like every
