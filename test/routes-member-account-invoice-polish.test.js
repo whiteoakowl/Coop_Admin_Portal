@@ -105,7 +105,11 @@ test('Member account page: a paid invoice drops Record Payment and the red Delet
   assert.match(afterPay.text, /Cancel/, 'Cancel should still be available on a paid invoice');
 });
 
-test('Parent Portal Accounting page has a Print button', async () => {
+// A later real request: "Print button should be an icon. And pdf icons
+// should both be next to account year dropdown on the same row. Amount
+// due on the far right on the same row." - the text Print button became
+// an icon link, alongside the year dropdown and the PDF icon.
+test('Parent Portal Accounting page has a Print icon next to the Account Year dropdown', async () => {
   const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('PrintBtnFamily') RETURNING id").get()).id;
   const code = await generateMemberCode();
   const memberId = (
@@ -121,7 +125,9 @@ test('Parent Portal Accounting page has a Print button', async () => {
   const cookie = loginRes.headers['set-cookie'];
   const page = await request(app).get('/accounting').set('Cookie', cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /class="roster-action-btn print-action-btn no-print" href="\/accounting\/print" target="_blank">Print</);
+  assert.match(page.text, /class="icon-btn accounting-toolbar-print no-print" href="\/accounting\/print" target="_blank" aria-label="Print"/);
+  assert.match(page.text, /accounting-toolbar-pdf/);
+  assert.match(page.text, /accounting-toolbar-year-form/);
 });
 
 test('Data cleanup migration: an existing event-registration charge with the old verbose "Event Registration" description is stripped down to just the event title', async () => {

@@ -57,7 +57,7 @@
       <% } else { %>
         <% days.forEach(function(d) { %>
           <h2><%= dayLabels[d] %></h2>
-          <div class="class-dash-grid">
+          <div class="class-dash-grid parent-class-dash-grid">
             <% byDay[d].forEach(function(c) { %>
               <%- include('partials/class-dash-card', { c: c, selectedChild: selectedChild, selectedParent: selectedParent }) %>
             <% }); %>

@@ -13708,6 +13708,18 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    twice for two other unrelated card shapes (the Class Schedule room-
    grid's clickable card and Student Portal's own "My Classes" grid). */
 .class-dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin: 0.75rem 0 1.5rem; }
+
+/* A real request: "Parent portal classroom dashboard. Desktop. Widen
+   the class cards so that information fits clean on each row. Don't
+   change mobile view." Scoped to Parent Portal's own
+   .parent-class-dash-grid (views/parent-class-dashboard.ejs) - Student
+   Portal's identical-looking dashboard (views/student-class-dashboard.
+   ejs) shares the base .class-dash-grid/.class-dash-card rules above
+   and keeps its original 200px cards, untouched. Desktop only (641px+)
+   - mobile keeps the same 200px minimum as before. */
+@media (min-width: 641px) {
+  .parent-class-dash-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+}
 .class-dash-card {
   display: block; border-radius: var(--radius);
   border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-sm);
@@ -14455,6 +14467,29 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    "shrink to fit on mobile for all tables. Total for payments, invoices
    and adjustments should be bottom right of each of those sections." */
 .accounting-section-total { text-align: right; font-weight: 700; margin-top: 0.4rem; }
+
+/* A real request: "Print button should be an icon. And pdf icons should
+   both be next to account year dropdown on the same row. Amount due on
+   the far right on the same row. Don't change mobile view." Default
+   (mobile, unchanged) keeps the original stacked look: the balance
+   badge sits right under the title (own full line), Print/PDF sit
+   together on the next line, and the year dropdown is on its own line
+   below that - the same three visual lines this page had before. */
+.accounting-toolbar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 1rem; }
+.accounting-toolbar-badge { order: 1; flex-basis: 100%; }
+.accounting-toolbar-print { order: 2; }
+.accounting-toolbar-pdf { order: 3; }
+.accounting-toolbar-year-form { order: 4; flex-basis: 100%; }
+
+@media (min-width: 641px) {
+  /* Desktop: year dropdown, then both icons, all on the same row as the
+     balance badge - margin-left: auto pushes just the badge (and
+     anything after it, though nothing is) to the row's far right. */
+  .accounting-toolbar-year-form { order: 1; flex-basis: auto; }
+  .accounting-toolbar-print { order: 2; }
+  .accounting-toolbar-pdf { order: 3; }
+  .accounting-toolbar-badge { order: 4; flex-basis: auto; margin-left: auto; }
+}
 
 /* A real request: "shrink the accounts table on desktop to bring the
    columns much closer together for better viewing. Tables should not
