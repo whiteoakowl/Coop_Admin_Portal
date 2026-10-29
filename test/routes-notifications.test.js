@@ -310,6 +310,23 @@ test('GET /main-admin/notifications renders a Text and an Email checkbox per typ
   assert.equal(typeCheckedState.sms_enabled, 0, 'event_registration should be seeded email-only (text unchecked)');
 });
 
+// A real request: "Admin settings gear. Notifications settings. Add
+// section for setup/cleanup text messages." Pulled out of the generic
+// flat table into its own clearly-labeled section, but still posting
+// the exact same text_/email_ field names to the same /channels route.
+test('GET /main-admin/notifications gives Setup/Cleanup its own clearly-labeled section, not listed in the generic flat table', async () => {
+  const admin = await loginAsMainAdmin();
+  const page = await request(app).get('/main-admin/notifications').set('Cookie', admin.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<h3>Setup\/Cleanup Text Messages<\/h3>/);
+  assert.match(page.text, /name="text_setup_cleanup_assignment" value="1" checked/);
+  assert.match(page.text, /name="email_setup_cleanup_assignment" value="1" checked/);
+  // The generic flat table's own <tr> should no longer carry this type -
+  // only the dedicated section's own checkboxes should mention it.
+  const flatTableMatches = page.text.match(/name="text_setup_cleanup_assignment"/g) || [];
+  assert.equal(flatTableMatches.length, 1, 'setup_cleanup_assignment should only appear once (its own section), not duplicated in the flat table');
+});
+
 test('POST /main-admin/notifications/channels flips only the submitted type, leaving every other type untouched', async () => {
   const admin = await loginAsMainAdmin();
   const before = await notifications.getType('floater_assignment');

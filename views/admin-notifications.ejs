@@ -15,13 +15,30 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <form method="POST" action="/main-admin/notifications/channels">
+      <%# A real request: "Add section for setup/cleanup text messages."
+          Setup/Cleanup's own type (setup_cleanup_assignment) gets a
+          clearly-labeled section of its own, same .manage-section/<h3>
+          convention the Default Messages table below already uses per
+          feature - pulled out of the generic flat table just below
+          rather than listed in both, though either one posts the exact
+          same text_/email_ field names to the same /channels handler,
+          so editing from here saves identically. %>
+      <% var setupCleanupType = types.find(function(t) { return t.key === 'setup_cleanup_assignment'; }); %>
+      <% if (setupCleanupType) { %>
+        <div class="manage-section">
+          <h3>Setup/Cleanup Text Messages</h3>
+          <p class="hint"><%= setupCleanupType.description %></p>
+          <label class="checkbox-inline-label"><input type="checkbox" name="text_<%= setupCleanupType.key %>" value="1" <%= setupCleanupType.sms_enabled ? 'checked' : '' %> /> Text</label>
+          <label class="checkbox-inline-label"><input type="checkbox" name="email_<%= setupCleanupType.key %>" value="1" <%= setupCleanupType.email_enabled ? 'checked' : '' %> /> Email</label>
+        </div>
+      <% } %>
       <div class="roster-scroll">
         <table class="roster-table members-table condensed-table">
           <thead>
             <tr><th>Type</th><th>Description</th><th>Text</th><th>Email</th></tr>
           </thead>
           <tbody>
-            <% types.forEach(function(t) { %>
+            <% types.filter(function(t) { return t.key !== 'setup_cleanup_assignment'; }).forEach(function(t) { %>
               <tr>
                 <td><%= t.label %></td>
                 <td><%= t.description %></td>

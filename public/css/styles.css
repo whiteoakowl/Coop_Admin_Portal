@@ -5413,6 +5413,17 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
   margin-bottom: 1.25rem;
 }
 .manage-section h2 { margin-top: 0; }
+/* A real request: "Check boxes lined up in a single row with text
+   starting at the check box" - a plain <label> wrapping a checkbox and
+   its own text already reads/clicks as one unit; this just keeps the
+   checkbox and text on one baseline with a little breathing room
+   between them and the next label, instead of the browser default's
+   slightly-off vertical alignment. Shared by Notifications Settings'
+   own per-type Text/Email toggles and the Lesson Plan Settings page's
+   own "allow teachers/members to edit" checkboxes. */
+.checkbox-inline-label { display: inline-flex; align-items: center; gap: 0.4rem; margin-right: 1.25rem; cursor: pointer; font-weight: 500; }
+.checkbox-inline-label input[type="checkbox"] { margin: 0; }
+.checkbox-inline-row { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-bottom: 1rem; }
 
 /* A real request: "add member. remove descriptions. no individual cards
    for each section just a distinctive line between each section" -
