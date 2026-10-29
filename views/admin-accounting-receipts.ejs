@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Receipts</h1>
+
+    <%# A real request: "add a subpage called receipts. Here you can
+        view any of the transactions that have a receipt attached to
+        it." Same date-range Filter as Transactions, pre-scoped to rows
+        that actually have a receipt on file. %>
+    <div class="roster-btn-row roster-btn-row-fit-text accounting-list-toolbar no-print">
+      <details class="filter-details" data-filter-details>
+        <summary class="roster-action-btn">Filter</summary>
+        <form method="GET" action="/main-admin/accounting/receipts" class="filter-panel">
+          <label for="receipts-start-date">From</label>
+          <input type="date" id="receipts-start-date" name="startDate" value="<%= filter.startDate || '' %>" />
+          <label for="receipts-end-date">To</label>
+          <input type="date" id="receipts-end-date" name="endDate" value="<%= filter.endDate || '' %>" />
+          <button type="submit" class="primary-btn">Apply</button>
+        </form>
+      </details>
+    </div>
+
+    <% if (rows.length === 0) { %>
+      <p class="roster-empty">No receipts on file yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table accounting-table-mobile-fit accounting-table-mobile-fit-tighter">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Date</th>
+              <th>Total</th>
+              <th>Category</th>
+              <th>Receipt</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(t) { %>
+              <tr>
+                <td><%= t.name %></td>
+                <td><%= t.dateLabel %></td>
+                <td><%= formatCents(t.amount_cents) %></td>
+                <td><%= t.category_name || 'Uncategorized' %></td>
+                <td>
+                  <button type="button" class="icon-btn" onclick="document.getElementById('receipt-view-<%= t.id %>').showModal()" aria-label="View receipt for <%= t.name %>" title="View receipt">
+                    <svg class="icon"><use href="#icon-file-text"/></svg>
+                  </button>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <% rows.forEach(function(t) { %>
+      <dialog id="receipt-view-<%= t.id %>" class="member-picker-dialog">
+        <h3>Receipt - <%= t.name %></h3>
+        <p><img src="/main-admin/accounting/transactions/<%= t.id %>/receipt/file" alt="Receipt for <%= t.name %>" class="accounting-receipt-preview" /></p>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+        </div>
+      </dialog>
+    <% }); %>
+  </main>
+  <script src="/js/filter-details-dismiss.js"></script>
+</body>
+</html>

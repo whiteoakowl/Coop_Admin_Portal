@@ -3,7 +3,7 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
-<body>
+<body class="profile-page">
   <%
     // Same bug class as accounting-home.ejs's own comment - this is the
     // literal "Account" bug from the report ("clicking on account it
@@ -64,12 +64,14 @@
             (so nothing here ever posts a value at all - see
             routes/portal-auth.js's own POST /portal/profile, which never
             even reads a birthday/gradeLevel field). %>
-        <label>Birthday <span class="hint">(contact an admin to change)</span>
-          <input type="text" value="<%= member.birthday || 'Not set' %>" disabled />
-        </label>
-        <label>Grade Level <span class="hint">(contact an admin to change)</span>
-          <input type="text" value="<%= member.grade_level || 'Not set' %>" disabled />
-        </label>
+        <div class="member-form-full date-time-two-col-row">
+          <label>Birthday <span class="hint">(contact an admin to change)</span>
+            <input type="text" value="<%= member.birthdayLabel || 'Not set' %>" disabled />
+          </label>
+          <label>Grade Level <span class="hint">(contact an admin to change)</span>
+            <input type="text" value="<%= member.grade_level || 'Not set' %>" disabled />
+          </label>
+        </div>
 
         <label class="member-form-full">Medical/Allergy Notes
           <textarea name="medicalNotes" rows="3"><%= member.medical_notes || '' %></textarea>
@@ -142,9 +144,9 @@
               <p class="hint">No classes scheduled.</p>
             <% } else { %>
               <% memberSchedule.days.forEach(function(d) { %>
-                <h3><%= dayLabels[d.day] || d.day %></h3>
+                <h3 class="profile-schedule-day-heading"><%= dayLabels[d.day] || d.day %></h3>
                 <div class="roster-scroll">
-                  <table class="roster-table">
+                  <table class="roster-table profile-schedule-table">
                     <thead><tr><th>Time</th><th>Class</th><th>Room</th><th>Role</th></tr></thead>
                     <tbody>
                       <% d.classes.forEach(function(row) { %>

@@ -70,26 +70,25 @@ async function createStudent(name, familyId) {
 }
 
 // A later real request: "Family homeschooling shouldn't be a tab anymore
-// on student portal. Co-op classes and family school management classes
-// are all under classroom dashboard subpages together" - the standalone
-// Family Homeschooling tab is gone; its own subpages (Overview/Classes/
-// Grades/Weekly Planner) now live under the Classroom Dashboard tab
-// instead, alongside Co-op Classes.
-test('Student Portal nav: no standalone Family Homeschooling tab - its pages live under Classroom Dashboard instead', async () => {
+// on student portal" - the standalone Family Homeschooling tab is gone;
+// its own pages live under the Classroom Dashboard tab instead - see
+// test/routes-student-classroom-dashboard-tab.test.js for that tab's own
+// full subpage coverage.
+test('Student Portal nav: no standalone Family Homeschooling tab', async () => {
   const familyId = await createFamily('Nav Family');
   const student = await createStudent('Nav Student', familyId);
   const page = await request(app).get('/student').set('Cookie', student.cookie);
   assert.equal(page.status, 200);
   assert.doesNotMatch(page.text, />Family Homeschooling</);
   assert.match(page.text, />Classroom Dashboard</);
-  assert.match(page.text, /href="\/student\/classes">Co-op Classes/);
-  assert.match(page.text, /href="\/student\/family-school">Family School Classes/);
-  assert.match(page.text, /href="\/student\/family-school\/grades">Grades/);
-  assert.match(page.text, /href="\/student\/family-school\/weekly-planner">Weekly Planner/);
-  assert.match(page.text, /href="\/student\/family-school\/overview">Overview/);
 });
 
-test('Homeschool Overview shows this one student\'s own GPA, attendance, and classes', async () => {
+// A real request: "Overview and portfolio should also be the same page
+// and called portfolio" - the old standalone Homeschool Overview page
+// is gone; Portfolio (already a superset - it also has Volunteer Hours,
+// Curriculum, Daily Learning Log, and Weekly Planner) shows the same
+// GPA/attendance/classes now.
+test('Portfolio shows this one student\'s own GPA, attendance, and classes', async () => {
   const familyId = await createFamily('Overview Family');
   const student = await createStudent('Overview Student', familyId);
   const classId = await createClass({ familyId, className: 'Overview Science', description: null, createdByAccountId: null });
@@ -99,7 +98,7 @@ test('Homeschool Overview shows this one student\'s own GPA, attendance, and cla
   await submitAssignment({ contentItemId: itemId, studentId: student.memberId, fileUrl: 'key', fileName: 'quiz.pdf' });
   await gradeAssignmentSubmission({ contentItemId: itemId, studentId: student.memberId, pointsEarned: 9, gradeLetter: 'A', feedback: 'Great work' });
 
-  const page = await request(app).get('/student/family-school/overview').set('Cookie', student.cookie);
+  const page = await request(app).get('/student/family-school/portfolio').set('Cookie', student.cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, /Overview Student/);
   assert.match(page.text, /Overview Science/);
@@ -154,9 +153,9 @@ test('a student from a DIFFERENT family never sees another family\'s homeschool 
   const lessonId = await createLesson({ classId, title: 'A Only Lesson', description: null, createdByAccountId: null });
   await createContentItem({ lessonId, type: 'assignment_submission', title: 'A Only Assignment', pointsPossible: 10 });
 
-  const overviewB = await request(app).get('/student/family-school/overview').set('Cookie', studentB.cookie);
-  assert.doesNotMatch(overviewB.text, /Family A Only Class/);
-  assert.doesNotMatch(overviewB.text, /Isolation Student A/);
+  const portfolioB = await request(app).get('/student/family-school/portfolio').set('Cookie', studentB.cookie);
+  assert.doesNotMatch(portfolioB.text, /Family A Only Class/);
+  assert.doesNotMatch(portfolioB.text, /Isolation Student A/);
 
   const gradesB = await request(app).get('/student/family-school/grades').set('Cookie', studentB.cookie);
   assert.doesNotMatch(gradesB.text, /A Only Assignment/);

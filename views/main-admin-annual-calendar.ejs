@@ -14,20 +14,6 @@
     <% if (notice) { %><p class="notice-banner"><%= notice %></p><% } %>
     <% if (error) { %><p class="notice-banner notice-banner-error"><%= error %></p><% } %>
 
-    <%# A real request: "Annual calendar dropdown for fiscal year should
-        actually be school years, 2026-2027, 2027-2028, 2028-2029 etc
-        (consecutive years). Create the next 20 years and 6 years
-        before." Picking one transparently finds-or-creates its calendar
-        behind the scenes (routes/main-admin-annual-calendar.js), so
-        there's no separate "+ Create Calendar" step any more. %>
-    <form method="GET" action="/main-admin/annual-calendar" class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left no-print">
-      <select name="schoolYear" aria-label="School Year" onchange="this.form.submit()">
-        <% schoolYearStartYears.forEach(function(y) { %>
-          <option value="<%= y %>" <%= selectedStartYear === y ? 'selected' : '' %>><%= y %>-<%= y + 1 %></option>
-        <% }); %>
-      </select>
-    </form>
-
     <%# A real request: "Create key button. Be able to add a label and
         color for each key item. Key shows on page. Be able to click
         each key then click on the calendar dates to color/key each one
@@ -43,7 +29,6 @@
         </button>
       <% }); %>
     </div>
-    <p class="hint no-print">Click a key above to select it, then click calendar dates to apply that key's color. Click the same key on a date again to clear it.</p>
 
     <%# A real request: "Edit calendar colors button and add/edit key
         button should be on the same row side by side." Their own
@@ -59,8 +44,22 @@
 
     <%# A real request: "Print, and pdf icons should be on the last row
         just above the calendar." Their own row, immediately above the
-        12-month grid instead of up with the other toolbar rows. %>
+        12-month grid instead of up with the other toolbar rows. A later
+        real request ("Year dropdown should be first in the row with the
+        pdf, export and print icons. Same row side by side") moved the
+        School Year picker (previously its own row up near the title)
+        in here too, first. Picking a year transparently finds-or-
+        creates its calendar behind the scenes (routes/main-admin-
+        annual-calendar.js), so there's no separate "+ Create Calendar"
+        step. %>
     <div class="roster-btn-row roster-btn-row-fit-text fs-attendance-row-left no-print">
+      <form method="GET" action="/main-admin/annual-calendar">
+        <select name="schoolYear" aria-label="School Year" onchange="this.form.submit()">
+          <% schoolYearStartYears.forEach(function(y) { %>
+            <option value="<%= y %>" <%= selectedStartYear === y ? 'selected' : '' %>><%= y %>-<%= y + 1 %></option>
+          <% }); %>
+        </select>
+      </form>
       <a class="icon-btn" href="/main-admin/annual-calendar/print?schoolYear=<%= selectedStartYear %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
       <a class="icon-btn" href="/main-admin/annual-calendar/download.pdf?schoolYear=<%= selectedStartYear %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
     </div>

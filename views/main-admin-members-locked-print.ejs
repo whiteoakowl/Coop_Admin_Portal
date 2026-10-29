@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.4in; }</style>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Locked</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-page">
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub">Locked Members</p>
+        </div>
+      </div>
+
+      <table class="roster-table condensed-table">
+        <thead><tr><th>Name</th><th>Email</th></tr></thead>
+        <tbody>
+          <% if (members.length === 0) { %>
+            <tr><td colspan="2" class="roster-empty">No locked members.</td></tr>
+          <% } %>
+          <% members.forEach(function(m) { %>
+            <tr>
+              <td><%= m.name %></td>
+              <td><%= m.accountEmail %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

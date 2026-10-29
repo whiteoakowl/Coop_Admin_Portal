@@ -11,7 +11,7 @@ const { createFailureRateLimiter } = require('../utils/loginRateLimit');
 const { GRADE_OPTIONS } = require('../utils/membership');
 const { CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
 const { CLASS_DAYS } = require('../utils/classDays');
-const { isValidISODate, formatDateNumeric } = require('../utils/dates');
+const { isValidISODate, formatDateLongNoWeekday } = require('../utils/dates');
 const { portalStatusForMembers, sectionIdsForMembers } = require('../utils/portalPermissions');
 const membershipHandbook = require('../utils/membershipHandbook');
 const membershipFormFields = require('../utils/membershipFormFields');
@@ -543,6 +543,7 @@ const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'Ju
 async function renderProfile(req, res, error, notice, activeTab) {
   const member = await memberForAccount(req.portalAccount.id);
   if (!member) return res.redirect('/portal');
+  member.birthdayLabel = member.birthday ? formatDateLongNoWeekday(member.birthday) : null;
   const family = await familyForAccount(req.portalAccount.id);
   const familyIds = family.map((m) => m.id);
   const placeholders = familyIds.map(() => '?').join(',');
@@ -720,7 +721,7 @@ router.get('/portal/family/:memberId', async (req, res) => {
   const found = await requireOwnFamilyMember(req, parseInt(req.params.memberId, 10));
   if (!found) return res.status(404).send('Not found');
   const { family, member } = found;
-  member.birthdayLabel = member.birthday ? formatDateNumeric(member.birthday) : null;
+  member.birthdayLabel = member.birthday ? formatDateLongNoWeekday(member.birthday) : null;
 
   const familyRow = member.family_id ? await db.prepare('SELECT name FROM families WHERE id = ?').get(member.family_id) : null;
   const allSections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
@@ -749,9 +750,17 @@ router.get('/portal/family/:memberId/edit', async (req, res) => {
   if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile');
   const found = await requireOwnFamilyMember(req, parseInt(req.params.memberId, 10));
   if (!found) return res.status(404).send('Not found');
+  found.member.birthdayLabel = found.member.birthday ? formatDateLongNoWeekday(found.member.birthday) : null;
+  // A real request: "Be able to change student's email when editing
+  // student profile" - the plain `email` field below is just contact
+  // info (members.email, no login tied to it); this is the actual
+  // sign-in credential (member_accounts.email) a student logs in with,
+  // so it only shows up here when a student member actually has one.
+  const account = found.member.member_type === 'student' ? await db.prepare('SELECT id, email FROM member_accounts WHERE member_id = ?').get(found.member.id) : null;
   res.render('parent-member-profile-edit', {
     title: `Edit ${found.member.name}`,
     member: found.member,
+    account,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -763,15 +772,30 @@ router.get('/portal/family/:memberId/edit', async (req, res) => {
 // available for a parent editing another member of their own family.
 // member_type, birthday, grade_level, family_id, and admin positions
 // never appear in this request at all, for the same reason POST
-// /portal/profile's own header comment gives.
+// /portal/profile's own header comment gives. loginEmail is the one
+// exception - see the GET route above's own comment on why it's a
+// separate, account-level field only shown (and only ever read here)
+// for a student who already has a portal account.
 router.post('/portal/family/:memberId/edit', async (req, res) => {
   if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile');
   const memberId = parseInt(req.params.memberId, 10);
   const found = await requireOwnFamilyMember(req, memberId);
   if (!found) return res.status(404).send('Not found');
+  const back = `/portal/family/${memberId}/edit`;
 
   const name = (req.body.name || '').trim();
-  if (!name) return res.redirect(`/portal/family/${memberId}/edit?error=` + encodeURIComponent('Name is required.'));
+  if (!name) return res.redirect(back + '?error=' + encodeURIComponent('Name is required.'));
+
+  if (found.member.member_type === 'student' && req.body.loginEmail !== undefined) {
+    const account = await db.prepare('SELECT id FROM member_accounts WHERE member_id = ?').get(memberId);
+    if (account) {
+      const loginEmail = req.body.loginEmail.trim();
+      if (!loginEmail) return res.redirect(back + '?error=' + encodeURIComponent('Login email is required.'));
+      const existing = await findAccountByEmail(loginEmail);
+      if (existing && existing.id !== account.id) return res.redirect(back + '?error=' + encodeURIComponent('That email is already in use by another account.'));
+      await db.prepare('UPDATE member_accounts SET email = ? WHERE id = ?').run(loginEmail, account.id);
+    }
+  }
 
   await db
     .prepare('UPDATE members SET name = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?, medical_notes = ? WHERE id = ?')
@@ -787,7 +811,7 @@ router.post('/portal/family/:memberId/edit', async (req, res) => {
       memberId
     );
 
-  res.redirect(`/portal/family/${memberId}/edit?notice=` + encodeURIComponent('Profile updated.'));
+  res.redirect(back + '?notice=' + encodeURIComponent('Profile updated.'));
 });
 
 // Deliberately narrow - only the fields the admin-side membership form

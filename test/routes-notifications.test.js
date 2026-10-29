@@ -1,9 +1,9 @@
 // Route-level coverage for the SMS/notification framework (Community &
 // Commerce track, item 11). See utils/notifications.js's own comments:
 // notify() always creates the in-app notification (the Notification
-// Center's own data), and only attempts email/sms when the type's own
-// email_enabled/sms_enabled is on and the recipient hasn't opted out -
-// there's no real SMS/email provider configured anywhere, so those channels
+// Center's own data), and only attempts email/sms when the type's
+// auto_send_enabled is on and the recipient hasn't opted out - there's
+// no real SMS/email provider configured anywhere, so those channels
 // always record status='skipped' (utils/smsProvider.js /
 // utils/emailProvider.js), never a fake "sent".
 const test = require('node:test');
@@ -47,21 +47,6 @@ async function loginAsMainAdmin() {
   const cookie = loginRes.headers['set-cookie'];
   const page = await request(app).get('/main-admin').set('Cookie', cookie);
   return { cookie, csrfToken: extractCsrf(page.text) };
-}
-
-// Builds the full all-types checkbox body POST /main-admin/notifications/channels
-// expects (every row's current text/email state), used below to flip
-// exactly one type's one channel without disturbing the others.
-async function fullChannelsBody(csrfToken, overrides = {}) {
-  const types = await notifications.listTypes();
-  const body = { _csrf: csrfToken };
-  for (const t of types) {
-    const key = `text_${t.key}`;
-    if (key in overrides ? overrides[key] : t.sms_enabled) body[key] = '1';
-    const emailKey = `email_${t.key}`;
-    if (emailKey in overrides ? overrides[emailKey] : t.email_enabled) body[emailKey] = '1';
-  }
-  return body;
 }
 
 let familyCounter = 0;
@@ -195,33 +180,11 @@ test('a member opting out of email for one type is recorded as skipped, not atte
   assert.match(stillOnEmail.detail, /No email provider configured/);
 });
 
-test('an email-only notification type (sms_enabled off) never attempts SMS, even when the recipient has not opted out of it', async () => {
-  const parent = await createParentAccount();
-
-  // Default preferences (no override saved) - SMS would normally be
-  // attempted for any type, confirming this is genuinely the type-level
-  // sms_enabled gate, not a leftover per-account opt-out from another test.
-  const emailOnlyId = await notifications.notify(parent.accountId, 'forum_reply', { title: 'Reply', body: 'Someone replied.' });
-  const emailOnlySms = (await db.prepare('SELECT * FROM notification_deliveries WHERE notification_id = ? AND channel = ?').all(emailOnlyId, 'sms'))[0];
-  assert.equal(emailOnlySms.status, 'skipped');
-  assert.match(emailOnlySms.detail, /email-only/);
-
-  // floater_assignment stays SMS-capable - the whole point of that
-  // feature is the text itself - so it hits smsProvider.send()'s own
-  // normal skip reason (the test fixture account has no phone on file)
-  // instead of the email-only gate above.
-  const floaterId = await notifications.notify(parent.accountId, 'floater_assignment', { title: 'Floater Assignment', body: "You're assigned: Hallway Monitor." });
-  const floaterSms = (await db.prepare('SELECT * FROM notification_deliveries WHERE notification_id = ? AND channel = ?').all(floaterId, 'sms'))[0];
-  assert.equal(floaterSms.status, 'skipped');
-  assert.doesNotMatch(floaterSms.detail, /email-only/);
-});
-
-test("turning a type's text and email channels both off stops email/sms but keeps the in-app notification", async () => {
+test("turning a type's auto-send off stops email/sms but keeps the in-app notification", async () => {
   const admin = await loginAsMainAdmin();
   const parent = await createParentAccount();
 
-  const offBody = await fullChannelsBody(admin.csrfToken, { text_event_registration: false, email_event_registration: false });
-  await request(app).post('/main-admin/notifications/channels').set('Cookie', admin.cookie).type('form').send(offBody);
+  await request(app).post('/main-admin/notifications/event_registration/auto-send').set('Cookie', admin.cookie).type('form').send({ email: '0', sms: '0', _csrf: admin.csrfToken });
 
   const eventId = await createPublishedEvent(admin);
   await request(app).post(`/events/${eventId}/register`).set('Cookie', parent.cookie).type('form').send({ memberId: parent.memberId, _csrf: parent.csrfToken });
@@ -229,16 +192,16 @@ test("turning a type's text and email channels both off stops email/sms but keep
   const items = await notifications.listForAccount(parent.accountId);
   assert.equal(items.length, 1);
   const deliveries = await db.prepare('SELECT * FROM notification_deliveries WHERE notification_id = ?').all(items[0].id);
-  assert.equal(deliveries.length, 3, 'in_app plus a skipped row for each of email/sms');
   assert.equal(deliveries.find((d) => d.channel === 'in_app').status, 'sent');
-  assert.equal(deliveries.find((d) => d.channel === 'email').status, 'skipped');
-  assert.equal(deliveries.find((d) => d.channel === 'sms').status, 'skipped');
+  const email = deliveries.find((d) => d.channel === 'email');
+  assert.equal(email.status, 'skipped');
+  assert.match(email.detail, /turned off/);
+  const sms = deliveries.find((d) => d.channel === 'sms');
+  assert.equal(sms.status, 'skipped');
+  assert.match(sms.detail, /turned off/);
 
-  // Restore to event_registration's real default (email-only - see
-  // the sms_enabled seed migration) for any later test relying on it,
-  // not just both-on.
-  const restoreBody = await fullChannelsBody(admin.csrfToken, { text_event_registration: false, email_event_registration: true });
-  await request(app).post('/main-admin/notifications/channels').set('Cookie', admin.cookie).type('form').send(restoreBody);
+  // Restore for any later test relying on default auto-send behavior.
+  await request(app).post('/main-admin/notifications/event_registration/auto-send').set('Cookie', admin.cookie).type('form').send({ email: '1', sms: '1', _csrf: admin.csrfToken });
 });
 
 // A real request: "a notifications settings card to control email,
@@ -295,56 +258,4 @@ test('sending a newsletter issue notifies every active member account', async ()
 
   const items = await notifications.listForAccount(parent.accountId);
   assert.ok(items.some((i) => i.type_key === 'newsletter_sent' && i.link_url === `/newsletter/${issueId}`));
-});
-
-test('GET /main-admin/notifications renders a Text and an Email checkbox per type, checked per their own column', async () => {
-  const admin = await loginAsMainAdmin();
-  const page = await request(app).get('/main-admin/notifications').set('Cookie', admin.cookie);
-  assert.equal(page.status, 200);
-  assert.match(page.text, /<th>Text<\/th><th>Email<\/th>/);
-  assert.match(page.text, /name="email_event_registration" value="1" checked/);
-  // event_registration is one of the email-only types from an earlier
-  // real request - its text checkbox should render unchecked.
-  assert.match(page.text, /name="text_event_registration" value="1"\s*\/>/);
-  const typeCheckedState = await notifications.getType('event_registration');
-  assert.equal(typeCheckedState.sms_enabled, 0, 'event_registration should be seeded email-only (text unchecked)');
-});
-
-// A real request: "Admin settings gear. Notifications settings. Add
-// section for setup/cleanup text messages." Pulled out of the generic
-// flat table into its own clearly-labeled section, but still posting
-// the exact same text_/email_ field names to the same /channels route.
-test('GET /main-admin/notifications gives Setup/Cleanup its own clearly-labeled section, not listed in the generic flat table', async () => {
-  const admin = await loginAsMainAdmin();
-  const page = await request(app).get('/main-admin/notifications').set('Cookie', admin.cookie);
-  assert.equal(page.status, 200);
-  assert.match(page.text, /<h3>Setup\/Cleanup Text Messages<\/h3>/);
-  assert.match(page.text, /name="text_setup_cleanup_assignment" value="1" checked/);
-  assert.match(page.text, /name="email_setup_cleanup_assignment" value="1" checked/);
-  // The generic flat table's own <tr> should no longer carry this type -
-  // only the dedicated section's own checkboxes should mention it.
-  const flatTableMatches = page.text.match(/name="text_setup_cleanup_assignment"/g) || [];
-  assert.equal(flatTableMatches.length, 1, 'setup_cleanup_assignment should only appear once (its own section), not duplicated in the flat table');
-});
-
-test('POST /main-admin/notifications/channels flips only the submitted type, leaving every other type untouched', async () => {
-  const admin = await loginAsMainAdmin();
-  const before = await notifications.getType('floater_assignment');
-  assert.equal(before.sms_enabled, 1);
-  assert.equal(before.email_enabled, 1);
-
-  const body = await fullChannelsBody(admin.csrfToken, { text_floater_assignment: false });
-  await request(app).post('/main-admin/notifications/channels').set('Cookie', admin.cookie).type('form').send(body);
-
-  const afterFloater = await notifications.getType('floater_assignment');
-  assert.equal(afterFloater.sms_enabled, 0, 'floater_assignment text should now be off');
-  assert.equal(afterFloater.email_enabled, 1, 'floater_assignment email should be unaffected');
-
-  const otherType = await notifications.getType('class_registration');
-  assert.equal(otherType.sms_enabled, 0, 'class_registration was already email-only before this POST and should stay that way');
-  assert.equal(otherType.email_enabled, 1);
-
-  // Restore for any later test relying on default channel behavior.
-  const restoreBody = await fullChannelsBody(admin.csrfToken, { text_floater_assignment: true });
-  await request(app).post('/main-admin/notifications/channels').set('Cookie', admin.cookie).type('form').send(restoreBody);
 });

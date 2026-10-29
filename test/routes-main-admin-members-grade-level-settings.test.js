@@ -58,7 +58,10 @@ async function loginAsMainAdmin() {
 test('Settings tab (no settingsTab) shows a card grid naming all 6 settings areas, no sub-tab content', async () => {
   const { cookie } = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/members?tab=settings').set('Cookie', cookie);
-  assert.match(page.text, /<div class="team-card-grid">/);
+  // A real request ("Members Settings. Mobile. Settings cards should be
+  // two columns, shrink to fit") added a 2nd class to this grid
+  // (settings-hub-card-grid) alongside the shared team-card-grid one.
+  assert.match(page.text, /<div class="team-card-grid settings-hub-card-grid">/);
   assert.match(page.text, /Grade Level Settings/);
   assert.match(page.text, /Membership Fee &amp; Payment/);
   assert.match(page.text, /Membership Form Fields/);

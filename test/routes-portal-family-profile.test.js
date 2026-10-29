@@ -104,6 +104,48 @@ test('a parent can edit a family member\'s contact info, but never their birthda
   assert.equal(updated.member_type, 'student', 'member type can never be spoofed to admin through this route');
 });
 
+// A real request: "Be able to change student's email when editing
+// student profile" - the plain Email field above is just contact info
+// (members.email), so this is the actual sign-in credential
+// (member_accounts.email) a student logs in with.
+test('a parent can change a student\'s login email when the student has a portal account, with uniqueness enforced', async () => {
+  const parent = await createParentAccount();
+  const studentAccountInfo = await db
+    .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text())")
+    .run(parent.studentId, `student-login-${familyCounter}@example.com`, hashPassword('testpassword123'));
+  const studentRole = await db.prepare("SELECT id FROM roles WHERE key = 'student'").get();
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(studentAccountInfo.lastInsertRowid, studentRole.id);
+
+  const editPage = await request(app).get(`/portal/family/${parent.studentId}/edit`).set('Cookie', parent.cookie);
+  assert.match(editPage.text, new RegExp(`name="loginEmail" value="student-login-${familyCounter}@example.com"`));
+
+  const otherFamilyId = (await db.prepare('INSERT INTO families (name) VALUES (?)').run('Other Login Email Family')).lastInsertRowid;
+  const otherMemberId = (
+    await db.prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, active) VALUES ('Someone Else', ?, ?, 'parent', ?, 1)").run(await generateMemberCode(), await generateMemberCode(), otherFamilyId)
+  ).lastInsertRowid;
+  const takenEmail = `already-taken-${familyCounter}@example.com`;
+  await db.prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text())").run(otherMemberId, takenEmail, hashPassword('testpassword123'));
+
+  const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(editPage.text)[1];
+  const collision = await request(app)
+    .post(`/portal/family/${parent.studentId}/edit`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ name: 'Family Profile Kid', loginEmail: takenEmail, _csrf: csrfToken });
+  assert.match(collision.headers.location, /error=/);
+  let account = await db.prepare('SELECT email FROM member_accounts WHERE id = ?').get(studentAccountInfo.lastInsertRowid);
+  assert.equal(account.email, `student-login-${familyCounter}@example.com`, 'a colliding email must never be saved');
+
+  const res = await request(app)
+    .post(`/portal/family/${parent.studentId}/edit`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ name: 'Family Profile Kid', loginEmail: `new-student-login-${familyCounter}@example.com`, _csrf: csrfToken });
+  assert.match(res.headers.location, /notice=/);
+  account = await db.prepare('SELECT email FROM member_accounts WHERE id = ?').get(studentAccountInfo.lastInsertRowid);
+  assert.equal(account.email, `new-student-login-${familyCounter}@example.com`);
+});
+
 test('a parent cannot view or edit another family\'s member by guessing an id', async () => {
   const parent = await createParentAccount();
   const otherFamily = await createParentAccount();

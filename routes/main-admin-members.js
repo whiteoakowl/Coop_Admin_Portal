@@ -451,6 +451,38 @@ router.get('/export.csv', async (req, res) => {
   sendCsv(res, `${showArchived ? 'archive' : 'members'}${typeFilter ? '-' + typeFilter : ''}.csv`, lines);
 });
 
+// A real request: "Members. Locked. Should have the same icons and
+// buttons formatted in the same rows as the archive page" - Export/
+// Print/Download PDF icons matching Archive's own row, built against
+// this list's own narrower shape (name/email, not the full member
+// roster Archive's print preview is built for) rather than reusing
+// main-admin-members-print.ejs.
+async function lockedMembersList() {
+  return db
+    .prepare(
+      `SELECT m.*, ma.id AS "accountId", ma.email AS "accountEmail" FROM members m
+       JOIN member_accounts ma ON ma.member_id = m.id
+       WHERE ma.status = 'suspended'
+       ORDER BY LOWER(m.name)`
+    )
+    .all();
+}
+
+router.get('/locked/export.csv', async (req, res) => {
+  const members = await lockedMembersList();
+  const lines = [toCsvRow(['Name', 'Email']), ...members.map((m) => toCsvRow([m.name, m.accountEmail]))];
+  sendCsv(res, 'locked.csv', lines);
+});
+
+router.get('/locked/print', async (req, res) => {
+  res.render('main-admin-members-locked-print', { title: 'Locked Print Preview', members: await lockedMembersList() });
+});
+
+router.get('/locked/download.pdf', async (req, res) => {
+  const pdf = await renderViewToPdf(req, 'main-admin-members-locked-print', { title: 'Locked Print Preview', members: await lockedMembersList() });
+  sendPdf(res, 'locked.pdf', pdf);
+});
+
 router.get('/import-template.xlsx', (req, res) => {
   const buffer = buildTemplateWorkbook(
     ['First Name', 'Last Name', 'Type', 'Address', 'City', 'State', 'Zip', 'Phone', 'Email', 'Birthday', 'Grade Level', 'Medical/Allergy Notes', 'Parent First Name', 'Parent Last Name'],

@@ -151,7 +151,12 @@ test('Student Portal Classroom Dashboard groups a Tuesday-enrolled class under i
 
   const dashboard = await request(app).get('/student/classes/dashboard').set('Cookie', student.cookie);
   assert.equal(dashboard.status, 200);
-  assert.match(dashboard.text, /<h2>Tuesday<\/h2>/);
+  // A real request merged Family School Management classes onto this
+  // same page, categorized under their own headings ("Co-op Classes"
+  // with each day as its own sub-heading below it) - the day heading
+  // itself is now an <h3>, not the page's only <h2>.
+  assert.match(dashboard.text, /<h2>Co-op Classes<\/h2>/);
+  assert.match(dashboard.text, /<h3>Tuesday<\/h3>/);
   assert.match(dashboard.text, /Tuesday Band/);
 });
 
@@ -203,7 +208,7 @@ test('portal-profile Schedules tab shows "Tuesday" for a family member\'s Tuesda
   // immediately before this specific class, not just appear somewhere
   // on the page.
   const classIndex = profile.text.indexOf('Tuesday Profile Class');
-  const headingIndex = profile.text.lastIndexOf('<h3>Tuesday</h3>', classIndex);
+  const headingIndex = profile.text.lastIndexOf('<h3 class="profile-schedule-day-heading">Tuesday</h3>', classIndex);
   assert.ok(headingIndex !== -1 && headingIndex < classIndex, 'the Tuesday Profile Class must be grouped under its own Tuesday heading');
 });
 

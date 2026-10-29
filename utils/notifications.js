@@ -18,13 +18,8 @@ async function getType(key) {
   return db.prepare('SELECT * FROM notification_types WHERE key = ?').get(key);
 }
 
-// A real request: "two columns of checkboxes titled text and email.
-// Admin can click each box to select if it will be a text notification,
-// email notification or both." Replaces the old single combined
-// auto_send_enabled toggle with two fully independent per-channel
-// switches on the same notification_types row.
-async function setChannelsEnabled(key, { textEnabled, emailEnabled }) {
-  await db.prepare('UPDATE notification_types SET sms_enabled = ?, email_enabled = ? WHERE key = ?').run(textEnabled ? 1 : 0, emailEnabled ? 1 : 0, key);
+async function setAutoSend(key, { email, sms }) {
+  await db.prepare('UPDATE notification_types SET auto_send_email_enabled = ?, auto_send_sms_enabled = ? WHERE key = ?').run(email ? 1 : 0, sms ? 1 : 0, key);
 }
 
 // Merges an account's stored overrides onto the "enabled by default"
@@ -65,13 +60,11 @@ async function recordDelivery(notificationId, channel, result) {
 }
 
 // The single entry point every feature calls to generate a
-// notification. Always creates the in-app notification. email_enabled
-// and sms_enabled are each independent, admin-controlled ceilings per
-// type (the Notifications settings page's own two checkbox columns) -
-// a type with both off behaves exactly like the old auto_send_enabled
-// off did (in-app only). On top of whichever channels the type itself
-// allows, a recipient's own per-account preference can still opt that
-// one account out of a channel the type otherwise permits.
+// notification. Always creates the in-app notification. Email and SMS
+// are each attempted only when the type's own auto-send flag for that
+// channel is on AND the recipient hasn't opted out of that channel for
+// this type - a Main Admin can turn off just email (or just text) for a
+// type without touching the other channel.
 async function notify(accountId, typeKey, { title, body, linkUrl = null, mediaUrl = null } = {}) {
   const type = await getType(typeKey);
   if (!type) throw new Error(`Unknown notification type: ${typeKey}`);
@@ -82,17 +75,21 @@ async function notify(accountId, typeKey, { title, body, linkUrl = null, mediaUr
 
   const account = await db.prepare('SELECT ma.email, m.phone FROM member_accounts ma LEFT JOIN members m ON m.id = ma.member_id WHERE ma.id = ?').get(accountId);
 
-  if (type.email_enabled && (await accountPrefersChannel(accountId, typeKey, 'email'))) {
+  if (type.auto_send_email_enabled && (await accountPrefersChannel(accountId, typeKey, 'email'))) {
     await recordDelivery(notificationId, 'email', await emailProvider.send(account?.email, title, body));
   } else {
-    const detail = type.email_enabled ? 'Recipient opted out of this notification type by email.' : 'This notification type is text-only - email is never sent for it.';
-    await recordDelivery(notificationId, 'email', { status: 'skipped', detail });
+    await recordDelivery(notificationId, 'email', {
+      status: 'skipped',
+      detail: type.auto_send_email_enabled ? 'Recipient opted out of this notification type by email.' : 'Auto-send by email is turned off for this notification type.',
+    });
   }
-  if (type.sms_enabled && (await accountPrefersChannel(accountId, typeKey, 'sms'))) {
+  if (type.auto_send_sms_enabled && (await accountPrefersChannel(accountId, typeKey, 'sms'))) {
     await recordDelivery(notificationId, 'sms', await smsProvider.send(account?.phone, `${title}: ${body}`, mediaUrl));
   } else {
-    const detail = type.sms_enabled ? 'Recipient opted out of this notification type by SMS.' : 'This notification type is email-only - text is never sent for it.';
-    await recordDelivery(notificationId, 'sms', { status: 'skipped', detail });
+    await recordDelivery(notificationId, 'sms', {
+      status: 'skipped',
+      detail: type.auto_send_sms_enabled ? 'Recipient opted out of this notification type by SMS.' : 'Auto-send by SMS is turned off for this notification type.',
+    });
   }
 
   return notificationId;
@@ -128,7 +125,7 @@ async function markAllRead(accountId) {
 module.exports = {
   listTypes,
   getType,
-  setChannelsEnabled,
+  setAutoSend,
   preferencesForAccount,
   setPreference,
   notify,

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Profit and Loss</h1>
+
+    <div class="roster-btn-row roster-btn-row-fit-text accounting-list-toolbar no-print">
+      <form method="GET" action="/main-admin/accounting/reports/profit-and-loss" class="filter-panel-inline">
+        <label for="pl-start-date">From</label>
+        <input type="date" id="pl-start-date" name="startDate" value="<%= filter.startDate || '' %>" />
+        <label for="pl-end-date">To</label>
+        <input type="date" id="pl-end-date" name="endDate" value="<%= filter.endDate || '' %>" />
+        <button type="submit" class="primary-btn">Apply</button>
+      </form>
+    </div>
+
+    <div class="roster-scroll">
+      <table class="roster-table condensed-table">
+        <thead>
+          <tr><th>Income</th><th>Amount</th></tr>
+        </thead>
+        <tbody>
+          <% if (incomeByCategory.length === 0) { %>
+            <tr><td colspan="2" class="roster-empty">No income recorded in this range.</td></tr>
+          <% } %>
+          <% incomeByCategory.forEach(function(c) { %>
+            <tr><td><%= c.name %></td><td><%= formatCents(c.cents) %></td></tr>
+          <% }); %>
+          <tr><td><strong>Total Income</strong></td><td><strong><%= formatCents(incomeCents) %></strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="roster-scroll">
+      <table class="roster-table condensed-table">
+        <thead>
+          <tr><th>Expenses</th><th>Amount</th></tr>
+        </thead>
+        <tbody>
+          <% if (expenseByCategory.length === 0) { %>
+            <tr><td colspan="2" class="roster-empty">No expenses recorded in this range.</td></tr>
+          <% } %>
+          <% expenseByCategory.forEach(function(c) { %>
+            <tr><td><%= c.name %></td><td><%= formatCents(c.cents) %></td></tr>
+          <% }); %>
+          <tr><td><strong>Total Expenses</strong></td><td><strong><%= formatCents(expenseCents) %></strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="accounting-report-net"><strong>Net Income:</strong> <%= formatCents(netCents) %></p>
+  </main>
+</body>
+</html>

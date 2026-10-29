@@ -88,6 +88,20 @@ test('Sections page has no description paragraph and its + Add Section button op
   assert.equal(newFormCount, 1);
 });
 
+// A real request: "remove description column. shrink to fit table in
+// mobile view... Add section button should be under title."
+test('Sections page has no Description table column, and the + Add Section button sits on its own row under the title', async () => {
+  const { cookie } = await loginAsMainAdmin();
+  const res = await request(app).get('/main-admin/sections').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.doesNotMatch(res.text, /<th>Description<\/th>/);
+  const h1Index = res.text.indexOf('<h1>Sections</h1>');
+  const btnIndex = res.text.indexOf("document.getElementById('add-section-dialog').showModal()");
+  assert.ok(h1Index !== -1 && btnIndex !== -1 && h1Index < btnIndex, 'the Add Section button must come after the title, not beside it');
+  // Not inside the same flex toolbar as the title anymore.
+  assert.doesNotMatch(res.text, /<div class="roster-toolbar no-print">\s*<h1>Sections<\/h1>/);
+});
+
 test('POST /main-admin/sections/new creates a section via the popup form, shown in a shrink-to-fit mobile table with a trash icon', async () => {
   const { cookie, csrfToken } = await loginAsMainAdmin();
   const res = await request(app)

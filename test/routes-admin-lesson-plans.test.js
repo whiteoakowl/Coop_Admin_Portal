@@ -119,6 +119,46 @@ test('A lesson plan\'s own manage page: Lesson Plan Details form, add a text con
   assert.match(withQuiz.text, /1 question/);
 });
 
+// A real request: "Add allow members to use this lesson plan for
+// Homeschool family management" - a single checkbox saved alongside
+// title/description on the same Lesson Plan Details form, off by
+// default.
+test('Lesson Plan Details form: the Homeschool family management checkbox defaults off and persists when checked', async () => {
+  const admin = await loginAsAdmin();
+  const createRes = await request(app)
+    .post('/admin/lesson-plans')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Family Use Plan', _csrf: admin.csrfToken });
+  const planId = /\/admin\/lesson-plans\/(\d+)/.exec(createRes.headers.location)[1];
+
+  const manage = await request(app).get(`/admin/lesson-plans/${planId}`).set('Cookie', admin.cookie);
+  assert.match(manage.text, /Allow members to use this lesson plan for Homeschool family management/);
+  assert.doesNotMatch(manage.text, /name="allowFamilySchoolUse" value="1" checked/);
+
+  await request(app)
+    .post(`/admin/lesson-plans/${planId}/edit`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Family Use Plan', description: '', allowFamilySchoolUse: '1', _csrf: admin.csrfToken });
+
+  const plan = await db.prepare('SELECT allow_family_school_use FROM lesson_plans WHERE id = ?').get(planId);
+  assert.equal(plan.allow_family_school_use, true);
+
+  const checkedPage = await request(app).get(`/admin/lesson-plans/${planId}`).set('Cookie', admin.cookie);
+  assert.match(checkedPage.text, /name="allowFamilySchoolUse" value="1" checked/);
+
+  // Saving again without the checkbox (unchecked box never posts a
+  // value) must turn it back off.
+  await request(app)
+    .post(`/admin/lesson-plans/${planId}/edit`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Family Use Plan', description: '', _csrf: admin.csrfToken });
+  const unchecked = await db.prepare('SELECT allow_family_school_use FROM lesson_plans WHERE id = ?').get(planId);
+  assert.equal(unchecked.allow_family_school_use, false);
+});
+
 test('Assign to Class deep-copies the lesson plan as a brand new, fully independent class lesson', async () => {
   const admin = await loginAsAdmin();
   const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'Art Class' });
@@ -214,89 +254,77 @@ test('Assign to Class deep-copies a quiz content item\'s own questions and choic
 // the lesson plan, all members to edit/add to the lesson plan. Dropdown
 // to select assigning this lesson plan to a co-op class. Dropdown menu
 // shows class titles, time and semester day in parenthesis."
-test('Lesson plan manage page links to Edit Settings, not the old Assign to Class dialog', async () => {
+// A real request: "Co-op admin portal. Lesson plans tab... allow
+// teachers to edit/add to the lesson plan, all members to edit/add to
+// the lesson plan." Both checkboxes live on the same Lesson Plan
+// Details form/route as the existing Homeschool family management one
+// (no separate Settings page/route - Assign to Class stays its own
+// inline dialog on this same manage page).
+test('Lesson Plan Details form: the teacher/member edit checkboxes default off and persist independently', async () => {
   const admin = await loginAsAdmin();
   const createRes = await request(app)
     .post('/admin/lesson-plans')
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ title: 'Settings Link Template', _csrf: admin.csrfToken });
+    .send({ title: 'Edit Permissions Template', _csrf: admin.csrfToken });
   const planId = /\/admin\/lesson-plans\/(\d+)/.exec(createRes.headers.location)[1];
 
-  const page = await request(app).get(`/admin/lesson-plans/${planId}`).set('Cookie', admin.cookie);
-  assert.equal(page.status, 200);
-  assert.match(page.text, new RegExp(`<a class="roster-action-btn" href="/admin/lesson-plans/${planId}/settings">Edit Settings</a>`));
-  assert.doesNotMatch(page.text, />Assign to Class</);
-  assert.doesNotMatch(page.text, /assign-lesson-plan-dialog/);
-});
-
-test('Lesson plan Settings page: GET shows the edit-permission checkboxes and the class dropdown with title/time/day/semester', async () => {
-  const admin = await loginAsAdmin();
-  const semesterId = (await db.prepare("INSERT INTO semesters (title) VALUES ('Fall Settings Test') RETURNING id").get()).id;
-  const classId = await createClass({ day: 'monday', hourPosition: 2, className: 'Settings Dropdown Class', semesterId });
-
-  const createRes = await request(app)
-    .post('/admin/lesson-plans')
-    .set('Cookie', admin.cookie)
-    .type('form')
-    .send({ title: 'Settings Page Template', _csrf: admin.csrfToken });
-  const planId = /\/admin\/lesson-plans\/(\d+)/.exec(createRes.headers.location)[1];
-
-  const page = await request(app).get(`/admin/lesson-plans/${planId}/settings`).set('Cookie', admin.cookie);
-  assert.equal(page.status, 200);
-  assert.match(page.text, /name="allowTeacherEdit" value="1"\s*\/>/);
-  assert.match(page.text, /Allow teachers to edit\/add to the lesson plan/);
-  assert.match(page.text, /name="allowMemberEdit" value="1"\s*\/>/);
-  assert.match(page.text, /Allow all members to edit\/add to the lesson plan/);
-  assert.match(page.text, new RegExp(`<option value="${classId}">Settings Dropdown Class \\([^)]+, Monday - Fall Settings Test\\)</`));
-});
-
-test('Lesson plan Settings page: POST saves the two edit-permission checkboxes', async () => {
-  const admin = await loginAsAdmin();
-  const createRes = await request(app)
-    .post('/admin/lesson-plans')
-    .set('Cookie', admin.cookie)
-    .type('form')
-    .send({ title: 'Settings Save Template', _csrf: admin.csrfToken });
-  const planId = /\/admin\/lesson-plans\/(\d+)/.exec(createRes.headers.location)[1];
-
-  const before = await db.prepare('SELECT allow_teacher_edit, allow_member_edit FROM lesson_plans WHERE id = ?').get(planId);
-  assert.equal(before.allow_teacher_edit, false);
-  assert.equal(before.allow_member_edit, false);
+  const manage = await request(app).get(`/admin/lesson-plans/${planId}`).set('Cookie', admin.cookie);
+  assert.equal(manage.status, 200);
+  assert.match(manage.text, /name="allowTeacherEdit" value="1"\s*\/>/);
+  assert.match(manage.text, /Allow teachers to edit\/add to the lesson plan/);
+  assert.match(manage.text, /name="allowMemberEdit" value="1"\s*\/>/);
+  assert.match(manage.text, /Allow all members to edit\/add to the lesson plan/);
+  assert.doesNotMatch(manage.text, /name="allowTeacherEdit" value="1" checked/);
+  assert.doesNotMatch(manage.text, /name="allowMemberEdit" value="1" checked/);
 
   await request(app)
-    .post(`/admin/lesson-plans/${planId}/settings`)
+    .post(`/admin/lesson-plans/${planId}/edit`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ allowTeacherEdit: '1', _csrf: admin.csrfToken });
+    .send({ title: 'Edit Permissions Template', description: '', allowTeacherEdit: '1', _csrf: admin.csrfToken });
 
   const afterTeacherOnly = await db.prepare('SELECT allow_teacher_edit, allow_member_edit FROM lesson_plans WHERE id = ?').get(planId);
   assert.equal(afterTeacherOnly.allow_teacher_edit, true, 'teacher checkbox should now be on');
   assert.equal(afterTeacherOnly.allow_member_edit, false, 'member checkbox was never checked, should stay off');
 
   await request(app)
-    .post(`/admin/lesson-plans/${planId}/settings`)
+    .post(`/admin/lesson-plans/${planId}/edit`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ allowTeacherEdit: '1', allowMemberEdit: '1', _csrf: admin.csrfToken });
+    .send({ title: 'Edit Permissions Template', description: '', allowTeacherEdit: '1', allowMemberEdit: '1', _csrf: admin.csrfToken });
 
   const afterBoth = await db.prepare('SELECT allow_teacher_edit, allow_member_edit FROM lesson_plans WHERE id = ?').get(planId);
   assert.equal(afterBoth.allow_teacher_edit, true);
   assert.equal(afterBoth.allow_member_edit, true);
+
+  // Same unchecked-box-never-posts rule as the existing Homeschool
+  // checkbox (see the test right above this one) - saving without
+  // either field turns both back off.
+  await request(app)
+    .post(`/admin/lesson-plans/${planId}/edit`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Edit Permissions Template', description: '', _csrf: admin.csrfToken });
+  const afterNeither = await db.prepare('SELECT allow_teacher_edit, allow_member_edit FROM lesson_plans WHERE id = ?').get(planId);
+  assert.equal(afterNeither.allow_teacher_edit, false);
+  assert.equal(afterNeither.allow_member_edit, false);
 });
 
-test('Lesson plan Settings page: the Assign to Class form still posts to the same /assign route and still works', async () => {
+test('Lesson plan manage page keeps the inline Assign to Class dialog (no separate Settings page)', async () => {
   const admin = await loginAsAdmin();
-  const classId = await createClass({ day: 'wednesday', hourPosition: 1, className: 'Settings Assign Class' });
+  const classId = await createClass({ day: 'wednesday', hourPosition: 1, className: 'Assign Class' });
   const createRes = await request(app)
     .post('/admin/lesson-plans')
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ title: 'Settings Assign Template', _csrf: admin.csrfToken });
+    .send({ title: 'Assign Template', _csrf: admin.csrfToken });
   const planId = /\/admin\/lesson-plans\/(\d+)/.exec(createRes.headers.location)[1];
 
-  const settingsPage = await request(app).get(`/admin/lesson-plans/${planId}/settings`).set('Cookie', admin.cookie);
-  assert.match(settingsPage.text, new RegExp(`<form method="POST" action="/admin/lesson-plans/${planId}/assign"`));
+  const page = await request(app).get(`/admin/lesson-plans/${planId}`).set('Cookie', admin.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, />Assign to Class</);
+  assert.match(page.text, /assign-lesson-plan-dialog/);
 
   const assignRes = await request(app)
     .post(`/admin/lesson-plans/${planId}/assign`)
@@ -304,47 +332,6 @@ test('Lesson plan Settings page: the Assign to Class form still posts to the sam
     .type('form')
     .send({ classId: String(classId), _csrf: admin.csrfToken });
   assert.match(assignRes.headers.location, /\/admin\/class-schedule\/assignments\/\d+/);
-
-  // Choosing no class still redirects back to the Settings page (where
-  // the dropdown now lives), not the old Manage page.
-  const noClassRes = await request(app)
-    .post(`/admin/lesson-plans/${planId}/assign`)
-    .set('Cookie', admin.cookie)
-    .type('form')
-    .send({ classId: '', _csrf: admin.csrfToken });
-  assert.match(noClassRes.headers.location, new RegExp(`/admin/lesson-plans/${planId}/settings\\?error=`));
-});
-
-// A real request: "Family school management portal, family classes.
-// Add a subpage called available lesson plans. Any lesson plans that
-// admin has created and marked shareable with parent portal will show
-// here as cards... Allows you to filter by grade level, and subject."
-// Covers the admin-side half: saving these three fields from the Lesson
-// Plan Details form.
-test('Lesson Plan Details form saves grade level, subject, and shareable-with-parents', async () => {
-  const admin = await loginAsAdmin();
-  const createRes = await request(app)
-    .post('/admin/lesson-plans')
-    .set('Cookie', admin.cookie)
-    .type('form')
-    .send({ title: 'Grade Subject Template', _csrf: admin.csrfToken });
-  const planId = /\/admin\/lesson-plans\/(\d+)/.exec(createRes.headers.location)[1];
-
-  const manage = await request(app).get(`/admin/lesson-plans/${planId}`).set('Cookie', admin.cookie);
-  assert.match(manage.text, /<select name="gradeLevel">/);
-  assert.match(manage.text, /name="subject"/);
-  assert.match(manage.text, /name="shareableWithParents" value="1"\s*\/>/);
-
-  await request(app)
-    .post(`/admin/lesson-plans/${planId}/edit`)
-    .set('Cookie', admin.cookie)
-    .type('form')
-    .send({ title: 'Grade Subject Template', description: '', gradeLevel: '3rd Grade', subject: 'Science', shareableWithParents: '1', _csrf: admin.csrfToken });
-
-  const plan = await db.prepare('SELECT grade_level, subject, shareable_with_parents FROM lesson_plans WHERE id = ?').get(planId);
-  assert.equal(plan.grade_level, '3rd Grade');
-  assert.equal(plan.subject, 'Science');
-  assert.equal(plan.shareable_with_parents, true);
 });
 
 test('Deleting a lesson plan does not affect a class it was already assigned to', async () => {

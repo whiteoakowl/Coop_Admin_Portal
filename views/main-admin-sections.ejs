@@ -15,12 +15,17 @@
         that used to sit here is gone; + Add Section now opens a popup
         dialog (same .member-picker-dialog shape every other "Add X"
         popup on this site already uses) instead of an always-visible
-        inline form. %>
-    <div class="roster-toolbar no-print">
-      <h1>Sections</h1>
-      <div class="roster-btn-row">
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-section-dialog').showModal()">+ Add Section</button>
-      </div>
+        inline form. A later real request ("remove description column...
+        Add section button should be under title") moved the button off
+        the title's own row (it used to sit side by side with <h1> via
+        .roster-toolbar's own justify-content: space-between) onto its
+        own row directly below, and dropped the table's Description
+        column (the dialog's own Description field is untouched - a
+        section can still be given one, it's just not shown as a table
+        column anymore). %>
+    <h1>Sections</h1>
+    <div class="roster-btn-row no-print">
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-section-dialog').showModal()">+ Add Section</button>
     </div>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
@@ -47,12 +52,11 @@
     <% } else { %>
       <div class="roster-scroll">
         <table class="roster-table condensed-table sections-table">
-          <thead><tr><th>Name</th><th>Description</th><th>Members</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Members</th><th></th></tr></thead>
           <tbody>
             <% sections.forEach(function(s) { %>
               <tr>
                 <td class="roster-name-col"><a href="/main-admin/sections/<%= s.id %>"><%= s.name %></a></td>
-                <td><%= s.description || '—' %></td>
                 <td><%= s.memberCount %></td>
                 <td class="actions-cell">
                   <form method="POST" action="/main-admin/sections/<%= s.id %>/delete" class="inline-block-form" onsubmit="return confirm('Delete this section? Event/class restrictions using it will no longer apply.');">

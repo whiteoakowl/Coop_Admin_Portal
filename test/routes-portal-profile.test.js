@@ -76,8 +76,12 @@ test('a real request: "clicking the profile icon... should be the member\'s full
 test('birthday and grade level are visible but locked - only an admin can change them', async () => {
   const parent = await createParentAccount();
   const page = await request(app).get('/portal/profile').set('Cookie', parent.cookie);
-  assert.match(page.text, /1985-01-01/);
-  assert.match(page.text, /<input type="text" value="1985-01-01" disabled \/>/);
+  // A later real request changed the displayed birthday format to a
+  // long "Month D, YYYY" label (see utils/dates.js's own
+  // formatDateLongNoWeekday) - the stored value itself is still the
+  // plain ISO date underneath, only the disabled input's own display
+  // text changed.
+  assert.match(page.text, /<input type="text" value="January 1, 1985" disabled \/>/);
 
   // A spoofed attempt to change them (or the name/type) through this
   // route has nothing to grab onto - the route never even reads a

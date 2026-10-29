@@ -82,15 +82,20 @@ test('My Classes shows only this student\'s own enrolled classes', async () => {
 // absence form sub pages. Students don't need access to those" - both
 // are a parent-facing concern (reporting a child's absence, printing a
 // child's name tag), not something a student fills out for themself.
-// Their own /absence and /student/name-tag routes are untouched - only
-// the Classes group's own subpages dropdown (portal-nav.ejs's own
-// STUDENT_NAV_LINKS) drops them.
-test('Student Portal Classes tab no longer offers Absence/Late Form or Name Tag Form as subpages', async () => {
+// Their own /absence and /student/name-tag routes are untouched - never
+// part of this group to begin with.
+//
+// A later real request renamed Classes to "Co-op Schedule" (still its
+// own standing tab, with the same Class Schedule/Classroom Dashboard
+// subpages as before). A separate real request gave Classroom Dashboard
+// its own full standing tab too (a different, consolidated hub tab -
+// see portal-nav.ejs's own STUDENT_NAV_LINKS for both).
+test('Student Portal nav offers Co-op Schedule and Classroom Dashboard as standing tabs, not Absence/Late Form or Name Tag Form', async () => {
   const { cookie } = await createStudent('Nav Subpages Student');
   const res = await request(app).get('/student').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /Class Schedule/, 'the remaining two subpages should still be there');
-  assert.match(res.text, /Classroom Dashboard/);
+  assert.match(res.text, /Co-op Schedule/, 'Class Schedule was renamed and promoted to its own tab');
+  assert.match(res.text, /Classroom Dashboard/, 'Classroom Dashboard is its own tab too, starting the new "Classroom" section');
   assert.doesNotMatch(res.text, /Absence\/Late Form/);
   assert.doesNotMatch(res.text, /Name Tag Form/);
 });

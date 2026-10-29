@@ -64,7 +64,11 @@ async function createPortalMember({ name, familyId, memberType, roleKey }) {
   return { memberId, accountId, cookie: loginRes.headers['set-cookie'] };
 }
 
-test('the description, Filter/icons/legend row, and 12-month grid render in order, with no month nav left behind', async () => {
+// A later real request ("Family attendance, delete description") removed
+// the "Click a date to mark present..." hint paragraph entirely - this
+// test now just confirms the Filter/icons/legend row and 12-month grid
+// still render in order, with no description or month nav left behind.
+test('the Filter/icons/legend row and 12-month grid render in order, with no description or month nav left behind', async () => {
   const familyId = await createFamily('Attendance Layout Family');
   const parent = await createPortalMember({ name: 'Layout Parent', familyId, memberType: 'parent', roleKey: 'parent' });
   const student = await createPortalMember({ name: 'Layout Student', familyId, memberType: 'student', roleKey: 'student' });
@@ -72,14 +76,13 @@ test('the description, Filter/icons/legend row, and 12-month grid render in orde
   const res = await request(app).get(`/parent/family-school/attendance?studentId=${student.memberId}&schoolYear=2026-2027`).set('Cookie', parent.cookie);
   assert.equal(res.status, 200);
 
-  const descriptionIdx = res.text.indexOf('Click a date to mark present');
+  assert.doesNotMatch(res.text, /Click a date to mark present/);
   const toolbarRowIdx = res.text.indexOf('fs-attendance-toolbar-row');
   const legendIdx = res.text.indexOf('fs-attendance-legend-present');
   const exportIdx = res.text.indexOf('aria-label="Export CSV"');
   const gridIdx = res.text.indexOf('annual-calendar-months-grid');
 
-  assert.ok(descriptionIdx > -1 && toolbarRowIdx > -1 && legendIdx > -1 && exportIdx > -1 && gridIdx > -1, 'every section should be present');
-  assert.ok(descriptionIdx < toolbarRowIdx, 'the description should come before the Filter/icons/legend row');
+  assert.ok(toolbarRowIdx > -1 && legendIdx > -1 && exportIdx > -1 && gridIdx > -1, 'every section should be present');
   assert.ok(toolbarRowIdx < exportIdx && toolbarRowIdx < legendIdx, 'the Filter, icons, and legend all live inside the same merged row');
   assert.ok(exportIdx < gridIdx && legendIdx < gridIdx, 'the merged row comes right before the 12-month grid itself');
 

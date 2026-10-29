@@ -6,7 +6,9 @@
 // (views/partials/portal-nav.ejs) alongside the existing Classes/Family
 // Homeschooling tabs, plus brand-new read-only Attendance/Portfolio
 // subpages (routes/student-family-school.js) and a Volunteer Hours stat
-// on the existing Homeschool Overview page.
+// on the Homeschool Overview page. A later real request then merged
+// Overview into Portfolio and dropped it as its own page - see the
+// Portfolio test below for Volunteer Hours' own coverage now.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -58,24 +60,28 @@ async function createStudent(name) {
 
 // A later real request: "Family homeschooling shouldn't be a tab anymore
 // on student portal. Co-op classes and family school management classes
-// are all under classroom dashboard subpages together" - Co-op Classes
-// and Family School Classes (plus Weekly Planner, the only other page
-// that used to live solely under the now-removed Family Homeschooling
-// tab) joined this tab's own subpages.
-test('Student Portal nav: Classroom Dashboard is a tab with Co-op + Family School classes and every other requested subpage', async () => {
+// are all under classroom dashboard subpages together" - Weekly Planner
+// (the only other page that used to live solely under the now-removed
+// Family Homeschooling tab) joined this tab's own subpages. A further
+// real request ("there should only be one subpage that says classes...
+// Overview and portfolio should also be the same page and called
+// portfolio") collapsed Co-op Classes/Family School Classes into one
+// Classes subpage (the existing /student/classes/dashboard page, which
+// already lists both kinds of classes together) and dropped Overview in
+// favor of Portfolio, which already shows everything Overview did.
+test('Student Portal nav: Classroom Dashboard is a tab with one Classes subpage and every other requested subpage', async () => {
   const student = await createStudent('Nav Student');
   const page = await request(app).get('/student').set('Cookie', student.cookie);
   assert.equal(page.status, 200);
   assert.match(page.text, />Classroom Dashboard</);
-  assert.match(page.text, /href="\/student\/classes">Co-op Classes</);
-  assert.match(page.text, /href="\/student\/family-school">Family School Classes</);
+  assert.match(page.text, /href="\/student\/classes\/dashboard">Classes</);
   assert.match(page.text, /href="\/student\/family-school\/grades">Grades</);
   assert.match(page.text, /href="\/student\/family-school\/attendance">Attendance</);
   assert.match(page.text, /href="\/student\/family-school\/weekly-planner">Weekly Planner</);
   assert.match(page.text, /href="\/forums\?portal=student">Chat</);
   assert.match(page.text, /href="\/student\/family-school\/portfolio">Portfolio</);
   assert.match(page.text, /href="\/student\/transcript">Transcripts</);
-  assert.match(page.text, /href="\/student\/family-school\/overview">Overview</);
+  assert.doesNotMatch(page.text, /href="\/student\/family-school\/overview">Overview</);
 });
 
 test('Attendance subpage shows this student\'s own present/absent days for the current school year, read-only', async () => {
@@ -108,16 +114,14 @@ test('Portfolio subpage summarizes this student\'s own classes, GPA, attendance,
   assert.match(page.text, /fs-overview-stat-value">5</); // 3 + 2 hours
 });
 
-test('Homeschool Overview now shows a Volunteer Hours stat alongside GPA and Attendance', async () => {
+// A real request: "Overview and portfolio should also be the same page
+// and called portfolio" - the old standalone Homeschool Overview route
+// (/student/family-school/overview) is gone; Portfolio is the one page
+// now, and it 404s since nothing in the app links to it anymore.
+test('the old standalone Homeschool Overview route is gone', async () => {
   const student = await createStudent('Overview Student');
-  await createVolunteerHourEntry({ studentId: student.memberId, hourDate: '2026-04-01', hours: 4, activityDescription: 'Food bank', createdByAccountId: null });
-
   const page = await request(app).get('/student/family-school/overview').set('Cookie', student.cookie);
-  assert.equal(page.status, 200);
-  assert.match(page.text, />GPA</);
-  assert.match(page.text, />Attendance</);
-  assert.match(page.text, />Volunteer Hours</);
-  assert.match(page.text, /fs-overview-stat-value">4</);
+  assert.equal(page.status, 404);
 });
 
 test("a student from a DIFFERENT family never sees another family's attendance or portfolio", async () => {

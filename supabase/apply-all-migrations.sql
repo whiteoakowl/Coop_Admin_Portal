@@ -5554,6 +5554,59 @@ insert into notification_types (key, label, description) values
   ('class_registration', 'Class Registration', 'Confirmation that a family member is registered for a class.')
 on conflict (key) do nothing;
 
+-- A real request: "Main admin portal, settings gear, notifications.
+-- Each popup will have check boxes in a single column for email or text
+-- settings." notification_types.auto_send_enabled was a single combined
+-- on/off flag with no way to turn email off while keeping text on (or
+-- vice versa) - splitting it into two independent columns is what the
+-- new per-type popup actually needs to save. Both default to 1 (on),
+-- backfilled from the old single flag so existing behavior is unchanged
+-- for every type until an admin explicitly narrows one down.
+alter table notification_types add column if not exists auto_send_email_enabled integer not null default 1;
+alter table notification_types add column if not exists auto_send_sms_enabled integer not null default 1;
+
+update notification_types set auto_send_email_enabled = auto_send_enabled, auto_send_sms_enabled = auto_send_enabled;
+
+alter table notification_types drop column if exists auto_send_enabled;
+
+-- A real request: "Add allow members to use this lesson plan for
+-- Homeschool family management. Lesson should appear on available
+-- lesson plans page. Lessons should show up under add preplanned class
+-- button... Assignment/lessons should also show up under weekly planner
+-- add lessons." A single per-plan visibility flag, off by default (an
+-- existing plan never silently becomes visible to Family School
+-- Management just because this column now exists) - every surface that
+-- lists lesson plans for a Family School Management parent filters on
+-- this flag (see utils/lessonPlans.js's own listFamilySchoolLessonPlans).
+alter table lesson_plans add column if not exists allow_family_school_use boolean not null default false;
+
+-- Accounting > Transactions subpage - a real request: "add a subpage
+-- called transactions. Here we can link our bank account securely and
+-- track all purchases that happen... Transactions are in a table on the
+-- screen and filter can narrow down that list. Each item shows name,
+-- date, total and dropdown to choose payment category. Purchases have a
+-- receipt icon... upload an image of your receipt." A real bank-link
+-- integration needs a chosen provider - no Plaid/Yodlee/Stripe wiring
+-- exists anywhere in this app (confirmed by grep), and the answered
+-- scoping question was manual entry for now, with a real bank feed
+-- deferred until a provider is chosen. accounting_category_id reuses the
+-- existing event_accounting_categories list (utils/events.js) rather
+-- than inventing a second category table.
+create table if not exists accounting_transactions (
+  id integer generated always as identity primary key,
+  type text not null check (type in ('income', 'expense')),
+  name text not null,
+  transaction_date text not null,
+  amount_cents integer not null,
+  accounting_category_id integer references event_accounting_categories(id) on delete set null,
+  receipt_key text,
+  receipt_name text,
+  receipt_content_type text,
+  created_at text not null default now_text(),
+  updated_at text not null default now_text()
+);
+create index if not exists idx_accounting_transactions_date on accounting_transactions(transaction_date);
+create index if not exists idx_accounting_transactions_type on accounting_transactions(type);
 -- A real request: "Class/event wait list or registration, event or
 -- class submission decision, babysitters decision, forum reply,
 -- announcements, newsletter sent, should be email notifications, not

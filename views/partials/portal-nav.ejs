@@ -127,13 +127,16 @@ const MAIN_ADMIN_NAV_LINKS = [
     { href: '/main-admin/accounting/invoices', label: 'Invoices' },
     { href: '/main-admin/accounting/payments', label: 'Payments' },
     { href: '/main-admin/accounting/adjustments', label: 'Adjustments' },
+    { href: '/main-admin/accounting/reports', label: 'Reports' },
+    { href: '/main-admin/accounting/transactions', label: 'Transactions' },
+    { href: '/main-admin/accounting/receipts', label: 'Receipts' },
     { href: '/main-admin/accounting/logs', label: 'Logs' },
     { href: '/main-admin/accounting/settings', label: 'Settings' },
   ] },
   { href: '/main-admin/announcements', icon: 'bell', label: 'Communication', subpages: [
     { href: '/main-admin/announcements', label: 'Announcements' },
-    { href: '/main-admin/announcements/text', label: 'Text' },
     { href: '/main-admin/announcements/email', label: 'Email' },
+    { href: '/main-admin/announcements/text', label: 'Text' },
     { href: '/main-admin/newsletter', label: 'Newsletter' },
   ] },
   { href: '/main-admin/events', icon: 'calendar-check', label: 'Events', subpages: [
@@ -329,13 +332,6 @@ const PARENT_NAV_LINKS = [
 const FAMILY_SCHOOL_NAV_LINKS = [
   { href: '/parent/family-school', icon: 'home', label: 'Home' },
   { href: '/parent/family-school/classes', icon: 'graduation-cap', label: 'Family Classes' },
-  // A real request: "Family school management portal, family classes.
-  // Add a subpage called available lesson plans." Another flat tab
-  // here, same "subpages become tabs" convention this whole array
-  // follows (see this array's own header comment) - not a nested
-  // subpages: [...] array, which this portal's nav deliberately never
-  // uses.
-  { href: '/parent/family-school/classes/available-lesson-plans', icon: 'book', label: 'Available Lesson Plans', mobileLabel: 'Available<br>Lesson Plans' },
   { href: '/parent/family-school/grades', icon: 'clipboard-list', label: 'Family Grades' },
   { href: '/parent/family-school/attendance', icon: 'calendar-check', label: 'Family Attendance' },
   { href: '/parent/family-school/journal', icon: 'book', label: 'Daily Learning Log', mobileLabel: 'Learning<br>Log' },
@@ -428,38 +424,49 @@ const TEACHER_NAV_LINKS = [
 // Their own /absence and /student/name-tag routes are untouched - same
 // "dropped from the nav, not from the route table" precedent this exact
 // group already set once before (Assignments above).
+//
+// A still later real request ("Class schedule should be its own tab
+// and called Co-op Schedule") split Co-op Schedule back out into its
+// own standing tab - same /student/classes route, just renamed and
+// promoted out of the old dropdown.
+//
+// A real request: "Classroom dashboard should be a menu tab as well.
+// Classroom dashboard subpages. Classes, grades, attendance, chat,
+// portfolio, transcripts, overview." Then: "Family homeschooling
+// shouldn't be a tab anymore. Co-op classes and family school
+// management classes are all under classroom dashboard subpages
+// together" - the standalone Family Homeschooling tab below (every
+// page read-only for a student, same as before) is gone; its own
+// Weekly Planner subpage moved in here, alongside this tab's own
+// existing Grades/Attendance/Portfolio/Overview (already family-school-
+// management pages). A further real request ("there should only be one
+// subpage that says classes, co-op classes and family management
+// classes are both on the classes page. Overview and portfolio should
+// also be the same page and called portfolio") then collapsed the
+// Co-op Classes/Family School Classes pair into one Classes subpage
+// (routes/student-portal.js's own /classes/dashboard, already showing
+// both kinds of classes together, categorized, since the Classroom
+// Dashboard content-merge request) and dropped Overview outright - its
+// own GPA/attendance/classes were already a subset of what Portfolio
+// shows, so this tab's own href now points there too.
 const STUDENT_NAV_LINKS = [
   { href: '/student', icon: 'home', label: 'Home' },
   { href: '/events?view=calendar&portal=student', icon: 'calendar-check', label: 'Events', subpages: [
     { href: '/events?view=calendar&portal=student', label: 'Calendar' },
     { href: '/student/events', label: 'My Event Registrations' },
   ] },
-  { href: '/student/classes', icon: 'graduation-cap', label: 'Classes', subpages: [
+  { href: '/student/classes', icon: 'graduation-cap', label: 'Co-op Schedule', mobileLabel: 'Co-op<br>Schedule', subpages: [
     { href: '/student/classes', label: 'Class Schedule' },
     { href: '/student/classes/dashboard', label: 'Classroom Dashboard' },
   ] },
-  // A real request: "Classroom dashboard should be a menu tab as well.
-  // Classroom dashboard subpages. Classes, grades, attendance, chat,
-  // portfolio, transcripts, overview." Then: "Family homeschooling
-  // shouldn't be a tab anymore. Co-op classes and family school
-  // management classes are all under classroom dashboard subpages
-  // together" - the standalone Family Homeschooling tab below (every
-  // page read-only for a student, same as before) is gone; its own
-  // Homeschool Classes/Weekly Planner subpages move in here, alongside
-  // this tab's own existing Grades/Attendance/Portfolio/Overview
-  // (already family-school-management pages) and the Classes subpage
-  // (renamed Co-op Classes, now that a second, distinct "classes" link
-  // sits right next to it) borrowed from the Classes tab above.
-  { href: '/student/family-school/overview', icon: 'grid', label: 'Classroom Dashboard', subpages: [
-    { href: '/student/classes', label: 'Co-op Classes' },
-    { href: '/student/family-school', label: 'Family School Classes' },
+  { href: '/student/family-school/portfolio', icon: 'grid', label: 'Classroom Dashboard', subpages: [
+    { href: '/student/classes/dashboard', label: 'Classes' },
     { href: '/student/family-school/grades', label: 'Grades' },
     { href: '/student/family-school/attendance', label: 'Attendance' },
     { href: '/student/family-school/weekly-planner', label: 'Weekly Planner' },
     { href: '/forums?portal=student', label: 'Chat' },
     { href: '/student/family-school/portfolio', label: 'Portfolio' },
     { href: '/student/transcript', label: 'Transcripts' },
-    { href: '/student/family-school/overview', label: 'Overview' },
   ] },
   { href: '/forums?portal=student', icon: 'users', label: 'Chat' },
   { href: '/student/resources', icon: 'book', label: 'Resources' },
@@ -580,6 +587,9 @@ const COMMUNITY_LINKS_TEACHER = [];
 // above); Calendar/Chat already cover Events/Chat, Photos moved into
 // STUDENT_NAV_LINKS itself, and Store isn't in the requested list -
 // still reachable at its own /store URL, just no longer a standing tab.
+// Classroom Dashboard (a real request: "should be a menu tab as well")
+// is its own full tab in STUDENT_NAV_LINKS above instead of a single
+// link down here.
 const COMMUNITY_LINKS_STUDENT = [];
 // portalTitle is a plain, caller-supplied string ('Main Admin' from every
 // views/main-admin-*.ejs and views/admin-<feature>-*.ejs file - the admin
@@ -610,6 +620,10 @@ const communityLinks =
     : portalTitle === 'Co-op Teacher Portal' ? COMMUNITY_LINKS_TEACHER
     : portalTitle === 'Student Portal' ? COMMUNITY_LINKS_STUDENT
     : COMMUNITY_LINKS;
+// This 3rd section's own heading - just "Community" everywhere; kept as
+// its own variable (rather than reverting the template below to a
+// hardcoded string) in case a future portal needs its own label here.
+const communityLinksTitle = 'Community';
 %>
 <%- include('icon-sprite') %>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -655,7 +669,7 @@ const communityLinks =
     </nav>
   <% } %>
   <% if (communityLinks.length) { %>
-    <p class="portal-nav-title">Community</p>
+    <p class="portal-nav-title"><%= communityLinksTitle %></p>
     <nav id="community-nav-links">
       <% communityLinks.forEach(function(link) { %>
         <a href="<%= link.href %>"><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>

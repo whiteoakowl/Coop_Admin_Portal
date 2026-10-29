@@ -18,26 +18,29 @@
     <label class="member-form-full">Description
       <textarea name="description" rows="2"><%= plan.description || '' %></textarea>
     </label>
-    <%# A real request: "Family school management portal, family
-        classes. Add a subpage called available lesson plans... Allows
-        you to filter by grade level, and subject." Set here, alongside
-        the plan's other descriptive details - the Available Lesson
-        Plans catalog's own Filter button reads these two fields. %>
-    <label>Grade Level
-      <select name="gradeLevel">
-        <option value="">Not set</option>
-        <% gradeLevels.forEach(function(g) { %>
-          <option value="<%= g %>" <%= plan.grade_level === g ? 'selected' : '' %>><%= g %></option>
-        <% }); %>
-      </select>
-    </label>
-    <label>Subject
-      <input type="text" name="subject" value="<%= plan.subject || '' %>" placeholder="e.g. Math, Science, History" />
-    </label>
+    <%# A real request: "Edit permissions should be check boxes in a
+        single column to the left with first word of each sentence
+        starting next to it. Add allow members to use this lesson plan
+        for Homeschool family management." .checkbox-option already is
+        exactly that shape (checkbox left, text starts right next to
+        it) - all 3 permissions stack in the same column. A later real
+        request ("allow teachers to edit/add to the lesson plan, all
+        members to edit/add to the lesson plan") added the other two,
+        saved alongside it on this same form/route rather than a
+        separate page - both default off, same as Homeschool use. %>
     <div class="member-form-full">
-      <%# "Any lesson plans that admin has created and marked shareable
-          with parent portal will show here as cards." %>
-      <label class="checkbox-inline-label"><input type="checkbox" name="shareableWithParents" value="1" <%= plan.shareable_with_parents ? 'checked' : '' %> /> Shareable with Family School Management (parent portal)</label>
+      <label class="checkbox-option">
+        <input type="checkbox" name="allowFamilySchoolUse" value="1" <%= plan.allow_family_school_use ? 'checked' : '' %> />
+        Allow members to use this lesson plan for Homeschool family management
+      </label>
+      <label class="checkbox-option">
+        <input type="checkbox" name="allowTeacherEdit" value="1" <%= plan.allow_teacher_edit ? 'checked' : '' %> />
+        Allow teachers to edit/add to the lesson plan
+      </label>
+      <label class="checkbox-option">
+        <input type="checkbox" name="allowMemberEdit" value="1" <%= plan.allow_member_edit ? 'checked' : '' %> />
+        Allow all members to edit/add to the lesson plan
+      </label>
     </div>
     <div class="member-form-full">
       <button type="submit" class="primary-btn">Save Lesson Plan Details</button>

@@ -93,8 +93,8 @@ test('Members/Communication/Events/Name Tags/Resource Links/Directory/Classified
   const pages = [
     '/main-admin/members',
     '/main-admin/announcements',
-    '/main-admin/announcements/text',
     '/main-admin/announcements/email',
+    '/main-admin/announcements/text',
     '/main-admin/newsletter',
     '/main-admin/events',
     '/main-admin/name-tags',
@@ -130,11 +130,16 @@ test('Mobile orange bar: every subpages-bearing item gets its own popup trigger 
     // Locked (a real request: "add a lock icon on each member. Add a
     // subpage called locked") added a 5th Members subpage.
     { slug: 'members', tabCount: 5 },
-    { slug: 'accounting', tabCount: 7 },
-    // Announcements, Text, Email (separate subpages again), Newsletter -
-    // Contact Admin Messages' own inbox subpage was removed entirely
-    // (messages now only ever reach an admin by email, never read back
-    // on the website).
+    // Reports/Transactions/Receipts (a real request: "accounting, add a
+    // subpage called reports... add a subpage called transactions...
+    // add a subpage called receipts") grew this from 7 to 10 subpages.
+    { slug: 'accounting', tabCount: 10 },
+    // Contact Admin Messages (the admin-facing inbox for the Parent/
+    // Student/Teacher-facing Contact Admins page) was later removed per
+    // a real request: "Members will not be able to read messages on the
+    // website. Instead when messages come through it will send directly
+    // to their email" - back down to 4 subpages (Announcements/Email/
+    // Text/Newsletter).
     { slug: 'communication', tabCount: 4 },
     { slug: 'events', tabCount: 6 },
     { slug: 'chat', tabCount: 3 },

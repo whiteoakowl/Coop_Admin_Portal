@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Transactions</h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <%# A real request: "Filter button for date range, purchases/income."
+        Same <details>/.filter-panel popover shape every other page's own
+        Filter button already uses. %>
+    <div class="roster-btn-row roster-btn-row-fit-text accounting-list-toolbar no-print">
+      <details class="filter-details" data-filter-details>
+        <summary class="roster-action-btn">Filter</summary>
+        <form method="GET" action="/main-admin/accounting/transactions" class="filter-panel">
+          <label for="transactions-start-date">From</label>
+          <input type="date" id="transactions-start-date" name="startDate" value="<%= filter.startDate || '' %>" />
+          <label for="transactions-end-date">To</label>
+          <input type="date" id="transactions-end-date" name="endDate" value="<%= filter.endDate || '' %>" />
+          <label for="transactions-type-select">Type</label>
+          <select id="transactions-type-select" name="type">
+            <option value="" <%= !filter.type ? 'selected' : '' %>>All</option>
+            <option value="income" <%= filter.type === 'income' ? 'selected' : '' %>>Income</option>
+            <option value="expense" <%= filter.type === 'expense' ? 'selected' : '' %>>Purchases</option>
+          </select>
+          <button type="submit" class="primary-btn">Apply</button>
+        </form>
+      </details>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-transaction-dialog').showModal()">+ Add Transaction</button>
+    </div>
+
+    <% if (rows.length === 0) { %>
+      <p class="roster-empty">No transactions recorded yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table accounting-table-mobile-fit accounting-table-mobile-fit-tighter">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Total</th>
+              <th>Category</th>
+              <th>Receipt</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(t) { %>
+              <tr>
+                <td><%= t.name %></td>
+                <td><%= t.dateLabel %></td>
+                <td><%= t.type === 'income' ? 'Income' : 'Purchase' %></td>
+                <td><%= formatCents(t.amount_cents) %></td>
+                <td>
+                  <form method="POST" action="/main-admin/accounting/transactions/<%= t.id %>/category" class="inline-block-form">
+                    <select name="accountingCategoryId" aria-label="Payment category for <%= t.name %>" onchange="this.form.submit()">
+                      <option value="">Uncategorized</option>
+                      <% accountingCategories.forEach(function(c) { %>
+                        <option value="<%= c.id %>" <%= t.accounting_category_id === c.id ? 'selected' : '' %>><%= c.name %></option>
+                      <% }); %>
+                    </select>
+                  </form>
+                </td>
+                <td>
+                  <% if (t.type === 'expense') { %>
+                    <button type="button" class="icon-btn" onclick="document.getElementById('receipt-dialog-<%= t.id %>').showModal()" aria-label="<%= t.receipt_key ? 'View or replace receipt' : 'Add receipt' %>" title="<%= t.receipt_key ? 'View or replace receipt' : 'Add receipt' %>">
+                      <svg class="icon"><use href="#icon-<%= t.receipt_key ? 'file-text' : 'image' %>"/></svg>
+                    </button>
+                  <% } %>
+                </td>
+                <td>
+                  <form method="POST" action="/main-admin/accounting/transactions/<%= t.id %>/delete" class="inline-block-form" data-confirm="Delete the transaction &ldquo;<%= t.name %>&rdquo;?">
+                    <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete transaction" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <dialog id="add-transaction-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/accounting/transactions" class="stack-form">
+        <h3>Add Transaction</h3>
+        <label>Type
+          <select name="type">
+            <option value="expense">Purchase</option>
+            <option value="income">Income</option>
+          </select>
+        </label>
+        <label>Name
+          <input type="text" name="name" placeholder="e.g. Office Supplies" required />
+        </label>
+        <label>Date
+          <input type="date" name="transactionDate" required />
+        </label>
+        <label>Amount
+          <input type="number" name="amount" step="0.01" min="0.01" placeholder="0.00" required />
+        </label>
+        <label>Payment Category
+          <select name="accountingCategoryId">
+            <option value="">Uncategorized</option>
+            <% accountingCategories.forEach(function(c) { %>
+              <option value="<%= c.id %>"><%= c.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <div class="member-form-footer">
+          <div class="member-form-footer-edit">
+            <button type="submit" class="primary-btn">Add Transaction</button>
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <%# A real request: "Purchases have a receipt icon. When you click
+        this icon a popup occurs and allows you to upload an image of
+        your receipt. And save." One dialog per row (same convention as
+        this file's own per-charge Record Payment dialog), since each
+        needs its own upload form/action and its own existing-receipt
+        preview. %>
+    <% rows.filter(function(t) { return t.type === 'expense'; }).forEach(function(t) { %>
+      <dialog id="receipt-dialog-<%= t.id %>" class="member-picker-dialog">
+        <h3>Receipt - <%= t.name %></h3>
+        <% if (t.receipt_key) { %>
+          <p><img src="/main-admin/accounting/transactions/<%= t.id %>/receipt/file" alt="Current receipt for <%= t.name %>" class="accounting-receipt-preview" /></p>
+        <% } else { %>
+          <p class="roster-empty">No receipt uploaded yet.</p>
+        <% } %>
+        <form method="POST" action="/main-admin/accounting/transactions/<%= t.id %>/receipt" enctype="multipart/form-data" class="stack-form">
+          <label>Upload Image
+            <input type="file" name="receipt" accept="image/*" required />
+          </label>
+          <div class="member-form-footer">
+            <div class="member-form-footer-edit">
+              <button type="submit" class="primary-btn">Save</button>
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+            </div>
+          </div>
+        </form>
+      </dialog>
+    <% }); %>
+  </main>
+  <script src="/js/filter-details-dismiss.js"></script>
+</body>
+</html>

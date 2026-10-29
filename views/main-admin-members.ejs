@@ -561,12 +561,26 @@
           pay their account balance." lockedMembers comes from routes/
           main-admin-members.js's own GET / (activeTab === 'locked'
           branch) - every member whose portal account is currently
-          'suspended'. %>
+          'suspended'. A later real request ("should have the same icons
+          and buttons formatted in the same rows as the archive page")
+          added this same Export/Print/PDF icon row Archive's own
+          .members-search-filter-row carries (routes/main-admin-
+          members.js's own GET /locked/export.csv|/print|/download.pdf),
+          and a page-specific locked-table class for its own mobile
+          shrink (styles.css), matching the .sections-table/.admins-
+          table convention rather than widening the shared .roster-table
+          default. %>
+      <div class="members-search-filter-row no-print">
+        <a class="icon-btn" href="/main-admin/members/locked/export.csv" aria-label="Export CSV" title="Export CSV"><svg class="icon"><use href="#icon-download"/></svg></a>
+        <a class="icon-btn" href="/main-admin/members/locked/print" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        <a class="icon-btn" href="/main-admin/members/locked/download.pdf" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+      </div>
+
       <% if (lockedMembers.length === 0) { %>
         <p class="roster-empty">No locked members.</p>
       <% } else { %>
         <div class="roster-scroll">
-          <table class="roster-table condensed-table">
+          <table class="roster-table condensed-table locked-table">
             <thead><tr><th>Name</th><th>Email</th><th></th></tr></thead>
             <tbody>
               <% lockedMembers.forEach(function(m) { %>
@@ -595,7 +609,7 @@
           settingsTab at all (it's always been its own full page at
           /main-admin/sections) - its card just links straight there. %>
       <% if (!settingsTab) { %>
-        <div class="team-card-grid">
+        <div class="team-card-grid settings-hub-card-grid">
           <div class="team-col">
             <a class="team-info-card" href="/main-admin/members?tab=settings&settingsTab=grade-levels">
               <span class="team-info-icon"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
@@ -666,7 +680,7 @@
                     <tr>
                       <td class="grade-level-settings-age-cell">
                         <input type="hidden" name="gradeLevel" value="<%= row.gradeLevel %>" />
-                        <input type="number" name="age" min="0" step="1" value="<%= row.age != null ? row.age : '' %>" placeholder="Age" /> years old
+                        <input type="number" name="age" min="0" step="1" value="<%= row.age != null ? row.age : '' %>" placeholder="Age" /><span class="grade-level-settings-age-suffix">years old</span>
                       </td>
                       <td><input type="date" name="cutoffDate" value="<%= row.cutoffDate || '' %>" /></td>
                       <td><%= row.gradeLevel %></td>

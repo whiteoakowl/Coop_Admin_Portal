@@ -9,17 +9,31 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Family School Management</h1>
 
+    <%# A real request: "Family school management classes. Class cards
+        should look like co-op class cards." Same .class-dash-card shape
+        the Classroom Dashboard's own Co-op Classes section uses (and
+        its own merged Homeschool Family Classes section now uses too) -
+        family_school_classes has no color/image of its own (see that
+        table's own migration comment), so every card here uses the same
+        fixed accent bar and Family Homeschooling-flavored placeholder
+        icon the dashboard's version already settled on. %>
     <% if (classes.length === 0) { %>
       <p class="roster-empty">No classes assigned to you yet.</p>
     <% } else { %>
-      <div class="team-card-grid">
+      <div class="class-dash-grid">
         <% classes.forEach(function(c) { %>
-          <div class="team-col">
-            <a class="team-info-card" href="/student/family-school/classes/<%= c.id %>">
-              <span class="team-info-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
-              <h3 class="team-info-title"><%= c.class_name %></h3>
-              <% if (c.description) { %><p class="hint"><%= c.description %></p><% } %>
-            </a>
+          <div class="class-dash-card">
+            <div class="class-dash-card-color-bar" style="background:var(--accent)"></div>
+            <div class="class-dash-card-body">
+              <span class="class-dash-card-image class-dash-card-image-placeholder"><svg class="icon"><use href="#icon-home-heart"/></svg></span>
+              <div class="class-dash-card-text">
+                <h3 class="class-dash-card-title"><%= c.class_name %></h3>
+                <% if (c.description) { %><p class="class-dash-card-meta"><%= c.description %></p><% } %>
+              </div>
+            </div>
+            <div class="class-dash-card-actions">
+              <a class="roster-action-btn" href="/student/family-school/classes/<%= c.id %>">View Class</a>
+            </div>
           </div>
         <% }); %>
       </div>

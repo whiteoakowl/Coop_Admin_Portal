@@ -16,8 +16,12 @@ module.exports = [
   {
     // node_modules/data are implicitly ignored by eslint's defaults; data/
     // is the gitignored runtime SQLite DB directory, listed here anyway in
-    // case a stray .js ever ends up in it.
-    ignores: ['data/**', 'public/js/vendor/**'],
+    // case a stray .js ever ends up in it. public/js/forum-editor.js is
+    // `npm run build:editor`'s own generated/minified bundle of
+    // forum-editor.source.js (that source file is linted separately,
+    // below) - same "generated, not hand-written" reasoning as
+    // public/js/vendor/** already being excluded.
+    ignores: ['data/**', 'public/js/vendor/**', 'public/js/forum-editor.js'],
   },
   js.configs.recommended,
   {
@@ -84,6 +88,22 @@ module.exports = [
       ecmaVersion: 2023,
       sourceType: 'commonjs',
       globals: { ...globals.browser, ...globals.node },
+    },
+    rules: {
+      'no-unused-vars': unusedVarsRule,
+    },
+  },
+  {
+    // forum-editor.source.js is the hand-edited source `npm run
+    // build:editor` (esbuild) bundles into public/js/forum-editor.js
+    // (excluded above, generated) - real ES module `import`s of the
+    // TipTap/ProseMirror packages, unlike every other plain-script file
+    // in public/js/.
+    files: ['public/js/forum-editor.source.js'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'module',
+      globals: globals.browser,
     },
     rules: {
       'no-unused-vars': unusedVarsRule,

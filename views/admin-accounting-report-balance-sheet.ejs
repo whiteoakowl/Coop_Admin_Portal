@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Balance Sheet</h1>
+
+    <%# A real decision: there is no chart of accounts anywhere in this
+        app, so this honestly shows the one figure it can actually
+        compute - a running Cash balance from every recorded Transaction
+        through the chosen date - rather than inventing assets,
+        liabilities, or equity line items with no real data behind them. %>
+    <div class="roster-btn-row roster-btn-row-fit-text accounting-list-toolbar no-print">
+      <form method="GET" action="/main-admin/accounting/reports/balance-sheet" class="filter-panel-inline">
+        <label for="bs-as-of-date">As of</label>
+        <input type="date" id="bs-as-of-date" name="asOfDate" value="<%= asOfDate || '' %>" />
+        <button type="submit" class="primary-btn">Apply</button>
+      </form>
+    </div>
+
+    <div class="roster-scroll">
+      <table class="roster-table condensed-table">
+        <thead>
+          <tr><th>Assets</th><th>Amount</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Cash</td><td><%= formatCents(cashCents) %></td></tr>
+          <tr><td><strong>Total Assets</strong></td><td><strong><%= formatCents(cashCents) %></strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="hint">Based on recorded Transactions only - this app has no chart of accounts, so other assets, liabilities, and equity aren&rsquo;t tracked yet.</p>
+  </main>
+</body>
+</html>

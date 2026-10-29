@@ -187,7 +187,11 @@ test('a parent can create a class, assign it to their own student, add a lesson 
     .type('form')
     .send({ type: 'assignment_submission', title: 'Worksheet', submissionBody: '<p>Do the worksheet</p>', submissionPointsPossible: '10', _csrf: csrf });
 
-  const studentClassPage = await request(app).get(`/student/family-school/classes/${classId}`).set('Cookie', student.cookie);
+  // A real request gave the class detail page the same Details/Lessons/
+  // Grades tabs the co-op's own class detail page already has - the
+  // lesson list (and its own completion count) now lives on the Lessons
+  // tab, not the page's default ('details') landing tab.
+  const studentClassPage = await request(app).get(`/student/family-school/classes/${classId}?tab=lessons`).set('Cookie', student.cookie);
   assert.equal(studentClassPage.status, 200);
   assert.match(studentClassPage.text, /Addition/);
   assert.match(studentClassPage.text, /0\/2/, 'the lesson should show 0/2 completed before the student does anything');
@@ -198,7 +202,7 @@ test('a parent can create a class, assign it to their own student, add a lesson 
   const studentCsrf = await csrfFrom(student.cookie, `/student/family-school/content/${textItem.id}`);
   await request(app).post(`/student/family-school/content/${textItem.id}/complete`).set('Cookie', student.cookie).type('form').send({ _csrf: studentCsrf });
 
-  const afterOneComplete = await request(app).get(`/student/family-school/classes/${classId}`).set('Cookie', student.cookie);
+  const afterOneComplete = await request(app).get(`/student/family-school/classes/${classId}?tab=lessons`).set('Cookie', student.cookie);
   assert.match(afterOneComplete.text, /1\/2/);
 
   // The submission-type item has no "complete" action - only a file
@@ -780,43 +784,167 @@ test('Family Classes: the Filter popover offers a Student dropdown that narrows 
   assert.doesNotMatch(filteredPage.text, /Student B Class/);
 });
 
-test('Family Classes: the +Preplanned Class button lists built-in templates, and picking one creates the class with its starter lessons already added', async () => {
+// A real request changed "+Preplanned Class" from a fixed built-in
+// template set to pulling from the admin's own Lesson Plans library
+// (only plans flagged allow_family_school_use), then moved that picker
+// from a dropdown dialog onto its own "Available Lesson Plans" tab/
+// subpage - "Available lesson plan tab should be a subpage under
+// family classes." The "+ Preplanned Class" button is now a plain link
+// into that tab, and each plan's own card has a Create Class button
+// (no dropdown needed - the card itself is the pick).
+test('Family Classes: the Available Lesson Plans tab lists only plans flagged for Homeschool family management, and its Create Class button creates a class with a linked lesson', async () => {
+  const { createLessonPlan, updateLessonPlan } = require('../utils/lessonPlans');
   const familyId = await createFamily('Preplanned Class Family');
   const parent = await createPortalMember({ name: 'Preplanned Parent', familyId, memberType: 'parent', roleKey: 'parent' });
 
-  const page = await request(app).get('/parent/family-school/classes').set('Cookie', parent.cookie);
-  assert.equal(page.status, 200);
-  assert.match(page.text, /\+ Preplanned Class/);
-  assert.match(page.text, /<option value="math">Math<\/option>/);
-  assert.match(page.text, /<option value="language_arts">Language Arts<\/option>/);
+  const flaggedId = await createLessonPlan({ title: 'Fractions Unit', description: 'Core fractions skills.', createdByAccountId: null });
+  await updateLessonPlan(flaggedId, { title: 'Fractions Unit', description: 'Core fractions skills.', allowFamilySchoolUse: true });
+  const unflaggedId = await createLessonPlan({ title: 'Not Yet Shared', description: null, createdByAccountId: null });
 
-  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/classes');
+  const classesPage = await request(app).get('/parent/family-school/classes').set('Cookie', parent.cookie);
+  assert.equal(classesPage.status, 200);
+  assert.match(classesPage.text, /href="\/parent\/family-school\/classes\?tab=availableLessonPlans">\+ Preplanned Class<\/a>/);
+  assert.match(classesPage.text, /<a class="view-tab active" href="\/parent\/family-school\/classes">Family Classes<\/a>/);
+  assert.doesNotMatch(classesPage.text, /Fractions Unit/, 'the lesson plan library listing must not render on the Family Classes tab itself');
+
+  const libraryPage = await request(app).get('/parent/family-school/classes?tab=availableLessonPlans').set('Cookie', parent.cookie);
+  assert.equal(libraryPage.status, 200);
+  assert.match(libraryPage.text, /<a class="view-tab active" href="\/parent\/family-school\/classes\?tab=availableLessonPlans">Available Lesson Plans<\/a>/);
+  assert.match(libraryPage.text, /Fractions Unit/);
+  assert.doesNotMatch(libraryPage.text, /Not Yet Shared/);
+
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/classes?tab=availableLessonPlans');
   const res = await request(app)
-    .post('/parent/family-school/classes/from-template')
+    .post('/parent/family-school/classes/from-lesson-plan')
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ templateKey: 'math', _csrf: csrf });
+    .send({ lessonPlanId: String(flaggedId), _csrf: csrf });
   assert.equal(res.status, 302);
   assert.match(res.headers.location, /notice=/);
 
-  const classRow = await db.prepare("SELECT * FROM family_school_classes WHERE family_id = ? AND class_name = 'Math'").get(familyId);
-  assert.ok(classRow, 'expected a class named after the template');
-  const lessons = await db.prepare('SELECT title FROM family_school_lessons WHERE class_id = ? ORDER BY position').all(classRow.id);
-  assert.deepEqual(lessons.map((l) => l.title), ['Numbers & Operations', 'Fractions & Decimals', 'Geometry Basics', 'Word Problems']);
+  const classRow = await db.prepare("SELECT * FROM family_school_classes WHERE family_id = ? AND class_name = 'Fractions Unit'").get(familyId);
+  assert.ok(classRow, 'expected a class named after the lesson plan');
+  const lesson = await db.prepare('SELECT title, source_lesson_plan_id FROM family_school_lessons WHERE class_id = ?').get(classRow.id);
+  assert.equal(lesson.title, 'Fractions Unit');
+  assert.equal(lesson.source_lesson_plan_id, flaggedId);
+  void unflaggedId;
 });
 
-test('Family Classes: an unknown template key is rejected without creating a class', async () => {
+// A real request: "Family school management, family classes. Mobile.
+// Filter, add new class, add preplanned class buttons should be side
+// by side in the same row. Shrink to fit." roster-btn-row-fit-text is
+// the same shared mobile-shrink class every other page's own Filter+
+// action-button row already uses.
+test('Family Classes toolbar row carries roster-btn-row-fit-text for the mobile shrink-to-fit layout', async () => {
+  const familyId = await createFamily('Classes Mobile Row Family');
+  const parent = await createPortalMember({ name: 'Classes Mobile Row Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const page = await request(app).get('/parent/family-school/classes').set('Cookie', parent.cookie);
+  assert.match(page.text, /<div class="roster-btn-row roster-btn-row-fit-text">/);
+});
+
+test('Family Classes: picking an unflagged (or unknown) lesson plan id is rejected without creating a class', async () => {
+  const { createLessonPlan } = require('../utils/lessonPlans');
   const familyId = await createFamily('Preplanned Class Invalid Family');
   const parent = await createPortalMember({ name: 'Preplanned Invalid Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const unflaggedId = await createLessonPlan({ title: 'Unflagged Plan', description: null, createdByAccountId: null });
   const csrf = await csrfFrom(parent.cookie, '/parent/family-school/classes');
+
   const res = await request(app)
-    .post('/parent/family-school/classes/from-template')
+    .post('/parent/family-school/classes/from-lesson-plan')
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ templateKey: 'not-a-real-template', _csrf: csrf });
+    .send({ lessonPlanId: String(unflaggedId), _csrf: csrf });
   assert.match(res.headers.location, /error=/);
+
+  const bogus = await request(app)
+    .post('/parent/family-school/classes/from-lesson-plan')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ lessonPlanId: '999999', _csrf: csrf });
+  assert.match(bogus.headers.location, /error=/);
+
   const classCount = (await db.prepare('SELECT COUNT(*) AS n FROM family_school_classes WHERE family_id = ?').get(familyId)).n;
   assert.equal(Number(classCount), 0);
+});
+
+// A real request: "Lesson should appear on available lesson plans
+// page" - the "+ New Lesson" dialog's own "Choose from Lesson Plans
+// library" source (views/parent-family-school-class-manage.ejs) only
+// lists, and only accepts, plans flagged allow_family_school_use.
+test('New Lesson "Choose from Lesson Plans library" source only offers, and only accepts, plans flagged for Homeschool family management', async () => {
+  const { createLessonPlan, updateLessonPlan } = require('../utils/lessonPlans');
+  const { createClass } = require('../utils/familySchool');
+  const familyId = await createFamily('Library Lesson Family');
+  const parent = await createPortalMember({ name: 'Library Lesson Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const classId = await createClass({ familyId, className: 'Library Lesson Class', description: null, createdByAccountId: null });
+
+  const flaggedId = await createLessonPlan({ title: 'Grammar Basics', description: null, createdByAccountId: null });
+  await updateLessonPlan(flaggedId, { title: 'Grammar Basics', description: null, allowFamilySchoolUse: true });
+  const unflaggedId = await createLessonPlan({ title: 'Not Shared Plan', description: null, createdByAccountId: null });
+
+  const page = await request(app).get(`/parent/family-school/classes/${classId}`).set('Cookie', parent.cookie);
+  assert.match(page.text, new RegExp(`<option value="${flaggedId}">Grammar Basics</option>`));
+  assert.doesNotMatch(page.text, /Not Shared Plan/);
+
+  const csrf = await csrfFrom(parent.cookie, `/parent/family-school/classes/${classId}`);
+  const rejected = await request(app)
+    .post(`/parent/family-school/classes/${classId}/lessons`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ source: 'plan', lessonPlanId: String(unflaggedId), _csrf: csrf });
+  assert.match(rejected.headers.location, /error=/);
+
+  const accepted = await request(app)
+    .post(`/parent/family-school/classes/${classId}/lessons`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ source: 'plan', lessonPlanId: String(flaggedId), _csrf: csrf });
+  assert.match(accepted.headers.location, /notice=/);
+  const lesson = await db.prepare('SELECT title, source_lesson_plan_id FROM family_school_lessons WHERE class_id = ?').get(classId);
+  assert.equal(lesson.title, 'Grammar Basics');
+  assert.equal(lesson.source_lesson_plan_id, flaggedId);
+});
+
+// A real request: "Assignment/lessons should also show up under weekly
+// planner add lessons" - an assignment-type content item on a lesson
+// plan a Family Classes lesson references (source_lesson_plan_id) must
+// appear in the "Add Class Assignment" dropdown, and picking it must
+// actually save the assignment (content_item_id stays null since that
+// column is a real foreign key into family_school_content_items only -
+// see assignmentOptionsForFamily's own comment).
+test('Weekly Planner "Add Class Assignment" dropdown includes an assignment from a referenced (flagged) lesson plan', async () => {
+  const { createLessonPlan, updateLessonPlan } = require('../utils/lessonPlans');
+  const { createLessonPlanContentItem } = require('../utils/lessonPlans');
+  const { createClass, createLesson, createWeek } = require('../utils/familySchool');
+  const familyId = await createFamily('Planner Library Family');
+  const parent = await createPortalMember({ name: 'Planner Library Parent', familyId, memberType: 'parent', roleKey: 'parent' });
+  const student = await createPortalMember({ name: 'Planner Library Student', familyId, memberType: 'student', roleKey: 'student' });
+
+  const planId = await createLessonPlan({ title: 'Essay Plan', description: null, createdByAccountId: null });
+  await updateLessonPlan(planId, { title: 'Essay Plan', description: null, allowFamilySchoolUse: true });
+  await createLessonPlanContentItem({ lessonPlanId: planId, type: 'assignment_upload', title: 'Draft Essay' });
+
+  const classId = await createClass({ familyId, className: 'Essay Class', description: null, createdByAccountId: null });
+  await createLesson({ classId, title: 'Essay Plan', description: null, createdByAccountId: null, sourceLessonPlanId: planId });
+  const weekId = await createWeek({ familyId, ownerType: 'student', studentId: student.memberId, title: 'Week 1', dates: ['2026-10-05'], createdByAccountId: null });
+  const dateRow = await db.prepare('SELECT id FROM family_school_week_dates WHERE week_id = ?').get(weekId);
+
+  const page = await request(app).get(`/parent/family-school/weekly-planner?owner=${student.memberId}&weekId=${weekId}`).set('Cookie', parent.cookie);
+  assert.match(page.text, /Draft Essay/);
+  const planOptionMatch = /<option value="(plan-\d+)">Essay Class &mdash; Draft Essay<\/option>/.exec(page.text);
+  assert.ok(planOptionMatch, 'expected a plan- prefixed option for the referenced plan\'s assignment item');
+
+  const csrf = await csrfFrom(parent.cookie, '/parent/family-school/weekly-planner');
+  const res = await request(app)
+    .post(`/parent/family-school/weekly-planner/dates/${dateRow.id}/assignments`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ contentItemId: planOptionMatch[1], subject: '', title: '', _csrf: csrf });
+  assert.equal(res.status, 302);
+  const assignment = await db.prepare('SELECT * FROM family_school_week_assignments WHERE week_date_id = ?').get(dateRow.id);
+  assert.equal(assignment.title, 'Draft Essay');
+  assert.equal(assignment.subject, 'Essay Class');
+  assert.equal(assignment.content_item_id, null, 'a plan-sourced pick must never write an invalid foreign key');
 });
 
 // A real request: "Content should say content/assignments. Button

@@ -3,7 +3,7 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
-<body>
+<body class="profile-page">
   <%- include('partials/portal-nav', {
     portalTitle: sharedPortalTitle('My Profile'),
     navLinks: [
@@ -46,13 +46,20 @@
       <label>Email
         <input type="email" name="email" value="<%= member.email || '' %>" />
       </label>
+      <% if (account) { %>
+        <label>Login Email
+          <input type="email" name="loginEmail" value="<%= account.email %>" required />
+        </label>
+      <% } %>
 
-      <label>Birthday <span class="hint">(contact an admin to change)</span>
-        <input type="text" value="<%= member.birthday || 'Not set' %>" disabled />
-      </label>
-      <label>Grade Level <span class="hint">(contact an admin to change)</span>
-        <input type="text" value="<%= member.grade_level || 'Not set' %>" disabled />
-      </label>
+      <div class="member-form-full date-time-two-col-row">
+        <label>Birthday <span class="hint">(contact an admin to change)</span>
+          <input type="text" value="<%= member.birthdayLabel || 'Not set' %>" disabled />
+        </label>
+        <label>Grade Level <span class="hint">(contact an admin to change)</span>
+          <input type="text" value="<%= member.grade_level || 'Not set' %>" disabled />
+        </label>
+      </div>
 
       <label class="member-form-full">Medical/Allergy Notes
         <textarea name="medicalNotes" rows="3"><%= member.medical_notes || '' %></textarea>
