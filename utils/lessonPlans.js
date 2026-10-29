@@ -41,10 +41,19 @@ async function createLessonPlan({ title, description, createdByAccountId }) {
   return info.lastInsertRowid;
 }
 
-async function updateLessonPlan(id, { title, description, allowFamilySchoolUse }) {
+// A real request: "Co-op admin portal. Lesson plans tab... allow
+// teachers to edit/add to the lesson plan, all members to edit/add to
+// the lesson plan." Two more independent permission checkboxes
+// alongside the existing Homeschool family management one, saved on the
+// same Lesson Plan Details form/route rather than a separate page -
+// both default false (today's admin-only editing is unchanged until an
+// admin opts a specific lesson plan in).
+async function updateLessonPlan(id, { title, description, allowFamilySchoolUse, allowTeacherEdit, allowMemberEdit }) {
   await db
-    .prepare('UPDATE lesson_plans SET title = ?, description = ?, allow_family_school_use = ?, updated_at = now_text() WHERE id = ?')
-    .run(title, description || null, !!allowFamilySchoolUse, id);
+    .prepare(
+      'UPDATE lesson_plans SET title = ?, description = ?, allow_family_school_use = ?, allow_teacher_edit = ?, allow_member_edit = ?, updated_at = now_text() WHERE id = ?'
+    )
+    .run(title, description || null, !!allowFamilySchoolUse, !!allowTeacherEdit, !!allowMemberEdit, id);
 }
 
 // A real request: "Lesson plan so that if a teacher uses it for co-op

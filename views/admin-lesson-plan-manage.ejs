@@ -12,14 +12,14 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <%# A real request: "there is a button called assign to class. Change
-        this button to say Edit settings. Click this button and the new
-        page allows you change lesson plan settings." A real page now
-        (views/admin-lesson-plan-settings.ejs), not a dialog here - the
-        Assign-to-Class picker moved there too, alongside the new allow-
-        teacher/member-edit checkboxes. %>
+    <%# A real request: "Admins can create lessons plans and assign them
+        to a class to be used as an option." A flat class picker (every
+        class app-wide, grouped by day) rather than the Duplicate Class
+        dialog's own two-step semester/day-then-class flow - there's no
+        "which day's grid" starting point here the way there is when
+        duplicating FROM one specific class already on a grid. %>
     <div class="roster-btn-row no-print">
-      <a class="roster-action-btn" href="/admin/lesson-plans/<%= plan.id %>/settings">Edit Settings</a>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('assign-lesson-plan-dialog').showModal()">Assign to Class</button>
       <%# "It can be locked or unlocked by admin." Admins can always keep
           editing this page regardless - locking only ever affects a
           non-admin's own use of this plan elsewhere (see utils/
@@ -32,7 +32,32 @@
       <% if (plan.locked) { %>Locked - a co-op class's own copy of this plan is still a separate, editable copy, but a Family Classes lesson that references this plan directly shows its content read-only.<% } else { %>Unlocked.<% } %>
     </p>
 
-    <%- include('partials/lesson-plan-content-manage', { plan, contentItems, gradeLevels }) %>
+    <dialog id="assign-lesson-plan-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/lesson-plans/<%= plan.id %>/assign">
+        <h3>Assign to Class</h3>
+        <p class="hint">Adds a new, independent copy of this lesson plan as a Lesson on the class you pick -
+          editing it afterward (from either side) never changes this original.</p>
+        <label>Class
+          <select name="classId" required>
+            <option value="">Choose a class&hellip;</option>
+            <% var classesByDay = {}; classes.forEach(function(c) { (classesByDay[c.dayLabel] = classesByDay[c.dayLabel] || []).push(c); }); %>
+            <% Object.keys(classesByDay).forEach(function(dayLabel) { %>
+              <optgroup label="<%= dayLabel %>">
+                <% classesByDay[dayLabel].forEach(function(c) { %>
+                  <option value="<%= c.id %>"><%= c.class_name %><% if (c.hourLabel) { %> (<%= c.hourLabel %>)<% } %></option>
+                <% }); %>
+              </optgroup>
+            <% }); %>
+          </select>
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Assign</button>
+        </div>
+      </form>
+    </dialog>
+
+    <%- include('partials/lesson-plan-content-manage', { plan, contentItems }) %>
   </main>
 </body>
 </html>

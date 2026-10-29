@@ -23,12 +23,23 @@
         starting next to it. Add allow members to use this lesson plan
         for Homeschool family management." .checkbox-option already is
         exactly that shape (checkbox left, text starts right next to
-        it) - a single checkbox today since this is the only permission
-        this plan has, in its own column rather than a grid/table. %>
+        it) - all 3 permissions stack in the same column. A later real
+        request ("allow teachers to edit/add to the lesson plan, all
+        members to edit/add to the lesson plan") added the other two,
+        saved alongside it on this same form/route rather than a
+        separate page - both default off, same as Homeschool use. %>
     <div class="member-form-full">
       <label class="checkbox-option">
         <input type="checkbox" name="allowFamilySchoolUse" value="1" <%= plan.allow_family_school_use ? 'checked' : '' %> />
         Allow members to use this lesson plan for Homeschool family management
+      </label>
+      <label class="checkbox-option">
+        <input type="checkbox" name="allowTeacherEdit" value="1" <%= plan.allow_teacher_edit ? 'checked' : '' %> />
+        Allow teachers to edit/add to the lesson plan
+      </label>
+      <label class="checkbox-option">
+        <input type="checkbox" name="allowMemberEdit" value="1" <%= plan.allow_member_edit ? 'checked' : '' %> />
+        Allow all members to edit/add to the lesson plan
       </label>
     </div>
     <div class="member-form-full">

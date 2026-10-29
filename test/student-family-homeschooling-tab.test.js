@@ -69,24 +69,25 @@ async function createStudent(name, familyId) {
   return { memberId, cookie: loginRes.headers['set-cookie'] };
 }
 
-// A later real request: "Family homeschooling shouldn't be a tab anymore
-// on student portal. Co-op classes and family school management classes
-// are all under classroom dashboard subpages together" - the standalone
-// Family Homeschooling tab is gone; its own subpages (Overview/Classes/
-// Grades/Weekly Planner) now live under the Classroom Dashboard tab
-// instead, alongside Co-op Classes.
-test('Student Portal nav: no standalone Family Homeschooling tab - its pages live under Classroom Dashboard instead', async () => {
+// A later real request split Classes back into "Co-op Schedule" (its own
+// standing tab) and "Classroom Dashboard" (its own tab, the first entry
+// of a new "Classroom" nav section) - see portal-nav.ejs's own
+// COMMUNITY_LINKS_STUDENT comment. Family Homeschooling stays a
+// standalone tab with its own subpages, untouched by that change; the
+// Classroom Dashboard page itself (not the nav) is what combines Co-op
+// and Homeschool Family classes together - see test/routes-student-
+// classroom-dashboard-family-merge.test.js for that page's own coverage.
+test('Student Portal nav: Family Homeschooling stays its own tab, and Classroom Dashboard is a separate standing tab', async () => {
   const familyId = await createFamily('Nav Family');
   const student = await createStudent('Nav Student', familyId);
   const page = await request(app).get('/student').set('Cookie', student.cookie);
   assert.equal(page.status, 200);
-  assert.doesNotMatch(page.text, />Family Homeschooling</);
+  assert.match(page.text, />Family Homeschooling</);
   assert.match(page.text, />Classroom Dashboard</);
-  assert.match(page.text, /href="\/student\/classes">Co-op Classes/);
-  assert.match(page.text, /href="\/student\/family-school">Family School Classes/);
-  assert.match(page.text, /href="\/student\/family-school\/grades">Grades/);
+  assert.match(page.text, /href="\/student\/family-school\/overview">Homeschool Overview/);
+  assert.match(page.text, /href="\/student\/family-school">Homeschool Classes/);
+  assert.match(page.text, /href="\/student\/family-school\/grades">Homeschool Grades/);
   assert.match(page.text, /href="\/student\/family-school\/weekly-planner">Weekly Planner/);
-  assert.match(page.text, /href="\/student\/family-school\/overview">Overview/);
 });
 
 test('Homeschool Overview shows this one student\'s own GPA, attendance, and classes', async () => {
