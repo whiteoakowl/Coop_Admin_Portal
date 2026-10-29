@@ -30,7 +30,8 @@ const { lessonAttachmentFileFilter, imageFileFilter } = require('../utils/upload
 // "Assign to Class" with no visibility flag of its own to gate it.
 // isLessonPlanLocked is the one shared lock lookup (see its own comment
 // in utils/lessonPlans.js).
-const { listLessonPlans, getLessonPlan, isLessonPlanLocked } = require('../utils/lessonPlans');
+const { listLessonPlans, listShareableLessonPlans, listShareableSubjects, getLessonPlan, isLessonPlanLocked, contentItemsForLessonPlan } = require('../utils/lessonPlans');
+const { GRADE_LEVELS } = require('../utils/classSchedule');
 const {
   CONTENT_ITEM_TYPES,
   classesForFamily,
@@ -314,6 +315,55 @@ router.post('/family-school/classes/from-template', async (req, res) => {
   const id = await createClassFromTemplate(templateKey, familyId, req.portalAccount.id);
   if (!id) return res.redirect('/parent/family-school/classes?error=' + encodeURIComponent('Choose a template.'));
   res.redirect(`/parent/family-school/classes/${id}?notice=` + encodeURIComponent('Class created from template.'));
+});
+
+// A real request: "Family school management portal, family classes.
+// Add a subpage called available lesson plans. Any lesson plans that
+// admin has created and marked shareable with parent portal will show
+// here as cards in a viewable format, no editing. You can click on
+// each class, view the lessons and assignments outline and click on
+// each assignment/lesson to view what is there. Add a filter button at
+// the top, fit to text. Allows you to filter by grade level, and
+// subject. Be able to select multiple from the dropdown menu with
+// check boxes." Pure read-only catalog, completely separate from "pick
+// from the library" when actually creating a lesson (the New Lesson
+// dialog's own Source toggle below, unchanged) - nothing here ever
+// writes to a lesson plan or copies/attaches one to a class. Registered
+// BEFORE GET /family-school/classes/:id below so its own literal path
+// segment isn't swallowed by that route's :id wildcard.
+router.get('/family-school/classes/available-lesson-plans', async (req, res) => {
+  const selectedGradeLevels = [].concat(req.query.gradeLevel || []).filter(Boolean);
+  const selectedSubjects = [].concat(req.query.subject || []).filter(Boolean);
+  const plans = await listShareableLessonPlans({ gradeLevels: selectedGradeLevels, subjects: selectedSubjects });
+  res.render('parent-family-school-available-lesson-plans', {
+    title: 'Available Lesson Plans',
+    plans,
+    gradeLevels: GRADE_LEVELS,
+    subjects: await listShareableSubjects(),
+    selectedGradeLevels,
+    selectedSubjects,
+  });
+});
+
+router.get('/family-school/classes/available-lesson-plans/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const plan = await getLessonPlan(id);
+  if (!plan || !plan.shareable_with_parents) return res.status(404).send('Not found');
+  res.render('parent-family-school-available-lesson-plan-detail', {
+    title: plan.title,
+    plan,
+    contentItems: await contentItemsForLessonPlan(id, { includeAnswerKey: false }),
+  });
+});
+
+router.get('/family-school/classes/available-lesson-plans/:id/content/:contentId', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const plan = await getLessonPlan(id);
+  if (!plan || !plan.shareable_with_parents) return res.status(404).send('Not found');
+  const contentItems = await contentItemsForLessonPlan(id, { includeAnswerKey: false });
+  const item = contentItems.find((i) => i.id === parseInt(req.params.contentId, 10));
+  if (!item) return res.status(404).send('Not found');
+  res.render('parent-family-school-available-lesson-plan-content', { title: item.title || plan.title, plan, item });
 });
 
 router.post('/family-school/classes/:id/delete', async (req, res) => {

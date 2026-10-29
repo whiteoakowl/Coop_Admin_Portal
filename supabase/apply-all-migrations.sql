@@ -5624,3 +5624,22 @@ on conflict (key) do nothing;
 insert into notification_message_templates (template_key, subject, body) values
   ('setup_cleanup_assignment_default', '', 'You''re assigned to {{team}}: {{tasks}}.')
 on conflict (template_key) do nothing;
+
+-- A real request: "Co-op admin portal. Lesson plans tab... allow
+-- teachers to edit/add to the lesson plan, all members to edit/add to
+-- the lesson plan." Both default false - today's existing behavior
+-- (admin-only editing) is unchanged until an admin opts a specific
+-- lesson plan in.
+alter table lesson_plans add column if not exists allow_teacher_edit boolean not null default false;
+alter table lesson_plans add column if not exists allow_member_edit boolean not null default false;
+
+-- A real request: "Family school management portal, family classes.
+-- Add a subpage called available lesson plans. Any lesson plans that
+-- admin has created and marked shareable with parent portal will show
+-- here as cards... Allows you to filter by grade level, and subject."
+-- Both nullable - a plan is still a plain internal template until an
+-- admin sets these. shareable_with_parents defaults false - every
+-- existing plan stays admin/co-op-only until an admin opts it in.
+alter table lesson_plans add column if not exists grade_level text;
+alter table lesson_plans add column if not exists subject text;
+alter table lesson_plans add column if not exists shareable_with_parents boolean not null default false;

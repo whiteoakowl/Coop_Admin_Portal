@@ -31,8 +31,48 @@ async function createLessonPlan({ title, description, createdByAccountId }) {
   return info.lastInsertRowid;
 }
 
-async function updateLessonPlan(id, { title, description }) {
-  await db.prepare("UPDATE lesson_plans SET title = ?, description = ?, updated_at = now_text() WHERE id = ?").run(title, description || null, id);
+async function updateLessonPlan(id, { title, description, gradeLevel, subject, shareableWithParents }) {
+  await db
+    .prepare('UPDATE lesson_plans SET title = ?, description = ?, grade_level = ?, subject = ?, shareable_with_parents = ?, updated_at = now_text() WHERE id = ?')
+    .run(title, description || null, gradeLevel || null, subject || null, shareableWithParents ? 1 : 0, id);
+}
+
+// A real request: "Family school management portal, family classes.
+// Add a subpage called available lesson plans. Any lesson plans that
+// admin has created and marked shareable with parent portal will show
+// here as cards." gradeLevels/subjects (both optional arrays) are the
+// Filter button's own multi-select checkboxes - an empty/omitted array
+// means "no filter on that dimension," never "match nothing."
+async function listShareableLessonPlans({ gradeLevels, subjects } = {}) {
+  const conditions = ['shareable_with_parents = true'];
+  const params = [];
+  if (gradeLevels && gradeLevels.length > 0) {
+    conditions.push(`grade_level IN (${gradeLevels.map(() => '?').join(',')})`);
+    params.push(...gradeLevels);
+  }
+  if (subjects && subjects.length > 0) {
+    conditions.push(`subject IN (${subjects.map(() => '?').join(',')})`);
+    params.push(...subjects);
+  }
+  return db.prepare(`SELECT * FROM lesson_plans WHERE ${conditions.join(' AND ')} ORDER BY title`).all(...params);
+}
+
+// Distinct subjects among shareable plans only - the Subject filter's
+// own checkbox options should never offer a value that would currently
+// filter the catalog down to nothing.
+async function listShareableSubjects() {
+  const rows = await db.prepare("SELECT DISTINCT subject FROM lesson_plans WHERE shareable_with_parents = true AND subject IS NOT NULL AND subject != '' ORDER BY subject").all();
+  return rows.map((r) => r.subject);
+}
+
+// A real request: "Click this button and the new page allows you
+// change lesson plan settings... allow teachers to edit/add to the
+// lesson plan, all members to edit/add to the lesson plan." Saved
+// separately from updateLessonPlan above (title/description, the
+// Manage page's own edit form) - the Settings page's own two checkboxes
+// are the only things this touches.
+async function updateLessonPlanSettings(id, { allowTeacherEdit, allowMemberEdit }) {
+  await db.prepare('UPDATE lesson_plans SET allow_teacher_edit = ?, allow_member_edit = ?, updated_at = now_text() WHERE id = ?').run(allowTeacherEdit ? 1 : 0, allowMemberEdit ? 1 : 0, id);
 }
 
 // A real request: "Lesson plan so that if a teacher uses it for co-op
@@ -235,9 +275,12 @@ async function assignLessonPlanToClass(lessonPlanId, classId, createdByAccountId
 
 module.exports = {
   listLessonPlans,
+  listShareableLessonPlans,
+  listShareableSubjects,
   getLessonPlan,
   createLessonPlan,
   updateLessonPlan,
+  updateLessonPlanSettings,
   deleteLessonPlan,
   isLessonPlanLocked,
   toggleLessonPlanLocked,

@@ -18,12 +18,13 @@ const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const { lessonAttachmentFileFilter } = require('../utils/uploads');
 const { saveLessonAttachment } = require('../utils/academics');
-const { allClassesList } = require('../utils/classSchedule');
+const { allClassesList, listSemesters, GRADE_LEVELS } = require('../utils/classSchedule');
 const {
   listLessonPlans,
   getLessonPlan,
   createLessonPlan,
   updateLessonPlan,
+  updateLessonPlanSettings,
   deleteLessonPlan,
   getLessonPlanContentItem,
   contentItemsForLessonPlan,
@@ -72,7 +73,7 @@ router.get('/lesson-plans/:id', async (req, res) => {
     title: plan.title,
     plan,
     contentItems,
-    classes: await allClassesList(),
+    gradeLevels: GRADE_LEVELS,
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
@@ -84,7 +85,13 @@ router.post('/lesson-plans/:id/edit', async (req, res) => {
   if (!plan) return res.status(404).send('Not found');
   const title = (req.body.title || '').trim();
   if (!title) return res.redirect(`/admin/lesson-plans/${id}?error=` + encodeURIComponent('A title is required.'));
-  await updateLessonPlan(id, { title, description: (req.body.description || '').trim() });
+  await updateLessonPlan(id, {
+    title,
+    description: (req.body.description || '').trim(),
+    gradeLevel: (req.body.gradeLevel || '').trim(),
+    subject: (req.body.subject || '').trim(),
+    shareableWithParents: req.body.shareableWithParents === '1',
+  });
   res.redirect(`/admin/lesson-plans/${id}?notice=` + encodeURIComponent('Lesson plan updated.'));
 });
 
@@ -99,6 +106,39 @@ router.post('/lesson-plans/:id/lock', async (req, res) => {
   res.redirect(`/admin/lesson-plans/${id}?notice=` + encodeURIComponent(locked ? 'Lesson plan locked.' : 'Lesson plan unlocked.'));
 });
 
+// A real request: "Click on an existing lesson plan and there is a
+// button called assign to class. Change this button to say Edit
+// settings. Click this button and the new page allows you change
+// lesson plan settings... Dropdown to select assigning this lesson plan
+// to a co-op class. Dropdown menu shows class titles, time and semester
+// day in parenthesis." A real page (not the old dialog) - the Assign
+// form now lives here instead of on the Manage page, still posting to
+// the same POST .../assign route below unchanged.
+router.get('/lesson-plans/:id/settings', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const plan = await getLessonPlan(id);
+  if (!plan) return res.status(404).send('Not found');
+  const semesters = await listSemesters();
+  const semesterTitleById = {};
+  semesters.forEach((s) => { semesterTitleById[s.id] = s.title; });
+  const classes = (await allClassesList()).map((c) => ({ ...c, semesterTitle: semesterTitleById[c.semester_id] || null }));
+  res.render('admin-lesson-plan-settings', {
+    title: `${plan.title} Settings`,
+    plan,
+    classes,
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+router.post('/lesson-plans/:id/settings', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const plan = await getLessonPlan(id);
+  if (!plan) return res.status(404).send('Not found');
+  await updateLessonPlanSettings(id, { allowTeacherEdit: req.body.allowTeacherEdit === '1', allowMemberEdit: req.body.allowMemberEdit === '1' });
+  res.redirect(`/admin/lesson-plans/${id}/settings?notice=` + encodeURIComponent('Settings saved.'));
+});
+
 // "Admins can create lessons plans and assign them to a class to be used
 // as an option" - the one-time deep copy. Redirects straight to the new
 // real Lesson on that class (the Co-op Admin side of it - a teacher on
@@ -109,7 +149,7 @@ router.post('/lesson-plans/:id/assign', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const plan = await getLessonPlan(id);
   if (!plan) return res.status(404).send('Not found');
-  const back = `/admin/lesson-plans/${id}`;
+  const back = `/admin/lesson-plans/${id}/settings`;
   const classId = parseInt(req.body.classId, 10);
   if (!classId) return res.redirect(back + '?error=' + encodeURIComponent('Choose a class to assign this lesson plan to.'));
   let assignmentId;

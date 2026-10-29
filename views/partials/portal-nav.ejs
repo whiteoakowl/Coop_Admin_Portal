@@ -328,6 +328,13 @@ const PARENT_NAV_LINKS = [
 const FAMILY_SCHOOL_NAV_LINKS = [
   { href: '/parent/family-school', icon: 'home', label: 'Home' },
   { href: '/parent/family-school/classes', icon: 'graduation-cap', label: 'Family Classes' },
+  // A real request: "Family school management portal, family classes.
+  // Add a subpage called available lesson plans." Another flat tab
+  // here, same "subpages become tabs" convention this whole array
+  // follows (see this array's own header comment) - not a nested
+  // subpages: [...] array, which this portal's nav deliberately never
+  // uses.
+  { href: '/parent/family-school/classes/available-lesson-plans', icon: 'book', label: 'Available Lesson Plans', mobileLabel: 'Available<br>Lesson Plans' },
   { href: '/parent/family-school/grades', icon: 'clipboard-list', label: 'Family Grades' },
   { href: '/parent/family-school/attendance', icon: 'calendar-check', label: 'Family Attendance' },
   { href: '/parent/family-school/journal', icon: 'book', label: 'Daily Learning Log', mobileLabel: 'Learning<br>Log' },
