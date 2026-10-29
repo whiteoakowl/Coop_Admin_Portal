@@ -112,11 +112,13 @@ test('Family School Management is its own portal reached from the parent role, a
   assert.doesNotMatch(fsmHome.text, /href="\/parent\/family-school\/settings"/);
 
   // A later real request ("Student portal add a tab that says family
-  // homeschooling...") renamed Student Portal's own nav entry for this
-  // feature and gave it subpages - see test/student-family-homeschooling-
-  // tab.test.js for coverage of that tab itself.
+  // homeschooling...") gave Student Portal its own nav entry for this
+  // feature; a further request then folded it into the Classroom
+  // Dashboard tab instead (no standalone Family Homeschooling tab
+  // anymore) - see test/student-family-homeschooling-tab.test.js for
+  // coverage of where its pages live now.
   const studentHome = await request(app).get('/student').set('Cookie', student.cookie);
-  assert.match(studentHome.text, />Family Homeschooling</);
+  assert.match(studentHome.text, />Classroom Dashboard</);
 
   const mainAdminHome = await request(app).get('/main-admin').set('Cookie', mainAdmin.cookie);
   assert.match(mainAdminHome.text, />Family School(?:<br\/?>| )Management</);

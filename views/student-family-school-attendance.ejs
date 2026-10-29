@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Attendance &mdash; <%= schoolYear %></h1>
+    <p class="hint">
+      <span class="badge-pill fs-attendance-legend-present">Present</span>
+      <span class="badge-pill fs-attendance-legend-absent">Absent</span>
+    </p>
+
+    <div class="annual-calendar-months-grid">
+      <% months.forEach(function(m) { %>
+        <div class="annual-calendar-month">
+          <h3><%= MONTH_NAMES[m.month - 1] %> <%= m.year %></h3>
+          <table class="fs-attendance-calendar annual-calendar-table">
+            <thead>
+              <tr><th>Su</th><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th></tr>
+            </thead>
+            <tbody>
+              <% m.weeks.forEach(function(week) { %>
+                <tr>
+                  <% week.forEach(function(d) { %>
+                    <% if (!d) { %>
+                      <td class="fs-attendance-day fs-attendance-day-empty"></td>
+                    <% } else {
+                      var status = m.attendanceByDate[d.date] || '';
+                    %>
+                      <td class="fs-attendance-day fs-attendance-day-<%= status || 'unmarked' %>"><%= d.day %></td>
+                    <% } %>
+                  <% }); %>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% }); %>
+    </div>
+  </main>
+</body>
+</html>

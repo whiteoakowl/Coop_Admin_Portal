@@ -13,6 +13,7 @@ const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth')
 const { memberForAccount } = require('../utils/portalAuth');
 const { lessonAttachmentFileFilter } = require('../utils/uploads');
 const { formatDateLabel } = require('../utils/dates');
+const { avatarColorFor } = require('../utils/members');
 const {
   classesForStudent,
   lessonsForStudentView,
@@ -27,7 +28,12 @@ const {
   weeksForOwner,
   weekGrid,
   subjectBreakdownForGrid,
+  attendanceForSchoolYear,
+  currentSchoolYear,
+  portfolioForStudent,
 } = require('../utils/familySchool');
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 router.use(requirePortalAuth, requirePortal('student'));
 
@@ -56,6 +62,32 @@ router.get('/family-school/overview', async (req, res) => {
 router.get('/family-school/grades', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   res.render('student-family-school-grades', { title: 'Homeschool Grades', grades: await gradesForStudent(member.id) });
+});
+
+// A real request: "Classroom dashboard subpages. Classes, grades,
+// attendance, chat, portfolio, transcripts." Read-only, current school
+// year only - the colored present/absent calendar Parent Portal's own
+// identical page shows, minus the click-to-toggle and Filter/Export/
+// Print/PDF controls (a parent marks attendance; a student just looks
+// at it), same simplification this file's own Grades/Overview pages
+// above already apply to their own Parent Portal counterparts.
+router.get('/family-school/attendance', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const schoolYear = currentSchoolYear();
+  const months = await attendanceForSchoolYear(member.id, parseInt(schoolYear.slice(0, 4), 10));
+  res.render('student-family-school-attendance', { title: 'Attendance', schoolYear, MONTH_NAMES, months });
+});
+
+// Same "summarize all family school management features... visual
+// profile" page Parent Portal's own Portfolio gives a parent, scoped to
+// just the signed-in student (no student/school-year picker - there's
+// only ever one student and this file's own convention is "all-time,
+// no filter" for Overview/Grades too) and reusing that exact same
+// partials/family-school-portfolio-body.ejs so the two never drift.
+router.get('/family-school/portfolio', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const portfolio = await portfolioForStudent(member.id, null);
+  res.render('student-family-school-portfolio', { title: 'Portfolio', portfolio, avatarColorFor });
 });
 
 // Read-only, same as every other route in this file - a student sees

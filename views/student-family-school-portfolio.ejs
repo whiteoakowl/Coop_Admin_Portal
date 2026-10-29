@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Portfolio</h1>
+
+    <%- include('partials/family-school-portfolio-body', { portfolio, avatarColorFor }) %>
+  </main>
+</body>
+</html>

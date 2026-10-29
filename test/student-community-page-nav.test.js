@@ -84,7 +84,7 @@ test('a signed-in student sees their own bottom tab bar on the Calendar page, no
   // A real request: "Student portal. Calendar should say events" -
   // matches Main Admin/Parent/Teacher, which all already said Events.
   assert.deepEqual(tabs, [
-    'Home', 'Events', 'Classes', 'Family Homeschooling', 'Chat', 'Resources', 'Photos', 'Babysitter Profile',
+    'Home', 'Events', 'Classes', 'Classroom Dashboard', 'Chat', 'Resources', 'Photos', 'Babysitter Profile',
     'Games', 'Pet', 'Reading Challenge', 'Achievements', 'Leaderboard', 'Nature News', 'Vocabulary',
   ]);
 });
@@ -104,7 +104,7 @@ test('a signed-in student sees their own bottom tab bar on the Chat page, with e
   assert.ok(tabs, 'the Chat page should render the bottom tab bar for a signed-in student');
   assert.equal(tabs.filter((t) => t === 'Chat').length, 1, 'exactly one Chat tab, not two');
   assert.deepEqual(tabs, [
-    'Home', 'Events', 'Classes', 'Family Homeschooling', 'Chat', 'Resources', 'Photos', 'Babysitter Profile',
+    'Home', 'Events', 'Classes', 'Classroom Dashboard', 'Chat', 'Resources', 'Photos', 'Babysitter Profile',
     'Games', 'Pet', 'Reading Challenge', 'Achievements', 'Leaderboard', 'Nature News', 'Vocabulary',
   ]);
   assert.doesNotMatch(res.text, /Member Directory/, 'the generic community list (Member Directory, Newsletter, ...) should not leak into a student\'s own nav');
