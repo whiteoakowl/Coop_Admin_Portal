@@ -232,6 +232,82 @@ test('My Profile shows the signed-in member\'s own Sections and Portal Roles bel
   );
 });
 
+// A real request: "Member profile. There should be a place for password
+// settings for every parent and student" - a self-service Password tab
+// on this same shared My Profile page, reachable by any portal account
+// (parent, student, or otherwise) since it posts against req.portalAccount.
+test('Password tab renders a current/new/confirm password form', async () => {
+  const parent = await createParentAccount();
+  const page = await request(app).get('/portal/profile?tab=password').set('Cookie', parent.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /class="view-tab active" href="\/portal\/profile\?tab=password">Password</);
+  assert.match(page.text, /<input type="password" name="currentPassword"/);
+  assert.match(page.text, /<input type="password" name="newPassword"/);
+  assert.match(page.text, /<input type="password" name="confirmPassword"/);
+});
+
+test('changing the password with the correct current password succeeds and the new password logs in', async () => {
+  const parent = await createParentAccount();
+  const res = await request(app)
+    .post('/portal/profile/password')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ currentPassword: 'testpassword123', newPassword: 'brandnewpassword456', confirmPassword: 'brandnewpassword456', _csrf: parent.csrfToken });
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /tab=password/);
+  assert.match(res.headers.location, /notice=/);
+
+  const account = await db.prepare('SELECT member_id FROM member_accounts WHERE member_id = ?').get(parent.memberId);
+  assert.ok(account, 'account still exists');
+
+  const loginRes = await request(app).get('/portal/profile'); // sanity: unauthenticated still redirects
+  assert.equal(loginRes.status, 302);
+
+  const oldPasswordLogin = await request(app).post('/login').type('form').send({ email: `profile-test-parent-${familyCounter}@example.com`, password: 'testpassword123', next: '/portal/profile' });
+  assert.match(oldPasswordLogin.text, /Incorrect email or password/, 'the old password no longer works');
+
+  const newPasswordLogin = await request(app).post('/login').type('form').send({ email: `profile-test-parent-${familyCounter}@example.com`, password: 'brandnewpassword456', next: '/portal/profile' });
+  assert.equal(newPasswordLogin.status, 302);
+  assert.match(newPasswordLogin.headers.location, /\/portal\/profile/);
+});
+
+test('changing the password with the wrong current password fails and leaves the password unchanged', async () => {
+  const parent = await createParentAccount();
+  const res = await request(app)
+    .post('/portal/profile/password')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ currentPassword: 'wrongpassword', newPassword: 'brandnewpassword456', confirmPassword: 'brandnewpassword456', _csrf: parent.csrfToken });
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /error=/);
+  assert.match(res.headers.location, /tab=password/);
+
+  const stillWorks = await request(app).post('/login').type('form').send({ email: `profile-test-parent-${familyCounter}@example.com`, password: 'testpassword123', next: '/portal/profile' });
+  assert.equal(stillWorks.status, 302, 'the original password still logs in');
+});
+
+test('changing the password with mismatched new/confirm fields fails with an error', async () => {
+  const parent = await createParentAccount();
+  const res = await request(app)
+    .post('/portal/profile/password')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ currentPassword: 'testpassword123', newPassword: 'brandnewpassword456', confirmPassword: 'somethingelse789', _csrf: parent.csrfToken });
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /error=/);
+});
+
+test('changing the password to something under 8 characters fails with an error', async () => {
+  const parent = await createParentAccount();
+  const res = await request(app)
+    .post('/portal/profile/password')
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ currentPassword: 'testpassword123', newPassword: 'short', confirmPassword: 'short', _csrf: parent.csrfToken });
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /error=/);
+});
+
 test('signing out and hitting the profile page redirects to login', async () => {
   const res = await request(app).get('/portal/profile');
   assert.equal(res.status, 302);

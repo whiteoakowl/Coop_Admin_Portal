@@ -428,7 +428,11 @@ const TEACHER_NAV_LINKS = [
 // A still later real request ("Class schedule should be its own tab
 // and called Co-op Schedule") split Co-op Schedule back out into its
 // own standing tab - same /student/classes route, just renamed and
-// promoted out of the old dropdown.
+// promoted out of the old dropdown. A later real request ("Co-op class
+// schedule there should be no subpages. Just click to view the current
+// co-op schedules") dropped its own Classroom Dashboard subpage link -
+// Classroom Dashboard is its own standing tab/section below anyway, so
+// nothing is unreachable, just no longer offered twice.
 //
 // A real request: "Classroom dashboard should be a menu tab as well.
 // Classroom dashboard subpages. Classes, grades, attendance, chat,
@@ -449,24 +453,35 @@ const TEACHER_NAV_LINKS = [
 // Dashboard content-merge request) and dropped Overview outright - its
 // own GPA/attendance/classes were already a subset of what Portfolio
 // shows, so this tab's own href now points there too.
+//
+// A still later real request: "Desktop. Dashboard panel. Classroom
+// dashboard should be a white title like Student portal and
+// activities. With the classroom dashboard subpages as tabs." On
+// desktop this entry no longer renders as a <details> dropdown inside
+// this same flat list - desktopAsSection (read by the template below)
+// pulls it out into its own titled section instead, right under the
+// portal's own title and above Activities, with each subpage as a
+// plain flat link instead of a collapsible group - same visual
+// language classLinks/STUDENT_ACTIVITY_LINKS below already uses for its
+// own "Activities" section. Left untouched on mobile (desktopAsSection
+// is only read by the desktop sidebar loop) - the bottom tab bar still
+// shows one "Classroom Dashboard" tab there that opens the same
+// subpages-dialog it always has, exactly as before this request.
 const STUDENT_NAV_LINKS = [
   { href: '/student', icon: 'home', label: 'Home' },
   { href: '/events?view=calendar&portal=student', icon: 'calendar-check', label: 'Events', subpages: [
     { href: '/events?view=calendar&portal=student', label: 'Calendar' },
     { href: '/student/events', label: 'My Event Registrations' },
   ] },
-  { href: '/student/classes', icon: 'graduation-cap', label: 'Co-op Schedule', mobileLabel: 'Co-op<br>Schedule', subpages: [
-    { href: '/student/classes', label: 'Class Schedule' },
-    { href: '/student/classes/dashboard', label: 'Classroom Dashboard' },
-  ] },
-  { href: '/student/family-school/portfolio', icon: 'grid', label: 'Classroom Dashboard', subpages: [
-    { href: '/student/classes/dashboard', label: 'Classes' },
-    { href: '/student/family-school/grades', label: 'Grades' },
-    { href: '/student/family-school/attendance', label: 'Attendance' },
-    { href: '/student/family-school/weekly-planner', label: 'Weekly Planner' },
-    { href: '/forums?portal=student', label: 'Chat' },
-    { href: '/student/family-school/portfolio', label: 'Portfolio' },
-    { href: '/student/transcript', label: 'Transcripts' },
+  { href: '/student/classes', icon: 'graduation-cap', label: 'Co-op Schedule', mobileLabel: 'Co-op<br>Schedule' },
+  { href: '/student/family-school/portfolio', icon: 'grid', label: 'Classroom Dashboard', desktopAsSection: true, subpages: [
+    { href: '/student/classes/dashboard', icon: 'graduation-cap', label: 'Classes' },
+    { href: '/student/family-school/grades', icon: 'clipboard-list', label: 'Grades' },
+    { href: '/student/family-school/attendance', icon: 'calendar-check', label: 'Attendance' },
+    { href: '/student/family-school/weekly-planner', icon: 'calendar-check', label: 'Weekly Planner' },
+    { href: '/forums?portal=student', icon: 'users', label: 'Chat' },
+    { href: '/student/family-school/portfolio', icon: 'file-text', label: 'Portfolio' },
+    { href: '/student/transcript', icon: 'file-text', label: 'Transcripts' },
   ] },
   { href: '/forums?portal=student', icon: 'users', label: 'Chat' },
   { href: '/student/resources', icon: 'book', label: 'Resources' },
@@ -635,7 +650,10 @@ const communityLinksTitle = 'Community';
   <p class="portal-nav-title"><%= portalTitle %></p>
   <nav id="admin-nav-links">
     <% primaryNavLinks.forEach(function(link) { %>
-      <% if (link.subpages && link.subpages.length) { %>
+      <% if (link.desktopAsSection) { %>
+        <%# Rendered as its own titled section below instead - see this
+            section's own real-request comment on STUDENT_NAV_LINKS. %>
+      <% } else if (link.subpages && link.subpages.length) { %>
         <details class="admin-nav-group">
           <summary><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %> <svg class="icon admin-nav-group-chevron"><use href="#icon-chevron-down"/></svg></summary>
           <div class="admin-nav-subpages">
@@ -649,6 +667,16 @@ const communityLinksTitle = 'Community';
       <% } %>
     <% }); %>
   </nav>
+  <% primaryNavLinks.forEach(function(link) { %>
+    <% if (link.desktopAsSection) { %>
+      <p class="portal-nav-title"><%= link.label %></p>
+      <nav id="<%= link.label.toLowerCase().replace(/[^a-z0-9]+/g, '-') %>-nav-links">
+        <% link.subpages.forEach(function(sp) { %>
+          <a href="<%= sp.href %>"><svg class="icon"><use href="#icon-<%= sp.icon %>"/></svg> <%= sp.label %></a>
+        <% }); %>
+      </nav>
+    <% } %>
+  <% }); %>
   <% if (classLinks) { %>
     <p class="portal-nav-title"><%= classLinksTitle %></p>
     <nav id="class-nav-links">

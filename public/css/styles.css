@@ -1753,9 +1753,15 @@ body.public-page .roster-empty {
 }
 .admin-sidebar nav a .icon { opacity: 0.75; }
 .admin-sidebar nav a:hover { background: rgba(255,255,255,0.4); }
+/* A real request: "the highlighted tab color should change to a darker
+   orange" - var(--accent-dark) (the same hex as --btn-bg-hover, the
+   app's own established dark-orange-background/dark-ink-text pairing -
+   see .primary-btn's own comment on why --ink reads at 10:1+ there, not
+   white) replaces the plain --surface/--brand-darker treatment this used
+   before. */
 .admin-sidebar nav a.active {
-  background: var(--surface);
-  color: var(--brand-darker);
+  background: var(--accent-dark);
+  color: var(--ink);
   box-shadow: var(--shadow-sm);
 }
 .admin-sidebar nav a.active .icon { opacity: 1; }
@@ -1782,31 +1788,26 @@ body.public-page .roster-empty {
 .admin-nav-group summary::-webkit-details-marker { display: none; }
 .admin-nav-group summary .icon { opacity: 0.75; }
 .admin-nav-group summary:hover { background: rgba(255,255,255,0.4); }
-.admin-nav-group.has-active-subpage summary {
-  background: var(--surface);
-  color: var(--brand-darker);
-  box-shadow: var(--shadow-sm);
-}
-.admin-nav-group.has-active-subpage summary .icon { opacity: 1; }
 .admin-nav-group-chevron { width: 0.9em; height: 0.9em; margin-left: auto; transition: transform 0.15s ease; }
 .admin-nav-group[open] .admin-nav-group-chevron { transform: rotate(180deg); }
 /* A real request: "when you click on a dashboard tab the subpages expand
-   and they are a lighter orange and the tab title is more outlined." This
-   is about the plain open/click state (any group you click open), not
-   just .has-active-subpage above (which only applies once a subpage is
-   actually the current page) - so both rules key off [open] alone. The
-   subpages list has no background at all today, sitting flush on the
-   sidebar's own solid --accent orange; a white-tint overlay reads as a
-   lighter orange against that same backdrop without needing a second
-   named color. */
-.admin-nav-group[open] summary { border: 1.5px solid rgba(0,0,0,0.16); }
+   and they are a lighter orange and the tab title is more outlined." A
+   later real request ("the subpage menu soft orange background should be
+   connected seamlessly with the tab for a clean look") replaced that
+   outline with the exact same soft-orange tint .admin-nav-subpages
+   already uses, no gap between them (.admin-nav-subpages's own margin-
+   top is 0 below) and flat corners at the shared seam (rounded only at
+   the very top of the summary and the very bottom of the subpages list)
+   - the open tab and its subpages now read as one continuous shape
+   instead of two separate boxes. */
+.admin-nav-group[open] summary { background: rgba(255,255,255,0.3); border-radius: 8px 8px 0 0; }
 .admin-nav-subpages {
   display: flex;
   flex-direction: column;
   padding-left: 1.9rem;
-  margin: 0.1rem 0 0.3rem;
+  margin: 0 0 0.3rem;
   background: rgba(255,255,255,0.3);
-  border-radius: 8px;
+  border-radius: 0 0 8px 8px;
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
 }
@@ -1820,7 +1821,23 @@ body.public-page .roster-empty {
   transition: background-color 0.15s ease;
 }
 .admin-nav-subpages a:hover { background: rgba(255,255,255,0.4); }
-.admin-nav-subpages a.active { background: var(--surface); color: var(--brand-darker); font-weight: 700; }
+/* A real request: "the highlighted tab color should change to a darker
+   orange. When a subpage is clicked on it should be the darker orange" -
+   same var(--accent-dark)/var(--ink) pairing as .admin-sidebar nav
+   a.active above, popping against the open group's own softer-orange
+   backdrop. Declared after the [open] tint rule above (equal
+   specificity - two class/attribute selectors each) so source order
+   lets this win for a group that's both open AND on the active subpage,
+   which admin-nav-accordion.js's own auto-open behavior means is always
+   the case together, never has-active-subpage alone. */
+.admin-nav-group.has-active-subpage summary {
+  background: var(--accent-dark);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  border-radius: 8px 8px 0 0;
+}
+.admin-nav-group.has-active-subpage summary .icon { opacity: 1; }
+.admin-nav-subpages a.active { background: var(--accent-dark); color: var(--ink); font-weight: 700; }
 
 .logout-form { margin: 0; }
 

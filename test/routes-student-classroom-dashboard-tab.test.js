@@ -84,6 +84,47 @@ test('Student Portal nav: Classroom Dashboard is a tab with one Classes subpage 
   assert.doesNotMatch(page.text, /href="\/student\/family-school\/overview">Overview</);
 });
 
+// A still later real request: "Co-op class schedule there should be no
+// subpages. Just click to view the current co-op schedules" plus
+// "Desktop. Dashboard panel. Classroom dashboard should be a white
+// title like Student portal and activities. With the classroom
+// dashboard subpages as tabs." Co-op Schedule drops its own dropdown
+// (it only ever offered Class Schedule/Classroom Dashboard, and
+// Classroom Dashboard is reachable its own way below); Classroom
+// Dashboard itself moves out of the dropdown-style nav list entirely on
+// desktop into its own titled section, same visual language as the
+// "Activities" section right below it - see portal-nav.ejs's own
+// desktopAsSection comment. Mobile is untouched (checked separately,
+// right below).
+test('Student Portal nav (desktop): Co-op Schedule is a plain link with no subpages dropdown', async () => {
+  const student = await createStudent('CoopNav Student');
+  const page = await request(app).get('/student').set('Cookie', student.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<a href="\/student\/classes"><svg class="icon"><use href="#icon-graduation-cap"\/><\/svg> Co-op Schedule<\/a>/);
+  assert.doesNotMatch(page.text, />Class Schedule</, 'the old Co-op Schedule subpage label is gone');
+});
+
+test('Student Portal nav (desktop): Classroom Dashboard is its own white title section with flat subpage links, not a dropdown', async () => {
+  const student = await createStudent('ClassDashNav Student');
+  const page = await request(app).get('/student').set('Cookie', student.cookie);
+  assert.equal(page.status, 200);
+  // Same <p class="portal-nav-title"> heading style "Student Portal" (the
+  // brand title) and "Activities" (classLinksTitle) already use.
+  assert.match(page.text, /<p class="portal-nav-title">Classroom Dashboard<\/p>/);
+  assert.match(page.text, /<nav id="classroom-dashboard-nav-links">/);
+  assert.match(page.text, /href="\/student\/classes\/dashboard"><svg class="icon"><use href="#icon-graduation-cap"\/><\/svg> Classes/);
+  // Not also rendered a second time as a <details> dropdown group.
+  assert.doesNotMatch(page.text, /<summary>[^<]*<svg class="icon"><use href="#icon-grid"\/><\/svg> Classroom Dashboard/);
+});
+
+test('Student Portal nav (mobile): Classroom Dashboard still opens its own subpages dialog, unchanged by the desktop-only section request', async () => {
+  const student = await createStudent('MobileNav Student');
+  const page = await request(app).get('/student').set('Cookie', student.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<button type="button" class="mobile-tab-subpages-trigger" data-subpages-dialog="mobile-subpages-classroom-dashboard"/);
+  assert.match(page.text, /<dialog class="view-tabs page-tabs-dialog no-print" id="mobile-subpages-classroom-dashboard">/);
+});
+
 test('Attendance subpage shows this student\'s own present/absent days for the current school year, read-only', async () => {
   const student = await createStudent('Attendance Student');
   const startYear = parseInt(currentSchoolYear().slice(0, 4), 10);

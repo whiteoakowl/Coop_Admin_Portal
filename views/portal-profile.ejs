@@ -32,6 +32,7 @@
       <a class="view-tab<%= activeTab === 'profile' ? ' active' : '' %>" href="/portal/profile?tab=profile">Profile</a>
       <a class="view-tab<%= activeTab === 'schedules' ? ' active' : '' %>" href="/portal/profile?tab=schedules">Schedules</a>
       <a class="view-tab<%= activeTab === 'signups' ? ' active' : '' %>" href="/portal/profile?tab=signups">Event Signups</a>
+      <a class="view-tab<%= activeTab === 'password' ? ' active' : '' %>" href="/portal/profile?tab=password">Password</a>
     </div>
 
     <% if (activeTab === 'profile') { %>
@@ -165,6 +166,26 @@
           </div>
         <% }); %>
       <% } %>
+    <% } else if (activeTab === 'password') { %>
+      <%# A real request: "Member profile. There should be a place for
+          password settings for every parent and student" - the same
+          current-password/new-password/confirm pattern routes/admin.js's
+          own Username/Password settings tab already uses, posting to
+          routes/portal-auth.js's own POST /portal/profile/password. %>
+      <form method="POST" action="/portal/profile/password" class="member-form-grid">
+        <label class="member-form-full">Current Password
+          <input type="password" name="currentPassword" autocomplete="current-password" required />
+        </label>
+        <label>New Password
+          <input type="password" name="newPassword" autocomplete="new-password" minlength="8" required />
+        </label>
+        <label>Confirm New Password
+          <input type="password" name="confirmPassword" autocomplete="new-password" minlength="8" required />
+        </label>
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Update Password</button>
+        </div>
+      </form>
     <% } else { %>
       <%# A real request: "Event signup tab should be organized by month
           and then by event with drop down from the event to show who

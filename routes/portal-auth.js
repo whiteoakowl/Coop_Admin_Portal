@@ -537,7 +537,7 @@ router.get('/portal/settings-hub', (req, res) => {
 // all resolve to one members row via memberForAccount; the single shared
 // Co-op Admin login (routes/admin.js) isn't tied to any one member, so
 // it keeps its own separate /admin/settings instead.
-const PROFILE_TABS = ['profile', 'schedules', 'signups'];
+const PROFILE_TABS = ['profile', 'schedules', 'signups', 'password'];
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 async function renderProfile(req, res, error, notice, activeTab) {
@@ -812,6 +812,34 @@ router.post('/portal/family/:memberId/edit', async (req, res) => {
     );
 
   res.redirect(back + '?notice=' + encodeURIComponent('Profile updated.'));
+});
+
+// A real request: "Member profile. There should be a place for password
+// settings for every parent and student" - a self-service Password tab
+// on this same shared My Profile page (every portal account type lands
+// here, not just parent/student), guarded by the account's own current
+// password the same way routes/admin.js's own POST /settings/password
+// already guards the Admin login's password change.
+router.post('/portal/profile/password', async (req, res) => {
+  if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile');
+  const back = '/portal/profile?tab=password';
+  const currentPassword = req.body.currentPassword || '';
+  const newPassword = req.body.newPassword || '';
+  const confirmPassword = req.body.confirmPassword || '';
+
+  const passwordOk = await verifyPassword(req.portalAccount, currentPassword);
+  if (!passwordOk) {
+    return res.redirect(back + '&error=' + encodeURIComponent('Current password is incorrect.'));
+  }
+  if (newPassword.length < 8) {
+    return res.redirect(back + '&error=' + encodeURIComponent('New password must be at least 8 characters.'));
+  }
+  if (newPassword !== confirmPassword) {
+    return res.redirect(back + '&error=' + encodeURIComponent('New passwords do not match.'));
+  }
+
+  await db.prepare('UPDATE member_accounts SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), req.portalAccount.id);
+  res.redirect(back + '&notice=' + encodeURIComponent('Password updated.'));
 });
 
 // Deliberately narrow - only the fields the admin-side membership form
