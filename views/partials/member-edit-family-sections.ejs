@@ -1,0 +1,49 @@
+<%
+// "Additional Parents/Guardians" and "Children" sections, shared by
+// every unified member edit page (Main Admin/Co-op Admin Edit Member,
+// Parent Portal Edit Profile) - a real request: "This page should look
+// exactly like the membership request form. The additional parent
+// sections and information, children sections and information." Same
+// section headings/+Add button/<template> pattern as the public self-
+// registration form (views/portal-register.ejs's own Additional Parents/
+// Children sections), just pre-filled with this family's own real
+// members instead of starting empty - see partials/member-edit-adult-
+// block.ejs/member-edit-child-block.ejs for the per-block field set, and
+// public/js/member-family-edit-form.js for the +Add Adult/+Add Child/
+// remove/renumber behavior.
+//
+// Locals: familyAdults - array of { member, portalStatus }; familyChildren -
+// array of { member, portalStatus, customFieldValues }; familyChildFields -
+// admin-defined child questions (all from utils/memberFamilyEdit.js's own
+// familyEditSections). showLogin - false on Co-op Admin's own edit page
+// (see partials/member-edit-adult-block.ejs's own header comment);
+// defaults true otherwise.
+const showLoginSection = typeof showLogin === 'undefined' || showLogin;
+const childFields = typeof familyChildFields !== 'undefined' ? familyChildFields : [];
+%>
+<div class="form-section">
+  <h2>Additional Parents / Guardians</h2>
+  <div id="member-family-adults">
+    <% familyAdults.forEach(function(entry, i) { %>
+      <%- include('member-edit-adult-block', { index: i, member: entry.member, portalStatus: entry.portalStatus, showLogin: showLoginSection }) %>
+    <% }); %>
+  </div>
+  <button type="button" class="btn-secondary" id="add-adult-btn">+ Add Adult</button>
+</div>
+
+<div class="form-section">
+  <h2>Children</h2>
+  <div id="member-family-children">
+    <% familyChildren.forEach(function(entry, i) { %>
+      <%- include('member-edit-child-block', { index: i, member: entry.member, portalStatus: entry.portalStatus, showLogin: showLoginSection, childFields, customFieldValues: entry.customFieldValues }) %>
+    <% }); %>
+  </div>
+  <button type="button" class="btn-secondary" id="add-child-btn">+ Add Child</button>
+</div>
+
+<template id="adult-block-template">
+  <%- include('member-edit-adult-block', { index: '__INDEX__', member: null, portalStatus: null, showLogin: showLoginSection }) %>
+</template>
+<template id="child-block-template">
+  <%- include('member-edit-child-block', { index: '__INDEX__', member: null, portalStatus: null, showLogin: showLoginSection, childFields, customFieldValues: null }) %>
+</template>

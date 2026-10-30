@@ -36,7 +36,21 @@
 //   portalAccount - null (no account yet) or the account row - only
 //     read when showPassword is true, to label the field "New Password
 //     (leave blank to keep the current one)" vs plain "Password"
+//   parentFields, childFields, generalFields - admin-defined extra
+//     questions (utils/membershipFormFields.js), same ones the public
+//     form asks - a real request: "Don't forget the check box
+//     questions. This should look IDENTICAL to the membership request
+//     form." parentFields render here for a Parent/Admin, childFields
+//     for a Student (same Birthday/Grade Level type-gating just above),
+//     and generalFields as their own separate section below this one -
+//     all three are optional locals; a caller that never passes them
+//     (none currently do, but defensive like every other optional local
+//     on this partial) just renders nothing extra.
+//   customFieldValues - this member's own already-answered values,
+//     "f"+id keyed (utils/membershipFormFields.js's own
+//     fieldValuesForView) - undefined/empty for a brand-new member
 const isStudentType = member.member_type === 'student';
+const ownFields = isStudentType ? (typeof childFields !== 'undefined' ? childFields : []) : (typeof parentFields !== 'undefined' ? parentFields : []);
 %>
 <div class="form-section">
   <div class="member-form-grid">
@@ -96,6 +110,9 @@ const isStudentType = member.member_type === 'student';
       <textarea name="medicalNotes" rows="3"><%= member.medical_notes || '' %></textarea>
     </label>
   </div>
+  <% ownFields.forEach(function(f) { %>
+    <%- include('membership-form-field', { field: f, namePrefix: 'customFields', values: (typeof customFieldValues !== 'undefined' ? customFieldValues : null) }) %>
+  <% }); %>
   <% if (member.member_type === 'admin') { %><input type="hidden" name="memberType" value="admin" /><% } %>
   <% if (typeof showPassword !== 'undefined' && showPassword) { %>
     <div class="member-form-grid">
@@ -115,3 +132,20 @@ const isStudentType = member.member_type === 'student';
     <% } %>
   <% } %>
 </div>
+
+<%# A real request: "Main admin portal. Members. Settings. Extra form
+    fields. Add a general field section" - its own separate section,
+    same as on the public form (views/portal-register.ejs), not folded
+    into the Parent/Guardian section above - only shown at all when an
+    admin has actually defined one, and only for a Parent/Admin (the
+    public form's own General section only ever appears once, asked of
+    whoever's registering the whole family, same reasoning childFields
+    above skips it for a Student). %>
+<% if (!isStudentType && typeof generalFields !== 'undefined' && generalFields && generalFields.length > 0) { %>
+  <div class="form-section">
+    <h2>General</h2>
+    <% generalFields.forEach(function(f) { %>
+      <%- include('membership-form-field', { field: f, namePrefix: 'customFields', values: (typeof customFieldValues !== 'undefined' ? customFieldValues : null) }) %>
+    <% }); %>
+  </div>
+<% } %>

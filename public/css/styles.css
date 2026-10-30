@@ -2887,6 +2887,29 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 }
 
 .member-edit-form { max-width: 720px; }
+/* A real request: "Make sure there is adequate row space between every
+   row" - the public self-registration form (#portal-register-form) and
+   the unified member edit pages (.member-edit-form-page) share this
+   exact field grid, so this is scoped to both equally rather than to
+   just one, keeping them "IDENTICAL" per that same request - a stray
+   <label>/<p>/.checkbox-option sitting directly in a .form-section or
+   .manage-section (Primary Parent checkbox, Sections/Portal Roles
+   headers, custom-field questions) has no gap at all otherwise, unlike
+   a row inside .member-form-grid, which already gets one from its own
+   `gap` below. */
+#portal-register-form .form-section > .checkbox-option,
+#portal-register-form .form-section > p,
+#portal-register-form .register-adult-block > .checkbox-option,
+#portal-register-form .register-child-block > .checkbox-option,
+.member-edit-form-page .form-section > .checkbox-option,
+.member-edit-form-page .form-section > p,
+.member-edit-form-page .manage-section > .checkbox-option,
+.member-edit-form-page .manage-section > p,
+.member-edit-form-page .register-adult-block > .checkbox-option,
+.member-edit-form-page .register-child-block > .checkbox-option {
+  margin: 1.25rem 0;
+}
+
 .member-form-grid {
   display: grid;
   /* minmax(0, 1fr), not a bare 1fr - a real bug report: "on mobile all
@@ -2901,7 +2924,11 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
      the container's actual width and each item's own min-width: 0 (set
      just below) takes over from there instead. */
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem 1.5rem;
+  /* A real request: "Make sure there is adequate row space between
+     every row" - row gap widened from 1rem for more breathing room
+     between stacked fields (e.g. Email above Phone Number on a narrow
+     column, or every field on mobile's single-column layout). */
+  gap: 1.5rem;
 }
 .member-form-full { grid-column: 1 / -1; }
 /* Event Details' Starts/Ends and Settings' Registration Opens/Closes
@@ -4789,7 +4816,8 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
    is the only control for picking one; this just offers a way to create a
    new one without leaving the Add/Edit Member form (see data-add-family-*
    in public/js/member-form.js). */
-.member-form-add-family-btn { margin-top: 0.6rem; }
+/* A real request: "Shrink add family button by half." */
+.member-form-add-family-btn { margin-top: 0.6rem; padding: 0.3rem 0.5rem; font-size: 0.78rem; }
 
 /* Dropdown + checklist rows (Choose a Family, Setup/Cleanup Team) - the
    dropdown is a quick-pick that checks/selects the matching row below;
@@ -4838,6 +4866,39 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 .member-form-footer-view,
 .member-form-footer-edit { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; width: 100%; min-width: 0; justify-content: space-between; }
 .member-edit-form-page .member-form-footer-edit { justify-content: flex-end; }
+
+/* A real request: "Save and cancel buttons and the bottom of the page,
+   same size, same row, side by side" - later clarified to "Save and
+   cancel buttons should fit to text," i.e. same row/same padding/
+   font-size (already true via the .member-form-footer rule just above),
+   NOT stretched to split the row evenly - each one sized to its own
+   label, same as this button pair already behaves everywhere else in
+   the app it's used. No extra rule needed here beyond the shared one
+   above; this comment just marks the spot so a future "make them even
+   width again" request doesn't get re-added by mistake. */
+
+/* A real request: "Sections dropdown menu should be white, not blue,
+   shrink to fit text" - the Sections/Portal Roles dropdown triggers
+   (partials/member-edit-admin-section.ejs) reuse the same <details
+   data-filter-details>/.filter-panel popover every other "Filter"
+   button in this app already uses, but needed their own summary style:
+   .btn-secondary is solid blue site-wide (see its own rule above) and
+   .roster-action-btn is solid orange - neither is the plain white,
+   shrink-to-fit look this one specific control needed. */
+.checklist-dropdown-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  padding: 0.55rem 0.9rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+.checklist-dropdown-toggle:hover { border-color: var(--btn-blue); }
 
 /* Cancel (.btn-secondary) and Save/Add Member (.primary-btn) normally use
    different padding/font-size scales elsewhere in the app - matched here
@@ -14233,19 +14294,19 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 }
 .member-profile-banner-title { display: flex; align-items: center; gap: 0.6rem; font-weight: 700; font-size: 1.1rem; }
 .member-profile-banner-title .icon { width: 1.3rem; height: 1.3rem; }
-.member-profile-banner-actions { display: flex; align-items: center; gap: 1rem; }
+.member-profile-banner-actions { display: flex; align-items: center; gap: 1.25rem; }
 .member-profile-banner-back { color: #fff; font-weight: 600; font-size: 0.9rem; text-decoration: none; }
 .member-profile-banner-back:hover { text-decoration: underline; }
 
 .member-profile-main-card {
   display: flex;
   align-items: flex-start;
-  gap: 1.25rem;
+  gap: 1.5rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--control-radius);
-  padding: 1.25rem;
-  margin-bottom: 1rem;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 .member-profile-avatar-lg {
   flex-shrink: 0;
@@ -14264,13 +14325,19 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .member-profile-main-info { flex: 1 1 auto; min-width: 0; }
 .member-profile-main-top { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; }
 .member-profile-main-top h1 { margin: 0; font-size: 1.5rem; }
-.member-profile-role-line { margin: 0.2rem 0 0.75rem; font-weight: 600; color: var(--brand-dark); }
-.member-profile-contact-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.35rem 0; color: var(--ink); }
+.member-profile-role-line { margin: 0.25rem 0 0.9rem; font-weight: 600; color: var(--brand-dark); }
+/* A real request: "Viewing member profile, before editing... Make sure
+   there is adequate spacing between rows, button and features," on all
+   three portals that render this shared partial (Parent/Main Admin/
+   Co-op Admin). Was briefly a Parent-Portal-only override further down
+   this file - widened here instead, on the shared base rule, now that
+   all three need it the same way. */
+.member-profile-contact-row { display: flex; align-items: center; gap: 0.65rem; margin: 0.6rem 0; color: var(--ink); }
 .member-profile-contact-row .icon { width: 1.1rem; height: 1.1rem; color: var(--brand-dark); flex-shrink: 0; }
 .member-profile-medical-row { color: var(--red); font-weight: 600; }
 .member-profile-medical-row .icon { color: var(--red); }
 
-.member-profile-cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.member-profile-cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
 @media (max-width: 720px) {
   .member-profile-cards-grid { grid-template-columns: 1fr; }
   /* Avatar + name stay centered as a header, but a real request says
@@ -14285,7 +14352,7 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
   background: var(--brand-soft);
   border: 1px solid var(--border);
   border-radius: var(--control-radius);
-  padding: 1.1rem;
+  padding: 1.35rem;
 }
 .member-profile-side-card h2 { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.75rem; font-size: 1rem; }
 .member-profile-side-card h2 .icon { width: 1.2rem; height: 1.2rem; color: var(--brand-dark); }
@@ -14300,7 +14367,7 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .member-profile-side-card-label { display: flex; align-items: center; gap: 0.35rem; font-weight: 700; font-size: 0.85rem; color: var(--ink); margin: 0.85rem 0 0.3rem; }
 .member-profile-side-card-label:first-of-type { margin-top: 0; }
 .member-profile-side-card-label .icon { width: 1rem; height: 1rem; }
-.member-profile-plain-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.member-profile-plain-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.55rem; }
 .member-profile-plain-list li { font-weight: 600; color: var(--ink); }
 .member-profile-plain-list a { color: var(--ink); text-decoration: none; }
 .member-profile-plain-list a:hover { color: var(--brand-dark); text-decoration: underline; }
@@ -14308,15 +14375,16 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .member-profile-extra-card p { margin: 0 0 0.5rem; }
 
 /* A real request: "Profile icon. Make sure there is adequate space
-   between buttons, rows and icons." Scoped to the My Profile pages
-   (profile-page on <body>) rather than widening these shared primitives
-   app-wide, since other pages (the admin-side Member Profile card,
-   Members list, etc.) use the same classes at their current, already-
-   reviewed spacing. */
+   between buttons, rows and icons," later extended to "Viewing member
+   profile, before editing... on parent portal, main admin portal,
+   co-op admin portal" - member-profile-contact-row/plain-list/banner-
+   actions are widened on their own base rule now (above), covering all
+   three portals' own Member Profile page the same way, not just Parent
+   Portal's. These two are still Parent-Portal-specific - the edit-form
+   grid gap only applies on /portal/profile/edit, and roster-btn-row is
+   used by the Schedules/Event Signups tabs' own button rows below the
+   card, not the card itself. */
 .profile-page .view-tabs { gap: 0.6rem; }
-.profile-page .member-profile-contact-row { margin: 0.6rem 0; gap: 0.65rem; }
-.profile-page .member-profile-plain-list { gap: 0.55rem; }
-.profile-page .member-profile-banner-actions { gap: 1.25rem; }
 .profile-page .member-form-grid { gap: 1.35rem 1.75rem; }
 .profile-page .roster-btn-row { gap: 0.75rem; }
 

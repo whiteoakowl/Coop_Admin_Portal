@@ -99,4 +99,20 @@ async function valuesForMember(memberId) {
   return map;
 }
 
-module.exports = { FIELD_TYPES, listFields, getField, createField, updateField, deleteField, saveFieldValues, valuesForMember };
+// Same shape valuesForMember returns, but keyed the "f"+id way views/
+// partials/membership-form-field.ejs's own `values` local already
+// expects (see that partial's own header comment on why) - a real
+// request: "Don't forget the check box questions. This should look
+// IDENTICAL to the membership request form" re-used these same admin-
+// defined questions, with their already-answered values, on the unified
+// member edit pages (Main Admin/Co-op Admin Edit Member, Parent Portal
+// Edit Profile), not just on the one-time public/admin intake forms
+// this partial originally only ever rendered on.
+async function fieldValuesForView(memberId) {
+  const raw = await valuesForMember(memberId);
+  const prefixed = {};
+  Object.keys(raw).forEach((id) => { prefixed['f' + id] = raw[id]; });
+  return prefixed;
+}
+
+module.exports = { FIELD_TYPES, listFields, getField, createField, updateField, deleteField, saveFieldValues, valuesForMember, fieldValuesForView };

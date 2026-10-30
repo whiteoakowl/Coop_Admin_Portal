@@ -38,7 +38,7 @@ const { notify } = require('../utils/notifications');
 const smsProvider = require('../utils/smsProvider');
 const path = require('path');
 const fs = require('fs');
-const { uploadMemberPhoto, savePhotoFile, deletePhotoFile } = require('../utils/memberPhoto');
+const { savePhotoFile, deletePhotoFile } = require('../utils/memberPhoto');
 const { allSetupTeams } = require('../utils/setup');
 const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions } = require('../utils/adminPositions');
 const { buildTemplateWorkbook, readRowsFromFile, sendCsv, toCsvRow } = require('../utils/spreadsheet');
@@ -63,6 +63,7 @@ const { getMemberSchedule, scheduleList } = require('../utils/schedule');
 const { portalStatusForMembers, sectionIdsForMembers, setMemberSections, setMemberRoles, addMemberSections, addMemberRoles } = require('../utils/portalPermissions');
 const { clearVolunteerMembershipIfNotParent } = require('../utils/volunteers');
 const { hashPassword, findAccountByEmail, ensurePortalAccountForMember } = require('../utils/portalAuth');
+const { familyEditSections, applyFamilyEditSubmission } = require('../utils/memberFamilyEdit');
 const {
   resolveFamilyId: resolveIntakeFamilyId,
   createParentMember,
@@ -1321,102 +1322,49 @@ router.get('/:id/edit', async (req, res) => {
     // the password/role fields this box already had.
     allSections: await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all(),
     memberSectionIds: (await sectionIdsForMembers([id]))[id],
-    // A real request: "when you click edit profile for a member, it
-    // should show the other parents and children's information as well
-    // for easy editing." - see routes/admin-members.js's own identical
-    // GET /members/:id/edit comment; this is the Main Admin copy of that
-    // same inline "Family Members" editor.
-    familyMembers: await familyOf(id),
+    // A real request: "This page should look exactly like the
+    // membership request form. The additional parent sections and
+    // information, children sections and information." - see
+    // utils/memberFamilyEdit.js's own header comment.
+    ...(await familyEditSections(id)),
+    // A real request: "Don't forget the check box questions. This
+    // should look IDENTICAL to the membership request form." - same
+    // admin-defined questions the public form asks, with this member's
+    // own already-answered values prefilled.
+    parentFields: await membershipFormFields.listFields('parent'),
+    childFields: await membershipFormFields.listFields('child'),
+    generalFields: await membershipFormFields.listFields('general'),
+    customFieldValues: await membershipFormFields.fieldValuesForView(id),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
 });
 
-// The inline "Family Members" editor's own per-row Save - see
-// routes/admin-members.js's own identical route for the full comment on
-// why this is deliberately a separate, narrower route from the full
-// Add/Edit Member form above (POST /:id/edit).
-router.post('/:viewerId/family/:memberId/quick-edit', async (req, res) => {
-  const viewerId = parseInt(req.params.viewerId, 10);
-  const memberId = parseInt(req.params.memberId, 10);
-  const back = `/main-admin/members/${viewerId}/edit`;
+// The old inline "Family Members" quick-edit table and its own per-row
+// POST /:viewerId/family/:memberId/quick-edit, plus the "Add to This
+// Family" quick-add dialog and its own POST /:id/quick-add-family-member,
+// both lived here - a real request ("This page should look exactly like
+// the membership request form. The additional parent sections and
+// information, children sections and information.") replaced both with
+// the Additional Parents/Children sections below (partials/member-edit-
+// family-sections.ejs's own +Add Adult/+Add Child, which cover the same
+// "edit or add a family member without leaving this page" job with the
+// full field set), so neither route is reachable from this page anymore.
 
-  const viewer = await db.prepare('SELECT family_id FROM members WHERE id = ?').get(viewerId);
-  const existing = await db.prepare('SELECT family_id, member_type FROM members WHERE id = ?').get(memberId);
-  if (!viewer || !existing || viewer.family_id == null || existing.family_id !== viewer.family_id) {
-    return res.redirect(back + '?error=' + encodeURIComponent('That family member could not be found.'));
-  }
-
-  const name = (req.body.name || '').trim();
-  if (!name) return res.redirect(back + '?error=' + encodeURIComponent('Name is required.'));
-  const clash = await db.prepare('SELECT id FROM members WHERE LOWER(name) = LOWER(?) AND id != ?').get(name, memberId);
-  if (clash) return res.redirect(back + '?error=' + encodeURIComponent(`"${name}" is already in the member list.`));
-
-  const email = (req.body.email || '').trim() || null;
-  const phone = (req.body.phone || '').trim() || null;
-  const isStudent = existing.member_type === 'student';
-  const birthdayRaw = (req.body.birthday || '').trim();
-  const birthday = isStudent && isValidISODate(birthdayRaw) ? birthdayRaw : null;
-  const gradeLevel = isStudent && GRADE_LEVELS.includes(req.body.gradeLevel) ? req.body.gradeLevel : null;
-
-  if (isStudent) {
-    await db.prepare('UPDATE members SET name = ?, email = ?, phone = ?, birthday = ?, grade_level = ? WHERE id = ?').run(name, email, phone, birthday, gradeLevel, memberId);
-  } else {
-    await db.prepare('UPDATE members SET name = ?, email = ?, phone = ? WHERE id = ?').run(name, email, phone, memberId);
-  }
-
-  res.redirect(back + '?notice=' + encodeURIComponent(`${name} updated.`));
-});
-
-// A real request: "when editing a member profile, there is a button that
-// says add parent/student. when you click this button it will ask
-// student or parent, name, if student then it asks birthday and grade.
-// save." A lightweight companion to the full Add Member form (routes/
-// main-admin-members.js's own /new, used to create a brand-new family) -
-// this one always adds onto the family of the member whose Edit Profile
-// page it was opened from, and only collects the few fields that form
-// actually asked for here (no email/phone/setup team/custom fields), via
-// utils/memberIntake.js's own createParentMember/createChildMember so
-// the new person still gets a real, individual profile the exact same
-// way every other entry point creates one. A later real request: "after
-// adding a new member to a family it will create a profile for that
-// member, still connected to the parent, using the same address as the
-// parent" - the new member's address/city/state/zip are copied from
-// this member (the one whose Edit Profile page the dialog was opened
-// from), same as how the full Add Member form's own single "Family
-// Address" section already applies one shared address to every parent/
-// child in that submission. A further real request removed the explicit
-// Student/Parent choice ("No parent/student choice on membership forms
-// or profiles") - whether the new person is a parent or a student is
-// derived from the Birthday they're given, same as the main Edit form.
-router.post('/:id/quick-add-family-member', async (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const back = `/main-admin/members/${id}/edit`;
-  const member = await db.prepare('SELECT family_id, address, city, state, zip FROM members WHERE id = ?').get(id);
-  if (!member || member.family_id == null) return res.redirect(back + '?error=' + encodeURIComponent('This member has no family yet - choose or add one above and save first.'));
-
-  const name = (req.body.name || '').trim();
-  if (!name) return res.redirect(back + '?error=' + encodeURIComponent('Name is required.'));
-  const birthday = isValidISODate((req.body.birthday || '').trim()) ? req.body.birthday.trim() : null;
-  const address = { address: member.address, city: member.city, state: member.state, zip: member.zip };
-
-  if (isChildAge(birthday)) {
-    const gradeLevel = GRADE_LEVELS.includes(req.body.gradeLevel) ? req.body.gradeLevel : null;
-    await createChildMember(member.family_id, address, { name, birthday, gradeLevel, medicalNotes: null });
-  } else {
-    await createParentMember(member.family_id, address, { name, isPrimaryParent: false }, req.portalAccount.id);
-  }
-
-  res.redirect(back + '?notice=' + encodeURIComponent(`${name} added to the family.`));
-});
-
-router.post('/:id/edit', uploadMemberPhoto((req) => `/main-admin/members/${req.params.id}/edit`), async (req, res) => {
+router.post('/:id/edit', uploadIntakePhotos((req) => `/main-admin/members/${req.params.id}/edit`), async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const existing = await db.prepare('SELECT photo_path, member_type, birthday FROM members WHERE id = ?').get(id);
   const f = memberFormFields(req, existing ? existing.birthday : null);
   if (!f.name) return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent('Name is required.'));
   const clash = await db.prepare('SELECT id FROM members WHERE LOWER(name) = LOWER(?) AND id != ?').get(f.name, id);
   if (clash) return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent(`"${f.name}" is already in the member list.`));
+  // multer.any() (uploadIntakePhotos) replaces the old single-file
+  // uploadMemberPhoto middleware now that this same submission can also
+  // carry a photo per Additional Parent/Children block below (req.files
+  // is an array, matched by fieldname - see utils/memberFamilyEdit.js's
+  // own fileFor) - this member's own photo still posts under the plain
+  // "photo" field name, unchanged.
+  const photoFile = (req.files || []).find((file) => file.fieldname === 'photo');
   // A real request: "There should not be admin check box on any of the
   // membership form or profiles... Admins will simply get a star."
   // member_type === 'admin' is derived purely from holding an Admin
@@ -1428,25 +1376,33 @@ router.post('/:id/edit', uploadMemberPhoto((req) => `/main-admin/members/${req.p
     f.memberType = existing.member_type;
     if (f.memberType !== 'admin') f.adminPositionIds = null;
   }
-  const photoPath = req.file ? await savePhotoFile(req.file) : existing ? existing.photo_path : null;
+  const photoPath = photoFile ? await savePhotoFile(photoFile) : existing ? existing.photo_path : null;
   // A newly uploaded photo replaces the old one in photo_path below - see
   // routes/admin-members.js's own identical POST /members/:id/edit.
-  if (req.file && existing && existing.photo_path) await deletePhotoFile(existing.photo_path);
+  if (photoFile && existing && existing.photo_path) await deletePhotoFile(existing.photo_path);
 
   // A real request: "No creating users. All Members should already have
   // an account. Each member profile should have a space for password."
-  // - checked before the UPDATE below so a rejected password doesn't
-  // still silently save the rest of the form with no feedback.
+  // followed by a later one: "All members should automatically have the
+  // password changeme123... Being on the member list means they already
+  // have an active account and this password." - account creation below
+  // no longer waits for a typed password at all; it only waits for an
+  // email. Checked before the UPDATE below so a rejected password
+  // doesn't still silently save the rest of the form with no feedback.
   const password = req.body.password || '';
   let portalStatus = (await portalStatusForMembers([id]))[id];
-  if (password) {
-    if (password.length < 8) {
-      return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent('Password must be at least 8 characters.'));
+  if (password && password.length < 8) {
+    return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent('Password must be at least 8 characters.'));
+  }
+  if (!portalStatus.account) {
+    // A typed password with no email to attach it to would otherwise be
+    // silently thrown away below - still worth a real error, unlike the
+    // no-password-typed case (nothing was asked for there, so there's
+    // nothing to reject).
+    if (password && !f.email) {
+      return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent('An email address is required to create a portal account.'));
     }
-    if (!portalStatus.account) {
-      if (!f.email) {
-        return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent('An email address is required to create a portal account.'));
-      }
+    if (f.email) {
       const emailClash = await findAccountByEmail(f.email);
       if (emailClash) {
         return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent('That email is already in use by another portal account.'));
@@ -1462,20 +1418,23 @@ router.post('/:id/edit', uploadMemberPhoto((req) => `/main-admin/members/${req.p
     .run(f.name, f.memberType, f.address, f.address2, f.city, f.state, f.zip, f.phone, f.email, photoPath, f.birthday, f.gradeLevel, f.medicalNotes, id);
   await syncMemberAdminPositions(id, f.adminPositionIds);
   await clearVolunteerMembershipIfNotParent(id, f.memberType);
-  await setMemberFamily(id, await resolveFamilyId(f));
+  const finalFamilyId = await resolveFamilyId(f);
+  await setMemberFamily(id, finalFamilyId);
   await setPrimaryParent(id, f.isPrimaryParent);
 
-  if (password) {
-    if (portalStatus.account) {
-      await db.prepare('UPDATE member_accounts SET password_hash = ? WHERE id = ?').run(hashPassword(password), portalStatus.account.id);
-    } else {
-      const info = await db
-        .prepare(
-          "INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at, approved_by_account_id) VALUES (?, ?, ?, 'active', now_text(), ?)"
-        )
-        .run(id, f.email, hashPassword(password), req.portalAccount.id);
-      portalStatus = { account: { id: info.lastInsertRowid }, roleIds: new Set() };
-    }
+  if (portalStatus.account) {
+    if (password) await db.prepare('UPDATE member_accounts SET password_hash = ? WHERE id = ?').run(hashPassword(password), portalStatus.account.id);
+  } else if (f.email) {
+    // Automatic now, typed password or not - see this route's own
+    // comment above. hashPassword(password || 'changeme123') is the
+    // same default ensurePortalAccountForMember already falls back to
+    // everywhere else in this app.
+    const info = await db
+      .prepare(
+        "INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at, approved_by_account_id) VALUES (?, ?, ?, 'active', now_text(), ?)"
+      )
+      .run(id, f.email, hashPassword(password || 'changeme123'), req.portalAccount.id);
+    portalStatus = { account: { id: info.lastInsertRowid }, roleIds: new Set() };
   }
 
   // Portal Settings' role checkboxes - only meaningful once this member
@@ -1491,6 +1450,35 @@ router.post('/:id/edit', uploadMemberPhoto((req) => `/main-admin/members/${req.p
   // this member ever logs into a portal themselves.
   const sectionIds = [].concat(req.body.sectionIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
   await setMemberSections(id, sectionIds);
+
+  // A real request: "Don't forget the check box questions. This should
+  // look IDENTICAL to the membership request form." - same admin-
+  // defined questions the public form saves (routes/portal-auth.js's
+  // own POST /register); 'general' only applies to a Parent/Admin,
+  // same gating partials/member-edit-fields.ejs's own General section
+  // uses, so editing an unrelated family member who happens to be a
+  // Student never overwrites a parent's already-answered general
+  // question with the "unchecked" default saveFieldValues gives every
+  // checkbox field it doesn't see a key for.
+  const customFieldsTarget = f.memberType === 'student' ? 'child' : 'parent';
+  await membershipFormFields.saveFieldValues(id, customFieldsTarget, req.body.customFields);
+  if (customFieldsTarget === 'parent') {
+    await membershipFormFields.saveFieldValues(id, 'general', req.body.customFields);
+  }
+
+  // A real request: "This page should look exactly like the membership
+  // request form. The additional parent sections and information,
+  // children sections and information." - see utils/memberFamilyEdit.js's
+  // own header comment. Runs after everything above already saved (same
+  // non-transactional posture the rest of this route already has), so a
+  // problem with one Additional Parent/Children block never blocks this
+  // member's own already-valid edits from saving.
+  const familyError = await applyFamilyEditSubmission(req, {
+    familyId: finalFamilyId,
+    address: { address: f.address, address2: f.address2, city: f.city, state: f.state, zip: f.zip },
+    createdByAccountId: req.portalAccount.id,
+  });
+  if (familyError) return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent(familyError));
 
   res.redirect('/main-admin/members?notice=' + encodeURIComponent(`${f.name} updated.`));
 });

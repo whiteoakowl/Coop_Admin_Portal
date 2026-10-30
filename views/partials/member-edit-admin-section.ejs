@@ -28,7 +28,7 @@
 <div class="manage-section member-form-section-box member-form-section-purple" data-family-box>
   <h2><svg class="icon"><use href="#icon-sliders"/></svg> Admin Settings</h2>
 
-  <label class="member-form-full">Family
+  <label class="member-form-full"><strong>Family</strong>
     <select name="familyId" data-family-select>
       <option value="">Choose from available families</option>
       <% families.forEach(function(f) { %>
@@ -38,15 +38,31 @@
   </label>
   <button type="button" class="btn-secondary member-form-add-family-btn" data-add-family-open>+ Add New Family</button>
 
+  <%
+  // A real request: "Sections and portal roles should be a dropdown
+  // menu of check box choices" - same <details data-filter-details>/
+  // .filter-panel popover every other "Filter" dropdown in this app
+  // already uses (public/js/filter-details-dismiss.js closes it on an
+  // outside click), repurposed here to hold a checkbox grid instead of
+  // a <select>, in place of the checkbox grid sitting directly on the
+  // page.
+  const checkedSectionCount = allSections.filter((s) => memberSectionIds.has(s.id)).length;
+  const checkedRoleCount = portalAccount ? allRoles.filter((r) => portalRoleIds.has(r.id)).length : 0;
+  %>
   <p><strong>Sections</strong></p>
   <% if (allSections.length === 0) { %>
     <p class="hint">No sections defined yet.</p>
   <% } else { %>
-    <div class="grade-pill-grid">
-      <% allSections.forEach(function(s) { %>
-        <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= memberSectionIds.has(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
-      <% }); %>
-    </div>
+    <details class="filter-details" data-filter-details>
+      <summary class="checklist-dropdown-toggle"><%= checkedSectionCount > 0 ? `${checkedSectionCount} selected` : 'Choose sections' %> <svg class="icon"><use href="#icon-chevron-down"/></svg></summary>
+      <div class="filter-panel">
+        <div class="grade-pill-grid">
+          <% allSections.forEach(function(s) { %>
+            <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= memberSectionIds.has(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
+          <% }); %>
+        </div>
+      </div>
+    </details>
   <% } %>
 
   <p><strong>Portal Roles</strong></p>
@@ -59,10 +75,15 @@
   <% } else if (allRoles.length === 0) { %>
     <p class="hint">No roles defined yet.</p>
   <% } else { %>
-    <div class="grade-pill-grid">
-      <% allRoles.forEach(function(r) { %>
-        <label class="grade-pill"><input type="checkbox" name="roleIds" value="<%= r.id %>" <%= portalRoleIds.has(r.id) ? 'checked' : '' %> /> <%= r.label %></label>
-      <% }); %>
-    </div>
+    <details class="filter-details" data-filter-details>
+      <summary class="checklist-dropdown-toggle"><%= checkedRoleCount > 0 ? `${checkedRoleCount} selected` : 'Choose portal roles' %> <svg class="icon"><use href="#icon-chevron-down"/></svg></summary>
+      <div class="filter-panel">
+        <div class="grade-pill-grid">
+          <% allRoles.forEach(function(r) { %>
+            <label class="grade-pill"><input type="checkbox" name="roleIds" value="<%= r.id %>" <%= portalRoleIds.has(r.id) ? 'checked' : '' %> /> <%= r.label %></label>
+          <% }); %>
+        </div>
+      </div>
+    </details>
   <% } %>
 </div>

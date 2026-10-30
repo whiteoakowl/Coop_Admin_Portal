@@ -13,15 +13,20 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <div class="member-form-page-panel">
-      <%# A real request: "when you click the edit profile button it
-          should look exactly like the membership request form. Exactly.
-          ... it will then show an admin only section at the bottom to
-          change portals, sections and family." Same partials Main
-          Admin's own Edit Member page uses (views/main-admin-member-
-          edit.ejs), minus Password - creating a portal account has
-          always been Main-Admin-only (see routes/main-admin-members.js's
-          own "No creating users" comment, and routes/admin-members.js's
-          own identical boundary on this same POST /members/:id/edit). %>
+      <%# A real request: "This page should look exactly like the
+          membership request form. The additional parent sections and
+          information, children sections and information. With family
+          information below. Save and cancel buttons and the bottom of
+          the page, same size, same row, side by side." Same partials
+          Main Admin's own Edit Member page uses (views/main-admin-
+          member-edit.ejs), minus Password - creating a portal account
+          has always been Main-Admin-only (see routes/main-admin-
+          members.js's own "No creating users" comment, and routes/
+          admin-members.js's own identical boundary on this same POST
+          /members/:id/edit) - so neither the Parent/Guardian fields
+          above nor any Additional Parent/Children block below ever asks
+          for a password here at all, new account or existing one alike
+          (showLogin: false below). %>
       <form
         method="POST"
         action="/admin/members/<%= member.id %>/edit"
@@ -30,7 +35,8 @@
         class="member-edit-form member-edit-form-page"
         data-add-family-url="/admin/members/families/new"
       >
-        <%- include('partials/member-edit-fields', { member, gradeLevels, showPassword: false }) %>
+        <%- include('partials/member-edit-fields', { member, gradeLevels, showPassword: false, parentFields, childFields, generalFields, customFieldValues }) %>
+        <%- include('partials/member-edit-family-sections', { familyAdults, familyChildren, familyChildFields, showLogin: false }) %>
         <%- include('partials/member-edit-admin-section', { member, families, memberFamilyId, allSections, memberSectionIds, allRoles, portalRoleIds, portalAccount, hasPasswordField: false }) %>
 
         <div class="member-form-footer">
@@ -40,8 +46,6 @@
           </div>
         </div>
       </form>
-
-      <%- include('partials/family-members-editor', { familyMembers, gradeLevels, viewerId: member.id, quickEditBasePath: '/admin/members' }) %>
 
       <%# Outside #member-form on purpose - a <form> can't nest inside another
           <form> (the browser silently drops the inner tag), so this dialog's
@@ -64,5 +68,7 @@
 
   </main>
   <script src="/js/member-form.js"></script>
+  <script src="/js/member-family-edit-form.js"></script>
+  <script src="/js/filter-details-dismiss.js"></script>
 </body>
 </html>

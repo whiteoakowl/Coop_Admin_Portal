@@ -1,0 +1,91 @@
+<%
+// Repeatable "Child" block on the unified member edit pages - mirrors
+// partials/member-edit-adult-block.ejs's own field grid/classes/
+// numbered-title/+Add-button pattern (see that partial's own header
+// comment for the shared Full Name/no-delete reasoning), matching the
+// public self-registration form's own partials/register-child-fields.ejs
+// field set exactly: no contact Email or Address fields here at all - a
+// child's own members.email/address columns are never touched by this
+// block, same as the public form never asks for them either (a child's
+// address is implicitly the family's own).
+//
+// Locals:
+//   index - this block's 0-based array position (children[index])
+//   member - the existing member row, or null for a brand-new block
+//   portalStatus - { account } for an existing child, or null/undefined
+//   showLogin - false on Co-op Admin's own edit page - see partials/
+//     member-edit-adult-block.ejs's own header comment.
+//   childFields - admin-defined extra questions for a student (utils/
+//     membershipFormFields.js) - a real request: "Don't forget the
+//     check box questions. This should look IDENTICAL to the
+//     membership request form," same as register-child-fields.ejs's
+//     own identical loop, prefilled from each entry's own
+//     customFieldValues ("f"+id keyed, utils/membershipFormFields.js's
+//     own fieldValuesForView) for an existing child, undefined for a
+//     brand-new one.
+//
+// A real request: "Not volunteer for setup crew check box. It should
+// be the same address as parent number 1 check box. Allow member to
+// create portal. The two checkboxes on the member request form." - the
+// "Give this student their own portal login" checkbox is back, same
+// wording/position as the public form's own partials/register-child-
+// fields.ejs (right before the Student Login Email/Password fields it
+// reveals). Checking it is still all that's needed to grant a real,
+// active account - utils/memberFamilyEdit.js's own applyChildren
+// defaults the password to changeme123 (same as everywhere else in
+// this app) when this is checked but the Password field is left blank.
+const m = member || {};
+const hasAccount = !!(portalStatus && portalStatus.account);
+const showLoginSection = typeof showLogin === 'undefined' || showLogin;
+%>
+<div class="manage-section register-child-block" data-child-block>
+  <div class="membership-child-header">
+    <h3 data-child-title></h3>
+    <% if (!member) { %>
+      <button type="button" class="icon-btn register-remove-child" aria-label="Remove child" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+    <% } %>
+  </div>
+  <input type="hidden" name="children[<%= index %>][id]" value="<%= member ? member.id : '' %>" />
+  <div class="member-form-grid">
+    <label class="member-form-full">Photo
+      <input type="file" name="children[<%= index %>][photo]" accept="image/*" />
+      <% if (m.photo_path) { %><span class="hint">Choose a new photo to replace the one on file.</span><% } %>
+    </label>
+    <label class="member-form-full">Full Name
+      <input type="text" name="children[<%= index %>][name]" value="<%= m.name || '' %>" />
+    </label>
+    <label>Birthdate
+      <input type="date" name="children[<%= index %>][birthdate]" value="<%= m.birthday || '' %>" />
+    </label>
+    <label class="member-form-full">Medical / Allergy Notes
+      <textarea name="children[<%= index %>][medicalNotes]" rows="2"><%= m.medical_notes || '' %></textarea>
+    </label>
+  </div>
+
+  <% if (showLoginSection) { %>
+    <% if (hasAccount) { %>
+      <div class="member-form-grid">
+        <p class="hint member-form-full">Account: <%= portalStatus.account.email %></p>
+        <label>New Password <span class="hint">(leave blank to keep the current one)</span>
+          <input type="password" name="children[<%= index %>][loginPassword]" minlength="8" autocomplete="new-password" />
+        </label>
+      </div>
+    <% } else { %>
+      <label class="checkbox-option">
+        <input type="checkbox" class="register-child-login-toggle" data-child-login-toggle name="children[<%= index %>][wantsLogin]" />
+        Give this student their own portal login
+      </label>
+      <div class="member-form-grid register-child-login-fields" data-child-login-fields hidden>
+        <label class="member-form-full">Student Login Email
+          <input type="email" name="children[<%= index %>][loginEmail]" value="" autocomplete="off" />
+        </label>
+        <label>Password <span class="hint">(optional - defaults to changeme123)</span>
+          <input type="password" name="children[<%= index %>][loginPassword]" minlength="8" autocomplete="new-password" />
+        </label>
+      </div>
+    <% } %>
+  <% } %>
+  <% (childFields || []).forEach(function(f) { %>
+    <%- include('membership-form-field', { field: f, namePrefix: 'children[' + index + '][customFields]', values: (typeof customFieldValues !== 'undefined' ? customFieldValues : null) }) %>
+  <% }); %>
+</div>

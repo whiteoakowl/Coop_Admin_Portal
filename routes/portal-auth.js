@@ -7,7 +7,7 @@ const router = express.Router();
 const db = require('../db');
 const { findAccountByEmail, verifyPassword, hashPassword, memberForAccount, familyForAccount } = require('../utils/portalAuth');
 const { generateMemberCode, setPrimaryParent } = require('../utils/members');
-const { uploadMemberPhoto, savePhotoFile: saveMemberPhotoFile, deletePhotoFile: deleteMemberPhotoFile } = require('../utils/memberPhoto');
+const { savePhotoFile: saveMemberPhotoFile, deletePhotoFile: deleteMemberPhotoFile } = require('../utils/memberPhoto');
 const { createFailureRateLimiter } = require('../utils/loginRateLimit');
 const { GRADE_OPTIONS } = require('../utils/membership');
 const { CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
@@ -20,6 +20,7 @@ const path = require('path');
 const fs = require('fs');
 const { createStorageClient, downloadFile } = require('../utils/storage');
 const { uploadIntakePhotos, savePhotoFile, parseArrayField } = require('../utils/memberIntake');
+const { familyEditSections, applyFamilyEditSubmission } = require('../utils/memberFamilyEdit');
 
 const portalLoginLimiter = createFailureRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 8 });
 
@@ -889,16 +890,36 @@ router.get('/portal/profile/edit', async (req, res) => {
     member,
     gradeLevels: GRADE_OPTIONS,
     portalAccount: req.portalAccount,
+    // A real request: "Parent portal, profile icon, edit button, should
+    // look exactly like the membership request form. All sections and
+    // features should be the same." - see utils/memberFamilyEdit.js's
+    // own header comment.
+    ...(await familyEditSections(member.id)),
+    // A real request: "Don't forget the check box questions. This
+    // should look IDENTICAL to the membership request form." - same
+    // admin-defined questions the public form asks, with this member's
+    // own already-answered values prefilled.
+    parentFields: await membershipFormFields.listFields('parent'),
+    childFields: await membershipFormFields.listFields('child'),
+    generalFields: await membershipFormFields.listFields('general'),
+    customFieldValues: await membershipFormFields.fieldValuesForView(member.id),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
 });
 
-router.post('/portal/profile/edit', uploadMemberPhoto(() => '/portal/profile/edit'), async (req, res) => {
+router.post('/portal/profile/edit', uploadIntakePhotos(() => '/portal/profile/edit'), async (req, res) => {
   if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile%2Fedit');
   const member = await memberForAccount(req.portalAccount.id);
   if (!member) return res.redirect('/portal');
   const back = '/portal/profile/edit';
+  // multer.any() (uploadIntakePhotos) replaces the old single-file
+  // uploadMemberPhoto middleware now that this same submission can also
+  // carry a photo per Additional Parent/Children block below (req.files
+  // is an array, matched by fieldname - see utils/memberFamilyEdit.js's
+  // own fileFor) - this member's own photo still posts under the plain
+  // "photo" field name, unchanged.
+  const photoFile = (req.files || []).find((file) => file.fieldname === 'photo');
 
   const name = (req.body.name || '').trim();
   if (!name) {
@@ -919,8 +940,14 @@ router.post('/portal/profile/edit', uploadMemberPhoto(() => '/portal/profile/edi
     }
   }
 
-  const photoPath = req.file ? await saveMemberPhotoFile(req.file) : member.photo_path;
-  if (req.file && member.photo_path) await deleteMemberPhotoFile(member.photo_path);
+  const photoPath = photoFile ? await saveMemberPhotoFile(photoFile) : member.photo_path;
+  if (photoFile && member.photo_path) await deleteMemberPhotoFile(member.photo_path);
+
+  const address = (req.body.address || '').trim() || null;
+  const address2 = (req.body.address2 || '').trim() || null;
+  const city = (req.body.city || '').trim() || null;
+  const state = (req.body.state || '').trim() || null;
+  const zip = (req.body.zip || '').trim() || null;
 
   await db
     .prepare(
@@ -928,11 +955,11 @@ router.post('/portal/profile/edit', uploadMemberPhoto(() => '/portal/profile/edi
     )
     .run(
       name,
-      (req.body.address || '').trim() || null,
-      (req.body.address2 || '').trim() || null,
-      (req.body.city || '').trim() || null,
-      (req.body.state || '').trim() || null,
-      (req.body.zip || '').trim() || null,
+      address,
+      address2,
+      city,
+      state,
+      zip,
       (req.body.phone || '').trim() || null,
       (req.body.email || '').trim() || null,
       (req.body.medicalNotes || '').trim() || null,
@@ -944,6 +971,29 @@ router.post('/portal/profile/edit', uploadMemberPhoto(() => '/portal/profile/edi
   if (newPassword) {
     await db.prepare('UPDATE member_accounts SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), req.portalAccount.id);
   }
+
+  // A real request: "Don't forget the check box questions. This should
+  // look IDENTICAL to the membership request form." - see routes/
+  // main-admin-members.js's own identical POST /:id/edit comment.
+  const customFieldsTarget = member.member_type === 'student' ? 'child' : 'parent';
+  await membershipFormFields.saveFieldValues(member.id, customFieldsTarget, req.body.customFields);
+  if (customFieldsTarget === 'parent') {
+    await membershipFormFields.saveFieldValues(member.id, 'general', req.body.customFields);
+  }
+
+  // A real request: "Parent portal, profile icon, edit button, should
+  // look exactly like the membership request form. All sections and
+  // features should be the same." - see utils/memberFamilyEdit.js's own
+  // header comment. createdByAccountId is null - a parent's own self-
+  // edit isn't a Main Admin account, so a brand-new family member added
+  // here has nothing to attribute their account's approval to, same as
+  // Co-op Admin's own identical call.
+  const familyError = await applyFamilyEditSubmission(req, {
+    familyId: member.family_id,
+    address: { address, address2, city, state, zip },
+    createdByAccountId: null,
+  });
+  if (familyError) return res.redirect(back + '?error=' + encodeURIComponent(familyError));
 
   res.redirect('/portal/profile?notice=' + encodeURIComponent('Profile updated.'));
 });
