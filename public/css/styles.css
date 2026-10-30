@@ -15701,3 +15701,101 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .diploma-design-preview { border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem; background: var(--surface-muted, #f7f9fb); overflow-x: auto; }
 .diploma-design-preview .diploma-cert { margin-bottom: 0; }
 .diploma-signature-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem 1.5rem; }
+
+/* Custom Forms (Main Admin "Forms" tab) - a real request: "Main admin
+   portal, forms tab. Should have full editing features and view just
+   like jotform. Exactly." Everything below is scoped to the .cf-*
+   classes views/custom-forms-fill.ejs, views/partials/custom-form-
+   field.ejs, and the builder's own live preview panel render - nothing
+   here touches any other form in the app. --cf-primary/--cf-radius are
+   set inline per form (custom-forms-fill.ejs's own <body style>, and
+   the builder preview panel) from custom_forms.theme_primary_color/
+   theme_button_style - a form nobody has themed yet falls back to this
+   app's existing --brand-dark blue and rounded corners, so it renders
+   exactly as it always has. */
+.cf-form { --cf-primary: var(--brand-dark); --cf-radius: 10px; }
+.cf-required-star { color: var(--red); font-weight: 700; }
+.cf-field.cf-hidden,
+.cf-page[data-cf-condition].cf-hidden { display: none !important; }
+
+.cf-page:not(.cf-page-active) { display: none; }
+.cf-page-heading h2 { margin-top: 0; margin-bottom: 0.25rem; }
+.cf-page-nav { display: flex; justify-content: space-between; gap: 0.75rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+
+.cf-btn, .cf-form .primary-btn {
+  background: var(--cf-primary);
+  color: #fff;
+  border-radius: var(--cf-radius);
+}
+.cf-btn:hover, .cf-form .primary-btn:hover { filter: brightness(0.9); box-shadow: none; }
+.cf-form input[type="radio"],
+.cf-form input[type="checkbox"] { accent-color: var(--cf-primary); }
+
+/* Multi-page progress indicator - hidden entirely for a single-page
+   form (custom-forms-fill.ejs only renders this nav when there's more
+   than one page), so a short form never shows a 1-of-1 progress bar. */
+.cf-progress { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-bottom: 1.25rem; }
+.cf-progress-step { display: flex; align-items: center; gap: 0.4rem; color: var(--muted); font-size: 0.85rem; }
+.cf-progress-dot {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.6rem; height: 1.6rem; border-radius: 50%;
+  background: var(--border); color: var(--ink); font-weight: 700; font-size: 0.8rem;
+  flex-shrink: 0;
+}
+.cf-progress-step-active { color: var(--ink); font-weight: 600; }
+.cf-progress-step-active .cf-progress-dot { background: var(--cf-primary); color: #fff; }
+
+.cf-heading { margin: 0.5rem 0 0.25rem; }
+.cf-paragraph { white-space: pre-wrap; color: var(--ink); margin: 0.25rem 0 0.75rem; }
+
+/* Star rating (1-5) - pure CSS, no library: radios rendered in reverse
+   (5..1) DOM order with flex-direction: row-reverse restoring the usual
+   visual left-to-right order, so the ":checked ~ label" general-sibling
+   selector (which only ever selects elements AFTER the checked input in
+   DOM order) lights up the chosen star and every lower one, matching
+   how a star rating always reads ("3 stars" visually fills the first
+   three, left to right). */
+.cf-rating { display: inline-flex; flex-direction: row-reverse; gap: 0.15rem; }
+.cf-rating input { position: absolute; opacity: 0; width: 0; height: 0; }
+.cf-rating label { font-size: 1.7rem; line-height: 1; color: var(--border); cursor: pointer; transition: color 0.1s ease; }
+.cf-rating input:checked ~ label { color: #f5a623; }
+.cf-rating label:hover,
+.cf-rating label:hover ~ label { color: #f5a623; }
+.cf-rating input:disabled ~ label { cursor: default; }
+
+.cf-scale { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.cf-scale-option { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; font-size: 0.8rem; color: var(--muted); }
+.cf-scale-option input { accent-color: var(--cf-primary); }
+
+@media (max-width: 640px) {
+  .cf-progress-label { display: none; }
+  .cf-page-nav { flex-wrap: wrap; }
+}
+
+/* Main Admin Forms builder - field-type palette (a fuller palette than
+   the original plain <select>, grouped the way utils/customForms.js's
+   own FIELD_TYPES groups them) and the live preview panel. */
+.cf-type-palette { display: flex; flex-direction: column; gap: 0.75rem; }
+.cf-type-palette-group-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0; }
+.cf-type-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.5rem; }
+.cf-type-btn {
+  display: flex; align-items: center; gap: 0.5rem;
+  border: 1px solid var(--border); border-radius: 10px; padding: 0.55rem 0.7rem;
+  background: #fff; cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--ink);
+  text-align: left;
+}
+.cf-type-btn:hover { border-color: var(--brand); background: var(--brand-soft); }
+.cf-type-btn.cf-type-btn-selected { border-color: var(--brand-dark); background: var(--brand-soft); color: var(--brand-dark); }
+.cf-type-btn .icon { width: 1rem; height: 1rem; flex-shrink: 0; }
+
+.cf-preview-panel { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; background: var(--surface-muted, #f7f9fb); }
+.cf-preview-panel .cf-form { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; }
+.cf-builder-layout { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+@media (max-width: 980px) {
+  .cf-builder-layout { grid-template-columns: 1fr; }
+}
+.cf-page-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.9rem 1rem; margin-bottom: 1rem; }
+.cf-page-card-header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.cf-page-card-header h3 { margin: 0; }
+.cf-condition-badge { font-size: 0.75rem; color: var(--brand-dark); background: var(--brand-soft); border-radius: 999px; padding: 0.1rem 0.5rem; }
+.cf-theme-swatch { width: 1.4rem; height: 1.4rem; border-radius: 4px; border: 1px solid var(--border); display: inline-block; vertical-align: middle; margin-right: 0.35rem; }

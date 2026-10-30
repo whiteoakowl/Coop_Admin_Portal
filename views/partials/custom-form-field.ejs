@@ -1,0 +1,78 @@
+<%
+// One field's input markup, shared by the public fill-out page
+// (custom-forms-fill.ejs) and the Main Admin builder's own live preview
+// panel (admin-custom-forms-builder.ejs) - rendering both from the same
+// partial is what makes the preview genuinely "look like what the
+// public form will look like" rather than a separate hand-maintained
+// approximation of it. Locals: field (with .options, already parsed
+// conditional_logic on .conditionalLogicParsed if present), ratingMax
+// (utils/customForms.js's RATING_MAX), disabled (optional - true in the
+// builder preview, where nothing is ever actually submitted).
+var isDisabled = typeof disabled !== 'undefined' && disabled;
+var req = field.is_required == 1;
+var conditionAttr = field.conditionalLogicParsed ? ` data-cf-condition='${JSON.stringify(field.conditionalLogicParsed)}'` : '';
+%>
+<% if (field.field_type === 'heading') { %>
+  <div class="member-form-full cf-field" data-cf-field-id="<%= field.id %>"<%- conditionAttr %>>
+    <h2 class="cf-heading"><%= field.label %></h2>
+    <% if (field.help_text) { %><p class="hint"><%= field.help_text %></p><% } %>
+  </div>
+<% } else if (field.field_type === 'paragraph') { %>
+  <div class="member-form-full cf-field" data-cf-field-id="<%= field.id %>"<%- conditionAttr %>>
+    <p class="cf-paragraph"><%= field.help_text || field.label %></p>
+  </div>
+<% } else { %>
+  <div class="member-form-full cf-field" data-cf-field-id="<%= field.id %>"<%- conditionAttr %>>
+    <label><%= field.label %><% if (req) { %> <span class="cf-required-star">*</span><% } %></label>
+    <% if (field.help_text) { %><p class="hint"><%= field.help_text %></p><% } %>
+
+    <% if (field.field_type === 'short_text') { %>
+      <input type="text" name="field_<%= field.id %>" placeholder="<%= field.placeholder || '' %>" value="<%= field.default_value || '' %>" <%= req ? 'required' : '' %> <%= isDisabled ? 'disabled' : '' %> />
+    <% } else if (field.field_type === 'email') { %>
+      <input type="email" name="field_<%= field.id %>" placeholder="<%= field.placeholder || 'name@example.com' %>" value="<%= field.default_value || '' %>" <%= req ? 'required' : '' %> <%= isDisabled ? 'disabled' : '' %> />
+    <% } else if (field.field_type === 'phone') { %>
+      <input type="tel" name="field_<%= field.id %>" placeholder="<%= field.placeholder || '(555) 555-5555' %>" value="<%= field.default_value || '' %>" <%= req ? 'required' : '' %> <%= isDisabled ? 'disabled' : '' %> />
+    <% } else if (field.field_type === 'url') { %>
+      <input type="url" name="field_<%= field.id %>" placeholder="<%= field.placeholder || 'https://' %>" value="<%= field.default_value || '' %>" <%= req ? 'required' : '' %> <%= isDisabled ? 'disabled' : '' %> />
+    <% } else if (field.field_type === 'long_text') { %>
+      <textarea name="field_<%= field.id %>" rows="3" placeholder="<%= field.placeholder || '' %>" <%= req ? 'required' : '' %> <%= isDisabled ? 'disabled' : '' %>><%= field.default_value || '' %></textarea>
+    <% } else if (field.field_type === 'number') { %>
+      <input type="number" name="field_<%= field.id %>" placeholder="<%= field.placeholder || '' %>" value="<%= field.default_value || '' %>" <%= req ? 'required' : '' %> <%= isDisabled ? 'disabled' : '' %> />
+    <% } else if (field.field_type === 'date') { %>
+      <input type="date" name="field_<%= field.id %>" value="<%= field.default_value || '' %>" <%= req ? 'required' : '' %> <%= isDisabled ? 'disabled' : '' %> />
+    <% } else if (field.field_type === 'single_choice') { %>
+      <% field.options.forEach(function(o) { %>
+        <label class="grade-pill"><input type="radio" name="field_<%= field.id %>" value="<%= o.label %>" <%= field.default_value === o.label ? 'checked' : '' %> <%= req ? 'required' : '' %> <%= isDisabled ? 'disabled' : '' %> /> <%= o.label %></label>
+      <% }); %>
+    <% } else if (field.field_type === 'multiple_choice') { %>
+      <% field.options.forEach(function(o) { %>
+        <label class="grade-pill"><input type="checkbox" name="field_<%= field.id %>" value="<%= o.id %>" data-option-label="<%= o.label %>" <%= isDisabled ? 'disabled' : '' %> /> <%= o.label %></label>
+      <% }); %>
+    <% } else if (field.field_type === 'dropdown') { %>
+      <select name="field_<%= field.id %>" <%= req ? 'required' : '' %> <%= isDisabled ? 'disabled' : '' %>>
+        <option value="">Choose one&hellip;</option>
+        <% field.options.forEach(function(o) { %><option value="<%= o.label %>" <%= field.default_value === o.label ? 'selected' : '' %>><%= o.label %></option><% }); %>
+      </select>
+    <% } else if (field.field_type === 'checkbox') { %>
+      <label class="grade-pill"><input type="checkbox" name="field_<%= field.id %>" value="1" <%= field.default_value === '1' ? 'checked' : '' %> <%= isDisabled ? 'disabled' : '' %> /> Yes</label>
+    <% } else if (field.field_type === 'rating') { %>
+      <div class="cf-rating">
+        <% for (var v = (ratingMax ? ratingMax.rating : 5); v >= 1; v--) { %>
+          <input type="radio" id="cf-rating-<%= field.id %>-<%= v %>" name="field_<%= field.id %>" value="<%= v %>" <%= String(field.default_value) === String(v) ? 'checked' : '' %> <%= req ? 'required' : '' %> <%= isDisabled ? 'disabled' : '' %> />
+          <label for="cf-rating-<%= field.id %>-<%= v %>" title="<%= v %> star<%= v === 1 ? '' : 's' %>">&#9733;</label>
+        <% } %>
+      </div>
+    <% } else if (field.field_type === 'scale') { %>
+      <div class="cf-scale">
+        <% for (var s = 1; s <= (ratingMax ? ratingMax.scale : 10); s++) { %>
+          <label class="cf-scale-option">
+            <input type="radio" name="field_<%= field.id %>" value="<%= s %>" <%= String(field.default_value) === String(s) ? 'checked' : '' %> <%= req ? 'required' : '' %> <%= isDisabled ? 'disabled' : '' %> />
+            <span><%= s %></span>
+          </label>
+        <% } %>
+      </div>
+    <% } else if (field.field_type === 'file') { %>
+      <input type="file" name="field_<%= field.id %>" <%= req ? 'required' : '' %> <%= isDisabled ? 'disabled' : '' %> />
+    <% } %>
+  </div>
+<% } %>

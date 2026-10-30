@@ -7,6 +7,25 @@
   <%- include('partials/portal-nav', {
     portalTitle: 'Main Admin',
   }) %>
+<%
+// Grouped field-type palette (utils/customForms.js's own FIELD_TYPES,
+// grouped by .group) - "a fuller field-type palette" than the original
+// plain <select>, rendered as one button grid per group in both the
+// Add Field and Edit Field dialogs below.
+var fieldTypeGroups = [];
+fieldTypes.forEach(function (t) {
+  var group = fieldTypeGroups.find(function (g) { return g.name === t.group; });
+  if (!group) { group = { name: t.group, types: [] }; fieldTypeGroups.push(group); }
+  group.types.push(t);
+});
+var buttonRadius = form.theme_button_style === 'pill' ? '999px' : form.theme_button_style === 'square' ? '4px' : '10px';
+%>
+  <%# Every field in the form, flat, for the conditional-logic rule
+      builder's own "depends on" dropdown and its value-type lookup
+      (public/js/custom-form-builder.js reads this to swap in a real
+      <select> of a choice field's own options once one is picked as
+      the condition's target). %>
+  <script type="application/json" id="cf-field-meta"><%- JSON.stringify(Object.fromEntries(allFields.map(function(f) { return [f.id, { type: f.field_type, options: f.options.map(function(o){ return o.label; }) }]; }))) %></script>
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
@@ -38,144 +57,323 @@
             <button type="submit" class="roster-action-btn">Move to Draft</button>
           </form>
         <% } %>
-        <form method="POST" action="/main-admin/forms/<%= form.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= form.title %>&quot;? This removes every field, assignment, and submission. This cannot be undone.">
+        <form method="POST" action="/main-admin/forms/<%= form.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= form.title %>&quot;? This removes every page, field, assignment, and submission. This cannot be undone.">
           <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
         </form>
       </div>
     </div>
 
-    <div class="manage-section">
-      <div class="grid-box-header"><h2>Settings</h2></div>
-      <form method="POST" action="/main-admin/forms/<%= form.id %>" class="member-form-grid">
-        <label class="member-form-full">Title
-          <input type="text" name="title" value="<%= form.title %>" required />
-        </label>
-        <label class="member-form-full">Description
-          <textarea name="description" rows="2"><%= form.description || '' %></textarea>
-        </label>
-        <div class="member-form-full">
-          <button type="submit" class="primary-btn">Save</button>
+    <div class="cf-builder-layout">
+      <div>
+        <div class="manage-section">
+          <div class="grid-box-header"><h2>Settings &amp; Theme</h2></div>
+          <form method="POST" action="/main-admin/forms/<%= form.id %>" class="member-form-grid">
+            <label class="member-form-full">Title
+              <input type="text" name="title" value="<%= form.title %>" required />
+            </label>
+            <label class="member-form-full">Description
+              <textarea name="description" rows="2"><%= form.description || '' %></textarea>
+            </label>
+            <%# Per-form appearance - a real request: "full editing
+                features and view just like jotform, exactly" (Jotform's
+                own Theme tab, scoped to primary color + button shape).
+                Applied live on the preview panel to the right, and on
+                the public fill-out page (custom-forms-fill.ejs). %>
+            <label>Primary Color
+              <input type="color" name="themePrimaryColor" value="<%= form.theme_primary_color %>" />
+            </label>
+            <label>Button Style
+              <select name="themeButtonStyle">
+                <% themeButtonStyles.forEach(function(s) { %>
+                  <option value="<%= s %>" <%= form.theme_button_style === s ? 'selected' : '' %>><%= s.charAt(0).toUpperCase() + s.slice(1) %></option>
+                <% }); %>
+              </select>
+            </label>
+            <div class="member-form-full">
+              <button type="submit" class="primary-btn">Save</button>
+            </div>
+          </form>
         </div>
-      </form>
-    </div>
 
-    <div class="manage-section">
-      <div class="grid-box-header">
-        <h2>Fields (<%= fields.length %>)</h2>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-field-dialog').showModal()">+ Add Field</button>
-      </div>
+        <div class="manage-section">
+          <div class="grid-box-header">
+            <h2>Pages (<%= pages.length %>)</h2>
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-page-dialog').showModal()">+ Add Page</button>
+          </div>
+          <p class="hint">A form with more than one page shows a progress bar on the fill-out page, and a page can be set to only appear when an earlier answer matches a condition.</p>
 
-      <% if (fields.length === 0) { %>
-        <p class="roster-empty">No fields yet &mdash; add one above.</p>
-      <% } %>
+          <div class="homepage-builder-canvas" data-homepage-blocks-container data-reorder-url="/main-admin/forms/<%= form.id %>/pages/reorder">
+            <% pages.forEach(function(page, pageIndex) { %>
+              <div class="cf-page-card" data-homepage-block-row="<%= page.id %>">
+                <div class="cf-page-card-header">
+                  <span data-homepage-block-drag-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span>
+                  <h3>Page <%= pageIndex + 1 %><%= page.title ? ': ' + page.title : '' %></h3>
+                  <% if (page.conditionalLogicParsed) { %><span class="cf-condition-badge">Conditional</span><% } %>
+                  <div class="training-lesson-actions">
+                    <button type="button" class="icon-btn" onclick="document.getElementById('edit-page-dialog-<%= page.id %>').showModal()" aria-label="Edit page" title="Edit Page"><svg class="icon"><use href="#icon-edit"/></svg></button>
+                    <% if (pages.length > 1) { %>
+                      <form method="POST" action="/main-admin/forms/<%= form.id %>/pages/<%= page.id %>/delete" class="inline-block-form" data-confirm="Remove this page? Its fields will move to the remaining page.">
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete page" title="Delete Page"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    <% } %>
+                  </div>
+                </div>
+                <% if (page.description) { %><p class="hint"><%= page.description %></p><% } %>
 
-      <div class="training-lesson-list">
-        <% fields.forEach(function(field) { %>
-          <div class="training-lesson-row">
-            <div class="training-lesson-row-main">
-              <svg class="icon"><use href="#icon-file-text"/></svg>
-              <div class="training-lesson-info">
-                <strong><%= field.label %></strong>
-                <span class="hint">
-                  <%= fieldTypes.find(function(t) { return t.key === field.field_type; }).label %>
-                  <% if (field.is_required == 1) { %> &middot; Required<% } %>
-                </span>
-                <% if (field.options.length) { %>
-                  <span class="hint">Options: <%= field.options.map(function(o) { return o.label; }).join(', ') %></span>
+                <% if (page.fields.length === 0) { %>
+                  <p class="roster-empty">No fields on this page yet.</p>
+                <% } else { %>
+                  <div class="homepage-builder-canvas" data-homepage-blocks-container data-reorder-url="/main-admin/forms/<%= form.id %>/fields/reorder" data-reorder-extra='<%- JSON.stringify({ pageId: page.id }) %>'>
+                    <% page.fields.forEach(function(field) { %>
+                      <div class="homepage-builder-block" data-homepage-block-row="<%= field.id %>">
+                        <span data-homepage-block-drag-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span>
+                        <div class="homepage-builder-block-preview">
+                          <span class="badge-pill badge-pill-gray homepage-builder-block-type"><%= fieldTypes.find(function(t) { return t.key === field.field_type; }).label %></span>
+                          <strong><%= field.label %></strong>
+                          <span class="hint">
+                            <% if (field.is_required == 1) { %>Required<% } %>
+                            <% if (field.options.length) { %> &middot; Options: <%= field.options.map(function(o) { return o.label; }).join(', ') %><% } %>
+                            <% if (field.conditionalLogicParsed) { %> &middot; <span class="cf-condition-badge">Conditional</span><% } %>
+                          </span>
+                        </div>
+                        <div class="homepage-builder-block-actions">
+                          <button type="button" class="icon-btn" onclick="document.getElementById('edit-field-dialog-<%= field.id %>').showModal()" aria-label="Edit <%= field.label %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
+                          <form method="POST" action="/main-admin/forms/<%= form.id %>/fields/<%= field.id %>/delete" class="inline-block-form" data-confirm="Remove field &quot;<%= field.label %>&quot;?">
+                            <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= field.label %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                          </form>
+                        </div>
+                      </div>
+                    <% }); %>
+                  </div>
                 <% } %>
+                <div class="roster-btn-row" style="margin-top: 0.6rem;">
+                  <button type="button" class="roster-action-btn roster-action-btn-small" onclick="document.getElementById('add-field-dialog-<%= page.id %>').showModal()">+ Add Field</button>
+                </div>
               </div>
-              <div class="training-lesson-actions">
-                <button type="button" class="icon-btn" onclick="document.getElementById('edit-field-dialog-<%= field.id %>').showModal()" aria-label="Edit <%= field.label %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
-                <form method="POST" action="/main-admin/forms/<%= form.id %>/fields/<%= field.id %>/delete" class="inline-block-form" data-confirm="Remove field &quot;<%= field.label %>&quot;?">
-                  <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= field.label %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                </form>
-              </div>
-            </div>
-          </div>
 
-          <dialog id="edit-field-dialog-<%= field.id %>" class="member-picker-dialog">
-            <form method="POST" action="/main-admin/forms/<%= form.id %>/fields/<%= field.id %>/update">
-              <h3>Edit Field</h3>
-              <label>Label
-                <input type="text" name="label" value="<%= field.label %>" required />
-              </label>
-              <label>Help Text
-                <input type="text" name="helpText" value="<%= field.help_text || '' %>" />
-              </label>
-              <% if (choiceTypes.indexOf(field.field_type) !== -1) { %>
-                <label>Options (one per line)
-                  <textarea name="options" rows="4"><%= field.options.map(function(o) { return o.label; }).join('\n') %></textarea>
-                </label>
-              <% } %>
-              <label class="grade-pill"><input type="checkbox" name="isRequired" <%= field.is_required == 1 ? 'checked' : '' %> /> Required</label>
-              <div class="notes-dialog-actions">
-                <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-                <button type="submit" class="primary-btn">Save</button>
+              <%# Add-Field dialog for THIS page - pageId is preset
+                  (hidden), so a field added here lands directly on this
+                  page with no extra picker needed. %>
+              <dialog id="add-field-dialog-<%= page.id %>" class="member-picker-dialog">
+                <form method="POST" action="/main-admin/forms/<%= form.id %>/fields">
+                  <h3>Add Field &mdash; Page <%= pageIndex + 1 %></h3>
+                  <input type="hidden" name="pageId" value="<%= page.id %>" />
+                  <div class="cf-type-palette">
+                    <% fieldTypeGroups.forEach(function(group) { %>
+                      <p class="cf-type-palette-group-label"><%= group.name %></p>
+                      <div class="cf-type-grid">
+                        <% group.types.forEach(function(t, i) { %>
+                          <label class="cf-type-btn">
+                            <input type="radio" name="fieldType" value="<%= t.key %>" style="position:absolute;opacity:0;" <%= (group === fieldTypeGroups[0] && i === 0) ? 'checked' : '' %> required />
+                            <svg class="icon"><use href="#icon-<%= t.icon %>"/></svg> <%= t.label %>
+                          </label>
+                        <% }); %>
+                      </div>
+                    <% }); %>
+                  </div>
+                  <label>Label
+                    <input type="text" name="label" required />
+                  </label>
+                  <label>Help Text
+                    <input type="text" name="helpText" />
+                  </label>
+                  <label data-cf-row="placeholder">Placeholder
+                    <input type="text" name="placeholder" />
+                  </label>
+                  <label data-cf-row="default">Default Value
+                    <input type="text" name="defaultValue" />
+                  </label>
+                  <label data-cf-row="options" style="display: none;">Options (one per line)
+                    <textarea name="options" rows="4"></textarea>
+                  </label>
+                  <label class="grade-pill" data-cf-row="required"><input type="checkbox" name="isRequired" /> Required</label>
+                  <%- include('partials/custom-form-condition-builder', { allFields: allFields, currentRule: null, conditionOperators: conditionOperators, choiceTypes: choiceTypes, excludeFieldId: null }) %>
+                  <div class="notes-dialog-actions">
+                    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+                    <button type="submit" class="primary-btn">Add</button>
+                  </div>
+                </form>
+              </dialog>
+            <% }); %>
+          </div>
+        </div>
+
+        <div class="manage-section">
+          <div class="grid-box-header"><h2>Assign To (<%= assignments.length %>)</h2></div>
+          <p class="hint">Leave unassigned to make this form open to any signed-in member once published.</p>
+          <div class="training-lesson-list">
+            <% assignments.forEach(function(a) { %>
+              <div class="training-lesson-row">
+                <div class="training-lesson-row-main">
+                  <svg class="icon"><use href="#icon-<%= a.member_id ? 'user' : 'users' %>"/></svg>
+                  <div class="training-lesson-info">
+                    <strong><%= a.memberName || a.roleLabel %></strong>
+                  </div>
+                  <div class="training-lesson-actions">
+                    <form method="POST" action="/main-admin/forms/<%= form.id %>/assignments/<%= a.id %>/delete" class="inline-block-form">
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Remove" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </div>
+                </div>
               </div>
-            </form>
-          </dialog>
-        <% }); %>
+            <% }); %>
+          </div>
+          <form method="POST" action="/main-admin/forms/<%= form.id %>/assignments" class="roster-btn-row" style="margin-top: 0.75rem;">
+            <select name="memberId">
+              <option value="">Assign a specific person&hellip;</option>
+              <% members.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
+            </select>
+            <span class="hint">or</span>
+            <select name="roleId">
+              <option value="">Assign a group&hellip;</option>
+              <% roles.forEach(function(r) { %><option value="<%= r.id %>"><%= r.label %></option><% }); %>
+            </select>
+            <button type="submit" class="roster-action-btn">Assign</button>
+          </form>
+        </div>
+      </div>
+
+      <%# Live preview - a real request: "Live preview while editing in
+          the builder itself, so an admin sees roughly what the public
+          form will look like as they build it." Rendered from the same
+          partial (partials/custom-form-field.ejs) the public fill-out
+          page itself uses, over the exact pages/fields/theme just
+          saved, so it can never drift from what custom-forms-fill.ejs
+          actually renders - and it's genuinely live for conditional
+          logic and multi-page navigation (public/js/custom-form-
+          runtime.js runs over this panel exactly like it does the real
+          fill-out page), just not for an unsaved edit still sitting in
+          a closed dialog (every builder action here is still a normal
+          form POST that reloads the page, same as the rest of this
+          admin UI - see this view's own header comment for why that's
+          an intentional scope line, not an oversight). %>
+      <div class="cf-preview-panel no-print">
+        <div class="grid-box-header"><h2>Live Preview</h2></div>
+        <div class="cf-form" data-cf-form style="--cf-primary: <%= form.theme_primary_color %>; --cf-radius: <%= buttonRadius %>;">
+          <h1 style="margin-top:0;"><%= form.title %></h1>
+          <% if (form.description) { %><p class="hint"><%= form.description %></p><% } %>
+          <% if (pages.length > 1) { %>
+            <nav class="cf-progress" aria-label="Form progress" data-cf-progress>
+              <% pages.forEach(function(page, i) { %>
+                <span class="cf-progress-step<%= i === 0 ? ' cf-progress-step-active' : '' %>" data-cf-progress-step="<%= page.id %>">
+                  <span class="cf-progress-dot"><%= i + 1 %></span>
+                  <span class="cf-progress-label"><%= page.title || ('Page ' + (i + 1)) %></span>
+                </span>
+              <% }); %>
+            </nav>
+          <% } %>
+          <div class="member-form-grid">
+            <% pages.forEach(function(page, pageIndex) { %>
+              <section
+                class="cf-page<%= pageIndex === 0 ? ' cf-page-active' : '' %>"
+                data-cf-page="<%= page.id %>"
+                data-cf-page-index="<%= pageIndex %>"
+                <% if (page.conditionalLogicParsed) { %>data-cf-condition='<%- JSON.stringify(page.conditionalLogicParsed) %>'<% } %>
+              >
+                <% if (pages.length > 1 && (page.title || page.description)) { %>
+                  <div class="member-form-full cf-page-heading">
+                    <% if (page.title) { %><h2><%= page.title %></h2><% } %>
+                    <% if (page.description) { %><p class="hint"><%= page.description %></p><% } %>
+                  </div>
+                <% } %>
+                <% if (page.fields.length === 0) { %>
+                  <p class="roster-empty member-form-full">No fields on this page yet.</p>
+                <% } %>
+                <% page.fields.forEach(function(field) { %>
+                  <%- include('partials/custom-form-field', { field: field, ratingMax: ratingMax || { rating: 5, scale: 10 } }) %>
+                <% }); %>
+                <div class="member-form-full cf-page-nav">
+                  <% if (pageIndex > 0) { %><button type="button" class="btn-secondary" data-cf-prev>&larr; Back</button><% } %>
+                  <% if (pageIndex < pages.length - 1) { %>
+                    <button type="button" class="primary-btn cf-btn" data-cf-next>Next &rarr;</button>
+                  <% } else { %>
+                    <button type="button" class="primary-btn cf-btn" disabled title="Preview only - not a real submission">Submit</button>
+                  <% } %>
+                </div>
+              </section>
+            <% }); %>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="manage-section">
-      <div class="grid-box-header"><h2>Assign To (<%= assignments.length %>)</h2></div>
-      <p class="hint">Leave unassigned to make this form open to any signed-in member once published.</p>
-      <div class="training-lesson-list">
-        <% assignments.forEach(function(a) { %>
-          <div class="training-lesson-row">
-            <div class="training-lesson-row-main">
-              <svg class="icon"><use href="#icon-<%= a.member_id ? 'user' : 'users' %>"/></svg>
-              <div class="training-lesson-info">
-                <strong><%= a.memberName || a.roleLabel %></strong>
-              </div>
-              <div class="training-lesson-actions">
-                <form method="POST" action="/main-admin/forms/<%= form.id %>/assignments/<%= a.id %>/delete" class="inline-block-form">
-                  <button type="submit" class="icon-btn icon-btn-danger" aria-label="Remove" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                </form>
-              </div>
-            </div>
-          </div>
-        <% }); %>
-      </div>
-      <form method="POST" action="/main-admin/forms/<%= form.id %>/assignments" class="roster-btn-row" style="margin-top: 0.75rem;">
-        <select name="memberId">
-          <option value="">Assign a specific person&hellip;</option>
-          <% members.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
-        </select>
-        <span class="hint">or</span>
-        <select name="roleId">
-          <option value="">Assign a group&hellip;</option>
-          <% roles.forEach(function(r) { %><option value="<%= r.id %>"><%= r.label %></option><% }); %>
-        </select>
-        <button type="submit" class="roster-action-btn">Assign</button>
-      </form>
-    </div>
-
-    <dialog id="add-field-dialog" class="member-picker-dialog">
-      <form method="POST" action="/main-admin/forms/<%= form.id %>/fields">
-        <h3>Add Field</h3>
-        <label>Field Type
-          <select name="fieldType" onchange="document.getElementById('new-field-options').style.display = <%- JSON.stringify(choiceTypes) %>.indexOf(this.value) !== -1 ? '' : 'none';">
-            <% fieldTypes.forEach(function(t) { %><option value="<%= t.key %>"><%= t.label %></option><% }); %>
-          </select>
+    <dialog id="add-page-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/forms/<%= form.id %>/pages">
+        <h3>Add Page</h3>
+        <label>Page Title
+          <input type="text" name="title" placeholder="e.g. Contact Info" />
         </label>
-        <label>Label
-          <input type="text" name="label" required />
+        <label>Description
+          <textarea name="description" rows="2"></textarea>
         </label>
-        <label>Help Text
-          <input type="text" name="helpText" />
-        </label>
-        <label id="new-field-options" style="display: none;">Options (one per line)
-          <textarea name="options" rows="4"></textarea>
-        </label>
-        <label class="grade-pill"><input type="checkbox" name="isRequired" /> Required</label>
+        <%- include('partials/custom-form-condition-builder', { allFields: allFields, currentRule: null, conditionOperators: conditionOperators, choiceTypes: choiceTypes, excludeFieldId: null }) %>
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <button type="submit" class="primary-btn">Add</button>
+          <button type="submit" class="primary-btn">Add Page</button>
         </div>
       </form>
     </dialog>
+
+    <% pages.forEach(function(page) { %>
+      <dialog id="edit-page-dialog-<%= page.id %>" class="member-picker-dialog">
+        <form method="POST" action="/main-admin/forms/<%= form.id %>/pages/<%= page.id %>/update">
+          <h3>Edit Page</h3>
+          <label>Page Title
+            <input type="text" name="title" value="<%= page.title || '' %>" />
+          </label>
+          <label>Description
+            <textarea name="description" rows="2"><%= page.description || '' %></textarea>
+          </label>
+          <%- include('partials/custom-form-condition-builder', { allFields: allFields, currentRule: page.conditionalLogicParsed, conditionOperators: conditionOperators, choiceTypes: choiceTypes, excludeFieldId: null }) %>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Save</button>
+          </div>
+        </form>
+      </dialog>
+    <% }); %>
+
+    <% allFields.forEach(function(field) { %>
+      <dialog id="edit-field-dialog-<%= field.id %>" class="member-picker-dialog" data-cf-field-type="<%= field.field_type %>">
+        <form method="POST" action="/main-admin/forms/<%= form.id %>/fields/<%= field.id %>/update">
+          <h3>Edit Field</h3>
+          <label>Page
+            <select name="pageId">
+              <% pages.forEach(function(p, i) { %>
+                <option value="<%= p.id %>" <%= field.page_id === p.id ? 'selected' : '' %>>Page <%= i + 1 %><%= p.title ? ': ' + p.title : '' %></option>
+              <% }); %>
+            </select>
+          </label>
+          <label>Label
+            <input type="text" name="label" value="<%= field.label %>" required />
+          </label>
+          <label>Help Text
+            <input type="text" name="helpText" value="<%= field.help_text || '' %>" />
+          </label>
+          <label data-cf-row="placeholder">Placeholder
+            <input type="text" name="placeholder" value="<%= field.placeholder || '' %>" />
+          </label>
+          <label data-cf-row="default">Default Value
+            <input type="text" name="defaultValue" value="<%= field.default_value || '' %>" />
+          </label>
+          <% if (choiceTypes.indexOf(field.field_type) !== -1) { %>
+            <label data-cf-row="options">Options (one per line)
+              <textarea name="options" rows="4"><%= field.options.map(function(o) { return o.label; }).join('\n') %></textarea>
+            </label>
+          <% } %>
+          <label class="grade-pill" data-cf-row="required"><input type="checkbox" name="isRequired" <%= field.is_required == 1 ? 'checked' : '' %> /> Required</label>
+          <%- include('partials/custom-form-condition-builder', { allFields: allFields, currentRule: field.conditionalLogicParsed, conditionOperators: conditionOperators, choiceTypes: choiceTypes, excludeFieldId: field.id }) %>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Save</button>
+          </div>
+        </form>
+      </dialog>
+    <% }); %>
   </main>
+
+  <script src="/js/homepage-block-reorder.js"></script>
+  <script src="/js/custom-form-runtime.js"></script>
+  <script src="/js/custom-form-builder.js"></script>
 </body>
 </html>

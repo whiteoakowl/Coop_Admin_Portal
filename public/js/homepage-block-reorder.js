@@ -51,11 +51,29 @@
 
     const reorderUrl = container.getAttribute('data-reorder-url');
     const blockIds = rowsIn(container).map((r) => r.getAttribute('data-homepage-block-row'));
+    // Custom Forms' own fields-within-a-page canvas (views/admin-custom-
+    // forms-builder.ejs) is the first caller that needs more than just
+    // the final order sent back - its reorder route also needs to know
+    // WHICH page these fields belong to, so a stale/tampered id can't
+    // move a field into a different page's own position sequence.
+    // data-reorder-extra is optional JSON merged into the request body
+    // alongside blockIds - every existing caller (Public Homepage's own
+    // blocks/menu-items) has no such attribute, so this changes nothing
+    // for them.
+    let extra = {};
+    const extraRaw = container.getAttribute('data-reorder-extra');
+    if (extraRaw) {
+      try {
+        extra = JSON.parse(extraRaw);
+      } catch (err) {
+        extra = {};
+      }
+    }
     try {
       await fetch(reorderUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
-        body: JSON.stringify({ blockIds }),
+        body: JSON.stringify({ blockIds, ...extra }),
       });
     } catch (err) {
       // Same tradeoff as lesson-drag-reorder.js's own comment - reordering
