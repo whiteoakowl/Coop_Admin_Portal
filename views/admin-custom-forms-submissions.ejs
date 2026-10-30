@@ -16,17 +16,41 @@
         <a class="roster-action-btn" href="/main-admin/forms/<%= form.id %>/builder">&larr; Back to Form</a>
         <a class="roster-action-btn" href="/main-admin/forms/<%= form.id %>/submissions/export">Export CSV</a>
       </div>
+      <%# A real submissions experience: filter by respondent name - a
+          real request's own "sortable/filterable table of responses."
+          A plain GET so the filter survives a refresh/bookmark, same
+          convention views/admin-search.ejs's own search form uses. %>
+      <form method="GET" action="/main-admin/forms/<%= form.id %>/submissions" class="roster-btn-row no-print">
+        <input type="hidden" name="sort" value="<%= sort %>" />
+        <input type="hidden" name="dir" value="<%= dir %>" />
+        <input type="search" name="q" value="<%= q %>" placeholder="Filter by member name&hellip;" />
+        <button type="submit" class="roster-action-btn">Filter</button>
+        <% if (q) { %><a class="roster-action-btn" href="/main-admin/forms/<%= form.id %>/submissions?sort=<%= sort %>&dir=<%= dir %>">Clear</a><% } %>
+      </form>
     </div>
 
     <% if (submissions.length === 0) { %>
-      <p class="roster-empty">No submissions yet.</p>
+      <p class="roster-empty"><%= q ? 'No submissions match "' + q + '".' : 'No submissions yet.' %></p>
     <% } else { %>
+      <%
+        // Sortable column headers - clicking a header sorts by that
+        // column, flipping direction if it's already the active sort
+        // (the same column clicked twice goes asc -> desc -> asc...).
+        function sortHref(column) {
+          var nextDir = sort === column && dir === 'asc' ? 'desc' : 'asc';
+          return `/main-admin/forms/${form.id}/submissions?q=${encodeURIComponent(q)}&sort=${column}&dir=${nextDir}`;
+        }
+        function sortArrow(column) {
+          if (sort !== column) return '';
+          return dir === 'asc' ? ' &uarr;' : ' &darr;';
+        }
+      %>
       <div class="roster-scroll">
         <table class="roster-table members-table condensed-table">
           <thead>
             <tr>
-              <th>Member</th>
-              <th>Submitted</th>
+              <th><a href="<%= sortHref('member') %>">Member<%- sortArrow('member') %></a></th>
+              <th><a href="<%= sortHref('submitted_at') %>">Submitted<%- sortArrow('submitted_at') %></a></th>
               <th></th>
             </tr>
           </thead>

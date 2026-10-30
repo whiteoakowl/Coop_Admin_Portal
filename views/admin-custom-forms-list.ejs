@@ -27,7 +27,11 @@
             <span class="team-info-icon"><svg class="icon"><use href="#icon-clipboard-list"/></svg></span>
             <h3 class="team-info-title"><a href="/main-admin/forms/<%= f.id %>/builder"><%= f.title %></a></h3>
             <span class="badge-pill badge-pill-<%= f.status === 'published' ? 'green' : f.status === 'closed' ? 'gray' : 'orange' %>"><%= f.status.charAt(0).toUpperCase() + f.status.slice(1) %></span>
-            <p class="hint"><%= f.submissionCount %> submission<%= f.submissionCount == 1 ? '' : 's' %></p>
+            <%# A quick visual reminder of each form's own theme (set in
+                the builder's Settings & Theme panel) right on its card,
+                so an admin juggling several forms doesn't have to open
+                each one just to tell them apart. %>
+            <p class="hint"><span class="cf-theme-swatch" style="background: <%= f.theme_primary_color %>;" title="Primary color"></span><%= f.submissionCount %> submission<%= f.submissionCount == 1 ? '' : 's' %></p>
             <div class="roster-btn-row">
               <a class="roster-action-btn" href="/main-admin/forms/<%= f.id %>/builder">Edit</a>
               <a class="roster-action-btn" href="/main-admin/forms/<%= f.id %>/submissions">Submissions</a>
