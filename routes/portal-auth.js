@@ -6,7 +6,8 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { findAccountByEmail, verifyPassword, hashPassword, memberForAccount, familyForAccount } = require('../utils/portalAuth');
-const { generateMemberCode } = require('../utils/members');
+const { generateMemberCode, setPrimaryParent } = require('../utils/members');
+const { uploadMemberPhoto, savePhotoFile: saveMemberPhotoFile, deletePhotoFile: deleteMemberPhotoFile } = require('../utils/memberPhoto');
 const { createFailureRateLimiter } = require('../utils/loginRateLimit');
 const { GRADE_OPTIONS } = require('../utils/membership');
 const { CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
@@ -583,7 +584,7 @@ router.get('/portal/settings-hub', (req, res) => {
 // all resolve to one members row via memberForAccount; the single shared
 // Co-op Admin login (routes/admin.js) isn't tied to any one member, so
 // it keeps its own separate /admin/settings instead.
-const PROFILE_TABS = ['profile', 'schedules', 'signups', 'password'];
+const PROFILE_TABS = ['profile', 'schedules', 'signups'];
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 async function renderProfile(req, res, error, notice, activeTab) {
@@ -707,6 +708,7 @@ async function renderProfile(req, res, error, notice, activeTab) {
   // 'profile' tab - the Schedules/Signups tabs above never render it.
   let memberSections = [];
   let memberPortalRoles = null;
+  let familyName = null;
   if (tab === 'profile') {
     const allSections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
     const memberSectionIds = (await sectionIdsForMembers([member.id]))[member.id];
@@ -714,17 +716,23 @@ async function renderProfile(req, res, error, notice, activeTab) {
     const allRoles = await db.prepare('SELECT * FROM roles ORDER BY label').all();
     memberSections = allSections.filter((s) => memberSectionIds.has(s.id));
     memberPortalRoles = portalStatus.account ? allRoles.filter((r) => portalStatus.roleIds.has(r.id)) : null;
+    const familyRow = member.family_id ? await db.prepare('SELECT name FROM families WHERE id = ?').get(member.family_id) : null;
+    familyName = familyRow ? familyRow.name : null;
   }
 
   res.render('portal-profile', {
     title: 'My Profile',
     member,
-    // Everyone else sharing this account's family - a real request:
-    // "Click a family member's name to open it" as the entry point into
-    // the new Member Profile page (views/parent-member-profile.ejs) below.
-    // Self is left out the same way member-profile-card.ejs's own
-    // famParents/famChildren already exclude the profile's own subject.
-    otherFamilyMembers: family.filter((m) => m.id !== member.id),
+    // A real request: "when parent portal clicks the profile button,
+    // keep the current profile view" - same read-only partials/member-
+    // profile-card.ejs banner the Co-op/Main Admin portals and this
+    // account's own /portal/family/:memberId already use, so the
+    // Profile tab needs the same famParents/famChildren split that
+    // partial expects (Parents includes self - see its own comment -
+    // Children never does, filtered inside the partial itself).
+    familyName,
+    famParents: family.filter((m) => m.member_type !== 'student'),
+    famChildren: family.filter((m) => m.member_type === 'student'),
     activeTab: tab,
     schedule,
     signups,
@@ -860,65 +868,82 @@ router.post('/portal/family/:memberId/edit', async (req, res) => {
   res.redirect(back + '?notice=' + encodeURIComponent('Profile updated.'));
 });
 
-// A real request: "Member profile. There should be a place for password
-// settings for every parent and student" - a self-service Password tab
-// on this same shared My Profile page (every portal account type lands
-// here, not just parent/student), guarded by the account's own current
-// password the same way routes/admin.js's own POST /settings/password
-// already guards the Admin login's password change.
-router.post('/portal/profile/password', async (req, res) => {
-  if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile');
-  const back = '/portal/profile?tab=password';
-  const currentPassword = req.body.currentPassword || '';
-  const newPassword = req.body.newPassword || '';
-  const confirmPassword = req.body.confirmPassword || '';
-
-  const passwordOk = await verifyPassword(req.portalAccount, currentPassword);
-  if (!passwordOk) {
-    return res.redirect(back + '&error=' + encodeURIComponent('Current password is incorrect.'));
-  }
-  if (newPassword.length < 8) {
-    return res.redirect(back + '&error=' + encodeURIComponent('New password must be at least 8 characters.'));
-  }
-  if (newPassword !== confirmPassword) {
-    return res.redirect(back + '&error=' + encodeURIComponent('New passwords do not match.'));
-  }
-
-  await db.prepare('UPDATE member_accounts SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), req.portalAccount.id);
-  res.redirect(back + '&notice=' + encodeURIComponent('Password updated.'));
-});
-
-// Deliberately narrow - only the fields the admin-side membership form
-// also treats as "just contact info" (see partials/member-form-fields.ejs)
-// are writable here. member_type, birthday, grade_level, family_id, and
-// admin positions never appear in this request at all, so there's
-// nothing for a raw/spoofed submission to even attempt to change - not a
-// value that gets silently discarded, a field that was simply never read.
-router.post('/portal/profile', async (req, res) => {
-  if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile');
+// A real request: "when parent portal clicks the profile button, keep
+// the current profile view. When you click the edit profile button it
+// should look exactly like the membership request form. Exactly."
+// Replaces the old POST /portal/profile (narrow "just contact info"
+// fields, no photo, no password) and the standalone Password tab
+// (routes this same file used to expose at POST /portal/profile/
+// password) - this one page covers everything either of those used to,
+// same field set/order/styling as partials/member-edit-fields.ejs's own
+// header comment describes (shared with both admin portals' Edit Member
+// pages), minus the admin-only Family/Sections/Portal Roles section
+// those get (a parent can't reassign their own family or grant their
+// own portal roles).
+router.get('/portal/profile/edit', async (req, res) => {
+  if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile%2Fedit');
   const member = await memberForAccount(req.portalAccount.id);
   if (!member) return res.redirect('/portal');
+  res.render('portal-profile-edit', {
+    title: `Edit ${member.name}`,
+    member,
+    gradeLevels: GRADE_OPTIONS,
+    portalAccount: req.portalAccount,
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
+
+router.post('/portal/profile/edit', uploadMemberPhoto(() => '/portal/profile/edit'), async (req, res) => {
+  if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile%2Fedit');
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.redirect('/portal');
+  const back = '/portal/profile/edit';
 
   const name = (req.body.name || '').trim();
   if (!name) {
-    return res.redirect('/portal/profile?error=' + encodeURIComponent('Name is required.'));
+    return res.redirect(back + '?error=' + encodeURIComponent('Name is required.'));
   }
+
+  // Same optional-password handling as the admin Edit Member forms this
+  // page now matches, plus a Confirm Password check (the member typing
+  // it is the one who'll use it, unlike an admin setting someone else's).
+  const newPassword = req.body.password || '';
+  const confirmPassword = req.body.confirmPassword || '';
+  if (newPassword) {
+    if (newPassword.length < 8) {
+      return res.redirect(back + '?error=' + encodeURIComponent('Password must be at least 8 characters.'));
+    }
+    if (newPassword !== confirmPassword) {
+      return res.redirect(back + '?error=' + encodeURIComponent('Passwords do not match.'));
+    }
+  }
+
+  const photoPath = req.file ? await saveMemberPhotoFile(req.file) : member.photo_path;
+  if (req.file && member.photo_path) await deleteMemberPhotoFile(member.photo_path);
 
   await db
     .prepare(
-      `UPDATE members SET name = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?, medical_notes = ? WHERE id = ?`
+      `UPDATE members SET name = ?, address = ?, address2 = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?, medical_notes = ?, photo_path = ? WHERE id = ?`
     )
     .run(
       name,
       (req.body.address || '').trim() || null,
+      (req.body.address2 || '').trim() || null,
       (req.body.city || '').trim() || null,
       (req.body.state || '').trim() || null,
       (req.body.zip || '').trim() || null,
       (req.body.phone || '').trim() || null,
       (req.body.email || '').trim() || null,
       (req.body.medicalNotes || '').trim() || null,
+      photoPath,
       member.id
     );
+  if (member.member_type !== 'student') await setPrimaryParent(member.id, req.body.isPrimaryParent === '1');
+
+  if (newPassword) {
+    await db.prepare('UPDATE member_accounts SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), req.portalAccount.id);
+  }
 
   res.redirect('/portal/profile?notice=' + encodeURIComponent('Profile updated.'));
 });

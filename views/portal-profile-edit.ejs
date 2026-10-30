@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="profile-page">
+  <%- include('partials/portal-nav', {
+    portalTitle: sharedPortalTitle('My Profile'),
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle no-print"><a href="/portal/profile">&larr; My Profile</a></p>
+    <h1>Edit <%= member.name %></h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <%# A real request: "when parent portal clicks the profile button,
+        keep the current profile view. When you click the edit profile
+        button it should look exactly like the membership request form.
+        Exactly." Same shared partial the two admin portals' own Edit
+        Member pages use (views/main-admin-member-edit.ejs, views/admin-
+        member-edit.ejs) - no admin-only section here (routes/portal-
+        auth.js's own POST /portal/profile/edit never touches Family/
+        Sections/Portal Roles, same scope POST /portal/profile already
+        had before this page existed). %>
+    <form method="POST" action="/portal/profile/edit" enctype="multipart/form-data" class="member-form-page-panel">
+      <%- include('partials/member-edit-fields', {
+        member,
+        gradeLevels,
+        showPassword: true,
+        confirmPassword: true,
+        portalAccount,
+      }) %>
+      <div class="member-form-footer">
+        <div class="member-form-footer-edit">
+          <a class="btn-secondary" href="/portal/profile">Cancel</a>
+          <button type="submit" class="primary-btn"><svg class="icon"><use href="#icon-save"/></svg> Save</button>
+        </div>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

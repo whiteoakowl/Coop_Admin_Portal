@@ -1,0 +1,117 @@
+<%
+// A real request: "when you click the edit profile button it should
+// look exactly like the membership request form. Exactly." Same field
+// set/order/CSS classes (.form-section/.member-form-grid/.member-form-
+// full/.checkbox-option) as the Parent/Guardian section of the public
+// self-registration form (views/portal-register.ejs) - Photo first,
+// then Name, Email, Phone, Address/Address 2/City/State/Zip, Medical
+// Notes, Password - instead of the older .member-form-card/class-form-
+// row styling this replaced. Shared by the Parent Portal's own self-
+// edit page (routes/portal-auth.js's GET/POST /portal/profile/edit) and
+// both admin portals' Edit Member pages (views/main-admin-member-edit.ejs,
+// views/admin-member-edit.ejs) so all three never visually drift apart.
+//
+// Unlike the public form (which only ever creates a brand-new parent or
+// child), this edits ONE already-existing member of either type, so
+// Birthday/Grade Level still only show for a student (same gating
+// member-form-fields.ejs - the box this replaced - already used), and
+// the admin-entered "Choose a Family"/Sections/Portal Roles controls
+// live separately in partials/member-edit-admin-section.ejs below this
+// (admin portals only - see that partial's own comment).
+//
+// Locals:
+//   member - the member row being edited
+//   gradeLevels - array of grade-level strings (student Birthday/Grade
+//     Level option list)
+//   showPassword - Main Admin and Parent Portal self-edit get a
+//     Password field; Co-op Admin edit doesn't (password/account
+//     creation has always been Main-Admin-only - see routes/admin-
+//     members.js's own POST /members/:id/edit comment)
+//   confirmPassword - only meaningful when showPassword is true; Parent
+//     Portal self-edit asks for Confirm Password (same as the public
+//     form's own Password/Confirm Password pair, since the member
+//     typing it is the one who'll use it); an admin setting someone
+//     else's password doesn't need to confirm it a second time, same as
+//     this box already worked before this request.
+//   portalAccount - null (no account yet) or the account row - only
+//     read when showPassword is true, to label the field "New Password
+//     (leave blank to keep the current one)" vs plain "Password"
+const isStudentType = member.member_type === 'student';
+%>
+<div class="form-section">
+  <div class="member-form-grid">
+    <label class="member-form-full">Photo
+      <input type="file" name="photo" accept="image/*" />
+      <% if (member.photo_path) { %><span class="hint">Choose a new photo to replace the one on file.</span><% } %>
+    </label>
+    <% if (!isStudentType) { %>
+      <label class="checkbox-option member-form-full">
+        <input type="checkbox" name="isPrimaryParent" value="1" <%= member.is_primary_parent ? 'checked' : '' %> />
+        <svg class="icon"><use href="#icon-star"/></svg> Primary Parent
+      </label>
+    <% } %>
+    <label class="member-form-full">Full Name
+      <input type="text" name="name" value="<%= member.name %>" required />
+    </label>
+    <label>Email
+      <input type="email" name="email" value="<%= member.email || '' %>" />
+    </label>
+    <label>Phone Number
+      <input type="tel" name="phone" value="<%= member.phone || '' %>" placeholder="555-123-4567" />
+    </label>
+    <label class="member-form-full">Address
+      <input type="text" name="address" value="<%= member.address || '' %>" />
+    </label>
+    <label class="member-form-full">Address 2
+      <input type="text" name="address2" value="<%= member.address2 || '' %>" />
+    </label>
+    <label>City
+      <input type="text" name="city" value="<%= member.city || '' %>" />
+    </label>
+    <label>State
+      <input type="text" name="state" value="<%= member.state || '' %>" />
+    </label>
+    <label>Zip Code
+      <input type="text" name="zip" value="<%= member.zip || '' %>" />
+    </label>
+    <%# Only ever reached from an admin edit context (Main Admin/Co-op
+        Admin) - Parent Portal's own self-edit page never has a student
+        here (a parent's own member_type is never 'student'), so there's
+        no "lock this for a non-admin" case to gate on, unlike the old
+        member-form-fields.ejs's own Birthday field this replaces. %>
+    <% if (isStudentType) { %>
+      <label>Birthday
+        <input type="date" name="birthday" value="<%= member.birthday || '' %>" />
+      </label>
+      <label>Grade Level
+        <select name="gradeLevel">
+          <option value="">Select grade level</option>
+          <% gradeLevels.forEach(function(g) { %>
+            <option value="<%= g %>" <%= member.grade_level === g ? 'selected' : '' %>><%= g %></option>
+          <% }); %>
+        </select>
+      </label>
+    <% } %>
+    <label class="member-form-full">Medical / Allergy Notes
+      <textarea name="medicalNotes" rows="3"><%= member.medical_notes || '' %></textarea>
+    </label>
+  </div>
+  <% if (member.member_type === 'admin') { %><input type="hidden" name="memberType" value="admin" /><% } %>
+  <% if (typeof showPassword !== 'undefined' && showPassword) { %>
+    <div class="member-form-grid">
+      <label><%= portalAccount ? 'New Password (leave blank to keep the current one)' : 'Password' %>
+        <input type="password" name="password" autocomplete="new-password" minlength="8" placeholder="<%= portalAccount ? 'Leave blank to keep unchanged' : 'At least 8 characters' %>" />
+      </label>
+      <% if (typeof confirmPassword !== 'undefined' && confirmPassword) { %>
+        <label>Confirm Password
+          <input type="password" name="confirmPassword" autocomplete="new-password" minlength="8" />
+        </label>
+      <% } %>
+    </div>
+    <% if (portalAccount) { %>
+      <p class="hint">Account: <%= portalAccount.email %> &middot; Status: <%= portalAccount.status %></p>
+    <% } else { %>
+      <p class="hint">No portal account yet. Set a password above to create one, using this member's Email address above as their login.</p>
+    <% } %>
+  <% } %>
+</div>

@@ -367,14 +367,23 @@ router.get('/members/export.csv', async (req, res) => {
 // hidden memberType=admin field (see partials/member-form-fields.ejs) that
 // this never overrides - the POST /:id/edit handler below also still
 // refuses to let a raw request change TO or FROM admin either way.
-function memberFormFields(req) {
-  const birthday = (req.body.birthday || '').trim() || null;
+// A real request: "We don't ask adults/parents for their birthday. Only
+// main admin and co-op admin can change... birthday." - partials/member-
+// edit-fields.ejs no longer renders a Birthday field at all for a Parent/
+// Admin (only for a Student), so a Parent/Admin's own edit submission
+// never carries a "birthday" key at all - existingBirthday (the member's
+// own on-file value, passed in by the caller) is what keeps that save
+// from silently wiping it out, exactly like a Student's own submission
+// (which does carry the key, blank or not) always could.
+function memberFormFields(req, existingBirthday) {
+  const birthday = req.body.birthday !== undefined ? (req.body.birthday || '').trim() || null : existingBirthday || null;
   const memberType = req.body.memberType === 'admin' ? 'admin' : isChildAge(birthday) ? 'student' : 'parent';
   const familyIdRaw = parseInt(req.body.familyId, 10);
   return {
     name: (req.body.name || '').trim(),
     memberType,
     address: (req.body.address || '').trim() || null,
+    address2: (req.body.address2 || '').trim() || null,
     city: (req.body.city || '').trim() || null,
     state: (req.body.state || '').trim() || null,
     zip: (req.body.zip || '').trim() || null,
@@ -723,7 +732,8 @@ router.post('/members/:viewerId/family/:memberId/quick-edit', async (req, res) =
 
 router.post('/members/:id/edit', uploadMemberPhoto((req) => `/admin/members/${req.params.id}/edit`), async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const f = memberFormFields(req);
+  const existing = await db.prepare('SELECT photo_path, member_type, birthday FROM members WHERE id = ?').get(id);
+  const f = memberFormFields(req, existing ? existing.birthday : null);
 
   if (!f.name) {
     return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent('Name is required.'));
@@ -738,7 +748,6 @@ router.post('/members/:id/edit', uploadMemberPhoto((req) => `/admin/members/${re
   if (clash) {
     return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent(`"${f.name}" is already in the member list.`));
   }
-  const existing = await db.prepare('SELECT photo_path, member_type FROM members WHERE id = ?').get(id);
   // A real request: "Choosing admins should not be on the membership
   // profile, co-op admin portal. It should be on main admin member
   // list edit only." partials/member-form-fields.ejs already never
@@ -759,13 +768,14 @@ router.post('/members/:id/edit', uploadMemberPhoto((req) => `/admin/members/${re
 
   await db.prepare(
     `UPDATE members SET
-       name = ?, member_type = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?,
+       name = ?, member_type = ?, address = ?, address2 = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?,
        photo_path = ?, birthday = ?, grade_level = ?, medical_notes = ?
      WHERE id = ?`
   ).run(
     f.name,
     f.memberType,
     f.address,
+    f.address2,
     f.city,
     f.state,
     f.zip,

@@ -16,6 +16,15 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <div class="member-form-page-panel">
+      <%# A real request: "when you click the edit profile button it
+          should look exactly like the membership request form. Exactly.
+          ... it will then show an admin only section at the bottom to
+          change portals, sections and family." See partials/member-
+          edit-fields.ejs's own header comment for why that part is a
+          separate, shared partial (same one Parent Portal's own self-
+          edit page and Co-op Admin's Edit Member page use) and partials/
+          member-edit-admin-section.ejs's own for the admin-only part
+          below it. %>
       <form
         method="POST"
         action="/main-admin/members/<%= member.id %>/edit"
@@ -24,7 +33,8 @@
         class="member-edit-form member-edit-form-page"
         data-add-family-url="/main-admin/members/families/new"
       >
-        <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, gradeLevels, adminPositions, memberAdminPositionIds }) %>
+        <%- include('partials/member-edit-fields', { member, gradeLevels, showPassword: true, confirmPassword: false, portalAccount }) %>
+        <%- include('partials/member-edit-admin-section', { member, families, memberFamilyId, allSections, memberSectionIds, allRoles, portalRoleIds, portalAccount, hasPasswordField: true }) %>
 
         <%# A real request: "when editing a member profile, there is a
             button that says add parent/student. when you click this
@@ -42,57 +52,6 @@
             <button type="button" class="btn-secondary" data-quick-add-member-open>+ Add Parent/Student</button>
           <% } else { %>
             <p class="hint">Choose or add a family above and save, then come back here to add more parents or students to it.</p>
-          <% } %>
-        </div>
-
-        <%# A real request (Approvals tab): "you can click the name and
-            view their membership form and edit, add portal settings etc.
-            save." A real later request: "No creating users. All Members
-            should already have an account. Each member profile should
-            have a space for password." - so this box covers BOTH a member
-            who already has a portal account (change their password,
-            manage roles) and one who doesn't yet (set a password here to
-            create their account on Save, using the Email field above as
-            their login - see routes/main-admin-members.js's own
-            POST /:id/edit). %>
-        <div class="manage-section">
-          <h2><svg class="icon"><use href="#icon-sliders"/></svg> Portal Settings</h2>
-
-          <%# A real request: "there should not be an edit permissions
-              button [on the profile page], it should just show the
-              member's sections and portal permissions. When you click
-              the edit button... that is where you can control portal
-              settings per member." Sections scope what an admin can see/
-              manage - independent of whether this member has a portal
-              login of their own, unlike Portal Roles below. %>
-          <p><strong>Sections</strong></p>
-          <% if (allSections.length === 0) { %>
-            <p class="hint">No sections defined yet.</p>
-          <% } else { %>
-            <div class="grade-pill-grid">
-              <% allSections.forEach(function(s) { %>
-                <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= memberSectionIds.has(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
-              <% }); %>
-            </div>
-          <% } %>
-
-          <% if (portalAccount) { %>
-            <p class="hint">Account: <%= portalAccount.email %> &middot; Status: <%= portalAccount.status %></p>
-          <% } else { %>
-            <p class="hint">No portal account yet. Set a password below to create one, using this member's Email address above as their login.</p>
-          <% } %>
-          <label class="member-form-full"><%= portalAccount ? 'New Password (leave blank to keep the current one)' : 'Password' %>
-            <input type="password" name="password" autocomplete="new-password" minlength="8" placeholder="<%= portalAccount ? 'Leave blank to keep unchanged' : 'At least 8 characters' %>" />
-          </label>
-          <p><strong>Portal Roles</strong></p>
-          <% if (allRoles.length === 0) { %>
-            <p class="hint">No roles defined yet.</p>
-          <% } else { %>
-            <div class="grade-pill-grid">
-              <% allRoles.forEach(function(r) { %>
-                <label class="grade-pill"><input type="checkbox" name="roleIds" value="<%= r.id %>" <%= portalRoleIds.has(r.id) ? 'checked' : '' %> /> <%= r.label %></label>
-              <% }); %>
-            </div>
           <% } %>
         </div>
 

@@ -125,14 +125,15 @@ test('Main Admin Settings: Admins tab', async (t) => {
     assert.match(res.text, /<div class="roster-scroll">\s*<table class="roster-table condensed-table admins-table">/);
   });
 
-  await t.test('the new position shows up in the (Co-op Admin) member edit form dropdown', async () => {
+  await t.test("Co-op Admin's own member edit form never shows an Admin Positions picker - managing positions is Main Admin > Admins-only", async () => {
     // Admin Positions still lives in utils/adminPositions.js, shared by
     // both portals' member data - only the Settings UI for MANAGING the
-    // list of positions moved to Main Admin. Co-op Admin's own member
-    // edit form (views/partials/member-form-fields.ejs) still shows an
-    // existing Admin's position checkboxes (just never lets anyone
-    // become Admin from there in the first place - see that partial's
-    // own comment). Member creation itself is Main Admin-only now
+    // list of positions moved to Main Admin. A later real request
+    // ("Remove add admin positions on the member form") then dropped the
+    // Admin Positions checklist from the member edit form entirely
+    // (partials/member-edit-fields.ejs no longer renders one at all, for
+    // either portal) - see test/adminNameTag.test.js's own comment on
+    // that same change. Member creation itself is Main Admin-only now
     // ("membership to the app/website... member creation is Main
     // Admin-only now"), so this inserts the member directly rather than
     // through Co-op Admin's own (now-removed) /admin/members/new.
@@ -146,7 +147,7 @@ test('Main Admin Settings: Admins tab', async (t) => {
 
     const res = await request(app).get(`/admin/members/${member.id}/edit`).set('Cookie', coopCookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, /President/);
+    assert.doesNotMatch(res.text, /President/, 'Admin Positions are never shown on this form - only set via Main Admin > Admins');
   });
 
   await t.test('adding a duplicate title is a no-op, not an error', async () => {

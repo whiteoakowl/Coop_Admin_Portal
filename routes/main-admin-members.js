@@ -884,8 +884,16 @@ router.post('/families/:id/delete', async (req, res) => {
 // counted as parents." Same derivation as routes/admin-members.js's own
 // memberFormFields, now that the two portals' edit forms share
 // partials/member-form-fields.ejs - see this file's own top comment.
-function memberFormFields(req) {
-  const birthday = (req.body.birthday || '').trim() || null;
+// A real request: "We don't ask adults/parents for their birthday. Only
+// main admin and co-op admin can change... birthday." - partials/member-
+// edit-fields.ejs no longer renders a Birthday field at all for a Parent/
+// Admin (only for a Student), so a Parent/Admin's own edit submission
+// never carries a "birthday" key at all - existingBirthday (the member's
+// own on-file value, passed in by the caller) is what keeps that save
+// from silently wiping it out, exactly like a Student's own submission
+// (which does carry the key, blank or not) always could.
+function memberFormFields(req, existingBirthday) {
+  const birthday = req.body.birthday !== undefined ? (req.body.birthday || '').trim() || null : existingBirthday || null;
   const memberType = req.body.memberType === 'admin' ? 'admin' : isChildAge(birthday) ? 'student' : 'parent';
   const newFamilyName = (req.body.newFamilyName || '').trim();
   const familyIdRaw = parseInt(req.body.familyId, 10);
@@ -893,6 +901,7 @@ function memberFormFields(req) {
     name: (req.body.name || '').trim(),
     memberType,
     address: (req.body.address || '').trim() || null,
+    address2: (req.body.address2 || '').trim() || null,
     city: (req.body.city || '').trim() || null,
     state: (req.body.state || '').trim() || null,
     zip: (req.body.zip || '').trim() || null,
@@ -1403,11 +1412,11 @@ router.post('/:id/quick-add-family-member', async (req, res) => {
 
 router.post('/:id/edit', uploadMemberPhoto((req) => `/main-admin/members/${req.params.id}/edit`), async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const f = memberFormFields(req);
+  const existing = await db.prepare('SELECT photo_path, member_type, birthday FROM members WHERE id = ?').get(id);
+  const f = memberFormFields(req, existing ? existing.birthday : null);
   if (!f.name) return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent('Name is required.'));
   const clash = await db.prepare('SELECT id FROM members WHERE LOWER(name) = LOWER(?) AND id != ?').get(f.name, id);
   if (clash) return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent(`"${f.name}" is already in the member list.`));
-  const existing = await db.prepare('SELECT photo_path, member_type FROM members WHERE id = ?').get(id);
   // A real request: "There should not be admin check box on any of the
   // membership form or profiles... Admins will simply get a star."
   // member_type === 'admin' is derived purely from holding an Admin
@@ -1447,10 +1456,10 @@ router.post('/:id/edit', uploadMemberPhoto((req) => `/main-admin/members/${req.p
 
   await db
     .prepare(
-      `UPDATE members SET name = ?, member_type = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?,
+      `UPDATE members SET name = ?, member_type = ?, address = ?, address2 = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?,
          photo_path = ?, birthday = ?, grade_level = ?, medical_notes = ? WHERE id = ?`
     )
-    .run(f.name, f.memberType, f.address, f.city, f.state, f.zip, f.phone, f.email, photoPath, f.birthday, f.gradeLevel, f.medicalNotes, id);
+    .run(f.name, f.memberType, f.address, f.address2, f.city, f.state, f.zip, f.phone, f.email, photoPath, f.birthday, f.gradeLevel, f.medicalNotes, id);
   await syncMemberAdminPositions(id, f.adminPositionIds);
   await clearVolunteerMembershipIfNotParent(id, f.memberType);
   await setMemberFamily(id, await resolveFamilyId(f));

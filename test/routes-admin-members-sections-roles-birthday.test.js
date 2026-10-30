@@ -8,11 +8,17 @@
 //    gains write access to Sections/Portal Roles, same as Main Admin's
 //    own edit page already has (routes/main-admin-members.js) - Co-op
 //    Admin previously only ever read these on the Member Profile page.
-// 2. partials/member-form-fields.ejs's Birthday field is hidden for a
-//    Parent/Admin on both admin portals' edit forms (still shown/
-//    editable for a Student), and an existing Parent/Admin's on-file
-//    birthday round-trips unchanged through a save even though it's
-//    not shown.
+// 2. A later real request ("when you click the edit profile button it
+//    should look exactly like the membership request form") replaced
+//    partials/member-form-fields.ejs with partials/member-edit-fields.ejs,
+//    whose Birthday field isn't just hidden via CSS for a Parent/Admin
+//    anymore - it's entirely absent from the DOM (still shown/editable
+//    for a Student), same as the public membership form never asks an
+//    adult for a birthday at all. An existing Parent/Admin's on-file
+//    birthday still round-trips unchanged through a save even though
+//    there's no field on the page to carry it (routes/admin-members.js's
+//    own memberFormFields falls back to the existing value whenever the
+//    submission has no "birthday" key at all).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -96,11 +102,10 @@ test('Birthday is hidden on a Parent/Admin edit form but still visible for a Stu
     .run();
 
   const parentPage = await request(app).get(`/admin/members/${parentId}/edit`).set('Cookie', cookie);
-  assert.match(parentPage.text, /data-birthday-field[^>]*display:none;/, 'Birthday field is hidden for a Parent');
+  assert.doesNotMatch(parentPage.text, /name="birthday"/, 'Birthday field is not rendered at all for a Parent');
 
   const studentPage = await request(app).get(`/admin/members/${studentId}/edit`).set('Cookie', cookie);
-  assert.doesNotMatch(studentPage.text, /data-birthday-field[^>]*display:none;/, 'Birthday field stays visible for a Student');
-  assert.match(studentPage.text, /name="birthday" value="2015-05-01"/);
+  assert.match(studentPage.text, /name="birthday" value="2015-05-01"/, 'Birthday field stays visible for a Student');
 });
 
 test("saving a Parent's edit form (where Birthday is hidden) does not blank out their existing on-file birthday", async () => {
@@ -110,17 +115,17 @@ test("saving a Parent's edit form (where Birthday is hidden) does not blank out 
     .run();
   const editPage = await request(app).get(`/admin/members/${parentId}/edit`).set('Cookie', cookie);
   const csrfToken = extractCsrf(editPage.text);
-  // The hidden Birthday input is still present in the DOM (not removed,
-  // not disabled) - a real browser submit round-trips its unchanged
-  // value. Simulating that exact submit here.
-  const birthdayValue = /name="birthday" value="([^"]*)"/.exec(editPage.text)[1];
-  assert.equal(birthdayValue, '1980-05-01');
+  // There's no Birthday input on the page at all for a Parent now (see
+  // this file's own top comment) - a real browser submit of this form
+  // simply never sends a "birthday" key. Simulating that exact submit
+  // here: no birthday field in the posted body whatsoever.
+  assert.doesNotMatch(editPage.text, /name="birthday"/);
 
   await request(app)
     .post(`/admin/members/${parentId}/edit`)
     .set('Cookie', cookie)
     .type('form')
-    .send({ name: 'Preserve Birthday Parent', birthday: birthdayValue, _csrf: csrfToken });
+    .send({ name: 'Preserve Birthday Parent', _csrf: csrfToken });
 
   const saved = await db.prepare('SELECT birthday FROM members WHERE id = ?').get(parentId);
   assert.equal(saved.birthday, '1980-05-01', 'an existing Parent\'s birthday must not be wiped out just because the field is hidden');

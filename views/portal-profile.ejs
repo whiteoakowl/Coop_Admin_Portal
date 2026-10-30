@@ -19,7 +19,7 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>My Profile</h1>
+    <% if (activeTab !== 'profile') { %><h1>My Profile</h1><% } %>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
@@ -27,107 +27,35 @@
     <%# A real request: "Clicking on the profile icon at the top on every
         portal should be the member's full profile membership form so
         that they can edit it. It will also have a tab for schedules,
-        event signups." %>
+        event signups." A later real request: "when parent portal clicks
+        the profile button, keep the current profile view. When you
+        click the edit profile button it should look exactly like the
+        membership request form" - the Profile tab is now the exact same
+        read-only partials/member-profile-card.ejs banner every other
+        portal's own Member Profile page already uses (its own "Edit"
+        link goes to routes/portal-auth.js's own GET /portal/profile/edit),
+        instead of an inline edit form - no more Password tab either
+        (that field lives on the new Edit Profile page now, same as the
+        public membership form's own Password field). %>
     <div class="view-tabs no-print">
       <a class="view-tab<%= activeTab === 'profile' ? ' active' : '' %>" href="/portal/profile?tab=profile">Profile</a>
       <a class="view-tab<%= activeTab === 'schedules' ? ' active' : '' %>" href="/portal/profile?tab=schedules">Schedules</a>
       <a class="view-tab<%= activeTab === 'signups' ? ' active' : '' %>" href="/portal/profile?tab=signups">Event Signups</a>
-      <a class="view-tab<%= activeTab === 'password' ? ' active' : '' %>" href="/portal/profile?tab=password">Password</a>
     </div>
 
     <% if (activeTab === 'profile') { %>
-      <form method="POST" action="/portal/profile" class="member-form-grid">
-        <label class="member-form-full">Name
-          <input type="text" name="name" value="<%= member.name %>" required />
-        </label>
-        <label>Address
-          <input type="text" name="address" value="<%= member.address || '' %>" />
-        </label>
-        <label>City
-          <input type="text" name="city" value="<%= member.city || '' %>" />
-        </label>
-        <label>State
-          <input type="text" name="state" value="<%= member.state || '' %>" />
-        </label>
-        <label>Zip
-          <input type="text" name="zip" value="<%= member.zip || '' %>" />
-        </label>
-        <label>Phone
-          <input type="text" name="phone" value="<%= member.phone || '' %>" />
-        </label>
-        <label>Email
-          <input type="email" name="email" value="<%= member.email || '' %>" />
-        </label>
-
-        <%# A real request: "They still can't edit the birthday and grade
-            level after joining though. They can see it but it's locked.
-            Only admin can change that on their form." Rendered disabled
-            (so nothing here ever posts a value at all - see
-            routes/portal-auth.js's own POST /portal/profile, which never
-            even reads a birthday/gradeLevel field). %>
-        <div class="member-form-full date-time-two-col-row">
-          <label>Birthday <span class="hint">(contact an admin to change)</span>
-            <input type="text" value="<%= member.birthdayLabel || 'Not set' %>" disabled />
-          </label>
-          <label>Grade Level <span class="hint">(contact an admin to change)</span>
-            <input type="text" value="<%= member.grade_level || 'Not set' %>" disabled />
-          </label>
-        </div>
-
-        <label class="member-form-full">Medical/Allergy Notes
-          <textarea name="medicalNotes" rows="3"><%= member.medical_notes || '' %></textarea>
-        </label>
-
-        <div class="member-form-full">
-          <button type="submit" class="primary-btn">Save</button>
-        </div>
-      </form>
-
-      <%# A real request: "Member profile for... parent portal should
-          match the image attached," answered with "Click a family
-          member's name to open it" as the entry point - this list leads
-          into views/parent-member-profile.ejs's own read-only Member
-          Profile page. Not a resurrection of the removed "My Family"
-          dashboard card (that one was explicitly replaced with upcoming
-          events) - this is a plain list on the existing Profile tab. %>
-      <% if (otherFamilyMembers.length > 0) { %>
-        <div class="form-section">
-          <h2>My Family</h2>
-          <ul class="member-profile-plain-list">
-            <% otherFamilyMembers.forEach(function(m) { %>
-              <li><a href="/portal/family/<%= m.id %>"><%= m.name %></a><% if (m.grade_level) { %> <span class="hint">(<%= m.grade_level %>)</span><% } %></li>
-            <% }); %>
-          </ul>
-        </div>
-      <% } %>
-
-      <%# A real request: "Below the family section it should show what
-          sections and portals the member has permissions for." Same
-          Sections/Portal Roles markup member-profile-card.ejs's own
-          side card already uses for a family member's profile, here
-          for the signed-in account's own member. %>
-      <div class="form-section">
-        <h2>Sections</h2>
-        <% if (memberSections.length === 0) { %>
-          <p class="hint">&mdash;</p>
-        <% } else { %>
-          <ul class="member-profile-plain-list">
-            <% memberSections.forEach(function(s) { %><li><%= s.name %></li><% }); %>
-          </ul>
-        <% } %>
-      </div>
-      <div class="form-section">
-        <h2>Portal Roles</h2>
-        <% if (memberPortalRoles === null) { %>
-          <p class="hint">No portal account</p>
-        <% } else if (memberPortalRoles.length === 0) { %>
-          <p class="hint">&mdash;</p>
-        <% } else { %>
-          <ul class="member-profile-plain-list">
-            <% memberPortalRoles.forEach(function(r) { %><li><%= r.label %></li><% }); %>
-          </ul>
-        <% } %>
-      </div>
+      <%- include('partials/member-profile-card', {
+        member,
+        familyName,
+        famParents,
+        famChildren,
+        memberSections,
+        memberPortalRoles,
+        backHref: '/portal',
+        backLabel: 'My Portals',
+        editHref: '/portal/profile/edit',
+        familyMemberHref: function(id) { return '/portal/family/' + id; },
+      }) %>
     <% } else if (activeTab === 'schedules') { %>
       <%# A real request: "Schedules tab should be organized by family
           member and then by day under each family member." One section
@@ -166,26 +94,6 @@
           </div>
         <% }); %>
       <% } %>
-    <% } else if (activeTab === 'password') { %>
-      <%# A real request: "Member profile. There should be a place for
-          password settings for every parent and student" - the same
-          current-password/new-password/confirm pattern routes/admin.js's
-          own Username/Password settings tab already uses, posting to
-          routes/portal-auth.js's own POST /portal/profile/password. %>
-      <form method="POST" action="/portal/profile/password" class="member-form-grid">
-        <label class="member-form-full">Current Password
-          <input type="password" name="currentPassword" autocomplete="current-password" required />
-        </label>
-        <label>New Password
-          <input type="password" name="newPassword" autocomplete="new-password" minlength="8" required />
-        </label>
-        <label>Confirm New Password
-          <input type="password" name="confirmPassword" autocomplete="new-password" minlength="8" required />
-        </label>
-        <div class="member-form-full">
-          <button type="submit" class="primary-btn">Update Password</button>
-        </div>
-      </form>
     <% } else { %>
       <%# A real request: "Event signup tab should be organized by month
           and then by event with drop down from the event to show who
