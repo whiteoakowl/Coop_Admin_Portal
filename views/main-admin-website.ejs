@@ -10,123 +10,279 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <%- include('partials/main-admin-settings-tabs', { activeSettingsTab: 'website' }) %>
-    <h1>Public Homepage</h1>
-    <p><a href="/welcome" target="_blank">View the live site &rarr;</a></p>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <section class="manage-section">
-      <div class="grid-box-header">
-        <h2>Site Info</h2>
-      </div>
-      <form method="POST" action="/main-admin/website/settings" class="member-form-grid">
-        <label class="member-form-full">Organization Name
-          <input type="text" name="org_name" value="<%= settings.org_name %>" required />
-        </label>
-        <label>Contact Email
-          <input type="email" name="contact_email" value="<%= settings.contact_email || '' %>" />
-        </label>
-        <label>Contact Phone
-          <input type="text" name="contact_phone" value="<%= settings.contact_phone || '' %>" />
-        </label>
-        <div class="member-form-full">
-          <button type="submit" class="primary-btn">Save Site Info</button>
-        </div>
-      </form>
-    </section>
-
     <%
-      // A real request: "edit the entire homepage like you would on
-      // Spotify or wix. Drag and drop images and text of different size
-      // choices. Add buttons and links." This canvas used to be desktop-
-      // only (a later real request, "Make the homepage design features
-      // mobile friendly," reversed that - see public/css/styles.css's
-      // own comment on this section for why it was safe to just remove
-      // the restriction rather than build a second, separate mobile UI).
-      // homepage_blocks (supabase/migrations/20261118010000_
-      // homepage_builder.sql) is an ordered list of text/image/button
-      // blocks - this canvas is the admin's own drag-and-drop editor for
-      // that list; views/public-home.ejs renders the same list, in the
-      // same order, on the real public page.
+      // A real request: "Main admin portal, settings gear, public
+      // homepage. Should have the exact webpage editing features as
+      // Shopify. See screenshot." The screenshot showed Shopify's own
+      // theme editor: a dark top bar (Exit/theme name/Desktop-Mobile
+      // toggle/Save), a left sidebar of collapsible sections (global
+      // theme settings first, then page content), and a live preview
+      // pane on the right showing the real rendered homepage. This page
+      // rebuilds the existing block/menu-tab builder (unchanged data
+      // model, unchanged routes - see utils/homepage.js) into that same
+      // shell, reusing this app's own <details class="manage-section">
+      // disclosure convention (views/partials/membership-fields-manager.ejs's
+      // own "+ Add Field" panel) for every collapsible section instead
+      // of inventing new accordion markup.
       var BLOCK_TYPE_LABELS = { text: 'Text', image: 'Image', button: 'Button' };
     %>
-    <section class="manage-section homepage-builder-section">
-      <div class="grid-box-header">
-        <h2>Homepage Content</h2>
-        <div class="roster-btn-row homepage-builder-add-row no-print">
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-block-dialog-text').showModal()">+ Text</button>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-block-dialog-image').showModal()">+ Image</button>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-block-dialog-button').showModal()">+ Button</button>
-        </div>
+
+    <div class="homepage-theme-topbar no-print">
+      <a class="homepage-theme-exit" href="/main-admin/settings">&larr; Exit</a>
+      <div class="homepage-theme-topbar-label">
+        <h1>Public Homepage</h1>
+        <span class="hint">Theme &amp; content</span>
       </div>
-
-      <% if (blocks.length === 0) { %>
-        <p class="roster-empty">No homepage content yet - add a text, image, or button block above.</p>
-      <% } else { %>
-        <div class="homepage-builder-canvas" data-homepage-blocks-container data-reorder-url="/main-admin/website/blocks/reorder">
-          <% blocks.forEach(function(b) { %>
-            <div class="homepage-builder-block" data-homepage-block-row="<%= b.id %>">
-              <span data-homepage-block-drag-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span>
-              <div class="homepage-builder-block-preview">
-                <span class="badge-pill badge-pill-gray homepage-builder-block-type"><%= BLOCK_TYPE_LABELS[b.block_type] %></span>
-                <% if (b.block_type === 'text') { %>
-                  <span class="homepage-builder-block-text-preview homepage-text-<%= b.text_size %>"><%= b.text_body || '(empty)' %></span>
-                <% } else if (b.block_type === 'image') { %>
-                  <% if (b.imageUrl) { %><img src="<%= b.imageUrl %>" alt="" class="homepage-builder-block-image-preview" /><% } else { %><span class="hint">No image chosen yet</span><% } %>
-                <% } else if (b.block_type === 'button') { %>
-                  <span class="homepage-builder-block-button-preview"><%= b.button_label || '(untitled button)' %> &rarr; <%= b.button_url || '(no link)' %></span>
-                <% } %>
-              </div>
-              <div class="homepage-builder-block-actions">
-                <button type="button" class="icon-btn" onclick="document.getElementById('edit-block-dialog-<%= b.id %>').showModal()" aria-label="Edit block" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
-                <form method="POST" action="/main-admin/website/blocks/<%= b.id %>/delete" data-confirm="Remove this block?" class="inline-block-form">
-                  <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete block" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                </form>
-              </div>
-            </div>
-          <% }); %>
-        </div>
-      <% } %>
-    </section>
-
-    <%# A real request: "Should be able to edit or add menu tabs to the
-        homepage." A much simpler ordered list than the content blocks
-        above (label + URL, no type to branch on) - reuses the exact same
-        drag-reorder script (public/js/homepage-block-reorder.js is
-        generic over its own data-homepage-block-row/data-homepage-
-        blocks-container attributes), just pointed at its own reorder
-        endpoint via data-reorder-url. %>
-    <section class="manage-section homepage-builder-section">
-      <div class="grid-box-header">
-        <h2>Menu Tabs</h2>
-        <div class="roster-btn-row no-print">
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-menu-item-dialog').showModal()">+ Menu Tab</button>
-        </div>
+      <div class="homepage-theme-viewport-toggle" role="group" aria-label="Preview size">
+        <button type="button" class="homepage-theme-viewport-btn is-active" data-viewport="desktop">Desktop</button>
+        <button type="button" class="homepage-theme-viewport-btn" data-viewport="mobile">Mobile</button>
       </div>
-      <p class="hint">Shown as a row of links in the public homepage's own header. Leave empty for no menu.</p>
+      <%# Submits the theme settings form below via HTML's own cross-
+          document form="..." attribute - block/menu-tab changes already
+          save instantly through their own existing Add/Edit/Delete
+          forms (unchanged), so this button only ever needs to cover the
+          theme settings fields. %>
+      <button type="submit" form="homepage-theme-settings-form" class="primary-btn homepage-theme-save-btn">Save</button>
+    </div>
 
-      <% if (menuItems.length === 0) { %>
-        <p class="roster-empty">No menu tabs yet - add one above.</p>
-      <% } else { %>
-        <div class="homepage-builder-canvas" data-homepage-blocks-container data-reorder-url="/main-admin/website/menu-items/reorder">
-          <% menuItems.forEach(function(item) { %>
-            <div class="homepage-builder-block" data-homepage-block-row="<%= item.id %>">
-              <span data-homepage-block-drag-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span>
-              <div class="homepage-builder-block-preview">
-                <span class="homepage-builder-block-button-preview"><%= item.label %> &rarr; <%= item.url %></span>
+    <div class="homepage-theme-shell">
+      <aside class="homepage-theme-sidebar no-print">
+        <details class="manage-section homepage-theme-section">
+          <summary>Site Info</summary>
+          <div class="homepage-theme-section-body">
+            <form method="POST" action="/main-admin/website/settings" class="stack-form">
+              <label>Organization Name
+                <input type="text" name="org_name" value="<%= settings.org_name %>" required />
+              </label>
+              <label>Contact Email
+                <input type="email" name="contact_email" value="<%= settings.contact_email || '' %>" />
+              </label>
+              <label>Contact Phone
+                <input type="text" name="contact_phone" value="<%= settings.contact_phone || '' %>" />
+              </label>
+              <div>
+                <button type="submit" class="btn-secondary">Save Site Info</button>
               </div>
-              <div class="homepage-builder-block-actions">
-                <button type="button" class="icon-btn" onclick="document.getElementById('edit-menu-item-dialog-<%= item.id %>').showModal()" aria-label="Edit menu tab" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
-                <form method="POST" action="/main-admin/website/menu-items/<%= item.id %>/delete" data-confirm="Remove this menu tab?" class="inline-block-form">
-                  <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete menu tab" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                </form>
-              </div>
+            </form>
+          </div>
+        </details>
+
+        <form id="homepage-theme-settings-form" method="POST" action="/main-admin/website/theme-settings" enctype="multipart/form-data">
+          <%# Colors - a real request: "Primary/buttons, Accent/badges,
+              Background, Cards & header, Text" named color roles, each
+              with a swatch + hex input (same paired <input type="color">
+              convention views/parent-family-school-settings.ejs's own
+              Title/Background/Font Color rows already use, plus a hex
+              text input next to it so the live preview below has a
+              readable value to put on its iframe's query string - see
+              public/js/homepage-theme-editor.js). %>
+          <details class="manage-section homepage-theme-section" open>
+            <summary>Colors</summary>
+            <div class="homepage-theme-section-body">
+              <label class="homepage-theme-color-row">
+                <span>Primary (buttons)</span>
+                <span class="homepage-theme-color-input">
+                  <input type="color" data-theme-color-picker data-pairs-with="theme-color-primary" value="<%= theme.colorPrimary %>" />
+                  <input type="text" id="theme-color-primary" name="colorPrimary" value="<%= theme.colorPrimary %>" class="homepage-theme-hex-input" maxlength="7" data-theme-field />
+                </span>
+              </label>
+              <label class="homepage-theme-color-row">
+                <span>Accent (badges)</span>
+                <span class="homepage-theme-color-input">
+                  <input type="color" data-theme-color-picker data-pairs-with="theme-color-accent" value="<%= theme.colorAccent %>" />
+                  <input type="text" id="theme-color-accent" name="colorAccent" value="<%= theme.colorAccent %>" class="homepage-theme-hex-input" maxlength="7" data-theme-field />
+                </span>
+              </label>
+              <label class="homepage-theme-color-row">
+                <span>Background</span>
+                <span class="homepage-theme-color-input">
+                  <input type="color" data-theme-color-picker data-pairs-with="theme-color-background" value="<%= theme.colorBackground %>" />
+                  <input type="text" id="theme-color-background" name="colorBackground" value="<%= theme.colorBackground %>" class="homepage-theme-hex-input" maxlength="7" data-theme-field />
+                </span>
+              </label>
+              <label class="homepage-theme-color-row">
+                <span>Cards &amp; header</span>
+                <span class="homepage-theme-color-input">
+                  <input type="color" data-theme-color-picker data-pairs-with="theme-color-cards" value="<%= theme.colorCards %>" />
+                  <input type="text" id="theme-color-cards" name="colorCards" value="<%= theme.colorCards %>" class="homepage-theme-hex-input" maxlength="7" data-theme-field />
+                </span>
+              </label>
+              <label class="homepage-theme-color-row">
+                <span>Text</span>
+                <span class="homepage-theme-color-input">
+                  <input type="color" data-theme-color-picker data-pairs-with="theme-color-text" value="<%= theme.colorText %>" />
+                  <input type="text" id="theme-color-text" name="colorText" value="<%= theme.colorText %>" class="homepage-theme-hex-input" maxlength="7" data-theme-field />
+                </span>
+              </label>
             </div>
-          <% }); %>
+          </details>
+
+          <%# Typography - a small curated list, not a font uploader (this
+              app has no custom-font-upload infra): open_sans/montserrat
+              are the two Google Fonts partials/head.ejs already loads
+              site-wide, the rest are plain web-safe stacks. %>
+          <details class="manage-section homepage-theme-section">
+            <summary>Typography</summary>
+            <div class="homepage-theme-section-body">
+              <label>Heading Font
+                <select name="fontHeading" data-theme-field>
+                  <% fontChoices.forEach(function(f) { %>
+                    <option value="<%= f.key %>" <%= theme.fontHeading === f.key ? 'selected' : '' %>><%= f.label %></option>
+                  <% }); %>
+                </select>
+              </label>
+              <label>Body Font
+                <select name="fontBody" data-theme-field>
+                  <% fontChoices.forEach(function(f) { %>
+                    <option value="<%= f.key %>" <%= theme.fontBody === f.key ? 'selected' : '' %>><%= f.label %></option>
+                  <% }); %>
+                </select>
+              </label>
+              <label>Base Text Size
+                <select name="fontSizeBase" data-theme-field>
+                  <option value="small" <%= theme.fontSizeBase === 'small' ? 'selected' : '' %>>Small</option>
+                  <option value="medium" <%= theme.fontSizeBase === 'medium' ? 'selected' : '' %>>Medium</option>
+                  <option value="large" <%= theme.fontSizeBase === 'large' ? 'selected' : '' %>>Large</option>
+                </select>
+              </label>
+            </div>
+          </details>
+
+          <%# Logo & Favicon - reuses the exact same upload plumbing the
+              block builder's own image blocks already use (Supabase
+              Storage when configured, local disk otherwise - see
+              routes/admin-website.js's own saveBlockImageIfProvided). %>
+          <details class="manage-section homepage-theme-section">
+            <summary>Logo &amp; Favicon</summary>
+            <div class="homepage-theme-section-body">
+              <% if (theme.logoUrl) { %><p class="hint">Current logo: <img src="<%= theme.logoUrl %>" alt="" class="homepage-theme-logo-preview" /></p><% } %>
+              <label>Logo <span class="hint">(replaces the default logo in the site header - leave blank to keep the current one)</span>
+                <input type="file" name="logo" accept="image/*" />
+              </label>
+              <% if (theme.faviconUrl) { %><p class="hint">Current favicon: <img src="<%= theme.faviconUrl %>" alt="" class="homepage-theme-favicon-preview" /></p><% } %>
+              <label>Favicon <span class="hint">(the small browser-tab icon - leave blank to keep the current one)</span>
+                <input type="file" name="favicon" accept="image/*" />
+              </label>
+            </div>
+          </details>
+
+          <%# Announcement Bar - off by default; shown only once an admin
+              both enables it and gives it text (views/public-home.ejs). %>
+          <details class="manage-section homepage-theme-section">
+            <summary>Announcement Bar</summary>
+            <div class="homepage-theme-section-body">
+              <label class="checkbox-option">
+                <input type="checkbox" name="announcementEnabled" data-theme-field <%= theme.announcementEnabled ? 'checked' : '' %> /> Show announcement bar
+              </label>
+              <label>Announcement Text
+                <input type="text" name="announcementText" value="<%= theme.announcementText %>" data-theme-field placeholder="e.g. Registration opens March 1st!" />
+              </label>
+            </div>
+          </details>
+        </form>
+
+        <%# Page content - the existing text/image/button block canvas,
+            unchanged data model and routes (utils/homepage.js), just
+            relocated into this sidebar instead of the old full-width
+            page body. %>
+        <details class="manage-section homepage-theme-section" open>
+          <summary>Home Page Content</summary>
+          <div class="homepage-theme-section-body">
+            <div class="roster-btn-row homepage-builder-add-row no-print">
+              <button type="button" class="roster-action-btn" onclick="document.getElementById('add-block-dialog-text').showModal()">+ Text</button>
+              <button type="button" class="roster-action-btn" onclick="document.getElementById('add-block-dialog-image').showModal()">+ Image</button>
+              <button type="button" class="roster-action-btn" onclick="document.getElementById('add-block-dialog-button').showModal()">+ Button</button>
+            </div>
+
+            <% if (blocks.length === 0) { %>
+              <p class="roster-empty">No homepage content yet - add a text, image, or button block above.</p>
+            <% } else { %>
+              <div class="homepage-builder-canvas" data-homepage-blocks-container data-reorder-url="/main-admin/website/blocks/reorder">
+                <% blocks.forEach(function(b) { %>
+                  <div class="homepage-builder-block" data-homepage-block-row="<%= b.id %>">
+                    <span data-homepage-block-drag-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span>
+                    <div class="homepage-builder-block-preview">
+                      <span class="badge-pill badge-pill-gray homepage-builder-block-type"><%= BLOCK_TYPE_LABELS[b.block_type] %></span>
+                      <% if (b.block_type === 'text') { %>
+                        <span class="homepage-builder-block-text-preview homepage-text-<%= b.text_size %>"><%= b.text_body || '(empty)' %></span>
+                      <% } else if (b.block_type === 'image') { %>
+                        <% if (b.imageUrl) { %><img src="<%= b.imageUrl %>" alt="" class="homepage-builder-block-image-preview" /><% } else { %><span class="hint">No image chosen yet</span><% } %>
+                      <% } else if (b.block_type === 'button') { %>
+                        <span class="homepage-builder-block-button-preview"><%= b.button_label || '(untitled button)' %> &rarr; <%= b.button_url || '(no link)' %></span>
+                      <% } %>
+                    </div>
+                    <div class="homepage-builder-block-actions">
+                      <button type="button" class="icon-btn" onclick="document.getElementById('edit-block-dialog-<%= b.id %>').showModal()" aria-label="Edit block" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
+                      <form method="POST" action="/main-admin/website/blocks/<%= b.id %>/delete" data-confirm="Remove this block?" class="inline-block-form">
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete block" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    </div>
+                  </div>
+                <% }); %>
+              </div>
+            <% } %>
+          </div>
+        </details>
+
+        <%# Menu Tabs - unchanged data model/routes, reusing the exact
+            same drag-reorder script as the block canvas above. %>
+        <details class="manage-section homepage-theme-section">
+          <summary>Menu Tabs</summary>
+          <div class="homepage-theme-section-body">
+            <div class="roster-btn-row no-print">
+              <button type="button" class="roster-action-btn" onclick="document.getElementById('add-menu-item-dialog').showModal()">+ Menu Tab</button>
+            </div>
+            <p class="hint">Shown as a row of links in the public homepage's own header. Leave empty for no menu.</p>
+
+            <% if (menuItems.length === 0) { %>
+              <p class="roster-empty">No menu tabs yet - add one above.</p>
+            <% } else { %>
+              <div class="homepage-builder-canvas" data-homepage-blocks-container data-reorder-url="/main-admin/website/menu-items/reorder">
+                <% menuItems.forEach(function(item) { %>
+                  <div class="homepage-builder-block" data-homepage-block-row="<%= item.id %>">
+                    <span data-homepage-block-drag-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span>
+                    <div class="homepage-builder-block-preview">
+                      <span class="homepage-builder-block-button-preview"><%= item.label %> &rarr; <%= item.url %></span>
+                    </div>
+                    <div class="homepage-builder-block-actions">
+                      <button type="button" class="icon-btn" onclick="document.getElementById('edit-menu-item-dialog-<%= item.id %>').showModal()" aria-label="Edit menu tab" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
+                      <form method="POST" action="/main-admin/website/menu-items/<%= item.id %>/delete" data-confirm="Remove this menu tab?" class="inline-block-form">
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete menu tab" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    </div>
+                  </div>
+                <% }); %>
+              </div>
+            <% } %>
+          </div>
+        </details>
+
+        <%# Reset theme to defaults - a real request: a confirm-gated
+            action that "restores the global theme settings... to their
+            shipped defaults, leaving page content blocks untouched."
+            Never touches homepage_blocks/homepage_menu_items - see
+            routes/admin-website.js's own /theme-settings/reset. %>
+        <form method="POST" action="/main-admin/website/theme-settings/reset" data-confirm="Reset colors, fonts, logo, favicon, and the announcement bar to their defaults? Page content and menu tabs are not affected." class="homepage-theme-reset-row">
+          <button type="submit" class="btn-secondary">Reset theme to defaults</button>
+        </form>
+      </aside>
+
+      <%# Live preview pane - an <iframe> onto routes/admin-website.js's
+          own /preview route (the real public-home template/content,
+          with any unsaved theme field changes applied via its own query
+          string - see public/js/homepage-theme-editor.js). Desktop/
+          Mobile just resizes this wrapper, same idea as this app's own
+          responsive CSS breakpoints - no separate mobile markup. %>
+      <section class="homepage-theme-preview-pane">
+        <div class="homepage-theme-preview-frame-wrap" data-viewport="desktop">
+          <iframe id="homepage-theme-preview-iframe" data-preview-base="/main-admin/website/preview" title="Public homepage preview" src="/main-admin/website/preview"></iframe>
         </div>
-      <% } %>
-    </section>
+      </section>
+    </div>
 
     <dialog id="add-menu-item-dialog" class="member-picker-dialog dialog-label-stack">
       <form method="POST" action="/main-admin/website/menu-items">
@@ -277,5 +433,6 @@
     </dialog>
   </main>
   <script src="/js/homepage-block-reorder.js"></script>
+  <script src="/js/homepage-theme-editor.js"></script>
 </body>
 </html>
