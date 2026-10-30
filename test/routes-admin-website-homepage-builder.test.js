@@ -303,3 +303,166 @@ test('a menu tab requires both a label and a URL', async () => {
   assert.equal(res.status, 302);
   assert.match(res.headers.location, /error=/);
 });
+
+// A real request: "Should have the exact webpage editing features as
+// Shopify. See screenshot." - Colors/Typography/Announcement Bar theme
+// settings (homepage_theme_settings, utils/homepage.js). Covers the new
+// theme settings save/round-trip, the public homepage actually
+// rendering the saved colors/announcement bar, the /preview route
+// rendering unsaved draft overrides without touching the saved row or
+// the real public site, Logo & Favicon upload, and Reset to defaults.
+test('theme settings save and round-trip into the builder page and the public homepage', async () => {
+  const admin = await loginAsMainAdmin();
+
+  const saveRes = await request(app)
+    .post('/main-admin/website/theme-settings')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({
+      colorPrimary: '#112233',
+      colorAccent: '#445566',
+      colorBackground: '#778899',
+      colorCards: '#aabbcc',
+      colorText: '#001122',
+      fontHeading: 'georgia',
+      fontBody: 'arial',
+      fontSizeBase: 'large',
+      announcementEnabled: 'on',
+      announcementText: 'Registration opens March 1st!',
+      _csrf: admin.csrfToken,
+    });
+  assert.equal(saveRes.status, 302);
+  assert.match(saveRes.headers.location, /notice=/);
+
+  const row = await db.prepare('SELECT * FROM homepage_theme_settings WHERE id = 1').get();
+  assert.equal(row.color_primary, '#112233');
+  assert.equal(row.color_accent, '#445566');
+  assert.equal(row.color_background, '#778899');
+  assert.equal(row.color_cards, '#aabbcc');
+  assert.equal(row.color_text, '#001122');
+  assert.equal(row.font_heading, 'georgia');
+  assert.equal(row.font_body, 'arial');
+  assert.equal(row.font_size_base, 'large');
+  assert.equal(Number(row.announcement_enabled), 1);
+  assert.equal(row.announcement_text, 'Registration opens March 1st!');
+
+  // Round-trips back into the builder page's own color/font inputs.
+  const builderPage = await request(app).get('/main-admin/website').set('Cookie', admin.cookie);
+  assert.match(builderPage.text, /value="#112233"/);
+  assert.match(builderPage.text, /value="#001122"/);
+  assert.match(builderPage.text, /<option value="georgia" selected>/);
+  assert.match(builderPage.text, /<option value="large" selected>/);
+
+  // Renders on the real public homepage: the theme CSS vars on <body>,
+  // and the now-enabled announcement bar.
+  const publicPage = await request(app).get('/welcome');
+  assert.match(publicPage.text, /class="public-home-page" style="[^"]*--hp-primary: #112233/);
+  assert.match(publicPage.text, /--hp-text: #001122/);
+  assert.match(publicPage.text, /<div class="site-announcement-bar">Registration opens March 1st!<\/div>/);
+});
+
+test('invalid hex colors and an unknown font key fall back to the shipped defaults instead of saving garbage', async () => {
+  const admin = await loginAsMainAdmin();
+  const res = await request(app)
+    .post('/main-admin/website/theme-settings')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ colorPrimary: 'not-a-color', fontHeading: 'comic-sans', fontSizeBase: 'huge', _csrf: admin.csrfToken });
+  assert.equal(res.status, 302);
+
+  const row = await db.prepare('SELECT * FROM homepage_theme_settings WHERE id = 1').get();
+  assert.equal(row.color_primary, '#E7AA7B');
+  assert.equal(row.font_heading, 'montserrat');
+  assert.equal(row.font_size_base, 'medium');
+});
+
+test('the /preview route renders unsaved draft theme overrides without touching the saved row or the real public site', async () => {
+  const admin = await loginAsMainAdmin();
+  const before = await db.prepare('SELECT * FROM homepage_theme_settings WHERE id = 1').get();
+
+  const previewRes = await request(app)
+    .get('/main-admin/website/preview')
+    .query({ colorPrimary: '#ff00ff', announcementEnabled: '1', announcementText: 'Draft announcement, not saved' })
+    .set('Cookie', admin.cookie);
+  assert.equal(previewRes.status, 200);
+  assert.match(previewRes.text, /--hp-primary: #ff00ff/);
+  assert.match(previewRes.text, /Draft announcement, not saved/);
+  assert.match(previewRes.text, /Preview &mdash; not the live site/);
+  assert.equal(previewRes.headers['x-robots-tag'], 'noindex');
+
+  // Nothing was persisted...
+  const after = await db.prepare('SELECT * FROM homepage_theme_settings WHERE id = 1').get();
+  assert.deepEqual(after, before);
+
+  // ...and the real public site shows neither the draft color nor text.
+  const publicPage = await request(app).get('/welcome');
+  assert.doesNotMatch(publicPage.text, /--hp-primary: #ff00ff/);
+  assert.doesNotMatch(publicPage.text, /Draft announcement, not saved/);
+  assert.doesNotMatch(publicPage.text, /homepage-preview-banner/);
+});
+
+test('uploading a logo and favicon saves them and the public homepage renders both', async () => {
+  const admin = await loginAsMainAdmin();
+
+  const uploadRes = await request(app)
+    .post(`/main-admin/website/theme-settings?_csrf=${encodeURIComponent(admin.csrfToken)}`)
+    .set('Cookie', admin.cookie)
+    .attach('logo', Buffer.from('fake logo bytes'), { filename: 'logo.png', contentType: 'image/png' })
+    .attach('favicon', Buffer.from('fake favicon bytes'), { filename: 'favicon.png', contentType: 'image/png' });
+  assert.equal(uploadRes.status, 302);
+  assert.doesNotMatch(uploadRes.headers.location, /error=/);
+
+  const row = await db.prepare('SELECT * FROM homepage_theme_settings WHERE id = 1').get();
+  assert.ok(row.logo_key, 'expected a logo_key to be stored');
+  assert.ok(row.favicon_key, 'expected a favicon_key to be stored');
+  assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'uploads', 'homepage', row.logo_key)));
+  assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'uploads', 'homepage', row.favicon_key)));
+
+  const publicPage = await request(app).get('/welcome');
+  assert.match(publicPage.text, new RegExp(`<img src="/uploads/homepage/${row.logo_key}" alt="" />`));
+  assert.match(publicPage.text, new RegExp(`<link rel="icon" href="/uploads/homepage/${row.favicon_key}" />`));
+});
+
+test('reset theme to defaults restores shipped values and deletes the uploaded logo/favicon, leaving blocks and menu tabs untouched', async () => {
+  const admin = await loginAsMainAdmin();
+  const before = await db.prepare('SELECT logo_key, favicon_key FROM homepage_theme_settings WHERE id = 1').get();
+  const blocksBefore = await db.prepare('SELECT COUNT(*) AS c FROM homepage_blocks').get();
+  const menuItemsBefore = await db.prepare('SELECT COUNT(*) AS c FROM homepage_menu_items').get();
+
+  const resetRes = await request(app)
+    .post('/main-admin/website/theme-settings/reset')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: admin.csrfToken });
+  assert.equal(resetRes.status, 302);
+  assert.match(resetRes.headers.location, /notice=/);
+
+  const row = await db.prepare('SELECT * FROM homepage_theme_settings WHERE id = 1').get();
+  assert.equal(row.color_primary, '#E7AA7B');
+  assert.equal(row.color_accent, '#79BAEC');
+  assert.equal(row.color_background, '#FFFFFF');
+  assert.equal(row.color_cards, '#FFFFFF');
+  assert.equal(row.color_text, '#1C2530');
+  assert.equal(row.font_heading, 'montserrat');
+  assert.equal(row.font_body, 'open_sans');
+  assert.equal(row.font_size_base, 'medium');
+  assert.equal(row.logo_key, null);
+  assert.equal(row.favicon_key, null);
+  assert.equal(Number(row.announcement_enabled), 0);
+  assert.equal(row.announcement_text, null);
+
+  // The previously-uploaded logo/favicon files are deleted from disk.
+  if (before.logo_key) assert.equal(fs.existsSync(path.join(__dirname, '..', 'public', 'uploads', 'homepage', before.logo_key)), false);
+  if (before.favicon_key) assert.equal(fs.existsSync(path.join(__dirname, '..', 'public', 'uploads', 'homepage', before.favicon_key)), false);
+
+  // Page content blocks and menu tabs are untouched by a theme reset.
+  const blocksAfter = await db.prepare('SELECT COUNT(*) AS c FROM homepage_blocks').get();
+  const menuItemsAfter = await db.prepare('SELECT COUNT(*) AS c FROM homepage_menu_items').get();
+  assert.equal(Number(blocksAfter.c), Number(blocksBefore.c));
+  assert.equal(Number(menuItemsAfter.c), Number(menuItemsBefore.c));
+
+  // The public homepage falls back to the default owl logo/favicon again.
+  const publicPage = await request(app).get('/welcome');
+  assert.match(publicPage.text, /<img src="\/img\/logo\.png" alt="" \/>/);
+  assert.doesNotMatch(publicPage.text, /<link rel="icon" href="\/uploads\/homepage\//);
+});
