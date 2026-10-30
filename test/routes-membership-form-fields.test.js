@@ -146,6 +146,8 @@ test('a self-registered parent through /register saves a submitted custom field 
       password: 'testpassword123',
       confirmPassword: 'testpassword123',
       handbookRead: '1',
+      privacyPolicyRead: '1',
+      termsRead: '1',
       [`customFields[f${id}]`]: 'Word of mouth',
     });
   assert.equal(res.status, 200);
@@ -234,6 +236,8 @@ test('a self-registered parent through /register saves a submitted General field
       password: 'testpassword123',
       confirmPassword: 'testpassword123',
       handbookRead: '1',
+      privacyPolicyRead: '1',
+      termsRead: '1',
       [`customFields[f${referralField.id}]`]: 'Word of mouth',
     });
   assert.equal(res.status, 200);

@@ -20,11 +20,32 @@
 const v = (typeof values !== 'undefined' && values) || {};
 %>
 <div class="manage-section register-child-block" data-child-block>
+  <%# A real request: "Put double title back but it should say parent/
+      guardian #2, #3 etc. Same for children" - back to a per-block
+      title, numbered the same way register-adult-fields.ejs's own
+      Parent/Guardian blocks are. Unlike those (continuing on from the
+      Parent/Guardian section above, implicitly #1), every child lives
+      in this one dynamic list with no separate "Child #1" elsewhere on
+      the page, so numbering here starts at #1, not #2. Filled in by
+      public/js/portal-register-form.js's own renumberChildren() (empty
+      here, not computed in EJS) for the same "stays correct after a
+      block is removed from the middle of the list" reason given there. %>
   <div class="membership-child-header">
-    <h3>Child</h3>
+    <h3 data-child-title></h3>
     <button type="button" class="icon-btn register-remove-child" aria-label="Remove child" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
   </div>
   <div class="member-form-grid">
+    <%# A real request: "Should be able to upload... student profile
+        photos," later sharpened to "Upload photo button should be
+        first under the title" - moved up from the bottom of this grid
+        to right under this block's own h3. Same single-file-per-block
+        convention views/member-intake-form.ejs's own child photo field
+        already uses - routes/portal-auth.js's own POST /register
+        matches it back to this child by this exact fieldname via
+        req.files. %>
+    <label class="member-form-full">Photo
+      <input type="file" name="children[<%= index %>][photo]" accept="image/*" />
+    </label>
     <label>First Name
       <input type="text" name="children[<%= index %>][firstName]" value="<%= v.firstName || '' %>" />
     </label>
@@ -42,14 +63,6 @@ const v = (typeof values !== 'undefined' && values) || {};
         approved member. %>
     <label class="member-form-full">Medical / Allergy Notes
       <textarea name="children[<%= index %>][medicalNotes]" rows="2"><%= v.medicalNotes || '' %></textarea>
-    </label>
-    <%# A real request: "Should be able to upload... student profile
-        photos." Same single-file-per-block convention views/member-
-        intake-form.ejs's own child photo field already uses -
-        routes/portal-auth.js's own POST /register matches it back to
-        this child by this exact fieldname via req.files. %>
-    <label class="member-form-full">Photo
-      <input type="file" name="children[<%= index %>][photo]" accept="image/*" />
     </label>
   </div>
 

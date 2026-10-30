@@ -1385,8 +1385,47 @@ body.public-page .roster-empty {
 .membership-add-parent2 { margin-top: 1rem; }
 .membership-child-block { margin-bottom: 1rem; }
 .membership-child-block:last-child { margin-bottom: 0; }
+/* A real request: "Put double title back but it should say parent/
+   guardian #2, #3 etc. Same for children" - the per-block <h3> is back
+   (now numbered, see register-adult-fields.ejs/register-child-fields.ejs's
+   own comments), so this row needs space-between again instead of the
+   flex-end a title-less, button-only row used. */
 .membership-child-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
 .membership-child-header h3 { margin: 0; }
+/* A real request: "The address is the same check boxes and description
+   row. Choose file upload photo row. There should be adequate space
+   between rows." Each .register-adult-block/.register-child-block
+   (views/partials/register-adult-fields.ejs/register-child-fields.ejs,
+   the public self-registration form's own repeatable Adult/Child
+   blocks) mixes .member-form-grid rows (already spaced by their own
+   `gap`) with loose standalone elements sitting directly in the block -
+   a .checkbox-option toggle ("Address is the same..."/"Give this
+   parent/student their own portal login") and the lone Photo field -
+   which had no spacing of their own between one another, reading as
+   cramped against the grids before/after them. The owl selector
+   (`* + *`) gives every child but the first the same ~1rem top margin a
+   .member-form-grid row already gets from its own gap, regardless of
+   which of these two block shapes it ends up next to. */
+.register-adult-block > * + *,
+.register-child-block > * + * {
+  margin-top: 1.5rem;
+}
+/* A real request: "give better spacing... its too squished together" -
+   1rem (matching .member-form-grid's own row gap) still read as
+   cramped for two checkbox toggles sitting right on top of one another
+   with no grid of their own in between - bumped to 1.5rem, the same
+   "adequate space between rows" value .class-settings-form's own rows
+   already settled on below. */
+
+/* A real request: "Sms messaging the check box should line up with the
+   first word of the description" - same flex-start + small top-nudge
+   fix .class-settings-form .checkbox-option below already uses for a
+   checkbox next to a label that wraps to multiple lines: plain
+   align-items: center (correct for a short one-line label) instead
+   centers the checkbox against the whole wrapped block, landing it on
+   a middle line instead of alongside the first word of the first line. */
+.checkbox-option.checkbox-option-top-align { align-items: flex-start; }
+.checkbox-option.checkbox-option-top-align input[type="checkbox"] { margin-top: 0.2rem; }
 .membership-volunteer-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

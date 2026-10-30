@@ -48,6 +48,8 @@ function baseRegistration(overrides) {
     password: 'testpassword123',
     confirmPassword: 'testpassword123',
     handbookRead: '1',
+    privacyPolicyRead: '1',
+    termsRead: '1',
     ...overrides,
   };
 }
@@ -98,13 +100,77 @@ test('GET /register shows a phone field, an unchecked SMS opt-in checkbox, and a
   assert.doesNotMatch(res.text, /name="smsOptIn"[^>]*checked/, 'the SMS opt-in checkbox must be unchecked by default');
   assert.match(res.text, /href="\/privacy-policy"/);
   assert.match(res.text, /Reply STOP/);
-  // A later real request: "the phone number field is far away from the
-  // request, should there be another phone number bar close to the
-  // permissions" - a live echo of the phone field sits right next to the
-  // SMS opt-in checkbox, scripted by public/js/portal-register-form.js.
   assert.match(res.text, /<input type="tel" id="register-phone-input" name="phone"/);
-  assert.match(res.text, /<strong id="sms-opt-in-phone-echo">\(enter your phone number above\)<\/strong>/);
   assert.match(res.text, /<script src="\/js\/portal-register-form\.js">/);
+});
+
+// A later real request trimmed the SMS paragraph down and moved its
+// Privacy Policy/Terms and Conditions link into its own required
+// checkboxes: "Remove msg and data rate may apply. Remove see our at
+// the end. Remove optional wording message. Remove texting: enter your
+// phone number above. Next section. Privacy Policy with a check box,
+// next row terms and conditions with checkbox."
+test('GET /register has a trimmed SMS paragraph and its own required Privacy Policy/Terms and Conditions checkboxes', async () => {
+  const res = await request(app).get('/register');
+  assert.equal(res.status, 200);
+  assert.doesNotMatch(res.text, /Msg &amp; data rates may apply/);
+  assert.doesNotMatch(res.text, /See our/);
+  assert.doesNotMatch(res.text, /Optional - you can still register without opting in to SMS/);
+  assert.doesNotMatch(res.text, /sms-opt-in-phone-echo/);
+  assert.match(res.text, /<input type="checkbox" name="privacyPolicyRead" value="1" required \/>/);
+  assert.match(res.text, /<input type="checkbox" name="termsRead" value="1" required \/>/);
+  assert.match(res.text, /I have read and agree to the <a href="\/privacy-policy" target="_blank">Privacy Policy<\/a>\./);
+  assert.match(res.text, /I have read and agree to the <a href="\/terms-and-conditions" target="_blank">Terms and Conditions<\/a>\./);
+});
+
+// A real request: "Policy handbook should be after sms message."
+test('GET /register places the Policy Handbook section right after SMS Notifications, before Privacy Policy & Terms and Conditions', async () => {
+  const res = await request(app).get('/register');
+  assert.equal(res.status, 200);
+  const smsIdx = res.text.indexOf('>SMS Notifications<');
+  const handbookIdx = res.text.indexOf('>Policy Handbook<');
+  const privacyIdx = res.text.indexOf('>Privacy Policy &amp; Terms and Conditions<');
+  assert.ok(smsIdx !== -1 && handbookIdx !== -1 && privacyIdx !== -1);
+  assert.ok(smsIdx < handbookIdx && handbookIdx < privacyIdx, 'Policy Handbook must sit between SMS Notifications and Privacy Policy & Terms and Conditions');
+});
+
+test('POST /register without checking the Privacy Policy or Terms and Conditions boxes is rejected', async () => {
+  const before = Number((await db.prepare('SELECT COUNT(*) AS c FROM member_accounts').get()).c);
+  const noPrivacyRes = await request(app)
+    .post('/register')
+    .type('form')
+    .send(baseRegistration({ privacyPolicyRead: undefined, email: 'no-privacy@example.com' }));
+  assert.equal(noPrivacyRes.status, 200);
+  assert.match(noPrivacyRes.text, /Privacy Policy/);
+  assert.doesNotMatch(noPrivacyRes.text, /Registration Submitted/);
+
+  const noTermsRes = await request(app)
+    .post('/register')
+    .type('form')
+    .send(baseRegistration({ termsRead: undefined, email: 'no-terms@example.com' }));
+  assert.equal(noTermsRes.status, 200);
+  assert.match(noTermsRes.text, /Terms and Conditions/);
+  assert.doesNotMatch(noTermsRes.text, /Registration Submitted/);
+
+  assert.equal(Number((await db.prepare('SELECT COUNT(*) AS c FROM member_accounts').get()).c), before);
+});
+
+// A real request: "At the bottom of the parent guardian section should
+// be the add portal password option" - no more separate "Account Login"
+// section further down the page.
+test('GET /register has the password fields inside the Parent/Guardian section, with no separate Account Login section', async () => {
+  const res = await request(app).get('/register');
+  assert.equal(res.status, 200);
+  assert.doesNotMatch(res.text, />Account Login</);
+  const parentSectionIdx = res.text.indexOf('>Parent / Guardian<');
+  const additionalParentsIdx = res.text.indexOf('>Additional Parents / Guardians<');
+  const passwordIdx = res.text.indexOf('name="password"');
+  const confirmPasswordIdx = res.text.indexOf('name="confirmPassword"');
+  assert.ok(parentSectionIdx !== -1 && passwordIdx !== -1 && confirmPasswordIdx !== -1 && additionalParentsIdx !== -1);
+  assert.ok(
+    parentSectionIdx < passwordIdx && passwordIdx < confirmPasswordIdx && confirmPasswordIdx < additionalParentsIdx,
+    'Password/Confirm Password must sit at the bottom of the Parent/Guardian section, before Additional Parents/Guardians'
+  );
 });
 
 test('POST /register without checking SMS opt-in saves the phone number but leaves sms_consent false', async () => {

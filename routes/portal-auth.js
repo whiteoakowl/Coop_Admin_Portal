@@ -205,20 +205,26 @@ router.post('/register', uploadIntakePhotos('/register'), async (req, res) => {
   const childrenForRerender = rawChildren.map((c) => ({ ...c, loginPassword: '', loginPasswordConfirm: '' }));
 
   // "There is a +child button. There should also be an add adult
-  // button." Same optional, drop-if-blank treatment as a child block -
-  // see partials/register-adult-fields.ejs's own header comment for why
-  // there's no login/password here, unlike a child block.
+  // button." Same optional, drop-if-blank treatment as a child block. A
+  // later real request ("add check box for give this parent their own
+  // portal log in") gave each additional adult the same wantsLogin
+  // toggle a child block already had - see partials/register-adult-
+  // fields.ejs's own header comment for why there's no separate login-
+  // email field here (the Email field already in that same block is
+  // reused as the login email).
   const rawAdults = parseArrayField(req.body, 'additionalParents').map((a, index) => ({ ...a, index }));
   const additionalParents = rawAdults.filter((a) => a && ((a.firstName || '').trim() || (a.lastName || '').trim()));
+  // Same never-echo-the-password treatment as childrenForRerender above.
+  const adultsForRerender = rawAdults.map((a) => ({ ...a, loginPassword: '', loginPasswordConfirm: '' }));
 
   if (!firstName || !lastName || !email || !password) {
-    return renderRegisterError(res, 'All fields are required.', formValues, childrenForRerender, rawAdults);
+    return renderRegisterError(res, 'All fields are required.', formValues, childrenForRerender, adultsForRerender);
   }
   if (password.length < 8) {
-    return renderRegisterError(res, 'Password must be at least 8 characters.', formValues, childrenForRerender, rawAdults);
+    return renderRegisterError(res, 'Password must be at least 8 characters.', formValues, childrenForRerender, adultsForRerender);
   }
   if (password !== req.body.confirmPassword) {
-    return renderRegisterError(res, 'Passwords do not match.', formValues, childrenForRerender, rawAdults);
+    return renderRegisterError(res, 'Passwords do not match.', formValues, childrenForRerender, adultsForRerender);
   }
   // A real request: "can't submit application without checking the
   // box" (having read the Policy Handbook). The checkbox itself is
@@ -226,30 +232,52 @@ router.post('/register', uploadIntakePhotos('/register'), async (req, res) => {
   // handbook (public/js/portal-register-form.js) - checked again here
   // since a disabled attribute is only ever a client-side nicety.
   if (req.body.handbookRead !== '1') {
-    return renderRegisterError(res, 'Please scroll through and confirm you have read the Policy Handbook before submitting.', formValues, childrenForRerender, rawAdults);
+    return renderRegisterError(res, 'Please scroll through and confirm you have read the Policy Handbook before submitting.', formValues, childrenForRerender, adultsForRerender);
+  }
+  // A real request: "Next section. Privacy Policy with a check box, next
+  // row terms and conditions with checkbox" - two more required
+  // agreements, same re-check-server-side-since-a-checkbox-is-only-ever-
+  // a-client-side-nicety reasoning as handbookRead above.
+  if (req.body.privacyPolicyRead !== '1') {
+    return renderRegisterError(res, 'Please check the box confirming you have read the Privacy Policy before submitting.', formValues, childrenForRerender, adultsForRerender);
+  }
+  if (req.body.termsRead !== '1') {
+    return renderRegisterError(res, 'Please check the box confirming you have read the Terms and Conditions before submitting.', formValues, childrenForRerender, adultsForRerender);
   }
 
   for (const c of children) {
     if (!(c.firstName || '').trim() || !(c.lastName || '').trim()) {
-      return renderRegisterError(res, 'Each child needs both a first and last name.', formValues, childrenForRerender, rawAdults);
+      return renderRegisterError(res, 'Each child needs both a first and last name.', formValues, childrenForRerender, adultsForRerender);
     }
     if (!c.wantsLogin) continue;
     const childEmail = (c.loginEmail || '').trim();
     const childPassword = c.loginPassword || '';
     if (!childEmail || !childPassword) {
-      return renderRegisterError(res, `${c.firstName}'s portal login needs an email and password.`, formValues, childrenForRerender, rawAdults);
+      return renderRegisterError(res, `${c.firstName}'s portal login needs an email and password.`, formValues, childrenForRerender, adultsForRerender);
     }
     if (childPassword.length < 8) {
-      return renderRegisterError(res, `${c.firstName}'s password must be at least 8 characters.`, formValues, childrenForRerender, rawAdults);
+      return renderRegisterError(res, `${c.firstName}'s password must be at least 8 characters.`, formValues, childrenForRerender, adultsForRerender);
     }
     if (childPassword !== c.loginPasswordConfirm) {
-      return renderRegisterError(res, `${c.firstName}'s passwords do not match.`, formValues, childrenForRerender, rawAdults);
+      return renderRegisterError(res, `${c.firstName}'s passwords do not match.`, formValues, childrenForRerender, adultsForRerender);
     }
   }
 
   for (const a of additionalParents) {
     if (!(a.firstName || '').trim() || !(a.lastName || '').trim()) {
-      return renderRegisterError(res, 'Each additional parent/guardian needs both a first and last name.', formValues, childrenForRerender, rawAdults);
+      return renderRegisterError(res, 'Each additional parent/guardian needs both a first and last name.', formValues, childrenForRerender, adultsForRerender);
+    }
+    if (!a.wantsLogin) continue;
+    const adultEmail = (a.email || '').trim();
+    const adultPassword = a.loginPassword || '';
+    if (!adultEmail || !adultPassword) {
+      return renderRegisterError(res, `${a.firstName}'s portal login needs an email (in their Email field above) and a password.`, formValues, childrenForRerender, adultsForRerender);
+    }
+    if (adultPassword.length < 8) {
+      return renderRegisterError(res, `${a.firstName}'s password must be at least 8 characters.`, formValues, childrenForRerender, adultsForRerender);
+    }
+    if (adultPassword !== a.loginPasswordConfirm) {
+      return renderRegisterError(res, `${a.firstName}'s passwords do not match.`, formValues, childrenForRerender, adultsForRerender);
     }
   }
 
@@ -258,18 +286,22 @@ router.post('/register', uploadIntakePhotos('/register'), async (req, res) => {
   // and against every existing account - a family accidentally reusing
   // the parent's own email for a child's login is exactly the kind of
   // mistake this needs to catch before anything is written.
-  const wantedEmails = [email, ...children.filter((c) => c.wantsLogin).map((c) => (c.loginEmail || '').trim())];
+  const wantedEmails = [
+    email,
+    ...children.filter((c) => c.wantsLogin).map((c) => (c.loginEmail || '').trim()),
+    ...additionalParents.filter((a) => a.wantsLogin).map((a) => (a.email || '').trim()),
+  ];
   const seen = new Set();
   for (const e of wantedEmails) {
     const key = e.toLowerCase();
     if (seen.has(key)) {
-      return renderRegisterError(res, 'Each login on this form needs its own, different email address.', formValues, childrenForRerender, rawAdults);
+      return renderRegisterError(res, 'Each login on this form needs its own, different email address.', formValues, childrenForRerender, adultsForRerender);
     }
     seen.add(key);
   }
   for (const e of wantedEmails) {
     if (await findAccountByEmail(e)) {
-      return renderRegisterError(res, `${e} is already in use by another account. Try logging in instead, or use a different email.`, formValues, childrenForRerender, rawAdults);
+      return renderRegisterError(res, `${e} is already in use by another account. Try logging in instead, or use a different email.`, formValues, childrenForRerender, adultsForRerender);
     }
   }
 
@@ -376,6 +408,20 @@ router.post('/register', uploadIntakePhotos('/register'), async (req, res) => {
           adultPhotoPaths[a.index] || null
         );
       newAdultMemberIds.push(aInfo.lastInsertRowid);
+
+      // A real request: "For add an adult, also add check box for give
+      // this parent their own portal log in" - same pending-account-plus-
+      // role grant as the primary parent above, just keyed off this
+      // adult's own wantsLogin checkbox instead of being unconditional.
+      if (a.wantsLogin) {
+        const adultEmail = (a.email || '').trim();
+        const adultAccountInfo = await tx
+          .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status) VALUES (?, ?, ?, 'pending')")
+          .run(aInfo.lastInsertRowid, adultEmail, hashPassword(a.loginPassword));
+        if (parentRole) {
+          await tx.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(adultAccountInfo.lastInsertRowid, parentRole.id);
+        }
+      }
     }
 
     for (const c of children) {
