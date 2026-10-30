@@ -15,7 +15,7 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <div class="member-form-page-panel">
+    <div class="member-form-page-panel member-edit-page-panel">
       <form
         method="POST"
         action="/main-admin/members/<%= member.id %>/edit"
@@ -84,16 +84,7 @@
           <label class="member-form-full"><%= portalAccount ? 'New Password (leave blank to keep the current one)' : 'Password' %>
             <input type="password" name="password" autocomplete="new-password" minlength="8" placeholder="<%= portalAccount ? 'Leave blank to keep unchanged' : 'At least 8 characters' %>" />
           </label>
-          <p><strong>Portal Roles</strong></p>
-          <% if (allRoles.length === 0) { %>
-            <p class="hint">No roles defined yet.</p>
-          <% } else { %>
-            <div class="grade-pill-grid">
-              <% allRoles.forEach(function(r) { %>
-                <label class="grade-pill"><input type="checkbox" name="roleIds" value="<%= r.id %>" <%= portalRoleIds.has(r.id) ? 'checked' : '' %> /> <%= r.label %></label>
-              <% }); %>
-            </div>
-          <% } %>
+          <%- include('partials/member-portal-roles', { member, allRoles, familyPortalRows }) %>
         </div>
 
         <div class="member-form-footer">

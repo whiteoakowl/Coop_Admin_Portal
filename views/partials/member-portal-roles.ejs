@@ -1,0 +1,60 @@
+<%
+// Shared "Portal Roles" editor block for the Main Admin / Co-op Admin
+// member edit pages. Two real requests drive this:
+//   "When the box is checked on child for allow student portal, that is
+//   all they have access to, the student portal" - a student only ever
+//   gets a single Allow Student Portal checkbox (tied to the Student
+//   role alone), not the full role grid every other member type sees, so
+//   there's no way to accidentally also grant them Teacher/Co-op Admin/
+//   Main Admin from here.
+//   "When editing the parent member, and choosing portals it will list
+//   each member in that family with a portal dropdown next to it" -
+//   editing any non-student member shows the WHOLE family's portal
+//   access in one place (each row its own name + dropdown), not just the
+//   member being edited.
+//
+// familyPortalRows is [{ member, portalAccount, roleIds }, ...] for the
+// member being edited plus every other member sharing their family (see
+// the routes' own GET /:id/edit) - its first row is always the member
+// being edited. Posts back as roleIds_<memberId> per row (see the
+// routes' own POST /:id/edit) rather than one shared `roleIds` name,
+// since more than one member's selection now travels in the same submit.
+var studentRole = allRoles.find(function(r) { return r.key === 'student'; });
+var nonStudentRoleOptions = allRoles
+  .filter(function(r) { return r.key !== 'student'; })
+  .map(function(r) { return { value: r.id, label: r.label }; });
+var selfIsStudent = member.member_type === 'student';
+var portalRows = selfIsStudent
+  ? familyPortalRows.filter(function(row) { return row.member.id === member.id; })
+  : familyPortalRows;
+%>
+<p><strong>Portal Roles</strong></p>
+<% if (portalRows.every(function(row) { return !row.portalAccount; })) { %>
+  <p class="hint">No portal account yet - an account has to be created from Main Admin &gt; Users before roles can be granted.</p>
+<% } else { %>
+  <% if (!selfIsStudent && portalRows.length > 1) { %>
+    <p class="hint">Manage portal access for everyone in this family.</p>
+  <% } %>
+  <div class="member-family-portal-roles">
+    <% portalRows.forEach(function(row) { %>
+      <div class="member-family-portal-row">
+        <span class="member-family-portal-name"><%= row.member.name %><% if (!selfIsStudent && row.member.id === member.id) { %> <span class="hint">(this profile)</span><% } %></span>
+        <% if (!row.portalAccount) { %>
+          <span class="hint">No portal account</span>
+        <% } else if (row.member.member_type === 'student') { %>
+          <label class="checkbox-option">
+            <input type="checkbox" name="roleIds_<%= row.member.id %>" value="<%= studentRole ? studentRole.id : '' %>" <%= studentRole && row.roleIds.has(studentRole.id) ? 'checked' : '' %> />
+            Allow Student Portal
+          </label>
+        <% } else { %>
+          <%- include('multi-select-checkbox', {
+            name: 'roleIds_' + row.member.id,
+            options: nonStudentRoleOptions,
+            selected: Array.from(row.roleIds).map(String),
+            placeholder: 'Select portal role(s)',
+          }) %>
+        <% } %>
+      </div>
+    <% }); %>
+  </div>
+<% } %>

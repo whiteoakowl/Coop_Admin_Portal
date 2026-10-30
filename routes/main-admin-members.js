@@ -1289,6 +1289,18 @@ router.get('/:id/edit', async (req, res) => {
   const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
   const portalStatus = (await portalStatusForMembers([id]))[id];
+  // A real request: "when editing the parent member, and choosing
+  // portals it will list each member in that family with a portal
+  // dropdown next to it" - views/partials/member-portal-roles.ejs renders
+  // one row per family member (self first) from this, each with its own
+  // portal account/role state.
+  const rolesFamilyRoster = [member, ...(await familyOf(id))];
+  const rolesFamilyPortalStatus = await portalStatusForMembers(rolesFamilyRoster.map((m) => m.id));
+  const familyPortalRows = rolesFamilyRoster.map((m) => ({
+    member: m,
+    portalAccount: rolesFamilyPortalStatus[m.id].account,
+    roleIds: rolesFamilyPortalStatus[m.id].roleIds,
+  }));
 
   res.render('main-admin-member-edit', {
     title: `Edit ${member.name}`,
@@ -1302,6 +1314,7 @@ router.get('/:id/edit', async (req, res) => {
     portalAccount: portalStatus.account,
     portalRoleIds: portalStatus.roleIds,
     allRoles: await db.prepare('SELECT * FROM roles ORDER BY label').all(),
+    familyPortalRows,
     // A real request: "there should not be an edit permissions button [on
     // the profile page], it should just show the member's sections and
     // portal permissions. When you click the edit button... that is where
@@ -1469,12 +1482,17 @@ router.post('/:id/edit', uploadMemberPhoto((req) => `/main-admin/members/${req.p
     }
   }
 
-  // Portal Settings' role checkboxes - only meaningful once this member
-  // actually has an account (either already did, or was just created
-  // above by setting a password in this same submit).
-  if (portalStatus.account) {
-    const roleIds = [].concat(req.body.roleIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
-    await setMemberRoles(id, roleIds, req.portalAccount.id);
+  // Portal Settings' role controls - see views/partials/member-portal-
+  // roles.ejs. A student only ever submits their own roleIds_<id> field
+  // (single Allow Student Portal checkbox); anyone else submits one for
+  // every member of their family, since that view renders the whole
+  // family's portal access in one place. setMemberRoles is already a
+  // no-op for a member with no account (e.g. a sibling who has none yet),
+  // so looping unconditionally is safe either way.
+  const rolesFamilyIds = existing && existing.member_type === 'student' ? [id] : [id, ...(await familyOf(id)).map((fm) => fm.id)];
+  for (const fmId of rolesFamilyIds) {
+    const fmRoleIds = [].concat(req.body['roleIds_' + fmId] || []).map((v) => parseInt(v, 10)).filter(Boolean);
+    await setMemberRoles(fmId, fmRoleIds, req.portalAccount.id);
   }
 
   // Sections - unlike Portal Roles, not gated behind having an account:

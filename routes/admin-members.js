@@ -651,6 +651,16 @@ router.get('/members/:id/edit', async (req, res) => {
   // minus Password/account-creation, which stays Main Admin-only (see
   // routes/main-admin-members.js's own "No creating users" comment).
   const portalStatus = (await portalStatusForMembers([id]))[id];
+  // See routes/main-admin-members.js's own identical GET /:id/edit
+  // comment - familyPortalRows backs views/partials/member-portal-
+  // roles.ejs's family-wide portal dropdown.
+  const rolesFamilyRoster = [member, ...(await familyOf(id))];
+  const rolesFamilyPortalStatus = await portalStatusForMembers(rolesFamilyRoster.map((m) => m.id));
+  const familyPortalRows = rolesFamilyRoster.map((m) => ({
+    member: m,
+    portalAccount: rolesFamilyPortalStatus[m.id].account,
+    roleIds: rolesFamilyPortalStatus[m.id].roleIds,
+  }));
   res.render('admin-member-edit', {
     title: `Edit ${member.name}`,
     mode: 'edit',
@@ -665,6 +675,7 @@ router.get('/members/:id/edit', async (req, res) => {
     portalAccount: portalStatus.account,
     allRoles: await db.prepare('SELECT * FROM roles ORDER BY label').all(),
     portalRoleIds: portalStatus.roleIds,
+    familyPortalRows,
     // A real request: "when you click edit profile for a member, it
     // should show the other parents and children's information as well
     // for easy editing." - each other family member gets its own compact
@@ -789,10 +800,15 @@ router.post('/members/:id/edit', uploadMemberPhoto((req) => `/admin/members/${re
   // identical handling when no password is set in the same submit.
   const sectionIds = [].concat(req.body.sectionIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
   await setMemberSections(id, sectionIds);
-  const portalStatus = (await portalStatusForMembers([id]))[id];
-  if (portalStatus.account) {
-    const roleIds = [].concat(req.body.roleIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
-    await setMemberRoles(id, roleIds, null);
+  // Portal Roles - see views/partials/member-portal-roles.ejs and
+  // routes/main-admin-members.js's own identical POST /:id/edit comment.
+  // A student only ever submits their own roleIds_<id> field; anyone
+  // else submits one per family member, since that view renders the
+  // whole family's portal access in one place.
+  const rolesFamilyIds = existing && existing.member_type === 'student' ? [id] : [id, ...(await familyOf(id)).map((fm) => fm.id)];
+  for (const fmId of rolesFamilyIds) {
+    const fmRoleIds = [].concat(req.body['roleIds_' + fmId] || []).map((v) => parseInt(v, 10)).filter(Boolean);
+    await setMemberRoles(fmId, fmRoleIds, null);
   }
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} updated.`));

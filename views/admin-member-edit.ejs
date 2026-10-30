@@ -12,7 +12,7 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <div class="member-form-page-panel">
+    <div class="member-form-page-panel member-edit-page-panel">
       <form
         method="POST"
         action="<%= mode === 'create' ? '/admin/members/new' : '/admin/members/' + member.id + '/edit' %>"
@@ -47,18 +47,7 @@
               </div>
             <% } %>
 
-            <p><strong>Portal Roles</strong></p>
-            <% if (!portalAccount) { %>
-              <p class="hint">No portal account yet - an account has to be created from Main Admin &gt; Users before roles can be granted.</p>
-            <% } else if (allRoles.length === 0) { %>
-              <p class="hint">No roles defined yet.</p>
-            <% } else { %>
-              <div class="grade-pill-grid">
-                <% allRoles.forEach(function(r) { %>
-                  <label class="grade-pill"><input type="checkbox" name="roleIds" value="<%= r.id %>" <%= portalRoleIds.has(r.id) ? 'checked' : '' %> /> <%= r.label %></label>
-                <% }); %>
-              </div>
-            <% } %>
+            <%- include('partials/member-portal-roles', { member, allRoles, familyPortalRows }) %>
           </div>
         <% } %>
 
