@@ -11527,6 +11527,83 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
 .homepage-block-image.homepage-image-full img { width: 100%; max-width: none; }
 .homepage-block-button { display: flex; }
 
+/* Shopify-style theme editor shell (views/main-admin-website.ejs) - a
+   real request: "Main admin portal, settings gear, public homepage.
+   Should have the exact webpage editing features as Shopify. See
+   screenshot." A dark top bar (Exit/theme name/Desktop-Mobile toggle/
+   Save), a left sidebar of collapsible <details> sections (reusing the
+   same native disclosure .manage-section already uses elsewhere in
+   this app - see views/partials/membership-fields-manager.ejs's own
+   <details class="manage-section">), and a live(-ish) preview pane on
+   the right (an <iframe> onto the real public homepage route/its own
+   /preview draft-rendering variant - see routes/admin-website.js and
+   public/js/homepage-theme-editor.js). */
+.homepage-theme-topbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--ink);
+  color: #fff;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 15;
+}
+.homepage-theme-exit { color: #fff; text-decoration: none; font-weight: 600; opacity: 0.85; }
+.homepage-theme-exit:hover { opacity: 1; text-decoration: underline; }
+.homepage-theme-topbar-label { display: flex; flex-direction: column; margin-right: auto; }
+.homepage-theme-topbar-label h1 { font-size: 0.95rem; margin: 0; color: #fff; }
+.homepage-theme-topbar-label .hint { color: rgba(255,255,255,0.7); }
+.homepage-theme-viewport-toggle { display: flex; border: 1px solid rgba(255,255,255,0.35); border-radius: var(--control-radius); overflow: hidden; }
+.homepage-theme-viewport-btn { background: transparent; color: #fff; border: none; padding: 0.4rem 0.85rem; font-size: 0.85rem; cursor: pointer; }
+.homepage-theme-viewport-btn.is-active { background: rgba(255,255,255,0.22); font-weight: 700; }
+.homepage-theme-save-btn { margin: 0; padding: 0.5rem 1.1rem; }
+
+.homepage-theme-shell { display: flex; gap: 1.25rem; align-items: flex-start; }
+.homepage-theme-sidebar {
+  flex: 0 0 380px;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+  position: sticky;
+  top: 4.5rem;
+}
+.homepage-theme-section summary { cursor: pointer; font-weight: 700; padding: 0.15rem 0; list-style: none; }
+.homepage-theme-section summary::-webkit-details-marker { display: none; }
+.homepage-theme-section-body { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.homepage-theme-color-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.homepage-theme-color-input { display: flex; align-items: center; gap: 0.4rem; }
+.homepage-theme-color-input input[type="color"] { width: 2.25rem; height: 2rem; padding: 0; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.homepage-theme-hex-input { width: 6.5rem; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.85rem; }
+.homepage-theme-logo-preview, .homepage-theme-favicon-preview { max-height: 48px; vertical-align: middle; margin-left: 0.5rem; }
+.homepage-theme-reset-row { margin-top: 0.25rem; }
+
+.homepage-theme-preview-pane { flex: 1 1 auto; min-width: 0; }
+.homepage-theme-preview-frame-wrap {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 100%;
+  height: calc(100vh - 160px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #fff;
+  transition: max-width 0.2s ease;
+}
+.homepage-theme-preview-frame-wrap[data-viewport="mobile"] { max-width: 420px; }
+.homepage-theme-preview-frame-wrap iframe { width: 100%; height: 100%; border: none; display: block; }
+
+@media (max-width: 900px) {
+  .homepage-theme-shell { flex-direction: column; }
+  .homepage-theme-sidebar { flex: 1 1 auto; max-width: none; max-height: none; position: static; }
+  .homepage-theme-preview-frame-wrap { height: 70vh; }
+}
+
 /* Parent/Student Lessons tab redesign (views/partials/lessons-view.ejs,
    public/js/lesson-accordion.js) - a real request: "Each lesson should be
    a bar with the lesson title and description. Should show number of
@@ -11961,6 +12038,58 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
    portal so the whole platform still visually agrees with itself once a
    visitor logs in.
    --------------------------------------------------------------------- */
+/* Public Homepage Theme Settings (Main Admin > Settings > Public
+   Homepage's own Colors/Typography sections, utils/homepage.js's own
+   themeStyleAttr) - a real request: "Should have the exact webpage
+   editing features as Shopify." --hp-* are a NEW, small set of CSS
+   custom properties scoped to just this page via the .public-home-page
+   body class, set inline per-render from the saved (or, in the editor's
+   own live preview iframe, not-yet-saved) theme row - deliberately NOT
+   the site-wide --bg/--accent/--surface/--ink tokens every admin page
+   also uses above, so customizing the public homepage's own colors can
+   never leak into the admin portals. Every fallback below matches
+   exactly what this page already rendered before this feature existed
+   (var(--surface)/var(--ink)/var(--btn-bg)/var(--accent)), so a
+   not-yet-customized homepage looks pixel-identical to before. */
+.public-home-page {
+  background: var(--hp-background, var(--surface));
+  color: var(--hp-text, var(--ink));
+  font-family: var(--hp-font-body, 'Open Sans', sans-serif);
+  font-size: var(--hp-font-size-base, 16px);
+}
+.public-home-page h1,
+.public-home-page h2,
+.public-home-page h3 { font-family: var(--hp-font-heading, 'Montserrat', sans-serif); }
+.public-home-page .site-header,
+.public-home-page .site-footer,
+.public-home-page .site-section-alt,
+.public-home-page .site-class-showcase-card,
+.public-home-page .site-faq-item,
+.public-home-page .site-announcement-card { background: var(--hp-cards, var(--surface)); }
+.public-home-page .site-header-brand,
+.public-home-page .site-header-menu a,
+.public-home-page .homepage-block-text { color: var(--hp-text, var(--ink)); }
+/* Scoped to .site-section (the block canvas and the Classes We Offer
+   showcase both sit in one), deliberately NOT .site-cta - that section's
+   own white-on-brand-dark button (below) stays its own fixed, non-
+   themed look, same as the Announcements/FAQ/CTA systems around it. */
+.public-home-page .site-section .primary-btn { background: var(--hp-primary, var(--btn-bg)); }
+.public-home-page .site-section .primary-btn:hover { filter: brightness(0.92); }
+.public-home-page .site-faq-item { border-left: 4px solid var(--hp-accent, var(--accent)); }
+.public-home-page .site-class-showcase-day { color: var(--hp-accent, var(--muted)); }
+
+/* Announcement Bar theme section - a real request: "Should have the
+   exact webpage editing features as Shopify" (the screenshot's own
+   "Announcement bar" section). A thin bar across the very top of the
+   public homepage, shown only once an admin both enables it and gives
+   it text (views/public-home.ejs). */
+.site-announcement-bar { background: var(--hp-accent, var(--brand)); color: #fff; text-align: center; padding: 0.5rem 1rem; font-size: 0.9rem; font-weight: 600; }
+
+/* The Public Homepage builder's own live preview iframe (routes/admin-
+   website.js's own /preview route sets isPreview) - never rendered on
+   the real public /welcome page. */
+.homepage-preview-banner { background: var(--yellow-bg); color: var(--yellow); text-align: center; font-size: 0.8rem; font-weight: 700; padding: 0.3rem; }
+
 .site-header {
   display: flex;
   align-items: center;

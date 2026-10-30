@@ -2,13 +2,40 @@
 <html lang="en">
 <head>
   <%- include('partials/head', { title }) %>
+  <%# A real request: "Should have the exact webpage editing features as
+      Shopify" - Logo & Favicon theme section (Main Admin > Settings >
+      Public Homepage). Placed AFTER partials/head's own default
+      <link rel="icon">, so it overrides the favicon on just this page
+      (every other page in the app keeps the default owl icon) without
+      touching that shared partial. %>
+  <% if (theme.faviconUrl) { %><link rel="icon" href="<%= theme.faviconUrl %>" /><% } %>
 </head>
-<body>
+<%# Theme CSS custom properties (utils/homepage.js's own themeStyleAttr)
+    scoped to just this page via the public-home-page class - never the
+    site-wide --bg/--accent/etc. tokens every admin page also uses (see
+    public/css/styles.css's own comment on this section for why a new,
+    page-scoped variable set exists instead of repointing those). %>
+<body class="public-home-page" style="<%- themeStyle %>">
   <%- include('partials/icon-sprite') %>
+
+  <%# Preview-only banner (routes/admin-website.js's own /preview route) -
+      never shown on the real public /welcome page. %>
+  <% if (typeof isPreview !== 'undefined' && isPreview) { %>
+    <div class="homepage-preview-banner">Preview &mdash; not the live site</div>
+  <% } %>
+
+  <%# Announcement Bar theme section - a real request: "Should have the
+      exact webpage editing features as Shopify" (the screenshot's own
+      "Announcement bar" section). Off by default (announcement_enabled
+      starts false) - shown only once an admin both turns it on AND
+      gives it text. %>
+  <% if (theme.announcementEnabled && theme.announcementText) { %>
+    <div class="site-announcement-bar"><%= theme.announcementText %></div>
+  <% } %>
 
   <header class="site-header">
     <a class="site-header-brand" href="/welcome">
-      <img src="/img/logo.png" alt="" />
+      <img src="<%= theme.logoUrl || '/img/logo.png' %>" alt="" />
       <%= settings.org_name %>
     </a>
     <%# A real request: "Should be able to edit or add menu tabs to the
