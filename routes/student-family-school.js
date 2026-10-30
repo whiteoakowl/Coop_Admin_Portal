@@ -23,7 +23,6 @@ const {
   markLessonItemComplete,
   submitAssignment,
   saveAttachment,
-  overviewForFamily,
   gradesForStudent,
   weeksForOwner,
   weekGrid,
@@ -43,20 +42,6 @@ router.get('/family-school', async (req, res) => {
     title: 'Family School Management',
     classes: await classesForStudent(member.id),
   });
-});
-
-// A real request: "Student portal add a tab that says family
-// homeschooling. Subpages are, homeschool overview, homeschool classes,
-// homeschool grades, weekly planner." Read-only - reuses the exact same
-// functions Parent Portal's own identical pages use (utils/
-// familySchool.js), just always scoped to the signed-in student's own
-// id/family, never a posted/query id, same rule this file's own header
-// comment already states for every route here.
-router.get('/family-school/overview', async (req, res) => {
-  const member = await memberForAccount(req.portalAccount.id);
-  const overview = member.family_id ? await overviewForFamily(member.family_id) : [];
-  const own = overview.find((s) => s.id === member.id) || null;
-  res.render('student-family-school-overview', { title: 'Homeschool Overview', student: own });
 });
 
 router.get('/family-school/grades', async (req, res) => {
@@ -82,8 +67,12 @@ router.get('/family-school/attendance', async (req, res) => {
 // profile" page Parent Portal's own Portfolio gives a parent, scoped to
 // just the signed-in student (no student/school-year picker - there's
 // only ever one student and this file's own convention is "all-time,
-// no filter" for Overview/Grades too) and reusing that exact same
-// partials/family-school-portfolio-body.ejs so the two never drift.
+// no filter" for Grades too) and reusing that exact same partials/
+// family-school-portfolio-body.ejs so the two never drift. A later real
+// request ("Overview and portfolio should also be the same page and
+// called portfolio") retired the separate Homeschool Overview page
+// (GPA/attendance/classes, a plain subset of what this page already
+// shows) in favor of this one.
 router.get('/family-school/portfolio', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const portfolio = await portfolioForStudent(member.id, null);

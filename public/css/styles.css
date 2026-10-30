@@ -1385,8 +1385,47 @@ body.public-page .roster-empty {
 .membership-add-parent2 { margin-top: 1rem; }
 .membership-child-block { margin-bottom: 1rem; }
 .membership-child-block:last-child { margin-bottom: 0; }
+/* A real request: "Put double title back but it should say parent/
+   guardian #2, #3 etc. Same for children" - the per-block <h3> is back
+   (now numbered, see register-adult-fields.ejs/register-child-fields.ejs's
+   own comments), so this row needs space-between again instead of the
+   flex-end a title-less, button-only row used. */
 .membership-child-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
 .membership-child-header h3 { margin: 0; }
+/* A real request: "The address is the same check boxes and description
+   row. Choose file upload photo row. There should be adequate space
+   between rows." Each .register-adult-block/.register-child-block
+   (views/partials/register-adult-fields.ejs/register-child-fields.ejs,
+   the public self-registration form's own repeatable Adult/Child
+   blocks) mixes .member-form-grid rows (already spaced by their own
+   `gap`) with loose standalone elements sitting directly in the block -
+   a .checkbox-option toggle ("Address is the same..."/"Give this
+   parent/student their own portal login") and the lone Photo field -
+   which had no spacing of their own between one another, reading as
+   cramped against the grids before/after them. The owl selector
+   (`* + *`) gives every child but the first the same ~1rem top margin a
+   .member-form-grid row already gets from its own gap, regardless of
+   which of these two block shapes it ends up next to. */
+.register-adult-block > * + *,
+.register-child-block > * + * {
+  margin-top: 1.5rem;
+}
+/* A real request: "give better spacing... its too squished together" -
+   1rem (matching .member-form-grid's own row gap) still read as
+   cramped for two checkbox toggles sitting right on top of one another
+   with no grid of their own in between - bumped to 1.5rem, the same
+   "adequate space between rows" value .class-settings-form's own rows
+   already settled on below. */
+
+/* A real request: "Sms messaging the check box should line up with the
+   first word of the description" - same flex-start + small top-nudge
+   fix .class-settings-form .checkbox-option below already uses for a
+   checkbox next to a label that wraps to multiple lines: plain
+   align-items: center (correct for a short one-line label) instead
+   centers the checkbox against the whole wrapped block, landing it on
+   a middle line instead of alongside the first word of the first line. */
+.checkbox-option.checkbox-option-top-align { align-items: flex-start; }
+.checkbox-option.checkbox-option-top-align input[type="checkbox"] { margin-top: 0.2rem; }
 .membership-volunteer-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1753,9 +1792,15 @@ body.public-page .roster-empty {
 }
 .admin-sidebar nav a .icon { opacity: 0.75; }
 .admin-sidebar nav a:hover { background: rgba(255,255,255,0.4); }
+/* A real request: "the highlighted tab color should change to a darker
+   orange" - var(--accent-dark) (the same hex as --btn-bg-hover, the
+   app's own established dark-orange-background/dark-ink-text pairing -
+   see .primary-btn's own comment on why --ink reads at 10:1+ there, not
+   white) replaces the plain --surface/--brand-darker treatment this used
+   before. */
 .admin-sidebar nav a.active {
-  background: var(--surface);
-  color: var(--brand-darker);
+  background: var(--accent-dark);
+  color: var(--ink);
   box-shadow: var(--shadow-sm);
 }
 .admin-sidebar nav a.active .icon { opacity: 1; }
@@ -1782,31 +1827,26 @@ body.public-page .roster-empty {
 .admin-nav-group summary::-webkit-details-marker { display: none; }
 .admin-nav-group summary .icon { opacity: 0.75; }
 .admin-nav-group summary:hover { background: rgba(255,255,255,0.4); }
-.admin-nav-group.has-active-subpage summary {
-  background: var(--surface);
-  color: var(--brand-darker);
-  box-shadow: var(--shadow-sm);
-}
-.admin-nav-group.has-active-subpage summary .icon { opacity: 1; }
 .admin-nav-group-chevron { width: 0.9em; height: 0.9em; margin-left: auto; transition: transform 0.15s ease; }
 .admin-nav-group[open] .admin-nav-group-chevron { transform: rotate(180deg); }
 /* A real request: "when you click on a dashboard tab the subpages expand
-   and they are a lighter orange and the tab title is more outlined." This
-   is about the plain open/click state (any group you click open), not
-   just .has-active-subpage above (which only applies once a subpage is
-   actually the current page) - so both rules key off [open] alone. The
-   subpages list has no background at all today, sitting flush on the
-   sidebar's own solid --accent orange; a white-tint overlay reads as a
-   lighter orange against that same backdrop without needing a second
-   named color. */
-.admin-nav-group[open] summary { border: 1.5px solid rgba(0,0,0,0.16); }
+   and they are a lighter orange and the tab title is more outlined." A
+   later real request ("the subpage menu soft orange background should be
+   connected seamlessly with the tab for a clean look") replaced that
+   outline with the exact same soft-orange tint .admin-nav-subpages
+   already uses, no gap between them (.admin-nav-subpages's own margin-
+   top is 0 below) and flat corners at the shared seam (rounded only at
+   the very top of the summary and the very bottom of the subpages list)
+   - the open tab and its subpages now read as one continuous shape
+   instead of two separate boxes. */
+.admin-nav-group[open] summary { background: rgba(255,255,255,0.3); border-radius: 8px 8px 0 0; }
 .admin-nav-subpages {
   display: flex;
   flex-direction: column;
   padding-left: 1.9rem;
-  margin: 0.1rem 0 0.3rem;
+  margin: 0 0 0.3rem;
   background: rgba(255,255,255,0.3);
-  border-radius: 8px;
+  border-radius: 0 0 8px 8px;
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
 }
@@ -1820,7 +1860,23 @@ body.public-page .roster-empty {
   transition: background-color 0.15s ease;
 }
 .admin-nav-subpages a:hover { background: rgba(255,255,255,0.4); }
-.admin-nav-subpages a.active { background: var(--surface); color: var(--brand-darker); font-weight: 700; }
+/* A real request: "the highlighted tab color should change to a darker
+   orange. When a subpage is clicked on it should be the darker orange" -
+   same var(--accent-dark)/var(--ink) pairing as .admin-sidebar nav
+   a.active above, popping against the open group's own softer-orange
+   backdrop. Declared after the [open] tint rule above (equal
+   specificity - two class/attribute selectors each) so source order
+   lets this win for a group that's both open AND on the active subpage,
+   which admin-nav-accordion.js's own auto-open behavior means is always
+   the case together, never has-active-subpage alone. */
+.admin-nav-group.has-active-subpage summary {
+  background: var(--accent-dark);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  border-radius: 8px 8px 0 0;
+}
+.admin-nav-group.has-active-subpage summary .icon { opacity: 1; }
+.admin-nav-subpages a.active { background: var(--accent-dark); color: var(--ink); font-weight: 700; }
 
 .logout-form { margin: 0; }
 
@@ -2831,6 +2887,29 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 }
 
 .member-edit-form { max-width: 720px; }
+/* A real request: "Make sure there is adequate row space between every
+   row" - the public self-registration form (#portal-register-form) and
+   the unified member edit pages (.member-edit-form-page) share this
+   exact field grid, so this is scoped to both equally rather than to
+   just one, keeping them "IDENTICAL" per that same request - a stray
+   <label>/<p>/.checkbox-option sitting directly in a .form-section or
+   .manage-section (Primary Parent checkbox, Sections/Portal Roles
+   headers, custom-field questions) has no gap at all otherwise, unlike
+   a row inside .member-form-grid, which already gets one from its own
+   `gap` below. */
+#portal-register-form .form-section > .checkbox-option,
+#portal-register-form .form-section > p,
+#portal-register-form .register-adult-block > .checkbox-option,
+#portal-register-form .register-child-block > .checkbox-option,
+.member-edit-form-page .form-section > .checkbox-option,
+.member-edit-form-page .form-section > p,
+.member-edit-form-page .manage-section > .checkbox-option,
+.member-edit-form-page .manage-section > p,
+.member-edit-form-page .register-adult-block > .checkbox-option,
+.member-edit-form-page .register-child-block > .checkbox-option {
+  margin: 1.25rem 0;
+}
+
 .member-form-grid {
   display: grid;
   /* minmax(0, 1fr), not a bare 1fr - a real bug report: "on mobile all
@@ -2845,7 +2924,11 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
      the container's actual width and each item's own min-width: 0 (set
      just below) takes over from there instead. */
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem 1.5rem;
+  /* A real request: "Make sure there is adequate row space between
+     every row" - row gap widened from 1rem for more breathing room
+     between stacked fields (e.g. Email above Phone Number on a narrow
+     column, or every field on mobile's single-column layout). */
+  gap: 1.5rem;
 }
 .member-form-full { grid-column: 1 / -1; }
 /* Event Details' Starts/Ends and Settings' Registration Opens/Closes
@@ -4733,7 +4816,8 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
    is the only control for picking one; this just offers a way to create a
    new one without leaving the Add/Edit Member form (see data-add-family-*
    in public/js/member-form.js). */
-.member-form-add-family-btn { margin-top: 0.6rem; }
+/* A real request: "Shrink add family button by half." */
+.member-form-add-family-btn { margin-top: 0.6rem; padding: 0.3rem 0.5rem; font-size: 0.78rem; }
 
 /* Dropdown + checklist rows (Choose a Family, Setup/Cleanup Team) - the
    dropdown is a quick-pick that checks/selects the matching row below;
@@ -4782,6 +4866,39 @@ li[data-assignment-id].fs-weekly-plan-dragging { opacity: 0.5; background: var(-
 .member-form-footer-view,
 .member-form-footer-edit { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; width: 100%; min-width: 0; justify-content: space-between; }
 .member-edit-form-page .member-form-footer-edit { justify-content: flex-end; }
+
+/* A real request: "Save and cancel buttons and the bottom of the page,
+   same size, same row, side by side" - later clarified to "Save and
+   cancel buttons should fit to text," i.e. same row/same padding/
+   font-size (already true via the .member-form-footer rule just above),
+   NOT stretched to split the row evenly - each one sized to its own
+   label, same as this button pair already behaves everywhere else in
+   the app it's used. No extra rule needed here beyond the shared one
+   above; this comment just marks the spot so a future "make them even
+   width again" request doesn't get re-added by mistake. */
+
+/* A real request: "Sections dropdown menu should be white, not blue,
+   shrink to fit text" - the Sections/Portal Roles dropdown triggers
+   (partials/member-edit-admin-section.ejs) reuse the same <details
+   data-filter-details>/.filter-panel popover every other "Filter"
+   button in this app already uses, but needed their own summary style:
+   .btn-secondary is solid blue site-wide (see its own rule above) and
+   .roster-action-btn is solid orange - neither is the plain white,
+   shrink-to-fit look this one specific control needed. */
+.checklist-dropdown-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  padding: 0.55rem 0.9rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+.checklist-dropdown-toggle:hover { border-color: var(--btn-blue); }
 
 /* Cancel (.btn-secondary) and Save/Add Member (.primary-btn) normally use
    different padding/font-size scales elsewhere in the app - matched here
@@ -13843,6 +13960,18 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    twice for two other unrelated card shapes (the Class Schedule room-
    grid's clickable card and Student Portal's own "My Classes" grid). */
 .class-dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin: 0.75rem 0 1.5rem; }
+
+/* A real request: "Parent portal classroom dashboard. Desktop. Widen
+   the class cards so that information fits clean on each row. Don't
+   change mobile view." Scoped to Parent Portal's own
+   .parent-class-dash-grid (views/parent-class-dashboard.ejs) - Student
+   Portal's identical-looking dashboard (views/student-class-dashboard.
+   ejs) shares the base .class-dash-grid/.class-dash-card rules above
+   and keeps its original 200px cards, untouched. Desktop only (641px+)
+   - mobile keeps the same 200px minimum as before. */
+@media (min-width: 641px) {
+  .parent-class-dash-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+}
 .class-dash-card {
   display: block; border-radius: var(--radius);
   border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-sm);
@@ -14204,19 +14333,19 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 }
 .member-profile-banner-title { display: flex; align-items: center; gap: 0.6rem; font-weight: 700; font-size: 1.1rem; }
 .member-profile-banner-title .icon { width: 1.3rem; height: 1.3rem; }
-.member-profile-banner-actions { display: flex; align-items: center; gap: 1rem; }
+.member-profile-banner-actions { display: flex; align-items: center; gap: 1.25rem; }
 .member-profile-banner-back { color: #fff; font-weight: 600; font-size: 0.9rem; text-decoration: none; }
 .member-profile-banner-back:hover { text-decoration: underline; }
 
 .member-profile-main-card {
   display: flex;
   align-items: flex-start;
-  gap: 1.25rem;
+  gap: 1.5rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--control-radius);
-  padding: 1.25rem;
-  margin-bottom: 1rem;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 .member-profile-avatar-lg {
   flex-shrink: 0;
@@ -14235,13 +14364,19 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .member-profile-main-info { flex: 1 1 auto; min-width: 0; }
 .member-profile-main-top { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; }
 .member-profile-main-top h1 { margin: 0; font-size: 1.5rem; }
-.member-profile-role-line { margin: 0.2rem 0 0.75rem; font-weight: 600; color: var(--brand-dark); }
-.member-profile-contact-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.35rem 0; color: var(--ink); }
+.member-profile-role-line { margin: 0.25rem 0 0.9rem; font-weight: 600; color: var(--brand-dark); }
+/* A real request: "Viewing member profile, before editing... Make sure
+   there is adequate spacing between rows, button and features," on all
+   three portals that render this shared partial (Parent/Main Admin/
+   Co-op Admin). Was briefly a Parent-Portal-only override further down
+   this file - widened here instead, on the shared base rule, now that
+   all three need it the same way. */
+.member-profile-contact-row { display: flex; align-items: center; gap: 0.65rem; margin: 0.6rem 0; color: var(--ink); }
 .member-profile-contact-row .icon { width: 1.1rem; height: 1.1rem; color: var(--brand-dark); flex-shrink: 0; }
 .member-profile-medical-row { color: var(--red); font-weight: 600; }
 .member-profile-medical-row .icon { color: var(--red); }
 
-.member-profile-cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.member-profile-cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
 @media (max-width: 720px) {
   .member-profile-cards-grid { grid-template-columns: 1fr; }
   /* Avatar + name stay centered as a header, but a real request says
@@ -14256,7 +14391,7 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
   background: var(--brand-soft);
   border: 1px solid var(--border);
   border-radius: var(--control-radius);
-  padding: 1.1rem;
+  padding: 1.35rem;
 }
 .member-profile-side-card h2 { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.75rem; font-size: 1rem; }
 .member-profile-side-card h2 .icon { width: 1.2rem; height: 1.2rem; color: var(--brand-dark); }
@@ -14274,7 +14409,7 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .member-profile-side-card-label { display: flex; align-items: center; gap: 0.35rem; font-weight: 700; font-size: 0.85rem; color: var(--ink); margin: 0.85rem 0 0.3rem; }
 .member-profile-side-card-label:first-of-type { margin-top: 0; }
 .member-profile-side-card-label .icon { width: 1rem; height: 1rem; }
-.member-profile-plain-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.member-profile-plain-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.55rem; }
 .member-profile-plain-list li { font-weight: 400; color: var(--ink); }
 .member-profile-plain-list a { color: var(--ink); text-decoration: none; }
 .member-profile-plain-list a:hover { color: var(--brand-dark); text-decoration: underline; }
@@ -14282,15 +14417,16 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 .member-profile-extra-card p { margin: 0 0 0.5rem; }
 
 /* A real request: "Profile icon. Make sure there is adequate space
-   between buttons, rows and icons." Scoped to the My Profile pages
-   (profile-page on <body>) rather than widening these shared primitives
-   app-wide, since other pages (the admin-side Member Profile card,
-   Members list, etc.) use the same classes at their current, already-
-   reviewed spacing. */
+   between buttons, rows and icons," later extended to "Viewing member
+   profile, before editing... on parent portal, main admin portal,
+   co-op admin portal" - member-profile-contact-row/plain-list/banner-
+   actions are widened on their own base rule now (above), covering all
+   three portals' own Member Profile page the same way, not just Parent
+   Portal's. These two are still Parent-Portal-specific - the edit-form
+   grid gap only applies on /portal/profile/edit, and roster-btn-row is
+   used by the Schedules/Event Signups tabs' own button rows below the
+   card, not the card itself. */
 .profile-page .view-tabs { gap: 0.6rem; }
-.profile-page .member-profile-contact-row { margin: 0.6rem 0; gap: 0.65rem; }
-.profile-page .member-profile-plain-list { gap: 0.55rem; }
-.profile-page .member-profile-banner-actions { gap: 1.25rem; }
 .profile-page .member-form-grid { gap: 1.35rem 1.75rem; }
 .profile-page .roster-btn-row { gap: 0.75rem; }
 
@@ -14641,6 +14777,29 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
    "shrink to fit on mobile for all tables. Total for payments, invoices
    and adjustments should be bottom right of each of those sections." */
 .accounting-section-total { text-align: right; font-weight: 700; margin-top: 0.4rem; }
+
+/* A real request: "Print button should be an icon. And pdf icons should
+   both be next to account year dropdown on the same row. Amount due on
+   the far right on the same row. Don't change mobile view." Default
+   (mobile, unchanged) keeps the original stacked look: the balance
+   badge sits right under the title (own full line), Print/PDF sit
+   together on the next line, and the year dropdown is on its own line
+   below that - the same three visual lines this page had before. */
+.accounting-toolbar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 1rem; }
+.accounting-toolbar-badge { order: 1; flex-basis: 100%; }
+.accounting-toolbar-print { order: 2; }
+.accounting-toolbar-pdf { order: 3; }
+.accounting-toolbar-year-form { order: 4; flex-basis: 100%; }
+
+@media (min-width: 641px) {
+  /* Desktop: year dropdown, then both icons, all on the same row as the
+     balance badge - margin-left: auto pushes just the badge (and
+     anything after it, though nothing is) to the row's far right. */
+  .accounting-toolbar-year-form { order: 1; flex-basis: auto; }
+  .accounting-toolbar-print { order: 2; }
+  .accounting-toolbar-pdf { order: 3; }
+  .accounting-toolbar-badge { order: 4; flex-basis: auto; margin-left: auto; }
+}
 
 /* A real request: "shrink the accounts table on desktop to bring the
    columns much closer together for better viewing. Tables should not

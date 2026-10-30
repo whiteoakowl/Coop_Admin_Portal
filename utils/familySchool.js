@@ -34,7 +34,7 @@ const { urlForUpload } = require('./uploadBackend');
 // from there, never a copy (this file never needs the plan row itself,
 // or its locked flag - see contentItemsForReferencedLessonPlan's own
 // comment below on why).
-const { contentItemsForLessonPlan, listFamilySchoolLessonPlans, getLessonPlan } = require('./lessonPlans');
+const { contentItemsForLessonPlan, getLessonPlan } = require('./lessonPlans');
 
 // Same bucket/local-dir convention routes/admin-members.js/routes/member-
 // directory.js already established for member photos - read-only reuse

@@ -1,0 +1,86 @@
+<%
+// A real request: "when you click the edit profile button it should
+// look exactly like the membership request form... For the two admin
+// portals it will then show an admin only section at the bottom to
+// change portals, sections and family." Everything here is an admin-
+// only action on an EXISTING member (reassigning their family, which
+// Sections they're visible under, which Portal Roles their account
+// holds) - deliberately separate from partials/member-edit-fields.ejs
+// above it (the part that looks exactly like the public membership
+// form) rather than folded into a "Choose a Family" box up top the way
+// the public form's own brand-new-member flow uses one, since none of
+// this is something either the public form or a self-edit page ever
+// touches.
+//
+// Locals:
+//   member, families (with memberCount), memberFamilyId
+//   allSections, memberSectionIds (Set)
+//   allRoles, portalRoleIds (Set) - only rendered when portalAccount is
+//     truthy, same "nothing to grant without an account" reasoning the
+//     box this replaced already used
+//   portalAccount - null or the account row
+//   hasPasswordField - whether the member-edit-fields.ejs box above this
+//     one (same page) actually offers a Password field - Main Admin's
+//     own edit page does (creating a portal account is Main-Admin-only),
+//     Co-op Admin's doesn't, so the "no account yet" hint below points
+//     there instead of at a field that isn't on the page.
+%>
+<div class="manage-section member-form-section-box member-form-section-purple" data-family-box>
+  <h2><svg class="icon"><use href="#icon-sliders"/></svg> Admin Settings</h2>
+
+  <label class="member-form-full"><strong>Family</strong>
+    <select name="familyId" data-family-select>
+      <option value="">Choose from available families</option>
+      <% families.forEach(function(f) { %>
+        <option value="<%= f.id %>" <%= memberFamilyId === f.id ? 'selected' : '' %>>The <%= f.name %> Family</option>
+      <% }); %>
+    </select>
+  </label>
+  <button type="button" class="btn-secondary member-form-add-family-btn" data-add-family-open>+ Add New Family</button>
+
+  <%
+  // A real request: "Sections and portal roles should be a dropdown
+  // menu of check box choices" - same <details data-filter-details>/
+  // .filter-panel popover every other "Filter" dropdown in this app
+  // already uses (public/js/filter-details-dismiss.js closes it on an
+  // outside click), repurposed here to hold a checkbox grid instead of
+  // a <select>, in place of the checkbox grid sitting directly on the
+  // page.
+  const checkedSectionCount = allSections.filter((s) => memberSectionIds.has(s.id)).length;
+  const checkedRoleCount = portalAccount ? allRoles.filter((r) => portalRoleIds.has(r.id)).length : 0;
+  %>
+  <p><strong>Sections</strong></p>
+  <% if (allSections.length === 0) { %>
+    <p class="hint">No sections defined yet.</p>
+  <% } else { %>
+    <details class="filter-details" data-filter-details>
+      <summary class="checklist-dropdown-toggle"><%= checkedSectionCount > 0 ? `${checkedSectionCount} selected` : 'Choose sections' %> <svg class="icon"><use href="#icon-chevron-down"/></svg></summary>
+      <div class="filter-panel">
+        <div class="grade-pill-grid">
+          <% allSections.forEach(function(s) { %>
+            <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= memberSectionIds.has(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
+          <% }); %>
+        </div>
+      </div>
+    </details>
+  <% } %>
+
+  <%
+  // A real request: "When the box is checked on child for allow student
+  // portal. That is all they have access too, the student portal. When
+  // editing the paren member, and choosing portals it will list each
+  // member in that family with a portal dropdown next to it." - replaces
+  // this box's own single-member role checkbox-dropdown above with
+  // views/partials/member-portal-roles.ejs, which renders either a
+  // single Allow Student Portal checkbox (editing a student) or one row
+  // + dropdown per family member (editing anyone else). familyPortalRows
+  // comes from the routes' own GET /:id/edit (member + familyOf(id),
+  // each with its own portal account/role state) - falls back to just
+  // this member's own row if a caller hasn't been updated to pass it,
+  // so this partial never crashes on a missing local.
+  var portalRolesRows = typeof familyPortalRows !== 'undefined' && familyPortalRows
+    ? familyPortalRows
+    : [{ member, portalAccount, roleIds: portalRoleIds }];
+  %>
+  <%- include('member-portal-roles', { member, allRoles, familyPortalRows: portalRolesRows }) %>
+</div>

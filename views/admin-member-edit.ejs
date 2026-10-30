@@ -13,55 +13,39 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <div class="member-form-page-panel member-edit-page-panel">
+      <%# A real request: "This page should look exactly like the
+          membership request form. The additional parent sections and
+          information, children sections and information. With family
+          information below. Save and cancel buttons and the bottom of
+          the page, same size, same row, side by side." Same partials
+          Main Admin's own Edit Member page uses (views/main-admin-
+          member-edit.ejs), minus Password - creating a portal account
+          has always been Main-Admin-only (see routes/main-admin-
+          members.js's own "No creating users" comment, and routes/
+          admin-members.js's own identical boundary on this same POST
+          /members/:id/edit) - so neither the Parent/Guardian fields
+          above nor any Additional Parent/Children block below ever asks
+          for a password here at all, new account or existing one alike
+          (showLogin: false below). %>
       <form
         method="POST"
-        action="<%= mode === 'create' ? '/admin/members/new' : '/admin/members/' + member.id + '/edit' %>"
+        action="/admin/members/<%= member.id %>/edit"
         enctype="multipart/form-data"
         id="member-form"
         class="member-edit-form member-edit-form-page"
         data-add-family-url="/admin/members/families/new"
       >
-        <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, gradeLevels, adminPositions, memberAdminPositionIds }) %>
-
-        <%# A real request: "Only main admin and co-op admin can change
-            sections, portal roles, family, and birthday." Same box as
-            Main Admin's own edit page (views/main-admin-member-edit.ejs),
-            minus the Password field - creating a portal account is still
-            Main Admin-only (see routes/main-admin-members.js's own "No
-            creating users" comment); Sections and Portal Roles themselves
-            were never actually restricted to Main Admin, just never
-            built out here - Co-op Admin already shows both read-only on
-            the Member Profile page (views/admin-member-profile.ejs). %>
-        <% if (mode === 'edit') { %>
-          <div class="manage-section">
-            <h2><svg class="icon"><use href="#icon-sliders"/></svg> Portal Settings</h2>
-
-            <p><strong>Sections</strong></p>
-            <% if (allSections.length === 0) { %>
-              <p class="hint">No sections defined yet.</p>
-            <% } else { %>
-              <div class="grade-pill-grid">
-                <% allSections.forEach(function(s) { %>
-                  <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= memberSectionIds.has(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
-                <% }); %>
-              </div>
-            <% } %>
-
-            <%- include('partials/member-portal-roles', { member, allRoles, familyPortalRows }) %>
-          </div>
-        <% } %>
+        <%- include('partials/member-edit-fields', { member, gradeLevels, showPassword: false, parentFields, childFields, generalFields, customFieldValues }) %>
+        <%- include('partials/member-edit-family-sections', { familyAdults, familyChildren, familyChildFields, showLogin: false }) %>
+        <%- include('partials/member-edit-admin-section', { member, families, memberFamilyId, allSections, memberSectionIds, allRoles, portalRoleIds, portalAccount, familyPortalRows, hasPasswordField: false }) %>
 
         <div class="member-form-footer">
           <div class="member-form-footer-edit">
             <a class="btn-secondary" href="/admin/members">Cancel</a>
-            <button type="submit" class="primary-btn"><svg class="icon"><use href="#icon-save"/></svg> <%= mode === 'create' ? 'Add Member' : 'Save Member' %></button>
+            <button type="submit" class="primary-btn"><svg class="icon"><use href="#icon-save"/></svg> Save Member</button>
           </div>
         </div>
       </form>
-
-      <% if (mode === 'edit') { %>
-        <%- include('partials/family-members-editor', { familyMembers, gradeLevels, viewerId: member.id, quickEditBasePath: '/admin/members' }) %>
-      <% } %>
 
       <%# Outside #member-form on purpose - a <form> can't nest inside another
           <form> (the browser silently drops the inner tag), so this dialog's
@@ -84,5 +68,7 @@
 
   </main>
   <script src="/js/member-form.js"></script>
+  <script src="/js/member-family-edit-form.js"></script>
+  <script src="/js/filter-details-dismiss.js"></script>
 </body>
 </html>

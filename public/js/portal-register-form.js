@@ -16,6 +16,23 @@
   const template = document.getElementById('register-child-template');
   let childIndex = childrenList ? childrenList.querySelectorAll('[data-child-block]').length : 0;
 
+  // A real request: "Put double title back but it should say parent/
+  // guardian #2, #3 etc. Same for children" - every child lives in this
+  // one dynamic list with no separate "Child #1" elsewhere on the page
+  // (unlike an additional parent, continuing on from the Parent/Guardian
+  // section above - see renumberAdults below), so numbering here starts
+  // at #1. Recomputed from each block's own DOM position (not the
+  // array `index` baked into its field names, which never shifts once a
+  // block is removed) so removing one from the middle of the list closes
+  // the gap instead of leaving a missing number behind.
+  function renumberChildren() {
+    if (!childrenList) return;
+    childrenList.querySelectorAll('[data-child-block]').forEach((block, i) => {
+      const title = block.querySelector('[data-child-title]');
+      if (title) title.textContent = 'Child #' + (i + 1);
+    });
+  }
+
   function bindLoginToggle(block) {
     const toggle = block.querySelector('[data-child-login-toggle]');
     const fields = block.querySelector('[data-child-login-fields]');
@@ -27,7 +44,7 @@
 
   function bindRemove(block) {
     const btn = block.querySelector('.register-remove-child');
-    if (btn) btn.addEventListener('click', () => block.remove());
+    if (btn) btn.addEventListener('click', () => { block.remove(); renumberChildren(); });
   }
 
   if (childrenList) {
@@ -35,6 +52,7 @@
       bindLoginToggle(block);
       bindRemove(block);
     });
+    renumberChildren();
   }
 
   if (addChildBtn && template && childrenList) {
@@ -47,6 +65,7 @@
       childrenList.appendChild(block);
       bindLoginToggle(block);
       bindRemove(block);
+      renumberChildren();
     });
   }
 
@@ -61,6 +80,20 @@
   const adultTemplate = document.getElementById('register-adult-template');
   let adultIndex = adultsList ? adultsList.querySelectorAll('[data-adult-block]').length : 0;
 
+  // A real request: "Put double title back but it should say parent/
+  // guardian #2, #3 etc." - numbering starts at #2 since the
+  // Parent/Guardian section at the top of the form is implicitly #1.
+  // Same DOM-position-based recompute as renumberChildren above, for the
+  // same "stays correct after a block is removed from the middle of the
+  // list" reason.
+  function renumberAdults() {
+    if (!adultsList) return;
+    adultsList.querySelectorAll('[data-adult-block]').forEach((block, i) => {
+      const title = block.querySelector('[data-adult-title]');
+      if (title) title.textContent = 'Parent/Guardian #' + (i + 2);
+    });
+  }
+
   function bindSameAddressToggle(block) {
     const toggle = block.querySelector('[data-adult-same-address-toggle]');
     const fields = block.querySelector('[data-adult-address-fields]');
@@ -70,16 +103,30 @@
     });
   }
 
+  // A real request: "For add an adult, also add check box for give this
+  // parent their own portal log in" - same show/hide pattern as a
+  // child's own bindLoginToggle above.
+  function bindAdultLoginToggle(block) {
+    const toggle = block.querySelector('[data-adult-login-toggle]');
+    const fields = block.querySelector('[data-adult-login-fields]');
+    if (!toggle || !fields) return;
+    toggle.addEventListener('change', () => {
+      fields.hidden = !toggle.checked;
+    });
+  }
+
   function bindRemoveAdult(block) {
     const btn = block.querySelector('.register-remove-adult');
-    if (btn) btn.addEventListener('click', () => block.remove());
+    if (btn) btn.addEventListener('click', () => { block.remove(); renumberAdults(); });
   }
 
   if (adultsList) {
     adultsList.querySelectorAll('[data-adult-block]').forEach((block) => {
       bindSameAddressToggle(block);
+      bindAdultLoginToggle(block);
       bindRemoveAdult(block);
     });
+    renumberAdults();
   }
 
   if (addAdultBtn && adultTemplate && adultsList) {
@@ -91,25 +138,10 @@
       const block = wrapper.firstElementChild;
       adultsList.appendChild(block);
       bindSameAddressToggle(block);
+      bindAdultLoginToggle(block);
       bindRemoveAdult(block);
+      renumberAdults();
     });
-  }
-
-  // A real request: "the phone number field is far away from the
-  // request, should there be another phone number bar close to the
-  // permissions" - echoes the real phone field's live value next to the
-  // SMS opt-in checkbox (see views/portal-register.ejs's own comment on
-  // #sms-opt-in-phone-echo), so that section alone shows a reviewer both
-  // the phone number and the opt-in language together.
-  const phoneInput = document.getElementById('register-phone-input');
-  const phoneEcho = document.getElementById('sms-opt-in-phone-echo');
-  if (phoneInput && phoneEcho) {
-    function updatePhoneEcho() {
-      const value = phoneInput.value.trim();
-      phoneEcho.textContent = value || '(enter your phone number above)';
-    }
-    phoneInput.addEventListener('input', updatePhoneEcho);
-    updatePhoneEcho();
   }
 
   // A real request: "can't check the box until you have scrolled

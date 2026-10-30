@@ -8,21 +8,46 @@
 //
 // Fully optional, same as a child block here - a blank block is
 // silently dropped server-side (routes/portal-auth.js's own additional-
-// parents filter) rather than blocking submission. No portal-login
-// toggle (unlike a child block) - an additional adult here is a profile
-// entry only; a Main Admin can grant them their own login later from
-// Users, the same as any other admin-entered member without one yet.
+// parents filter) rather than blocking submission.
+//
+// A real request: "For add an adult, also add check box for give this
+// parent their own portal log in" - same wantsLogin/Password/Confirm
+// pattern register-child-fields.ejs's own child-login-toggle already
+// uses, except there's no separate login-email field here: the Email
+// field already in the grid above doubles as the login email (routes/
+// portal-auth.js's own additionalParents validation requires it be
+// filled in when this is checked), rather than asking for the same
+// address twice.
 //
 // `values` carries back whatever the visitor typed if the whole form
-// re-renders after a validation error, same as register-child-fields.ejs.
+// re-renders after a validation error, so nothing the visitor already
+// typed gets lost, but never their password - see register-child-
+// fields.ejs's own matching comment.
 const v = (typeof values !== 'undefined' && values) || {};
 %>
 <div class="manage-section register-adult-block" data-adult-block>
+  <%# A real request: "Put double title back but it should say parent/
+      guardian #2, #3 etc." - back to a per-block title, now numbered
+      instead of repeating the same static "Additional Parent/Guardian"
+      text verbatim for every block. The number itself is filled in by
+      public/js/portal-register-form.js's own renumberAdults() (empty
+      here, not computed in EJS) so it can count this block's actual
+      position among every .register-adult-block currently in the DOM,
+      starting from #2 since the Parent/Guardian section above this one
+      is implicitly #1 - the one place that stays correct after a block
+      is removed from the middle of the list, which a number baked in at
+      render time never would. %>
   <div class="membership-child-header">
-    <h3>Additional Parent/Guardian</h3>
+    <h3 data-adult-title></h3>
     <button type="button" class="icon-btn register-remove-adult" aria-label="Remove adult" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
   </div>
   <div class="member-form-grid">
+    <%# A real request: "Upload photo button should be first under the
+        title" - moved up from the bottom of this block to right under
+        its own h3. %>
+    <label class="member-form-full">Photo
+      <input type="file" name="additionalParents[<%= index %>][photo]" accept="image/*" />
+    </label>
     <label>First Name
       <input type="text" name="additionalParents[<%= index %>][firstName]" value="<%= v.firstName || '' %>" />
     </label>
@@ -64,8 +89,18 @@ const v = (typeof values !== 'undefined' && values) || {};
     </label>
   </div>
 
-  <%# A real request: "Should be able to upload parent profile photos." %>
-  <label class="member-form-full">Photo
-    <input type="file" name="additionalParents[<%= index %>][photo]" accept="image/*" />
+  <label class="checkbox-option">
+    <input type="checkbox" class="register-adult-login-toggle" data-adult-login-toggle name="additionalParents[<%= index %>][wantsLogin]" <%= v.wantsLogin ? 'checked' : '' %> />
+    Give this parent their own portal login
   </label>
+  <div class="member-form-grid register-adult-login-fields" data-adult-login-fields <%= v.wantsLogin ? '' : 'hidden' %>>
+    <p class="hint member-form-full">Uses the email address entered above as their login.</p>
+    <label>Password
+      <input type="password" name="additionalParents[<%= index %>][loginPassword]" minlength="8" autocomplete="new-password" />
+    </label>
+    <label>Confirm Password
+      <input type="password" name="additionalParents[<%= index %>][loginPasswordConfirm]" minlength="8" autocomplete="new-password" />
+    </label>
+  </div>
+
 </div>

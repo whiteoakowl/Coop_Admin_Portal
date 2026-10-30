@@ -1,0 +1,182 @@
+// Coverage for a real request: "Classroom dashboard should be a menu
+// tab as well. Classroom dashboard subpages. Classes, grades,
+// attendance, chat, portfolio, transcripts. overview, which shows
+// volunteer hours, days of school attendance from family school
+// management, GPA, etc." Adds a new Classroom Dashboard nav tab
+// (views/partials/portal-nav.ejs) alongside the existing Classes/Family
+// Homeschooling tabs, plus brand-new read-only Attendance/Portfolio
+// subpages (routes/student-family-school.js) and a Volunteer Hours stat
+// on the Homeschool Overview page. A later real request then merged
+// Overview into Portfolio and dropped it as its own page - see the
+// Portfolio test below for Volunteer Hours' own coverage now.
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const testDbPath = path.join(os.tmpdir(), `student-classroom-dashboard-tab-test-db-${process.pid}.db`);
+const testUploadsDir = path.join(os.tmpdir(), `student-classroom-dashboard-tab-test-uploads-${process.pid}`);
+process.env.DB_PATH = testDbPath;
+process.env.UPLOADS_DIR = testUploadsDir;
+process.env.SESSION_SECRET = 'test-secret-not-for-real-use';
+
+const request = require('supertest');
+const app = require('../server');
+
+test.before(() => app.ready);
+const db = require('../db');
+const { hashPassword } = require('../utils/portalAuth');
+const { toggleAttendance, createVolunteerHourEntry, currentSchoolYear } = require('../utils/familySchool');
+
+test.after(() => {
+  fs.rmSync(testDbPath, { force: true });
+  fs.rmSync(`${testDbPath}-wal`, { force: true });
+  fs.rmSync(`${testDbPath}-shm`, { force: true });
+  fs.rmSync(testUploadsDir, { recursive: true, force: true });
+});
+
+let counter = 0;
+async function createStudent(name) {
+  counter += 1;
+  const code = `classdash${counter}`;
+  const familyId = (await db.prepare("INSERT INTO families (name) VALUES (?) RETURNING id").get(`${name} Family`)).id;
+  const email = `${code}@example.com`;
+  const memberId = (
+    await db
+      .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, active) VALUES (?, ?, ?, 'student', ?, 1) RETURNING id")
+      .get(name, code, code, familyId)
+  ).id;
+  const acctId = (
+    await db
+      .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text()) RETURNING id")
+      .get(memberId, email, hashPassword('testpassword123'))
+  ).id;
+  const role = await db.prepare("SELECT id FROM roles WHERE key = 'student'").get();
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(acctId, role.id);
+  const loginRes = await request(app).post('/login').type('form').send({ email, password: 'testpassword123', next: '/student' });
+  return { memberId, familyId, cookie: loginRes.headers['set-cookie'] };
+}
+
+// A later real request: "Family homeschooling shouldn't be a tab anymore
+// on student portal. Co-op classes and family school management classes
+// are all under classroom dashboard subpages together" - Weekly Planner
+// (the only other page that used to live solely under the now-removed
+// Family Homeschooling tab) joined this tab's own subpages. A further
+// real request ("there should only be one subpage that says classes...
+// Overview and portfolio should also be the same page and called
+// portfolio") collapsed Co-op Classes/Family School Classes into one
+// Classes subpage (the existing /student/classes/dashboard page, which
+// already lists both kinds of classes together) and dropped Overview in
+// favor of Portfolio, which already shows everything Overview did.
+test('Student Portal nav: Classroom Dashboard is a tab with one Classes subpage and every other requested subpage', async () => {
+  const student = await createStudent('Nav Student');
+  const page = await request(app).get('/student').set('Cookie', student.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, />Classroom Dashboard</);
+  assert.match(page.text, /href="\/student\/classes\/dashboard">Classes</);
+  assert.match(page.text, /href="\/student\/family-school\/grades">Grades</);
+  assert.match(page.text, /href="\/student\/family-school\/attendance">Attendance</);
+  assert.match(page.text, /href="\/student\/family-school\/weekly-planner">Weekly Planner</);
+  assert.match(page.text, /href="\/forums\?portal=student">Chat</);
+  assert.match(page.text, /href="\/student\/family-school\/portfolio">Portfolio</);
+  assert.match(page.text, /href="\/student\/transcript">Transcripts</);
+  assert.doesNotMatch(page.text, /href="\/student\/family-school\/overview">Overview</);
+});
+
+// A still later real request: "Co-op class schedule there should be no
+// subpages. Just click to view the current co-op schedules" plus
+// "Desktop. Dashboard panel. Classroom dashboard should be a white
+// title like Student portal and activities. With the classroom
+// dashboard subpages as tabs." Co-op Schedule drops its own dropdown
+// (it only ever offered Class Schedule/Classroom Dashboard, and
+// Classroom Dashboard is reachable its own way below); Classroom
+// Dashboard itself moves out of the dropdown-style nav list entirely on
+// desktop into its own titled section, same visual language as the
+// "Activities" section right below it - see portal-nav.ejs's own
+// desktopAsSection comment. Mobile is untouched (checked separately,
+// right below).
+test('Student Portal nav (desktop): Co-op Schedule is a plain link with no subpages dropdown', async () => {
+  const student = await createStudent('CoopNav Student');
+  const page = await request(app).get('/student').set('Cookie', student.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<a href="\/student\/classes"><svg class="icon"><use href="#icon-graduation-cap"\/><\/svg> Co-op Schedule<\/a>/);
+  assert.doesNotMatch(page.text, />Class Schedule</, 'the old Co-op Schedule subpage label is gone');
+});
+
+test('Student Portal nav (desktop): Classroom Dashboard is its own white title section with flat subpage links, not a dropdown', async () => {
+  const student = await createStudent('ClassDashNav Student');
+  const page = await request(app).get('/student').set('Cookie', student.cookie);
+  assert.equal(page.status, 200);
+  // Same <p class="portal-nav-title"> heading style "Student Portal" (the
+  // brand title) and "Activities" (classLinksTitle) already use.
+  assert.match(page.text, /<p class="portal-nav-title">Classroom Dashboard<\/p>/);
+  assert.match(page.text, /<nav id="classroom-dashboard-nav-links">/);
+  assert.match(page.text, /href="\/student\/classes\/dashboard"><svg class="icon"><use href="#icon-graduation-cap"\/><\/svg> Classes/);
+  // Not also rendered a second time as a <details> dropdown group.
+  assert.doesNotMatch(page.text, /<summary>[^<]*<svg class="icon"><use href="#icon-grid"\/><\/svg> Classroom Dashboard/);
+});
+
+test('Student Portal nav (mobile): Classroom Dashboard still opens its own subpages dialog, unchanged by the desktop-only section request', async () => {
+  const student = await createStudent('MobileNav Student');
+  const page = await request(app).get('/student').set('Cookie', student.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<button type="button" class="mobile-tab-subpages-trigger" data-subpages-dialog="mobile-subpages-classroom-dashboard"/);
+  assert.match(page.text, /<dialog class="view-tabs page-tabs-dialog no-print" id="mobile-subpages-classroom-dashboard">/);
+});
+
+test('Attendance subpage shows this student\'s own present/absent days for the current school year, read-only', async () => {
+  const student = await createStudent('Attendance Student');
+  const startYear = parseInt(currentSchoolYear().slice(0, 4), 10);
+  await toggleAttendance(student.memberId, `${startYear}-09-02`); // present
+  await toggleAttendance(student.memberId, `${startYear}-09-03`); // present
+  await toggleAttendance(student.memberId, `${startYear}-09-03`); // absent
+
+  const page = await request(app).get('/student/family-school/attendance').set('Cookie', student.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<h1>Attendance/);
+  assert.match(page.text, /fs-attendance-day-present"[^>]*>2</);
+  assert.match(page.text, /fs-attendance-day-absent"[^>]*>3</);
+  // Read-only - no click-to-toggle data attributes or JS.
+  assert.doesNotMatch(page.text, /data-fs-attendance-cell/);
+  assert.doesNotMatch(page.text, /family-school-attendance\.js/);
+});
+
+test('Portfolio subpage summarizes this student\'s own classes, GPA, attendance, and volunteer hours', async () => {
+  const student = await createStudent('Portfolio Student');
+  await createVolunteerHourEntry({ studentId: student.memberId, hourDate: '2026-04-01', hours: 3, activityDescription: 'Library', createdByAccountId: null });
+  await createVolunteerHourEntry({ studentId: student.memberId, hourDate: '2026-04-02', hours: 2, activityDescription: 'Park cleanup', createdByAccountId: null });
+
+  const page = await request(app).get('/student/family-school/portfolio').set('Cookie', student.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<h1>Portfolio<\/h1>/);
+  assert.match(page.text, /Portfolio Student/);
+  assert.match(page.text, /Volunteer Hours/);
+  assert.match(page.text, /fs-overview-stat-value">5</); // 3 + 2 hours
+});
+
+// A real request: "Overview and portfolio should also be the same page
+// and called portfolio" - the old standalone Homeschool Overview route
+// (/student/family-school/overview) is gone; Portfolio is the one page
+// now, and it 404s since nothing in the app links to it anymore.
+test('the old standalone Homeschool Overview route is gone', async () => {
+  const student = await createStudent('Overview Student');
+  const page = await request(app).get('/student/family-school/overview').set('Cookie', student.cookie);
+  assert.equal(page.status, 404);
+});
+
+test("a student from a DIFFERENT family never sees another family's attendance or portfolio", async () => {
+  const studentA = await createStudent('Family A Student');
+  const studentB = await createStudent('Family B Student');
+  const startYear = parseInt(currentSchoolYear().slice(0, 4), 10);
+  await toggleAttendance(studentA.memberId, `${startYear}-09-05`); // present for A only
+  await createVolunteerHourEntry({ studentId: studentA.memberId, hourDate: '2026-04-01', hours: 7, activityDescription: 'A only', createdByAccountId: null });
+
+  const attendancePage = await request(app).get('/student/family-school/attendance').set('Cookie', studentB.cookie);
+  assert.doesNotMatch(attendancePage.text, /fs-attendance-day-present"[^>]*>5</);
+
+  const portfolioPage = await request(app).get('/student/family-school/portfolio').set('Cookie', studentB.cookie);
+  assert.match(portfolioPage.text, /Family B Student/);
+  assert.doesNotMatch(portfolioPage.text, /Family A Student/);
+  assert.doesNotMatch(portfolioPage.text, /fs-overview-stat-value">7</);
+});

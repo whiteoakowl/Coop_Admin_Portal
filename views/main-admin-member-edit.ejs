@@ -16,6 +16,21 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <div class="member-form-page-panel member-edit-page-panel">
+      <%# A real request: "This page should look exactly like the
+          membership request form. The additional parent sections and
+          information, children sections and information. With family
+          information below. Save and cancel buttons and the bottom of
+          the page, same size, same row, side by side." See partials/
+          member-edit-fields.ejs's own header comment for why the first
+          part is a separate, shared partial (same one Parent Portal's
+          own self-edit page and Co-op Admin's Edit Member page use),
+          partials/member-edit-family-sections.ejs's own for the
+          Additional Parents/Children sections (replacing the old inline
+          "Family Members" quick-edit table and "Add to This Family"
+          quick-add dialog - both fully superseded by +Add Adult/+Add
+          Child there, which cover the same job with the full field set),
+          and partials/member-edit-admin-section.ejs's own for the
+          admin-only "family information" section at the bottom. %>
       <form
         method="POST"
         action="/main-admin/members/<%= member.id %>/edit"
@@ -24,68 +39,9 @@
         class="member-edit-form member-edit-form-page"
         data-add-family-url="/main-admin/members/families/new"
       >
-        <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, gradeLevels, adminPositions, memberAdminPositionIds }) %>
-
-        <%# A real request: "when editing a member profile, there is a
-            button that says add parent/student. when you click this
-            button it will ask student or parent, name, if student then
-            it asks birthday and grade. save." A quick-add dialog (see
-            data-quick-add-member-dialog below, outside #member-form for
-            the same reason the Add Family dialog is) that always adds
-            onto this member's own family - each new person still gets
-            their own individual profile via utils/memberIntake.js, just
-            like the full Add Member form does. %>
-        <div class="manage-section">
-          <h2><svg class="icon"><use href="#icon-users"/></svg> Add to This Family</h2>
-          <% if (memberFamilyId) { %>
-            <p class="hint">Add another parent or student to this family - they get their own individual profile.</p>
-            <button type="button" class="btn-secondary" data-quick-add-member-open>+ Add Parent/Student</button>
-          <% } else { %>
-            <p class="hint">Choose or add a family above and save, then come back here to add more parents or students to it.</p>
-          <% } %>
-        </div>
-
-        <%# A real request (Approvals tab): "you can click the name and
-            view their membership form and edit, add portal settings etc.
-            save." A real later request: "No creating users. All Members
-            should already have an account. Each member profile should
-            have a space for password." - so this box covers BOTH a member
-            who already has a portal account (change their password,
-            manage roles) and one who doesn't yet (set a password here to
-            create their account on Save, using the Email field above as
-            their login - see routes/main-admin-members.js's own
-            POST /:id/edit). %>
-        <div class="manage-section">
-          <h2><svg class="icon"><use href="#icon-sliders"/></svg> Portal Settings</h2>
-
-          <%# A real request: "there should not be an edit permissions
-              button [on the profile page], it should just show the
-              member's sections and portal permissions. When you click
-              the edit button... that is where you can control portal
-              settings per member." Sections scope what an admin can see/
-              manage - independent of whether this member has a portal
-              login of their own, unlike Portal Roles below. %>
-          <p><strong>Sections</strong></p>
-          <% if (allSections.length === 0) { %>
-            <p class="hint">No sections defined yet.</p>
-          <% } else { %>
-            <div class="grade-pill-grid">
-              <% allSections.forEach(function(s) { %>
-                <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= memberSectionIds.has(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
-              <% }); %>
-            </div>
-          <% } %>
-
-          <% if (portalAccount) { %>
-            <p class="hint">Account: <%= portalAccount.email %> &middot; Status: <%= portalAccount.status %></p>
-          <% } else { %>
-            <p class="hint">No portal account yet. Set a password below to create one, using this member's Email address above as their login.</p>
-          <% } %>
-          <label class="member-form-full"><%= portalAccount ? 'New Password (leave blank to keep the current one)' : 'Password' %>
-            <input type="password" name="password" autocomplete="new-password" minlength="8" placeholder="<%= portalAccount ? 'Leave blank to keep unchanged' : 'At least 8 characters' %>" />
-          </label>
-          <%- include('partials/member-portal-roles', { member, allRoles, familyPortalRows }) %>
-        </div>
+        <%- include('partials/member-edit-fields', { member, gradeLevels, showPassword: true, confirmPassword: false, portalAccount, parentFields, childFields, generalFields, customFieldValues }) %>
+        <%- include('partials/member-edit-family-sections', { familyAdults, familyChildren, familyChildFields }) %>
+        <%- include('partials/member-edit-admin-section', { member, families, memberFamilyId, allSections, memberSectionIds, allRoles, portalRoleIds, portalAccount, familyPortalRows, hasPasswordField: true }) %>
 
         <div class="member-form-footer">
           <div class="member-form-footer-edit">
@@ -95,11 +51,11 @@
         </div>
       </form>
 
-      <%- include('partials/family-members-editor', { familyMembers, gradeLevels, viewerId: member.id, quickEditBasePath: '/main-admin/members' }) %>
-
-      <%# Outside #member-form on purpose - see views/admin-member-edit.ejs's
-          own identical comment on why this dialog can't nest inside the
-          main form. %>
+      <%# Outside #member-form on purpose - a <form> can't nest inside
+          another <form> (the browser silently drops the inner tag), so
+          this dialog's own form has to live as a sibling, not a
+          descendant, of the main Edit Member form. See data-add-family-*
+          in public/js/member-form.js. %>
       <dialog class="member-picker-dialog" data-add-family-dialog>
         <form data-add-family-form>
           <h3>Add Family</h3>
@@ -113,43 +69,10 @@
           </div>
         </form>
       </dialog>
-
-      <%# "add parent/student ... it will ask student or parent, name, if
-          student then it asks birthday and grade. save." A plain form
-          POST (no fetch) to routes/main-admin-members.js's own
-          /:id/quick-add-family-member - simplest way to show the result
-          (a fresh page load re-rendering this same Edit Profile page with
-          a success/error banner), consistent with how every other action
-          on this page already reports back. A further real request: "No
-          parent/student choice on membership forms or profiles. All
-          children are automatically counted as student and adults
-          counted as parents." - no more Student/Parent radio here either;
-          Birthday is the only thing that decides it (grade level is only
-          ever meaningful for a child, but asking for it costs nothing on
-          the rare case someone leaves it blank for an adult). %>
-      <dialog class="member-picker-dialog" data-quick-add-member-dialog>
-        <form method="POST" action="/main-admin/members/<%= member.id %>/quick-add-family-member" data-quick-add-member-form>
-          <h3>Add Parent/Student</h3>
-          <label>Name
-            <input type="text" name="name" placeholder="Full name" required />
-          </label>
-          <label>Birthday <span class="hint">(leave blank for an adult/parent)</span>
-            <input type="date" name="birthday" />
-          </label>
-          <label>Grade Level <span class="hint">(students only)</span>
-            <select name="gradeLevel">
-              <option value="">Select grade level</option>
-              <% gradeLevels.forEach(function(g) { %><option value="<%= g %>"><%= g %></option><% }); %>
-            </select>
-          </label>
-          <div class="notes-dialog-actions">
-            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-            <button type="submit" class="primary-btn">Save</button>
-          </div>
-        </form>
-      </dialog>
     </div>
   </main>
   <script src="/js/member-form.js"></script>
+  <script src="/js/member-family-edit-form.js"></script>
+  <script src="/js/filter-details-dismiss.js"></script>
 </body>
 </html>

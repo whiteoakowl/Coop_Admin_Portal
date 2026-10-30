@@ -152,13 +152,13 @@ const STUDENT_DASHBOARD_CATEGORIES = {
     color: 'blue',
     icon: 'icon-graduation-cap',
     links: [
-      { href: '/student/classes', icon: 'icon-clock', label: 'Class Schedule' },
-      { href: '/student/classes/dashboard', icon: 'icon-graduation-cap', label: 'Classroom Dashboard' },
+      { href: '/student/classes/dashboard', icon: 'icon-graduation-cap', label: 'Classes' },
       { href: '/student/resources', icon: 'icon-book', label: 'Resources' },
-      { href: '/student/family-school/overview', icon: 'icon-home-heart', label: 'Homeschool Overview' },
-      { href: '/student/family-school', icon: 'icon-book', label: 'Homeschool Classes' },
-      { href: '/student/family-school/grades', icon: 'icon-file-text', label: 'Homeschool Grades' },
+      { href: '/student/family-school/grades', icon: 'icon-file-text', label: 'Grades' },
+      { href: '/student/family-school/attendance', icon: 'icon-calendar-check', label: 'Attendance' },
       { href: '/student/family-school/weekly-planner', icon: 'icon-calendar-check', label: 'Weekly Planner' },
+      { href: '/student/family-school/portfolio', icon: 'icon-home-heart', label: 'Portfolio' },
+      { href: '/student/transcript', icon: 'icon-file-text', label: 'Transcripts' },
     ],
   },
   fun: {

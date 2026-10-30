@@ -85,11 +85,11 @@ test('My Classes shows only this student\'s own enrolled classes', async () => {
 // Their own /absence and /student/name-tag routes are untouched - never
 // part of this group to begin with.
 //
-// A later real request split the old Classes dropdown (Class Schedule +
-// Classroom Dashboard subpages) back into 2 standing tabs: "Class
-// schedule should be its own tab and called Co-op Schedule. Classroom
-// dashboard should be its own tab and the beginning of a new section" -
-// portal-nav.ejs's own STUDENT_NAV_LINKS/COMMUNITY_LINKS_STUDENT.
+// A later real request renamed Classes to "Co-op Schedule" (still its
+// own standing tab, with the same Class Schedule/Classroom Dashboard
+// subpages as before). A separate real request gave Classroom Dashboard
+// its own full standing tab too (a different, consolidated hub tab -
+// see portal-nav.ejs's own STUDENT_NAV_LINKS for both).
 test('Student Portal nav offers Co-op Schedule and Classroom Dashboard as standing tabs, not Absence/Late Form or Name Tag Form', async () => {
   const { cookie } = await createStudent('Nav Subpages Student');
   const res = await request(app).get('/student').set('Cookie', cookie);

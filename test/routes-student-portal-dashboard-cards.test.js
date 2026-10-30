@@ -88,9 +88,10 @@ test('Classroom Dashboard category page lists its pages in a 2-column blue card 
   assert.equal(page.status, 200);
   assert.match(page.text, /<h1>Classroom Dashboard<\/h1>/);
   assert.match(page.text, /class="landing-grid landing-grid-two landing-card-rect"/);
-  assert.match(page.text, /landing-card landing-card-blue" href="\/student\/classes"/);
-  assert.match(page.text, />Homeschool Grades</);
+  assert.match(page.text, /landing-card landing-card-blue" href="\/student\/classes\/dashboard"/);
+  assert.match(page.text, />Grades</);
   assert.match(page.text, /landing-card landing-card-blue" href="\/student\/family-school\/weekly-planner"/);
+  assert.match(page.text, /landing-card landing-card-blue" href="\/student\/family-school\/portfolio"/);
 });
 
 test('Fun Dashboard category page lists its pages in a 2-column green card grid', async () => {

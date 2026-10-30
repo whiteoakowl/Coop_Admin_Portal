@@ -17,6 +17,12 @@
       <div class="form-section">
         <h2>Parent / Guardian</h2>
         <div class="member-form-grid">
+          <%# A real request: "Upload photo button should be first under
+              the title" - moved up from the bottom of this grid to right
+              under the section heading. %>
+          <label class="member-form-full">Photo
+            <input type="file" name="photo" accept="image/*" />
+          </label>
           <label>First Name
             <input type="text" name="firstName" value="<%= formValues.firstName || '' %>" required autocomplete="given-name" />
           </label>
@@ -46,14 +52,23 @@
           <label>Zip Code
             <input type="text" name="zip" value="<%= formValues.zip || '' %>" autocomplete="postal-code" />
           </label>
-          <%# "Should be able to upload parent profile photos." %>
-          <label class="member-form-full">Photo
-            <input type="file" name="photo" accept="image/*" />
-          </label>
         </div>
         <% parentFields.forEach(function(f) { %>
           <%- include('partials/membership-form-field', { field: f, namePrefix: 'customFields', values: formValues.customFields }) %>
         <% }); %>
+        <%# A real request: "At the bottom of the parent guardian section
+            should be the add portal password option" - moved down from
+            this form's own separate, far-lower "Account Login" section
+            (now gone) into the bottom of this one instead, right where
+            every other Parent/Guardian field already lives. %>
+        <div class="member-form-grid">
+          <label>Password
+            <input type="password" name="password" required minlength="8" autocomplete="new-password" />
+          </label>
+          <label>Confirm Password
+            <input type="password" name="confirmPassword" required minlength="8" autocomplete="new-password" />
+          </label>
+        </div>
       </div>
 
       <%# A real request: "Main admin portal. Members. Settings. Extra
@@ -103,18 +118,6 @@
         <button type="button" class="btn-secondary" id="add-child-btn">+ Add Child</button>
       </div>
 
-      <div class="form-section">
-        <h2>Account Login</h2>
-        <div class="member-form-grid">
-          <label>Password
-            <input type="password" name="password" required minlength="8" autocomplete="new-password" />
-          </label>
-          <label>Confirm Password
-            <input type="password" name="confirmPassword" required minlength="8" autocomplete="new-password" />
-          </label>
-        </div>
-      </div>
-
       <%# 10DLC compliance - a real Telnyx campaign review rejection asked
           for "a link/screenshot of the opt-in form... showing the phone
           number field and full SMS opt-in language," separate from (and
@@ -127,42 +130,41 @@
           phone number above, not just described after the fact. %>
       <div class="form-section">
         <h2>SMS Notifications</h2>
-        <%# A real request: "the phone number field is far away from the
-            request, should there be another phone number bar close to
-            the permissions" - the actual <input name="phone"> stays up
-            in Parent/Guardian (it's one real field, no duplicate to keep
-            in sync), but this section echoes its current value live
-            (public/js/portal-register-form.js) so this section alone -
-            phone number, opt-in language, and the checkbox - is a
-            self-contained screenshot/link target, without scrolling back
-            up to prove a phone number was actually entered. %>
-        <p class="hint">Texting: <strong id="sms-opt-in-phone-echo">(enter your phone number above)</strong></p>
         <%# A real request: "Agree to sms notification the check box
             should be on the first row next to the first word of the
-            permission." The checkbox now sits inline, directly before
+            permission." The checkbox sits inline, directly before
             "Sanford Homeschoolers may send..." (the permission text
             itself), on the same row/paragraph, instead of on its own
-            separate line below it - the old standalone "I agree to
-            receive..." sentence is folded into this same label rather
-            than kept as a second, redundant agreement statement.
-            name="smsOptIn"/the server-side handling in routes/portal-
-            auth.js are unchanged. %>
-        <label class="checkbox-option">
+            separate line below it. A later real request trimmed this
+            same paragraph down to just the opt-in language itself -
+            "Msg & data rates may apply," the "See our Privacy Policy and
+            Terms and Conditions" link sentence, the phone-number echo
+            line above, and the "Optional..." hint below are all gone;
+            the Privacy Policy/Terms and Conditions links moved to their
+            own dedicated, required checkboxes in the next section
+            instead of being folded into this one unrelated paragraph. %>
+        <%# A real request: "Sms messaging the check box should line up
+            with the first word of the description" - checkbox-option-
+            top-align (styles.css) keeps the checkbox level with "Sanford"
+            instead of vertically centered against this label's whole
+            3-line wrapped paragraph. %>
+        <label class="checkbox-option checkbox-option-top-align">
           <input type="checkbox" name="smsOptIn" value="1" />
-          Sanford Homeschoolers may send SMS text messages to the phone number above for co-op announcements, event reminders, and schedule changes. Message frequency varies. Msg &amp; data rates may apply. Reply STOP to a message at any time to opt out, or HELP for help. See our <a href="/privacy-policy" target="_blank">Privacy Policy</a> and <a href="/terms-and-conditions" target="_blank">Terms and Conditions</a>.
+          Sanford Homeschoolers may send SMS text messages to the phone number above for co-op announcements, event reminders, and schedule changes. Message frequency varies. Reply STOP to a message at any time to opt out, or HELP for help.
         </label>
-        <p class="hint">Optional - you can still register without opting in to SMS, and can change this later from your account's Notification Preferences.</p>
       </div>
 
-      <%# A real request: "there should be a place at the bottom of the
-          membership application to check a box after reading the policy
-          handbook. can't check the box until you have scrolled through
-          the entire handbook. can't submit application without checking
-          the box." public/js/portal-register-form.js disables the
-          checkbox until #handbook-scroll-box is scrolled to its bottom;
-          routes/portal-auth.js's POST /register checks handbookRead
-          again server-side since a disabled attribute is only ever a
-          client-side nicety. %>
+      <%# A real request: "Policy handbook should be after sms message" -
+          moved up ahead of Privacy Policy & Terms and Conditions below,
+          right after SMS Notifications. "there should be a place at the
+          bottom of the membership application to check a box after
+          reading the policy handbook. can't check the box until you
+          have scrolled through the entire handbook. can't submit
+          application without checking the box." public/js/portal-
+          register-form.js disables the checkbox until #handbook-scroll-
+          box is scrolled to its bottom; routes/portal-auth.js's POST
+          /register checks handbookRead again server-side since a
+          disabled attribute is only ever a client-side nicety. %>
       <div class="form-section">
         <h2>Policy Handbook</h2>
         <%# A real request: "add an option to upload the policy handbook
@@ -184,6 +186,23 @@
           I have read and agree to the Sanford Homeschoolers Policy Handbook.
         </label>
         <p class="hint" id="handbook-scroll-hint">Scroll through the handbook above to enable this checkbox.</p>
+      </div>
+
+      <%# A real request: "Next section. Privacy Policy with a check box,
+          next row terms and conditions with checkbox." Each is its own
+          required agreement, same as the Policy Handbook checkbox above -
+          separate from (and no longer folded into) the SMS paragraph
+          above it. %>
+      <div class="form-section">
+        <h2>Privacy Policy &amp; Terms and Conditions</h2>
+        <label class="checkbox-option">
+          <input type="checkbox" name="privacyPolicyRead" value="1" required />
+          I have read and agree to the <a href="/privacy-policy" target="_blank">Privacy Policy</a>.
+        </label>
+        <label class="checkbox-option">
+          <input type="checkbox" name="termsRead" value="1" required />
+          I have read and agree to the <a href="/terms-and-conditions" target="_blank">Terms and Conditions</a>.
+        </label>
       </div>
 
       <%# A real request: "place at the bottom of the application for

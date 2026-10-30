@@ -154,19 +154,19 @@ test('Member form: creating an Admin member with positions, and the position pic
   let member = await db.prepare("SELECT * FROM members WHERE name = 'Pat President'").get();
   assert.equal(member.member_type, 'admin');
 
-  // Once already Admin, Co-op Admin's own edit form still shows (and can
-  // edit) their Admin Positions checklist - see partials/member-form-
-  // fields.ejs's own comment: it never grants/revokes Admin status
-  // itself, but doesn't lock out managing an existing Admin's other
-  // fields, positions included. A real request: "ability to add
-  // unlimited admin positions to a member profile" - adminPositionIds is
-  // a checkbox multi-select (Admin Positions box), not the old single
-  // <select name="adminPositionId">.
+  // A later real request: "Remove add admin positions on the member
+  // form" - the Co-op Admin edit form no longer shows an Admin
+  // Positions picker at all (managing which positions a member holds
+  // is Main Admin > Admins-only now, see routes/main-admin.js's own
+  // POST /admins/positions/:id/update above), but still shows this
+  // member as a fixed Admin indicator and still accepts (and correctly
+  // links) adminPositionIds from a raw/spoofed submission that includes
+  // the old adminPositionsFormPresent marker, same as before - the
+  // route-level handling was never actually tied to the removed UI.
   const adminEditPage = await request(app).get(`/admin/members/${created.id}/edit`).set('Cookie', cookie);
   assert.equal(adminEditPage.status, 200);
   assert.match(adminEditPage.text, /<input type="hidden" name="memberType" value="admin"/, 'now Admin, shown as a fixed indicator');
   assert.doesNotMatch(adminEditPage.text, /<input type="radio" name="memberType"/);
-  assert.match(adminEditPage.text, /President/, 'expected the Settings-managed position in the picker');
 
   const createRes = await request(app)
     .post(`/admin/members/${created.id}/edit`)
@@ -179,11 +179,6 @@ test('Member form: creating an Admin member with positions, and the position pic
   assert.equal(member.member_type, 'admin');
   const linkedIds = (await db.prepare('SELECT admin_position_id AS "id" FROM member_admin_positions WHERE member_id = ?').all(member.id)).map((r) => r.id);
   assert.deepEqual(new Set(linkedIds), new Set([presidentId, treasurerId]));
-
-  const editPage = await request(app).get(`/admin/members/${member.id}/edit`).set('Cookie', cookie);
-  assert.equal(editPage.status, 200);
-  assert.match(editPage.text, new RegExp(`value="${presidentId}" class="member-form-checklist-checkbox" checked`), 'President should be pre-checked on the edit form');
-  assert.match(editPage.text, new RegExp(`value="${treasurerId}" class="member-form-checklist-checkbox" checked`), 'Treasurer should be pre-checked on the edit form');
 });
 
 test('Design page: admin is offered as a name tag design type, and Print includes admin members with their badge', async () => {

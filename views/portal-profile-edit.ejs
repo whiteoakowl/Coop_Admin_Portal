@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="profile-page">
+  <%- include('partials/portal-nav', {
+    portalTitle: sharedPortalTitle('My Profile'),
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle no-print"><a href="/portal/profile">&larr; My Profile</a></p>
+    <h1>Edit <%= member.name %></h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <%# A real request: "Parent portal, profile icon, edit button,
+        should look exactly like the membership request form. All
+        sections and features should be the same." Same shared partials
+        the two admin portals' own Edit Member pages use (views/main-
+        admin-member-edit.ejs, views/admin-member-edit.ejs), including
+        the Additional Parents/Children sections (partials/member-edit-
+        family-sections.ejs) - minus the admin-only Family/Sections/
+        Portal Roles section those get (routes/portal-auth.js's own POST
+        /portal/profile/edit never touches those, same scope POST
+        /portal/profile already had before this page existed; a parent
+        can't reassign their own family or grant their own portal roles). %>
+    <form method="POST" action="/portal/profile/edit" enctype="multipart/form-data" class="member-form-page-panel member-edit-form-page">
+      <%- include('partials/member-edit-fields', {
+        member,
+        gradeLevels,
+        showPassword: true,
+        confirmPassword: true,
+        portalAccount,
+        parentFields,
+        childFields,
+        generalFields,
+        customFieldValues,
+      }) %>
+      <%- include('partials/member-edit-family-sections', { familyAdults, familyChildren, familyChildFields }) %>
+      <div class="member-form-footer">
+        <div class="member-form-footer-edit">
+          <a class="btn-secondary" href="/portal/profile">Cancel</a>
+          <button type="submit" class="primary-btn"><svg class="icon"><use href="#icon-save"/></svg> Save</button>
+        </div>
+      </div>
+    </form>
+  </main>
+  <script src="/js/member-family-edit-form.js"></script>
+</body>
+</html>

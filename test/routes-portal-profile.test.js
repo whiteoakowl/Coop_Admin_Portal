@@ -60,49 +60,54 @@ async function createParentAccount() {
   return { cookie, csrfToken: extractCsrf(page.text), memberId: parentInfo.lastInsertRowid, studentId: studentInfo.lastInsertRowid };
 }
 
+// A later real request: "when parent portal clicks the profile button,
+// keep the current profile view. When you click the edit profile button
+// it should look exactly like the membership request form. Exactly."
+// My Profile is now a read-only partials/member-profile-card.ejs view
+// (same shared card the Co-op/Main Admin portals' own member profile
+// pages use) with a separate Edit link to /portal/profile/edit, instead
+// of the inline edit form this test used to exercise directly.
 test('a real request: "clicking the profile icon... should be the member\'s full profile membership form"', async () => {
   const parent = await createParentAccount();
   const page = await request(app).get('/portal/profile').set('Cookie', parent.cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /value="Profile Test Parent 1"/);
+  assert.match(page.text, /<h1>Profile Test Parent 1<\/h1>/);
+  assert.match(page.text, /class="roster-action-btn" href="\/portal\/profile\/edit">Edit</, 'the read-only profile card links to the new Edit Profile page');
 
   // The profile icon in the shared nav shell now points here, not at the
   // generic account-settings page. It also carries a ?portal=parent tag
   // (see portal-nav.ejs's own cornerPortalQuery comment) so a dual-role
   // account's Profile link stays on whichever portal it's viewing.
   assert.match(page.text, /class="admin-corner-link" href="\/portal\/profile\?portal=parent"/);
+
+  const editPage = await request(app).get('/portal/profile/edit').set('Cookie', parent.cookie);
+  assert.equal(editPage.status, 200);
+  assert.match(editPage.text, /value="Profile Test Parent 1"/, 'the Edit Profile page looks exactly like the membership request form\'s own fields');
 });
 
-test('birthday and grade level are visible but locked - only an admin can change them', async () => {
+// A real request: parents are never asked for a birthday at all (member-
+// edit-fields.ejs only shows Birthday/Grade Level for a Student, and a
+// parent's own member_type is never 'student'), so there's nothing for a
+// parent's own self-edit submission to spoof there. member_type and
+// family_id are still never readable/writable through this route either.
+test('spoofing member type or family through the Edit Profile form has nothing to grab onto', async () => {
   const parent = await createParentAccount();
-  const page = await request(app).get('/portal/profile').set('Cookie', parent.cookie);
-  // A later real request changed the displayed birthday format to a
-  // long "Month D, YYYY" label (see utils/dates.js's own
-  // formatDateLongNoWeekday) - the stored value itself is still the
-  // plain ISO date underneath, only the disabled input's own display
-  // text changed.
-  assert.match(page.text, /<input type="text" value="January 1, 1985" disabled \/>/);
-
-  // A spoofed attempt to change them (or the name/type) through this
-  // route has nothing to grab onto - the route never even reads a
-  // birthday/gradeLevel/memberType field.
   await request(app)
-    .post('/portal/profile')
+    .post('/portal/profile/edit')
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ name: 'Profile Test Parent', phone: '555-9999', birthday: '2000-01-01', gradeLevel: '5th Grade', memberType: 'admin', _csrf: parent.csrfToken });
+    .send({ name: 'Profile Test Parent', phone: '555-9999', memberType: 'admin', familyId: '999999', _csrf: parent.csrfToken });
 
-  const member = await db.prepare('SELECT birthday, grade_level, phone, member_type FROM members WHERE id = ?').get(parent.memberId);
-  assert.equal(member.birthday, '1985-01-01', 'birthday must never change through this route');
-  assert.equal(member.grade_level, null);
+  const member = await db.prepare('SELECT phone, member_type, family_id FROM members WHERE id = ?').get(parent.memberId);
   assert.equal(member.phone, '555-9999', 'ordinary contact fields still save normally');
   assert.equal(member.member_type, 'parent', 'member type can never be spoofed to admin through this route');
+  assert.notEqual(member.family_id, 999999, 'family can never be reassigned through this route');
 });
 
-test('editing contact info through the profile form saves correctly', async () => {
+test('editing contact info through the Edit Profile form saves correctly', async () => {
   const parent = await createParentAccount();
   const res = await request(app)
-    .post('/portal/profile')
+    .post('/portal/profile/edit')
     .set('Cookie', parent.cookie)
     .type('form')
     .send({ name: 'Profile Test Parent', address: '123 Main St', city: 'Springfield', state: 'IL', zip: '62704', phone: '555-1212', email: 'updated@example.com', medicalNotes: 'No allergies', _csrf: parent.csrfToken });
@@ -220,17 +225,28 @@ test('My Profile shows the signed-in member\'s own Sections and Portal Roles bel
 
   const page = await request(app).get('/portal/profile').set('Cookie', parent.cookie);
   assert.equal(page.status, 200);
-  const familyIndex = page.text.indexOf('>My Family<');
-  const sectionsIndex = page.text.indexOf('>Sections<');
+  // Now the same shared partials/member-profile-card.ejs's own Family/
+  // Sections/Portal Roles cards the Co-op/Main Admin portals already use
+  // (see that partial's own header comment) - "Family", not "My Family".
+  const familyIndex = page.text.indexOf('Family</h2>');
+  const sectionsIndex = page.text.indexOf('Sections</h2>');
   const teenCoopIndex = page.text.indexOf('Teen Co-op');
-  const portalRolesIndex = page.text.indexOf('>Portal Roles<');
+  const portalRolesIndex = page.text.indexOf('Portal Roles</h2>');
   const parentRoleIndex = page.text.indexOf('<li>Parent</li>');
   assert.ok(familyIndex !== -1 && sectionsIndex !== -1 && teenCoopIndex !== -1 && portalRolesIndex !== -1 && parentRoleIndex !== -1, 'all four markers must be present');
   assert.ok(
     familyIndex < sectionsIndex && sectionsIndex < teenCoopIndex && teenCoopIndex < portalRolesIndex && portalRolesIndex < parentRoleIndex,
-    'Sections/Portal Roles must render below My Family, each with its own data'
+    'Sections/Portal Roles must render below Family, each with its own data'
   );
 });
+
+// A later real request: "when you click the edit profile button it
+// should look exactly like the membership request form. Exactly" plus a
+// follow-up clarification ("Remove it, password lives in Edit Profile")
+// removed the standalone Password tab this file used to test here -
+// password changes are now just the Password/Confirm Password fields on
+// the Edit Profile page itself (partials/member-edit-fields.ejs), covered
+// by test/routes-portal-profile-edit.test.js instead.
 
 test('signing out and hitting the profile page redirects to login', async () => {
   const res = await request(app).get('/portal/profile');

@@ -33,25 +33,38 @@
     <% } else { %>
       <div class="grid-box-header">
         <h1>Accounting</h1>
-        <span class="badge-pill badge-pill-<%= balanceCents > 0 ? 'orange' : 'green' %>"><%= balanceCents > 0 ? formatCents(balanceCents) + ' due' : 'Paid in full' %></span>
-        <%# A real request: "add print button to member account pages on
-            parent portal and main admin portal." %>
-        <a class="roster-action-btn print-action-btn no-print" href="/accounting/print<%= yearFilter !== 'current' ? '?year=' + yearFilter : '' %>" target="_blank">Print</a>
-        <a class="icon-btn no-print" href="/accounting/download.pdf<%= yearFilter !== 'current' ? '?year=' + yearFilter : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
       </div>
-      <%# Same year filter as the Main Admin Account page - "current,
-          all or the individual years for accounting." %>
-      <form method="GET" class="roster-btn-row no-print" style="margin-bottom: 1rem;">
-        <label>Account Year
-          <select name="year" onchange="this.form.submit()">
-            <option value="current" <%= yearFilter === 'current' ? 'selected' : '' %>>Current Year</option>
-            <option value="all" <%= yearFilter === 'all' ? 'selected' : '' %>>All Years</option>
-            <% years.forEach(function(y) { %>
-              <option value="<%= y %>" <%= yearFilter === y ? 'selected' : '' %>><%= y %></option>
-            <% }); %>
-          </select>
-        </label>
-      </form>
+      <%# A real request: "Print button should be an icon. And pdf icons
+          should both be next to account year dropdown on the same row.
+          Amount due on the far right on the same row. Don't change
+          mobile view." .accounting-toolbar-row is one shared flex row
+          (desktop: year dropdown, Print icon, PDF icon, then the
+          balance badge pushed to the far right via margin-left:auto) -
+          below 641px every child keeps its original stacked order/line
+          breaks (badge right under the title, then Print/PDF together,
+          then the year dropdown on its own line), matching this page's
+          layout before this request. %>
+      <div class="accounting-toolbar-row">
+        <span class="badge-pill badge-pill-<%= balanceCents > 0 ? 'orange' : 'green' %> accounting-toolbar-badge"><%= balanceCents > 0 ? formatCents(balanceCents) + ' due' : 'Paid in full' %></span>
+        <%# A real request: "add print button to member account pages on
+            parent portal and main admin portal" - now an icon, not a
+            text button (a later real request). %>
+        <a class="icon-btn accounting-toolbar-print no-print" href="/accounting/print<%= yearFilter !== 'current' ? '?year=' + yearFilter : '' %>" target="_blank" aria-label="Print" title="Print"><svg class="icon"><use href="#icon-printer"/></svg></a>
+        <a class="icon-btn accounting-toolbar-pdf no-print" href="/accounting/download.pdf<%= yearFilter !== 'current' ? '?year=' + yearFilter : '' %>" aria-label="Download PDF" title="Download PDF"><svg class="icon"><use href="#icon-pdf"/></svg></a>
+        <%# Same year filter as the Main Admin Account page - "current,
+            all or the individual years for accounting." %>
+        <form method="GET" class="accounting-toolbar-year-form no-print">
+          <label>Account Year
+            <select name="year" onchange="this.form.submit()">
+              <option value="current" <%= yearFilter === 'current' ? 'selected' : '' %>>Current Year</option>
+              <option value="all" <%= yearFilter === 'all' ? 'selected' : '' %>>All Years</option>
+              <% years.forEach(function(y) { %>
+                <option value="<%= y %>" <%= yearFilter === y ? 'selected' : '' %>><%= y %></option>
+              <% }); %>
+            </select>
+          </label>
+        </form>
+      </div>
 
       <div class="manage-section">
         <div class="grid-box-header"><h2>Invoices</h2></div>

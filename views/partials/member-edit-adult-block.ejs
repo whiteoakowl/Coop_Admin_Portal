@@ -1,0 +1,113 @@
+<%
+// Repeatable "Additional Parent/Guardian" block on the unified member
+// edit pages (Main Admin/Co-op Admin Edit Member, Parent Portal Edit
+// Profile) - a real request: "This page should look exactly like the
+// membership request form. The additional parent sections and
+// information." Same field grid/classes/numbered-title/same-address-
+// toggle pattern as the public self-registration form's own partials/
+// register-adult-fields.ejs, adapted for a family that may already have
+// real members in it - utils/memberFamilyEdit.js's own applyAdditional
+// Parents reads the hidden "id" field below to know whether this block
+// updates a real person or creates a brand-new one. The Remove button
+// only ever shows on a block that was just added client-side (public/js/
+// member-family-edit-form.js) - never on an existing, already-real
+// family member, so this form can never delete someone.
+//
+// Unlike the public form's own First/Last Name split (which only ever
+// creates someone brand new), this uses ONE "Full Name" field even for a
+// freshly-added block - members.name has always been a single column
+// (see partials/member-edit-fields.ejs's own header comment) - so one
+// template/one set of field names can do both the update and the create
+// job.
+//
+// Locals:
+//   index - this block's 0-based array position (additionalParents[index])
+//   member - the existing member row, or null for a brand-new block
+//   portalStatus - { account } for an existing member, or null/undefined
+//   showLogin - false on Co-op Admin's own edit page - creating or
+//     changing a portal account/password has always been Main-Admin-only
+//     (see utils/memberFamilyEdit.js's own applyFamilyEditSubmission),
+//     so that page never even shows this section at all.
+//
+// A real request: "Not volunteer for setup crew check box. It should
+// be the same address as parent number 1 check box. Allow member to
+// create portal. The two checkboxes on the member request form." - the
+// "Give this parent their own portal login" checkbox is back, same
+// wording/position as the public form's own partials/register-adult-
+// fields.ejs (right before the password fields it reveals). Checking it
+// is still all that's needed to grant a real, active account -
+// utils/memberFamilyEdit.js's own applyAdditionalParents defaults the
+// password to changeme123 (same as everywhere else in this app) when
+// this is checked but the Password field below is left blank.
+const m = member || {};
+const hasAccount = !!(portalStatus && portalStatus.account);
+const showLoginSection = typeof showLogin === 'undefined' || showLogin;
+%>
+<div class="manage-section register-adult-block" data-adult-block>
+  <div class="membership-child-header">
+    <h3 data-adult-title></h3>
+    <% if (!member) { %>
+      <button type="button" class="icon-btn register-remove-adult" aria-label="Remove adult" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+    <% } %>
+  </div>
+  <input type="hidden" name="additionalParents[<%= index %>][id]" value="<%= member ? member.id : '' %>" />
+  <div class="member-form-grid">
+    <label class="member-form-full">Photo
+      <input type="file" name="additionalParents[<%= index %>][photo]" accept="image/*" />
+      <% if (m.photo_path) { %><span class="hint">Choose a new photo to replace the one on file.</span><% } %>
+    </label>
+    <label class="member-form-full">Full Name
+      <input type="text" name="additionalParents[<%= index %>][name]" value="<%= m.name || '' %>" />
+    </label>
+    <label>Email
+      <input type="email" name="additionalParents[<%= index %>][email]" value="<%= m.email || '' %>" />
+    </label>
+    <label>Phone Number
+      <input type="tel" name="additionalParents[<%= index %>][phone]" value="<%= m.phone || '' %>" placeholder="555-123-4567" />
+    </label>
+  </div>
+
+  <label class="checkbox-option">
+    <input type="checkbox" class="register-adult-same-address-toggle" data-adult-same-address-toggle name="additionalParents[<%= index %>][sameAddress]" value="1" <%= (!member || !m.address) ? 'checked' : '' %> />
+    Address is the same as the first parent/guardian
+  </label>
+  <div class="member-form-grid register-adult-address-fields" data-adult-address-fields <%= (!member || !m.address) ? 'hidden' : '' %>>
+    <label class="member-form-full">Address
+      <input type="text" name="additionalParents[<%= index %>][address]" value="<%= m.address || '' %>" />
+    </label>
+    <label class="member-form-full">Address 2
+      <input type="text" name="additionalParents[<%= index %>][address2]" value="<%= m.address2 || '' %>" />
+    </label>
+    <label>City
+      <input type="text" name="additionalParents[<%= index %>][city]" value="<%= m.city || '' %>" />
+    </label>
+    <label>State
+      <input type="text" name="additionalParents[<%= index %>][state]" value="<%= m.state || '' %>" />
+    </label>
+    <label>Zip Code
+      <input type="text" name="additionalParents[<%= index %>][zip]" value="<%= m.zip || '' %>" />
+    </label>
+  </div>
+
+  <% if (showLoginSection) { %>
+    <% if (hasAccount) { %>
+      <div class="member-form-grid">
+        <p class="hint member-form-full">Account: <%= portalStatus.account.email %></p>
+        <label>New Password <span class="hint">(leave blank to keep the current one)</span>
+          <input type="password" name="additionalParents[<%= index %>][loginPassword]" minlength="8" autocomplete="new-password" />
+        </label>
+      </div>
+    <% } else { %>
+      <label class="checkbox-option">
+        <input type="checkbox" class="register-adult-login-toggle" data-adult-login-toggle name="additionalParents[<%= index %>][wantsLogin]" />
+        Give this parent their own portal login
+      </label>
+      <div class="member-form-grid register-adult-login-fields" data-adult-login-fields hidden>
+        <p class="hint member-form-full">Uses the Email address entered above as their login - leave the Password blank to use the default password, changeme123.</p>
+        <label>Password <span class="hint">(optional)</span>
+          <input type="password" name="additionalParents[<%= index %>][loginPassword]" minlength="8" autocomplete="new-password" />
+        </label>
+      </div>
+    <% } %>
+  <% } %>
+</div>

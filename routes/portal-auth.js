@@ -6,7 +6,8 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { findAccountByEmail, verifyPassword, hashPassword, memberForAccount, familyForAccount } = require('../utils/portalAuth');
-const { generateMemberCode } = require('../utils/members');
+const { generateMemberCode, setPrimaryParent } = require('../utils/members');
+const { savePhotoFile: saveMemberPhotoFile, deletePhotoFile: deleteMemberPhotoFile } = require('../utils/memberPhoto');
 const { createFailureRateLimiter } = require('../utils/loginRateLimit');
 const { GRADE_OPTIONS } = require('../utils/membership');
 const { CLASS_DAY_LABELS_FULL } = require('../utils/classSchedule');
@@ -19,6 +20,7 @@ const path = require('path');
 const fs = require('fs');
 const { createStorageClient, downloadFile } = require('../utils/storage');
 const { uploadIntakePhotos, savePhotoFile, parseArrayField } = require('../utils/memberIntake');
+const { familyEditSections, applyFamilyEditSubmission } = require('../utils/memberFamilyEdit');
 
 const portalLoginLimiter = createFailureRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 8 });
 
@@ -205,20 +207,26 @@ router.post('/register', uploadIntakePhotos('/register'), async (req, res) => {
   const childrenForRerender = rawChildren.map((c) => ({ ...c, loginPassword: '', loginPasswordConfirm: '' }));
 
   // "There is a +child button. There should also be an add adult
-  // button." Same optional, drop-if-blank treatment as a child block -
-  // see partials/register-adult-fields.ejs's own header comment for why
-  // there's no login/password here, unlike a child block.
+  // button." Same optional, drop-if-blank treatment as a child block. A
+  // later real request ("add check box for give this parent their own
+  // portal log in") gave each additional adult the same wantsLogin
+  // toggle a child block already had - see partials/register-adult-
+  // fields.ejs's own header comment for why there's no separate login-
+  // email field here (the Email field already in that same block is
+  // reused as the login email).
   const rawAdults = parseArrayField(req.body, 'additionalParents').map((a, index) => ({ ...a, index }));
   const additionalParents = rawAdults.filter((a) => a && ((a.firstName || '').trim() || (a.lastName || '').trim()));
+  // Same never-echo-the-password treatment as childrenForRerender above.
+  const adultsForRerender = rawAdults.map((a) => ({ ...a, loginPassword: '', loginPasswordConfirm: '' }));
 
   if (!firstName || !lastName || !email || !password) {
-    return renderRegisterError(res, 'All fields are required.', formValues, childrenForRerender, rawAdults);
+    return renderRegisterError(res, 'All fields are required.', formValues, childrenForRerender, adultsForRerender);
   }
   if (password.length < 8) {
-    return renderRegisterError(res, 'Password must be at least 8 characters.', formValues, childrenForRerender, rawAdults);
+    return renderRegisterError(res, 'Password must be at least 8 characters.', formValues, childrenForRerender, adultsForRerender);
   }
   if (password !== req.body.confirmPassword) {
-    return renderRegisterError(res, 'Passwords do not match.', formValues, childrenForRerender, rawAdults);
+    return renderRegisterError(res, 'Passwords do not match.', formValues, childrenForRerender, adultsForRerender);
   }
   // A real request: "can't submit application without checking the
   // box" (having read the Policy Handbook). The checkbox itself is
@@ -226,30 +234,52 @@ router.post('/register', uploadIntakePhotos('/register'), async (req, res) => {
   // handbook (public/js/portal-register-form.js) - checked again here
   // since a disabled attribute is only ever a client-side nicety.
   if (req.body.handbookRead !== '1') {
-    return renderRegisterError(res, 'Please scroll through and confirm you have read the Policy Handbook before submitting.', formValues, childrenForRerender, rawAdults);
+    return renderRegisterError(res, 'Please scroll through and confirm you have read the Policy Handbook before submitting.', formValues, childrenForRerender, adultsForRerender);
+  }
+  // A real request: "Next section. Privacy Policy with a check box, next
+  // row terms and conditions with checkbox" - two more required
+  // agreements, same re-check-server-side-since-a-checkbox-is-only-ever-
+  // a-client-side-nicety reasoning as handbookRead above.
+  if (req.body.privacyPolicyRead !== '1') {
+    return renderRegisterError(res, 'Please check the box confirming you have read the Privacy Policy before submitting.', formValues, childrenForRerender, adultsForRerender);
+  }
+  if (req.body.termsRead !== '1') {
+    return renderRegisterError(res, 'Please check the box confirming you have read the Terms and Conditions before submitting.', formValues, childrenForRerender, adultsForRerender);
   }
 
   for (const c of children) {
     if (!(c.firstName || '').trim() || !(c.lastName || '').trim()) {
-      return renderRegisterError(res, 'Each child needs both a first and last name.', formValues, childrenForRerender, rawAdults);
+      return renderRegisterError(res, 'Each child needs both a first and last name.', formValues, childrenForRerender, adultsForRerender);
     }
     if (!c.wantsLogin) continue;
     const childEmail = (c.loginEmail || '').trim();
     const childPassword = c.loginPassword || '';
     if (!childEmail || !childPassword) {
-      return renderRegisterError(res, `${c.firstName}'s portal login needs an email and password.`, formValues, childrenForRerender, rawAdults);
+      return renderRegisterError(res, `${c.firstName}'s portal login needs an email and password.`, formValues, childrenForRerender, adultsForRerender);
     }
     if (childPassword.length < 8) {
-      return renderRegisterError(res, `${c.firstName}'s password must be at least 8 characters.`, formValues, childrenForRerender, rawAdults);
+      return renderRegisterError(res, `${c.firstName}'s password must be at least 8 characters.`, formValues, childrenForRerender, adultsForRerender);
     }
     if (childPassword !== c.loginPasswordConfirm) {
-      return renderRegisterError(res, `${c.firstName}'s passwords do not match.`, formValues, childrenForRerender, rawAdults);
+      return renderRegisterError(res, `${c.firstName}'s passwords do not match.`, formValues, childrenForRerender, adultsForRerender);
     }
   }
 
   for (const a of additionalParents) {
     if (!(a.firstName || '').trim() || !(a.lastName || '').trim()) {
-      return renderRegisterError(res, 'Each additional parent/guardian needs both a first and last name.', formValues, childrenForRerender, rawAdults);
+      return renderRegisterError(res, 'Each additional parent/guardian needs both a first and last name.', formValues, childrenForRerender, adultsForRerender);
+    }
+    if (!a.wantsLogin) continue;
+    const adultEmail = (a.email || '').trim();
+    const adultPassword = a.loginPassword || '';
+    if (!adultEmail || !adultPassword) {
+      return renderRegisterError(res, `${a.firstName}'s portal login needs an email (in their Email field above) and a password.`, formValues, childrenForRerender, adultsForRerender);
+    }
+    if (adultPassword.length < 8) {
+      return renderRegisterError(res, `${a.firstName}'s password must be at least 8 characters.`, formValues, childrenForRerender, adultsForRerender);
+    }
+    if (adultPassword !== a.loginPasswordConfirm) {
+      return renderRegisterError(res, `${a.firstName}'s passwords do not match.`, formValues, childrenForRerender, adultsForRerender);
     }
   }
 
@@ -258,18 +288,22 @@ router.post('/register', uploadIntakePhotos('/register'), async (req, res) => {
   // and against every existing account - a family accidentally reusing
   // the parent's own email for a child's login is exactly the kind of
   // mistake this needs to catch before anything is written.
-  const wantedEmails = [email, ...children.filter((c) => c.wantsLogin).map((c) => (c.loginEmail || '').trim())];
+  const wantedEmails = [
+    email,
+    ...children.filter((c) => c.wantsLogin).map((c) => (c.loginEmail || '').trim()),
+    ...additionalParents.filter((a) => a.wantsLogin).map((a) => (a.email || '').trim()),
+  ];
   const seen = new Set();
   for (const e of wantedEmails) {
     const key = e.toLowerCase();
     if (seen.has(key)) {
-      return renderRegisterError(res, 'Each login on this form needs its own, different email address.', formValues, childrenForRerender, rawAdults);
+      return renderRegisterError(res, 'Each login on this form needs its own, different email address.', formValues, childrenForRerender, adultsForRerender);
     }
     seen.add(key);
   }
   for (const e of wantedEmails) {
     if (await findAccountByEmail(e)) {
-      return renderRegisterError(res, `${e} is already in use by another account. Try logging in instead, or use a different email.`, formValues, childrenForRerender, rawAdults);
+      return renderRegisterError(res, `${e} is already in use by another account. Try logging in instead, or use a different email.`, formValues, childrenForRerender, adultsForRerender);
     }
   }
 
@@ -376,6 +410,20 @@ router.post('/register', uploadIntakePhotos('/register'), async (req, res) => {
           adultPhotoPaths[a.index] || null
         );
       newAdultMemberIds.push(aInfo.lastInsertRowid);
+
+      // A real request: "For add an adult, also add check box for give
+      // this parent their own portal log in" - same pending-account-plus-
+      // role grant as the primary parent above, just keyed off this
+      // adult's own wantsLogin checkbox instead of being unconditional.
+      if (a.wantsLogin) {
+        const adultEmail = (a.email || '').trim();
+        const adultAccountInfo = await tx
+          .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status) VALUES (?, ?, ?, 'pending')")
+          .run(aInfo.lastInsertRowid, adultEmail, hashPassword(a.loginPassword));
+        if (parentRole) {
+          await tx.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(adultAccountInfo.lastInsertRowid, parentRole.id);
+        }
+      }
     }
 
     for (const c of children) {
@@ -661,6 +709,7 @@ async function renderProfile(req, res, error, notice, activeTab) {
   // 'profile' tab - the Schedules/Signups tabs above never render it.
   let memberSections = [];
   let memberPortalRoles = null;
+  let familyName = null;
   if (tab === 'profile') {
     const allSections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
     const memberSectionIds = (await sectionIdsForMembers([member.id]))[member.id];
@@ -668,17 +717,23 @@ async function renderProfile(req, res, error, notice, activeTab) {
     const allRoles = await db.prepare('SELECT * FROM roles ORDER BY label').all();
     memberSections = allSections.filter((s) => memberSectionIds.has(s.id));
     memberPortalRoles = portalStatus.account ? allRoles.filter((r) => portalStatus.roleIds.has(r.id)) : null;
+    const familyRow = member.family_id ? await db.prepare('SELECT name FROM families WHERE id = ?').get(member.family_id) : null;
+    familyName = familyRow ? familyRow.name : null;
   }
 
   res.render('portal-profile', {
     title: 'My Profile',
     member,
-    // Everyone else sharing this account's family - a real request:
-    // "Click a family member's name to open it" as the entry point into
-    // the new Member Profile page (views/parent-member-profile.ejs) below.
-    // Self is left out the same way member-profile-card.ejs's own
-    // famParents/famChildren already exclude the profile's own subject.
-    otherFamilyMembers: family.filter((m) => m.id !== member.id),
+    // A real request: "when parent portal clicks the profile button,
+    // keep the current profile view" - same read-only partials/member-
+    // profile-card.ejs banner the Co-op/Main Admin portals and this
+    // account's own /portal/family/:memberId already use, so the
+    // Profile tab needs the same famParents/famChildren split that
+    // partial expects (Parents includes self - see its own comment -
+    // Children never does, filtered inside the partial itself).
+    familyName,
+    famParents: family.filter((m) => m.member_type !== 'student'),
+    famChildren: family.filter((m) => m.member_type === 'student'),
     activeTab: tab,
     schedule,
     signups,
@@ -814,37 +869,131 @@ router.post('/portal/family/:memberId/edit', async (req, res) => {
   res.redirect(back + '?notice=' + encodeURIComponent('Profile updated.'));
 });
 
-// Deliberately narrow - only the fields the admin-side membership form
-// also treats as "just contact info" (see partials/member-form-fields.ejs)
-// are writable here. member_type, birthday, grade_level, family_id, and
-// admin positions never appear in this request at all, so there's
-// nothing for a raw/spoofed submission to even attempt to change - not a
-// value that gets silently discarded, a field that was simply never read.
-router.post('/portal/profile', async (req, res) => {
-  if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile');
+// A real request: "when parent portal clicks the profile button, keep
+// the current profile view. When you click the edit profile button it
+// should look exactly like the membership request form. Exactly."
+// Replaces the old POST /portal/profile (narrow "just contact info"
+// fields, no photo, no password) and the standalone Password tab
+// (routes this same file used to expose at POST /portal/profile/
+// password) - this one page covers everything either of those used to,
+// same field set/order/styling as partials/member-edit-fields.ejs's own
+// header comment describes (shared with both admin portals' Edit Member
+// pages), minus the admin-only Family/Sections/Portal Roles section
+// those get (a parent can't reassign their own family or grant their
+// own portal roles).
+router.get('/portal/profile/edit', async (req, res) => {
+  if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile%2Fedit');
   const member = await memberForAccount(req.portalAccount.id);
   if (!member) return res.redirect('/portal');
+  res.render('portal-profile-edit', {
+    title: `Edit ${member.name}`,
+    member,
+    gradeLevels: GRADE_OPTIONS,
+    portalAccount: req.portalAccount,
+    // A real request: "Parent portal, profile icon, edit button, should
+    // look exactly like the membership request form. All sections and
+    // features should be the same." - see utils/memberFamilyEdit.js's
+    // own header comment.
+    ...(await familyEditSections(member.id)),
+    // A real request: "Don't forget the check box questions. This
+    // should look IDENTICAL to the membership request form." - same
+    // admin-defined questions the public form asks, with this member's
+    // own already-answered values prefilled.
+    parentFields: await membershipFormFields.listFields('parent'),
+    childFields: await membershipFormFields.listFields('child'),
+    generalFields: await membershipFormFields.listFields('general'),
+    customFieldValues: await membershipFormFields.fieldValuesForView(member.id),
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
+
+router.post('/portal/profile/edit', uploadIntakePhotos(() => '/portal/profile/edit'), async (req, res) => {
+  if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile%2Fedit');
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.redirect('/portal');
+  const back = '/portal/profile/edit';
+  // multer.any() (uploadIntakePhotos) replaces the old single-file
+  // uploadMemberPhoto middleware now that this same submission can also
+  // carry a photo per Additional Parent/Children block below (req.files
+  // is an array, matched by fieldname - see utils/memberFamilyEdit.js's
+  // own fileFor) - this member's own photo still posts under the plain
+  // "photo" field name, unchanged.
+  const photoFile = (req.files || []).find((file) => file.fieldname === 'photo');
 
   const name = (req.body.name || '').trim();
   if (!name) {
-    return res.redirect('/portal/profile?error=' + encodeURIComponent('Name is required.'));
+    return res.redirect(back + '?error=' + encodeURIComponent('Name is required.'));
   }
+
+  // Same optional-password handling as the admin Edit Member forms this
+  // page now matches, plus a Confirm Password check (the member typing
+  // it is the one who'll use it, unlike an admin setting someone else's).
+  const newPassword = req.body.password || '';
+  const confirmPassword = req.body.confirmPassword || '';
+  if (newPassword) {
+    if (newPassword.length < 8) {
+      return res.redirect(back + '?error=' + encodeURIComponent('Password must be at least 8 characters.'));
+    }
+    if (newPassword !== confirmPassword) {
+      return res.redirect(back + '?error=' + encodeURIComponent('Passwords do not match.'));
+    }
+  }
+
+  const photoPath = photoFile ? await saveMemberPhotoFile(photoFile) : member.photo_path;
+  if (photoFile && member.photo_path) await deleteMemberPhotoFile(member.photo_path);
+
+  const address = (req.body.address || '').trim() || null;
+  const address2 = (req.body.address2 || '').trim() || null;
+  const city = (req.body.city || '').trim() || null;
+  const state = (req.body.state || '').trim() || null;
+  const zip = (req.body.zip || '').trim() || null;
 
   await db
     .prepare(
-      `UPDATE members SET name = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?, medical_notes = ? WHERE id = ?`
+      `UPDATE members SET name = ?, address = ?, address2 = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?, medical_notes = ?, photo_path = ? WHERE id = ?`
     )
     .run(
       name,
-      (req.body.address || '').trim() || null,
-      (req.body.city || '').trim() || null,
-      (req.body.state || '').trim() || null,
-      (req.body.zip || '').trim() || null,
+      address,
+      address2,
+      city,
+      state,
+      zip,
       (req.body.phone || '').trim() || null,
       (req.body.email || '').trim() || null,
       (req.body.medicalNotes || '').trim() || null,
+      photoPath,
       member.id
     );
+  if (member.member_type !== 'student') await setPrimaryParent(member.id, req.body.isPrimaryParent === '1');
+
+  if (newPassword) {
+    await db.prepare('UPDATE member_accounts SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), req.portalAccount.id);
+  }
+
+  // A real request: "Don't forget the check box questions. This should
+  // look IDENTICAL to the membership request form." - see routes/
+  // main-admin-members.js's own identical POST /:id/edit comment.
+  const customFieldsTarget = member.member_type === 'student' ? 'child' : 'parent';
+  await membershipFormFields.saveFieldValues(member.id, customFieldsTarget, req.body.customFields);
+  if (customFieldsTarget === 'parent') {
+    await membershipFormFields.saveFieldValues(member.id, 'general', req.body.customFields);
+  }
+
+  // A real request: "Parent portal, profile icon, edit button, should
+  // look exactly like the membership request form. All sections and
+  // features should be the same." - see utils/memberFamilyEdit.js's own
+  // header comment. createdByAccountId is null - a parent's own self-
+  // edit isn't a Main Admin account, so a brand-new family member added
+  // here has nothing to attribute their account's approval to, same as
+  // Co-op Admin's own identical call.
+  const familyError = await applyFamilyEditSubmission(req, {
+    familyId: member.family_id,
+    address: { address, address2, city, state, zip },
+    createdByAccountId: null,
+  });
+  if (familyError) return res.redirect(back + '?error=' + encodeURIComponent(familyError));
 
   res.redirect('/portal/profile?notice=' + encodeURIComponent('Profile updated.'));
 });

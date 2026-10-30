@@ -110,7 +110,6 @@ test('a parent can edit a family member\'s contact info, but never their birthda
 // (member_accounts.email) a student logs in with.
 test('a parent can change a student\'s login email when the student has a portal account, with uniqueness enforced', async () => {
   const parent = await createParentAccount();
-  const studentCode = await generateMemberCode();
   const studentAccountInfo = await db
     .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text())")
     .run(parent.studentId, `student-login-${familyCounter}@example.com`, hashPassword('testpassword123'));

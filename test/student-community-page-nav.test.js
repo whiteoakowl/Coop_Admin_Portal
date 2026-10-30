@@ -80,19 +80,19 @@ test('a signed-in student sees their own bottom tab bar on the Calendar page, no
   // A later real request moved Classes to the 3rd tab and dropped
   // Assignments as its own standing tab (see routes/student-portal.js's
   // own /classes/dashboard comment - it's now one click away from every
-  // Classroom Dashboard card instead). A still later real request split
-  // Classes back into 2 standing tabs ("Class schedule should be its own
-  // tab and called Co-op Schedule. Classroom dashboard should be its own
-  // tab and the beginning of a new section") - Co-op Schedule stays in
-  // the primary group, Classroom Dashboard moves to the end (the
-  // previously-empty 3rd/"Classroom" section, appended into this same
-  // scrollable bar per the mobile template's own comment).
+  // Classroom Dashboard card instead). A still later real request
+  // renamed it "Co-op Schedule". A real request: "Classroom dashboard
+  // should be a menu tab as well" gave Classroom Dashboard its own tab
+  // too; a further real request ("Family homeschooling shouldn't be a
+  // tab anymore. Co-op classes and family school management classes are
+  // all under classroom dashboard subpages together") then folded the
+  // old standalone Family Homeschooling tab's own pages in there instead
+  // of keeping it a separate tab.
   // A real request: "Student portal. Calendar should say events" -
   // matches Main Admin/Parent/Teacher, which all already said Events.
   assert.deepEqual(tabs, [
-    'Home', 'Events', 'Co-op Schedule', 'Family Homeschooling', 'Chat', 'Resources', 'Photos', 'Babysitter Profile',
+    'Home', 'Events', 'Co-op Schedule', 'Classroom Dashboard', 'Chat', 'Resources', 'Photos', 'Babysitter Profile',
     'Games', 'Pet', 'Reading Challenge', 'Achievements', 'Leaderboard', 'Nature News', 'Vocabulary',
-    'Classroom Dashboard',
   ]);
 });
 
@@ -111,9 +111,8 @@ test('a signed-in student sees their own bottom tab bar on the Chat page, with e
   assert.ok(tabs, 'the Chat page should render the bottom tab bar for a signed-in student');
   assert.equal(tabs.filter((t) => t === 'Chat').length, 1, 'exactly one Chat tab, not two');
   assert.deepEqual(tabs, [
-    'Home', 'Events', 'Co-op Schedule', 'Family Homeschooling', 'Chat', 'Resources', 'Photos', 'Babysitter Profile',
+    'Home', 'Events', 'Co-op Schedule', 'Classroom Dashboard', 'Chat', 'Resources', 'Photos', 'Babysitter Profile',
     'Games', 'Pet', 'Reading Challenge', 'Achievements', 'Leaderboard', 'Nature News', 'Vocabulary',
-    'Classroom Dashboard',
   ]);
   assert.doesNotMatch(res.text, /Member Directory/, 'the generic community list (Member Directory, Newsletter, ...) should not leak into a student\'s own nav');
 });

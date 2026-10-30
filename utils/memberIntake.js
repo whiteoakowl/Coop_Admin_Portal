@@ -47,12 +47,18 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX
 // never caught anywhere, so it fell through to server.js's generic
 // catch-all error handler and threw away everything else on the form.
 // Same fix as routes/admin-documents.js's own uploadDocument wrapper.
-// `back` is the URL to redirect to on that one error case.
+// `back` is the URL to redirect to on that one error case - a plain
+// string for a fixed path (the original callers, e.g. '/register'), or
+// a function(req) for a path that carries a route param (the unified
+// member edit pages, e.g. /main-admin/members/:id/edit - same
+// function(req) convention utils/memberPhoto.js's own uploadMemberPhoto
+// already uses).
 function uploadIntakePhotos(back) {
   return function (req, res, next) {
     upload.any()(req, res, (err) => {
       if (err && err.code === 'LIMIT_FILE_SIZE') {
-        return res.redirect(`${back}?error=` + encodeURIComponent(`That photo is too large - photos are limited to ${MAX_CHILD_PHOTO_BYTES / (1024 * 1024)}MB.`));
+        const redirectTo = typeof back === 'function' ? back(req) : back;
+        return res.redirect(`${redirectTo}?error=` + encodeURIComponent(`That photo is too large - photos are limited to ${MAX_CHILD_PHOTO_BYTES / (1024 * 1024)}MB.`));
       }
       next(err);
     });
