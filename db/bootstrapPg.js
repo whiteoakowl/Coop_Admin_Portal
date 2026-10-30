@@ -975,6 +975,28 @@ async function backfillRemovePendingSubstituteAssignments(db) {
   await db.prepare("DELETE FROM substitute_assignments WHERE status = 'pending'").run();
 }
 
+// Main Admin Forms tab upgrade ("full editing features and view just
+// like jotform, exactly") - every custom_form_fields row now needs a
+// page_id (multi-page/section support, supabase/migrations/20261225010000_
+// custom_forms_builder_upgrade.sql), but every form that existed before
+// this migration has fields with page_id still NULL and no
+// custom_form_pages row to point them at. Gives each such form exactly
+// one default page ("Page 1") and reassigns its existing fields to it,
+// so an already-published form keeps rendering as a single page, same
+// as before this upgrade - new forms never hit this (utils/customForms.js's
+// createForm already makes a first page itself).
+async function backfillCustomFormDefaultPages(db) {
+  const orphanedFormIds = await db.prepare('SELECT DISTINCT form_id AS id FROM custom_form_fields WHERE page_id IS NULL').all();
+  for (const { id: formId } of orphanedFormIds) {
+    let page = await db.prepare('SELECT id FROM custom_form_pages WHERE form_id = ? ORDER BY position, id LIMIT 1').get(formId);
+    if (!page) {
+      const info = await db.prepare('INSERT INTO custom_form_pages (form_id, title, position) VALUES (?, ?, 0)').run(formId, 'Page 1');
+      page = { id: info.lastInsertRowid };
+    }
+    await db.prepare('UPDATE custom_form_fields SET page_id = ? WHERE form_id = ? AND page_id IS NULL').run(page.id, formId);
+  }
+}
+
 module.exports = {
   seedIfMissing,
   backfillNameTagLogo,
@@ -995,4 +1017,5 @@ module.exports = {
   backfillNameTagStackedSizing,
   backfillTaskItemBarcodes,
   backfillRemovePendingSubstituteAssignments,
+  backfillCustomFormDefaultPages,
 };

@@ -49,6 +49,7 @@ const {
   backfillNameTagStackedSizing,
   backfillTaskItemBarcodes,
   backfillRemovePendingSubstituteAssignments,
+  backfillCustomFormDefaultPages,
 } = require('./bootstrapPg');
 
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'supabase', 'migrations');
@@ -142,6 +143,7 @@ db.ready = schemaReady
   // have one yet needs that backfill's INSERT to have run first.
   .then(() => backfillSetupCleanupBadgeFields(db))
   .then(() => backfillRemovePendingSubstituteAssignments(db))
+  .then(() => backfillCustomFormDefaultPages(db))
   // Lazily required (not imported at the top of this file, unlike every
   // other backfill above) - utils/classSchedule.js itself does
   // `require('../db')`, and this whole file IS '../db' from that
