@@ -3,7 +3,16 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
-<body>
+<%
+// Per-form theme (a real request: "full editing features and view just
+// like jotform, exactly" - Jotform's own Theme tab, scoped to what this
+// app needs: a primary color + a button shape). Applied as CSS custom
+// properties scoped to this one page, so it never leaks into the rest
+// of the portal - see public/css/styles.css's own .cf-* rules for what
+// reads --cf-primary/--cf-radius.
+var buttonRadius = form.theme_button_style === 'pill' ? '999px' : form.theme_button_style === 'square' ? '4px' : '10px';
+%>
+<body style="--cf-primary: <%= form.theme_primary_color %>; --cf-radius: <%= buttonRadius %>;">
   <%- include('partials/portal-nav', {
     portalTitle: 'Forms',
     navLinks: [
@@ -19,51 +28,58 @@
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <form method="POST" action="/forms/<%= form.id %>/submit" enctype="multipart/form-data" class="member-form-grid">
+    <% if (pages.length > 1) { %>
+      <%# Multi-page progress indicator - a real request: "multi-page/
+          section forms... with a progress indicator." Hidden entirely
+          for the common single-page form (see the length check above),
+          so a short form still looks exactly like it always has. %>
+      <nav class="cf-progress no-print" aria-label="Form progress" data-cf-progress>
+        <% pages.forEach(function(page, i) { %>
+          <span class="cf-progress-step<%= i === 0 ? ' cf-progress-step-active' : '' %>" data-cf-progress-step="<%= page.id %>">
+            <span class="cf-progress-dot"><%= i + 1 %></span>
+            <span class="cf-progress-label"><%= page.title || ('Page ' + (i + 1)) %></span>
+          </span>
+        <% }); %>
+      </nav>
+    <% } %>
+
+    <form method="POST" action="/forms/<%= form.id %>/submit" enctype="multipart/form-data" class="member-form-grid cf-form" id="cf-fill-form" data-cf-form>
       <label class="member-form-full">Who is this for?
         <select name="memberId" required>
           <% family.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
         </select>
       </label>
 
-      <% fields.forEach(function(field) { %>
-        <div class="member-form-full">
-          <label><%= field.label %><% if (field.is_required == 1) { %> *<% } %></label>
-          <% if (field.help_text) { %><p class="hint"><%= field.help_text %></p><% } %>
-
-          <% if (field.field_type === 'short_text') { %>
-            <input type="text" name="field_<%= field.id %>" <%= field.is_required == 1 ? 'required' : '' %> />
-          <% } else if (field.field_type === 'long_text') { %>
-            <textarea name="field_<%= field.id %>" rows="3" <%= field.is_required == 1 ? 'required' : '' %>></textarea>
-          <% } else if (field.field_type === 'number') { %>
-            <input type="number" name="field_<%= field.id %>" <%= field.is_required == 1 ? 'required' : '' %> />
-          <% } else if (field.field_type === 'date') { %>
-            <input type="date" name="field_<%= field.id %>" <%= field.is_required == 1 ? 'required' : '' %> />
-          <% } else if (field.field_type === 'single_choice') { %>
-            <% field.options.forEach(function(o) { %>
-              <label class="grade-pill"><input type="radio" name="field_<%= field.id %>" value="<%= o.label %>" <%= field.is_required == 1 ? 'required' : '' %> /> <%= o.label %></label>
-            <% }); %>
-          <% } else if (field.field_type === 'multiple_choice') { %>
-            <% field.options.forEach(function(o) { %>
-              <label class="grade-pill"><input type="checkbox" name="field_<%= field.id %>" value="<%= o.id %>" /> <%= o.label %></label>
-            <% }); %>
-          <% } else if (field.field_type === 'dropdown') { %>
-            <select name="field_<%= field.id %>" <%= field.is_required == 1 ? 'required' : '' %>>
-              <option value="">Choose one&hellip;</option>
-              <% field.options.forEach(function(o) { %><option value="<%= o.label %>"><%= o.label %></option><% }); %>
-            </select>
-          <% } else if (field.field_type === 'checkbox') { %>
-            <label class="grade-pill"><input type="checkbox" name="field_<%= field.id %>" value="1" /> Yes</label>
-          <% } else if (field.field_type === 'file') { %>
-            <input type="file" name="field_<%= field.id %>" <%= field.is_required == 1 ? 'required' : '' %> />
+      <% pages.forEach(function(page, pageIndex) { %>
+        <section
+          class="cf-page<%= pageIndex === 0 ? ' cf-page-active' : '' %>"
+          data-cf-page="<%= page.id %>"
+          data-cf-page-index="<%= pageIndex %>"
+          <% if (page.conditionalLogicParsed) { %>data-cf-condition='<%- JSON.stringify(page.conditionalLogicParsed) %>'<% } %>
+        >
+          <% if (pages.length > 1 && (page.title || page.description)) { %>
+            <div class="member-form-full cf-page-heading">
+              <% if (page.title) { %><h2><%= page.title %></h2><% } %>
+              <% if (page.description) { %><p class="hint"><%= page.description %></p><% } %>
+            </div>
           <% } %>
-        </div>
-      <% }); %>
 
-      <div class="member-form-full">
-        <button type="submit" class="primary-btn">Submit</button>
-      </div>
+          <% page.fields.forEach(function(field) { %>
+            <%- include('partials/custom-form-field', { field: field, ratingMax: ratingMax }) %>
+          <% }); %>
+
+          <div class="member-form-full cf-page-nav no-print">
+            <% if (pageIndex > 0) { %><button type="button" class="btn-secondary" data-cf-prev>&larr; Back</button><% } %>
+            <% if (pageIndex < pages.length - 1) { %>
+              <button type="button" class="primary-btn cf-btn" data-cf-next>Next &rarr;</button>
+            <% } else { %>
+              <button type="submit" class="primary-btn cf-btn">Submit</button>
+            <% } %>
+          </div>
+        </section>
+      <% }); %>
     </form>
   </main>
+  <script src="/js/custom-form-runtime.js"></script>
 </body>
 </html>

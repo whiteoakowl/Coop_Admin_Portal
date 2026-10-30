@@ -101,8 +101,24 @@ router.get('/:id', async (req, res) => {
   if (!(await customForms.canAccessForm(form.id, family, roleIds))) {
     return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have access to this form.", backHref: '/forms', backLabel: 'Back to Forms' });
   }
-  const fields = await customForms.fieldsForForm(form.id);
-  res.render('custom-forms-fill', { title: form.title, form, fields, family, error: req.query.error || null });
+  // Multi-page/section forms: pages (ordered) each carrying their own
+  // ordered fields - a one-page form (the common case) just renders as
+  // one page with no progress bar (views/custom-forms-fill.ejs only
+  // shows one once pages.length > 1).
+  const pages = await customForms.pagesWithFields(form.id);
+  for (const page of pages) {
+    page.conditionalLogicParsed = customForms.parseConditionalLogic(page.conditional_logic);
+    for (const field of page.fields) field.conditionalLogicParsed = customForms.parseConditionalLogic(field.conditional_logic);
+  }
+  res.render('custom-forms-fill', {
+    title: form.title,
+    form,
+    pages,
+    ratingMax: customForms.RATING_MAX,
+    displayOnlyTypes: [...customForms.DISPLAY_ONLY_TYPES],
+    family,
+    error: req.query.error || null,
+  });
 });
 
 router.get('/:id/mine/:memberId', async (req, res) => {
@@ -117,6 +133,25 @@ router.get('/:id/mine/:memberId', async (req, res) => {
   const answers = await customForms.answersForSubmission(submission.id);
   res.render('custom-forms-submitted', { title: form.title, form, submission, answers });
 });
+
+// The field's submitted value, in whatever shape evaluateCondition
+// expects (a plain string for most types, an array of selected option
+// LABELS - not ids - for multiple_choice, since a conditional rule's
+// own `value` is always a label, same as single_choice/dropdown already
+// submit). Used to build valuesByFieldId below, which both the
+// required-field check and isFieldVisible read from - the one place
+// "what did they actually answer" is computed, so the two can never see
+// a different answer for the same field.
+function rawValueForField(field, body, filesByField) {
+  if (field.field_type === 'multiple_choice') {
+    const raw = body[`field_${field.id}`];
+    const ids = (Array.isArray(raw) ? raw : raw ? [raw] : []).map((v) => parseInt(v, 10));
+    return field.options.filter((o) => ids.includes(o.id)).map((o) => o.label);
+  }
+  if (field.field_type === 'checkbox') return body[`field_${field.id}`] ? '1' : '0';
+  if (field.field_type === 'file') return filesByField.has(`field_${field.id}`) ? 'has-file' : '';
+  return (body[`field_${field.id}`] || '').toString();
+}
 
 router.post('/:id/submit', upload.any(), async (req, res) => {
   const form = await customForms.getForm(req.params.id);
@@ -134,23 +169,39 @@ router.post('/:id/submit', upload.any(), async (req, res) => {
     return res.redirect(`/forms/${form.id}/mine/${memberId}`);
   }
 
-  const fields = await customForms.fieldsForForm(form.id);
+  const pages = await customForms.pagesWithFields(form.id);
+  // heading/paragraph are layout-only (DISPLAY_ONLY_TYPES) - never an
+  // answer, never required, never stored.
+  const fields = pages.flatMap((p) => p.fields).filter((f) => !customForms.DISPLAY_ONLY_TYPES.has(f.field_type));
   const filesByField = new Map((req.files || []).map((f) => [f.fieldname, f]));
+
+  // Conditional logic ("only show this field/section when...") is
+  // enforced server-side too, not just hidden client-side with plain JS
+  // (public/js/custom-form-runtime.js) - a required field a respondent
+  // never actually saw, because its own rule failed or its whole
+  // page/section was skipped, must never block submission. Every
+  // field's raw submitted value is collected up front (independent of
+  // field order, since a rule can point at a field anywhere in the
+  // form) before any required check runs.
+  const valuesByFieldId = {};
+  for (const field of fields) valuesByFieldId[field.id] = rawValueForField(field, req.body, filesByField);
+
   const answers = [];
   for (const field of fields) {
-    if (field.is_required && field.field_type !== 'file' && field.field_type !== 'multiple_choice' && !req.body[`field_${field.id}`]) {
+    const visible = customForms.isFieldVisible(field, valuesByFieldId, pages);
+    if (field.is_required && visible && field.field_type !== 'file' && field.field_type !== 'multiple_choice' && !req.body[`field_${field.id}`]) {
       return res.redirect(`/forms/${form.id}?error=` + encodeURIComponent(`"${field.label}" is required.`));
     }
     if (field.field_type === 'multiple_choice') {
       const raw = req.body[`field_${field.id}`];
       const optionIds = (Array.isArray(raw) ? raw : raw ? [raw] : []).map((v) => parseInt(v, 10));
-      if (field.is_required && optionIds.length === 0) {
+      if (field.is_required && visible && optionIds.length === 0) {
         return res.redirect(`/forms/${form.id}?error=` + encodeURIComponent(`"${field.label}" is required.`));
       }
       answers.push({ fieldId: field.id, valueText: null, optionIds });
     } else if (field.field_type === 'file') {
       const file = filesByField.get(`field_${field.id}`);
-      if (field.is_required && !file) {
+      if (field.is_required && visible && !file) {
         return res.redirect(`/forms/${form.id}?error=` + encodeURIComponent(`"${field.label}" is required.`));
       }
       let key = null;

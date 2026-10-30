@@ -1,0 +1,48 @@
+<%
+// The "only show this field/section when..." rule builder, shared by
+// both the field-edit and page-edit dialogs in views/admin-custom-forms-
+// builder.ejs. Locals: allFields (every field in the form, flat - the
+// dropdown of possible controlling fields), currentRule (utils/
+// customForms.js's parseConditionalLogic result, or null for "always
+// show"), conditionOperators (CONDITION_OPERATORS), choiceTypes,
+// excludeFieldId (optional - a field can't depend on itself).
+var candidates = allFields.filter(function (f) { return !excludeFieldId || f.id !== excludeFieldId; });
+var targetField = currentRule ? candidates.find(function (f) { return f.id === currentRule.fieldId; }) : null;
+var targetIsChoiceLike = targetField && (choiceTypes.indexOf(targetField.field_type) !== -1 || targetField.field_type === 'checkbox');
+%>
+<label>Only show when&hellip;
+  <select name="conditionFieldId" data-cf-condition-field>
+    <option value="">Always show</option>
+    <% candidates.forEach(function(f) { %>
+      <option value="<%= f.id %>" <%= currentRule && currentRule.fieldId === f.id ? 'selected' : '' %>><%= f.label %></option>
+    <% }); %>
+  </select>
+</label>
+<div data-cf-condition-row style="<%= currentRule ? '' : 'display:none;' %>">
+  <label>Condition
+    <select name="conditionOperator">
+      <% conditionOperators.forEach(function(o) { %>
+        <option value="<%= o.key %>" <%= currentRule && currentRule.operator === o.key ? 'selected' : '' %>><%= o.label %></option>
+      <% }); %>
+    </select>
+  </label>
+  <label>Value
+    <input
+      type="text"
+      name="conditionValue"
+      data-cf-condition-value-text
+      value="<%= currentRule && !targetIsChoiceLike ? currentRule.value : '' %>"
+      <%= targetIsChoiceLike ? 'disabled style="display:none;"' : '' %>
+    />
+    <select name="conditionValue" data-cf-condition-value-select <%= !targetIsChoiceLike ? 'disabled style="display:none;"' : '' %>>
+      <% if (targetField && targetField.field_type === 'checkbox') { %>
+        <option value="1" <%= currentRule && currentRule.value === '1' ? 'selected' : '' %>>Yes (checked)</option>
+        <option value="0" <%= currentRule && currentRule.value === '0' ? 'selected' : '' %>>No (unchecked)</option>
+      <% } else if (targetField) { %>
+        <% targetField.options.forEach(function(o) { %>
+          <option value="<%= o.label %>" <%= currentRule && currentRule.value === o.label ? 'selected' : '' %>><%= o.label %></option>
+        <% }); %>
+      <% } %>
+    </select>
+  </label>
+</div>
