@@ -7,41 +7,30 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { formatFriendlyTimestamp } = require('../utils/dates');
 const homepage = require('../utils/homepage');
-const { publicShowcaseClasses } = require('../utils/classSchedule');
 
 router.get('/', async (req, res) => {
   const settings = await db.prepare('SELECT * FROM site_settings WHERE id = 1').get();
-  const announcementRows = await db
-    .prepare("SELECT * FROM announcements WHERE is_public = 1 AND (expires_at IS NULL OR expires_at > now_text()) ORDER BY published_at DESC LIMIT 3")
-    .all();
-  const announcements = announcementRows.map((a) => ({ ...a, publishedLabel: formatFriendlyTimestamp(a.published_at) }));
-  const faqs = await db.prepare('SELECT * FROM faqs WHERE is_public = 1 ORDER BY position, id').all();
-  const blocks = await homepage.listBlocks();
-  const menuItems = await homepage.listMenuItems();
-  // A real request: "Check box to be viewable to public on public
-  // homepage" - a read-only showcase of whichever Schedule Grids an
-  // admin has opted into (Edit Schedule Grids popup's own new checkbox).
-  // No registration here - a non-member still goes through Member
-  // Registration/Login like today, same as every other "Ready to join"
-  // CTA on this page.
-  // start_time/end_time are free-text labels (e.g. "9:00 AM", typed on
-  // the Create Class form), not real SQL timestamps - used as-is rather
-  // than run through a timestamp formatter.
-  const showcaseClasses = (await publicShowcaseClasses()).map((c) => ({
-    ...c,
-    timeLabel: c.startTime ? c.startTime + (c.endTime ? ` – ${c.endTime}` : '') : null,
-  }));
+  // A real request: "Should have the exact webpage editing features as
+  // Shopify." theme (homepage_theme_settings, utils/homepage.js) holds
+  // the site-wide colors/fonts/logo/favicon/announcement-bar settings an
+  // admin picks once from Main Admin > Settings > Public Homepage - its
+  // own data is separate from the page's content blocks below, same
+  // split Shopify's own theme editor makes. loadPublicPageData is the
+  // exact same content-loading this route always did, just pulled into
+  // utils/homepage.js so routes/admin-website.js's own /preview route
+  // (same admin screen's live preview pane) can render identically
+  // without a second, drifting copy of this query logic.
+  const theme = await homepage.getThemeSettings();
+  const pageData = await homepage.loadPublicPageData();
 
   res.render('public-home', {
     title: settings.org_name,
     settings,
-    announcements,
-    faqs,
-    blocks,
-    menuItems,
-    showcaseClasses,
+    theme,
+    themeStyle: homepage.themeStyleAttr(theme),
+    isPreview: false,
+    ...pageData,
   });
 });
 

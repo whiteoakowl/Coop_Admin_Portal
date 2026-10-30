@@ -85,7 +85,43 @@ router.get('/', async (req, res) => {
   const settings = await db.prepare('SELECT * FROM site_settings WHERE id = 1').get();
   const blocks = await homepage.listBlocks();
   const menuItems = await homepage.listMenuItems();
-  res.render('main-admin-website', { title: 'Public Homepage', settings, blocks, menuItems, notice: req.query.notice || null, error: req.query.error || null });
+  const theme = await homepage.getThemeSettings();
+  res.render('main-admin-website', {
+    title: 'Public Homepage',
+    settings,
+    blocks,
+    menuItems,
+    theme,
+    fontChoices: homepage.FONT_CHOICES,
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+// Live preview pane (views/main-admin-website.ejs's own iframe) - a real
+// request: "a live preview pane on the right showing the actual
+// rendered homepage... which visibly updates as settings change."
+// Renders the exact same public-home template/content the real
+// /welcome route does, but with the SAVED theme overridden by whatever
+// theme fields are present on the query string (homepage.withThemeOverrides)
+// - nothing here ever reads req.body or writes to the database, so an
+// admin fiddling with colors before hitting Save never affects the real
+// public site. noindex since this is never meant to be a second public
+// URL for the homepage, just this editor's own preview frame.
+router.get('/preview', async (req, res) => {
+  const settings = await db.prepare('SELECT * FROM site_settings WHERE id = 1').get();
+  const savedTheme = await homepage.getThemeSettings();
+  const theme = homepage.withThemeOverrides(savedTheme, req.query);
+  const pageData = await homepage.loadPublicPageData();
+  res.set('X-Robots-Tag', 'noindex');
+  res.render('public-home', {
+    title: settings.org_name,
+    settings,
+    theme,
+    themeStyle: homepage.themeStyleAttr(theme),
+    isPreview: true,
+    ...pageData,
+  });
 });
 
 // Org Name/Contact Email/Contact Phone - the only homepage-related fields
@@ -103,6 +139,66 @@ router.post('/settings', async (req, res) => {
     .prepare('UPDATE site_settings SET org_name = ?, contact_email = ?, contact_phone = ?, updated_at = now_text() WHERE id = 1')
     .run((req.body.org_name || '').trim(), (req.body.contact_email || '').trim(), (req.body.contact_phone || '').trim());
   res.redirect('/main-admin/website?notice=' + encodeURIComponent('Site info saved.'));
+});
+
+// Theme Settings (Colors/Typography/Logo & Favicon/Announcement Bar) - a
+// real request: "Should have the exact webpage editing features as
+// Shopify." logo + favicon share one multipart form with the color/font/
+// announcement fields (both optional - most saves touch neither file),
+// same MAX_IMAGE_BYTES/imageFileFilter guard as uploadBlockImage above.
+const themeUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_IMAGE_BYTES }, fileFilter: imageFileFilter });
+function uploadThemeImages(req, res, next) {
+  themeUpload.fields([
+    { name: 'logo', maxCount: 1 },
+    { name: 'favicon', maxCount: 1 },
+  ])(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') {
+      return res.redirect('/main-admin/website?error=' + encodeURIComponent(`That image is too large - images are limited to ${MAX_IMAGE_BYTES / (1024 * 1024)}MB.`));
+    }
+    next(err);
+  });
+}
+
+function themeDataFromBody(body) {
+  const hex = (value, fallback) => (/^#[0-9a-fA-F]{6}$/.test(value || '') ? value : fallback);
+  const font = (value, fallback) => (homepage.FONT_CHOICES.some((f) => f.key === value) ? value : fallback);
+  return {
+    colorPrimary: hex(body.colorPrimary, homepage.THEME_DEFAULTS.colorPrimary),
+    colorAccent: hex(body.colorAccent, homepage.THEME_DEFAULTS.colorAccent),
+    colorBackground: hex(body.colorBackground, homepage.THEME_DEFAULTS.colorBackground),
+    colorCards: hex(body.colorCards, homepage.THEME_DEFAULTS.colorCards),
+    colorText: hex(body.colorText, homepage.THEME_DEFAULTS.colorText),
+    fontHeading: font(body.fontHeading, homepage.THEME_DEFAULTS.fontHeading),
+    fontBody: font(body.fontBody, homepage.THEME_DEFAULTS.fontBody),
+    fontSizeBase: ['small', 'medium', 'large'].includes(body.fontSizeBase) ? body.fontSizeBase : homepage.THEME_DEFAULTS.fontSizeBase,
+    announcementEnabled: body.announcementEnabled === 'on' || body.announcementEnabled === '1',
+    announcementText: (body.announcementText || '').trim(),
+  };
+}
+
+router.post('/theme-settings', uploadThemeImages, async (req, res) => {
+  const existing = await homepage.getThemeSettings();
+  const data = themeDataFromBody(req.body);
+  const logoFile = req.files && req.files.logo && req.files.logo[0];
+  const faviconFile = req.files && req.files.favicon && req.files.favicon[0];
+  data.logoKey = await saveBlockImageIfProvided(logoFile, existing.logoKey);
+  data.faviconKey = await saveBlockImageIfProvided(faviconFile, existing.faviconKey);
+  await homepage.saveThemeSettings(data);
+  res.redirect('/main-admin/website?notice=' + encodeURIComponent('Theme settings saved.'));
+});
+
+// Reset theme to defaults - a real request: a confirm-gated action
+// (views/main-admin-website.ejs's own data-confirm) that "restores the
+// global theme settings... to their shipped defaults, leaving page
+// content blocks untouched." homepage_blocks/homepage_menu_items are
+// never touched here - only the one homepage_theme_settings row.
+router.post('/theme-settings/reset', async (req, res) => {
+  const old = await homepage.resetThemeSettings();
+  if (old) {
+    await deleteBlockImageFile(old.logo_key);
+    await deleteBlockImageFile(old.favicon_key);
+  }
+  res.redirect('/main-admin/website?notice=' + encodeURIComponent('Theme reset to defaults.'));
 });
 
 function blockDataFromBody(body) {
